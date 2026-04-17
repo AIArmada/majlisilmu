@@ -12,9 +12,7 @@ class InstitutionDetailMediaData extends Data
         public ?string $cover_url,
     ) {}
 
-    /**
-     * @param  array{public_image_url: string, image_url: string, logo_url: string, cover_url: ?string}  $media
-     */
+    /** @param  array{public_image_url: string, logo_url: string, cover_url: ?string}  $media */
     public static function fromCardMedia(array $media): self
     {
         return new self(

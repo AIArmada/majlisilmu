@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Member;
 
 use App\Models\User;
+use App\Support\Mcp\McpAuthenticatedUserResolver;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -29,7 +30,7 @@ abstract class AbstractMemberTool extends Tool
 
     protected function authorizeMember(Request $request): User
     {
-        $user = $request->user();
+        $user = app(McpAuthenticatedUserResolver::class)->resolve($request->user());
 
         abort_unless($user instanceof User && $user->hasMemberMcpAccess(), 403);
 

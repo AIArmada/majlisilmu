@@ -13,24 +13,26 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Mcp\Server\Middleware\AddWwwAuthenticateHeader;
 
+Mcp::oauthRoutes('oauth/mcp');
+
 Mcp::web('/mcp/admin', AdminServer::class)
     ->middleware([
         NormalizeMcpAcceptHeader::class,
-        'auth:sanctum',
+        'auth:sanctum,api',
         EnsureAdminMcpAccess::class,
     ]);
 
 Mcp::web('/mcp/member', MemberServer::class)
     ->middleware([
         NormalizeMcpAcceptHeader::class,
-        'auth:sanctum',
+        'auth:sanctum,api',
         EnsureMemberMcpAccess::class,
     ]);
 
 Route::middleware([
     NormalizeMcpAcceptHeader::class,
     AddWwwAuthenticateHeader::class,
-    'auth:sanctum',
+    'auth:sanctum,api',
     EnsureAdminMcpAccess::class,
 ])->group(function (): void {
     Route::get('/mcp/admin', [AdminMcpController::class, 'stream']);
@@ -40,7 +42,7 @@ Route::middleware([
 Route::middleware([
     NormalizeMcpAcceptHeader::class,
     AddWwwAuthenticateHeader::class,
-    'auth:sanctum',
+    'auth:sanctum,api',
     EnsureMemberMcpAccess::class,
 ])->group(function (): void {
     Route::get('/mcp/member', [MemberMcpController::class, 'stream']);

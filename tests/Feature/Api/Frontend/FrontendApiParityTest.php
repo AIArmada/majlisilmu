@@ -117,12 +117,14 @@ it('exposes corrected frontend contract metadata', function () {
         ->and($manifest['docs']['openapi'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($manifest['routing_surfaces']['public']['manifest_endpoint'] ?? null)->toContain('/api/v1/manifest')
         ->and($manifest['routing_surfaces']['admin']['manifest_endpoint'] ?? null)->toContain('/api/v1/admin/manifest')
-        ->and($manifest['rules'] ?? [])->toContain('Use the admin record route_key returned by admin collection or detail payloads for record-specific schema and mutation paths; id remains accepted as a compatibility fallback.')
+        ->and($manifest['rules'] ?? [])->toContain('Use the admin record route_key returned by admin collection or detail payloads for record-specific schema and mutation paths.')
         ->and($quickstart[0]['endpoint'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($submitEventFields)->toContain('parent_event_id', 'scoped_institution_id')
-        ->and($submitEventFields)->toContain('submission_country_id', 'submission_country_code', 'submission_country_key')
+        ->and($submitEventFields)->toContain('submission_country_id')
+        ->and($submitEventFields)->not->toContain('submission_country_code', 'submission_country_key')
         ->not->toContain('timezone')
         ->and($submitEventConditionalRules->pluck('field')->all())->not->toContain('live_url')
+        ->and($submitEventConditionalRules->pluck('field')->all())->not->toContain('submission_country_id')
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'submission_country_id')['allowed_values'])
         ->toContain(data_get($submitEvent, 'defaults.submission_country_id'))
         ->and(collect($submitEvent['fields'])->firstWhere('name', 'notes')['max_length'])->toBe(1000)
@@ -139,7 +141,8 @@ it('exposes corrected frontend contract metadata', function () {
         ->json('data');
     $speakerFields = collect($speakerContract['fields'] ?? [])->pluck('name')->all();
 
-    expect($speakerFields)->toContain('job_title', 'avatar', 'cover', 'address', 'address.country_id', 'address.country_code', 'address.country_key', 'qualifications', 'institution_id', 'institution_position')
+    expect($speakerFields)->toContain('job_title', 'avatar', 'cover', 'address', 'address.country_id', 'qualifications', 'institution_id', 'institution_position')
+        ->not->toContain('address.country_code', 'address.country_key')
         ->not->toContain('address.line1')
         ->not->toContain('address.google_maps_url')
         ->not->toContain('position')
@@ -165,6 +168,57 @@ it('clamps public institution directory per_page values to the supported maximum
         ->assertOk()
         ->assertJsonPath('meta.pagination.per_page', 50)
         ->assertJsonCount(50, 'data');
+});
+
+it('filters public institutions by current location radius and returns distance metadata', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    $nearInstitution = Institution::factory()->create([
+        'name' => 'Masjid Radius Dekat',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $nearInstitution->address()->update([
+        'lat' => 3.1390,
+        'lng' => 101.6869,
+    ]);
+
+    $farInstitution = Institution::factory()->create([
+        'name' => 'Masjid Radius Jauh',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $farInstitution->address()->update([
+        'lat' => 3.2600,
+        'lng' => 101.8600,
+    ]);
+
+    $pendingInstitution = Institution::factory()->create([
+        'name' => 'Masjid Radius Pending',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+    $pendingInstitution->address()->update([
+        'lat' => 3.1390,
+        'lng' => 101.6869,
+    ]);
+
+    $response = $this->getJson('/api/v1/institutions?lat=3.1390&lng=101.6869&radius_km=12&per_page=10')
+        ->assertOk()
+        ->assertJsonPath('meta.location.active', true)
+        ->assertJsonPath('meta.location.lat', 3.139)
+        ->assertJsonPath('meta.location.lng', 101.6869)
+        ->assertJsonPath('meta.location.radius_km', 12)
+        ->assertJsonPath('data.0.id', (string) $nearInstitution->id);
+
+    $names = collect($response->json('data'))->pluck('name')->all();
+
+    expect($names)
+        ->toContain('Masjid Radius Dekat')
+        ->not->toContain('Masjid Radius Jauh')
+        ->not->toContain('Masjid Radius Pending')
+        ->and($response->json('data.0.distance_km'))->toBeNumeric()
+        ->and((float) $response->json('data.0.distance_km'))->toBeLessThan(1.0);
 });
 
 it('exposes authenticated contribution update contracts and permission-gated direct edit media support', function () {
@@ -1146,17 +1200,14 @@ it('serializes institution directory payloads with card media aliases for mobile
 
     expect(data_get($item, 'display_name'))->toBe($institution->display_name)
         ->and(data_get($item, 'events_count'))->toBe(1)
-        ->and(data_get($item, 'event_count'))->toBe(1)
         ->and(data_get($item, 'public_image_url'))->toBeString()->not->toBe('')
         ->and(data_get($item, 'logo_url'))->toBeString()->not->toBe('')
         ->and(data_get($item, 'cover_url'))->toBeString()->not->toBe('')
-        ->and(data_get($item, 'image_url'))->toBeString()->not->toBe('')
-        ->and(data_get($item, 'public_image_url'))->toBe(data_get($item, 'image_url'))
-        ->and(data_get($item, 'image_url'))->toBe(data_get($item, 'cover_url'))
-        ->and(data_get($item, 'image_url'))->not->toBe(data_get($item, 'logo_url'))
         ->and(data_get($item, 'is_following'))->toBeTrue()
         ->and(array_key_exists('location', $item))->toBeTrue()
-        ->and(array_key_exists('location_text', $item))->toBeTrue();
+        ->and(array_key_exists('event_count', $item))->toBeFalse()
+        ->and(array_key_exists('image_url', $item))->toBeFalse()
+        ->and(array_key_exists('location_text', $item))->toBeFalse();
 });
 
 it('returns authenticated follow state in the frontend institution api', function () {
@@ -1421,7 +1472,7 @@ it('keeps placeholder institution imagery when no real media exists', function (
     expect(data_get($item, 'cover_url'))->toBeNull()
         ->and(data_get($item, 'logo_url'))->toBeString()->toContain('/images/placeholders/institution.png')
         ->and(data_get($item, 'public_image_url'))->toBe(data_get($item, 'logo_url'))
-        ->and(data_get($item, 'image_url'))->toBe(data_get($item, 'logo_url'));
+        ->and(array_key_exists('image_url', $item))->toBeFalse();
 });
 
 it('exposes the institution public image url in the frontend institution detail payload', function () {
@@ -1789,7 +1840,7 @@ it('creates speaker contribution requests through the frontend api with an expli
             'name' => 'Frontend API Scoped Country Speaker',
             'gender' => 'male',
             'address' => [
-                'country_code' => 'SG',
+                'country_id' => $singaporeId,
                 'state_id' => null,
             ],
         ])->assertCreated()
@@ -1873,12 +1924,12 @@ it('exposes explicit country data and country filters on frontend institution an
         'country_id' => $countryId,
     ]);
 
-    $this->getJson(route('api.client.institutions.index', ['country_code' => 'MY', 'search' => 'Country Filter Institution']))
+    $this->getJson(route('api.client.institutions.index', ['country_id' => $countryId, 'search' => 'Country Filter Institution']))
         ->assertOk()
         ->assertJsonPath('data.0.country.iso2', 'MY')
         ->assertJsonPath('data.0.country.key', 'malaysia');
 
-    $this->getJson(route('api.client.speakers.index', ['country_key' => 'malaysia', 'search' => 'Country Filter Speaker']))
+    $this->getJson(route('api.client.speakers.index', ['country_id' => $countryId, 'search' => 'Country Filter Speaker']))
         ->assertOk()
         ->assertJsonPath('data.0.country.iso2', 'MY')
         ->assertJsonPath('data.0.country.key', 'malaysia');
@@ -2608,7 +2659,7 @@ it('requires explicit country input for frontend event submissions and accepts a
         ->assertJsonValidationErrors(['submission_country_id']);
 
     $this->postJson(route('api.client.submit-event.store'), array_merge($payload, [
-        'submission_country_key' => 'malaysia',
+        'submission_country_id' => 132,
     ]))
         ->assertCreated()
         ->assertJsonPath('data.event.title', 'Frontend API Legacy Timezone Event');
@@ -3088,6 +3139,8 @@ it('mirrors the public speaker page payload for app clients', function () {
         ->getJson(route('api.client.speakers.show', ['speakerKey' => $speaker->slug]))
         ->assertOk();
 
+    $speakerInstitution = $response->json('data.speaker.institutions.0');
+
     expect($response->json('data.speaker.job_title'))->toBe('Penasihat Dakwah')
         ->and($response->json('data.speaker.is_freelance'))->toBeTrue()
         ->and($response->json('data.speaker.address.country_id'))->toBe($countryId)
@@ -3105,8 +3158,7 @@ it('mirrors the public speaker page payload for app clients', function () {
         ->and($response->json('data.speaker.institutions.0.position'))->toBe('Mudarris')
         ->and($response->json('data.speaker.institutions.0.is_primary'))->toBeTrue()
         ->and($response->json('data.speaker.institutions.0.public_image_url'))->not->toBeEmpty()
-        ->and($response->json('data.speaker.institutions.0.public_image_url'))->toBe($response->json('data.speaker.institutions.0.chip_image_url'))
-        ->and($response->json('data.speaker.institutions.0.chip_image_url'))->not->toBeEmpty()
+        ->and(array_key_exists('chip_image_url', is_array($speakerInstitution) ? $speakerInstitution : []))->toBeFalse()
         ->and($response->json('data.upcoming_events.0.reference_study_subtitle'))->toBe('Kitab API')
         ->and($response->json('data.upcoming_events.0.event_type_label'))->toBe(EventType::KuliahCeramah->getLabel())
         ->and($response->json('data.upcoming_events.0.event_format'))->toBe('hybrid')

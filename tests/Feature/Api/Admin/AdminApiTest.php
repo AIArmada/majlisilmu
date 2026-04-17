@@ -45,7 +45,7 @@ it('lists accessible admin resources for privileged users', function () {
         ->and($response->json('data.docs.ui'))->toBe('https://api.majlisilmu.test/docs')
         ->and($response->json('data.docs.openapi'))->toBe('https://api.majlisilmu.test/docs.json')
         ->and($response->json('data.write_workflow.discover_resources'))->toContain('/api/v1/admin/manifest')
-        ->and($response->json('data.rules'))->toContain('Use the admin record route_key returned by admin collection or record endpoints for record-specific paths; id remains accepted as a compatibility fallback.');
+        ->and($response->json('data.rules'))->toContain('Use the admin record route_key returned by admin collection or record endpoints for record-specific paths.');
 
     $resourceKeys = collect($response->json('data.resources'))->pluck('key')->all();
 
@@ -133,6 +133,7 @@ it('returns admin speaker resource metadata and records', function () {
     $speaker = Speaker::factory()->create([
         'name' => 'Admin API Speaker',
     ]);
+    $speakerRouteKey = (string) $speaker->getRouteKey();
 
     Sanctum::actingAs($admin);
 
@@ -151,10 +152,11 @@ it('returns admin speaker resource metadata and records', function () {
         ->assertJsonPath('data.0.title', 'Admin API Speaker')
         ->assertJsonPath('data.0.abilities.view', true);
 
-    $this->getJson('/api/v1/admin/speakers/'.$speaker->getKey())
+    $this->getJson('/api/v1/admin/speakers/'.$speakerRouteKey)
         ->assertOk()
         ->assertJsonPath('data.resource.key', 'speakers')
         ->assertJsonPath('data.record.id', $speaker->getKey())
+        ->assertJsonPath('data.record.route_key', $speakerRouteKey)
         ->assertJsonPath('data.record.attributes.name', 'Admin API Speaker')
         ->assertJsonPath('data.record.abilities.view', true);
 });
@@ -178,8 +180,9 @@ it('exposes admin speaker write schema and can create and update speakers throug
     expect(collect($schema['catalogs'] ?? [])->pluck('field')->all())
         ->toContain('address.country_id')
         ->toContain('address.state_id', 'address.district_id', 'address.subdistrict_id')
-        ->and($speakerFields)->toContain('address.country_id', 'address.country_code', 'address.country_key')
-        ->and(collect($schema['conditional_rules'] ?? [])->pluck('field')->all())->toContain('address.country_id');
+        ->and($speakerFields)->toContain('address.country_id')
+        ->and($speakerFields)->not->toContain('address.country_code', 'address.country_key')
+        ->and(collect($schema['conditional_rules'] ?? [])->pluck('field')->all())->not->toContain('address.country_id');
 
     $createResponse = $this->postJson('/api/v1/admin/speakers', [
         'name' => 'Admin API Created Speaker',
@@ -194,13 +197,14 @@ it('exposes admin speaker write schema and can create and update speakers throug
 
     $speakerId = (string) $createResponse->json('data.record.id');
     $speaker = Speaker::query()->findOrFail($speakerId);
+    $speakerRouteKey = (string) $speaker->getRouteKey();
 
     expect($speaker->name)->toBe('Admin API Created Speaker')
         ->and($speaker->slug)->toBe('admin-api-created-speaker-my')
         ->and($speaker->status)->toBe('verified')
         ->and($speaker->allow_public_event_submission)->toBeTrue();
 
-    $this->putJson('/api/v1/admin/speakers/'.$speakerId, [
+    $this->putJson('/api/v1/admin/speakers/'.$speakerRouteKey, [
         'name' => 'Admin API Updated Speaker',
         'gender' => 'male',
         'honorific' => ['dato'],
@@ -276,8 +280,9 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
     ])->assertCreated();
 
     $speakerId = (string) $createResponse->json('data.record.id');
+    $speakerRouteKey = (string) Speaker::query()->findOrFail($speakerId)->getRouteKey();
 
-    $this->getJson('/api/v1/admin/speakers/'.$speakerId)
+    $this->getJson('/api/v1/admin/speakers/'.$speakerRouteKey)
         ->assertOk()
         ->assertJsonPath('data.record.attributes.address.country_id', $firstFixtures['country_id'])
         ->assertJsonMissingPath('data.record.attributes.address.line1')
@@ -285,7 +290,7 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
         ->assertJsonPath('data.record.attributes.address.state_id', $firstFixtures['state_id'])
         ->assertJsonPath('data.record.attributes.address.district_id', $firstFixtures['district_id']);
 
-    $this->putJson('/api/v1/admin/speakers/'.$speakerId, [
+    $this->putJson('/api/v1/admin/speakers/'.$speakerRouteKey, [
         'name' => 'Admin API Address Freshness Speaker',
         'gender' => 'male',
         'status' => 'verified',
@@ -303,7 +308,7 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
         ->assertJsonPath('data.record.attributes.address.state_id', $secondFixtures['state_id'])
         ->assertJsonPath('data.record.attributes.address.district_id', $secondFixtures['district_id']);
 
-    $this->getJson('/api/v1/admin/speakers/'.$speakerId)
+    $this->getJson('/api/v1/admin/speakers/'.$speakerRouteKey)
         ->assertOk()
         ->assertJsonPath('data.record.attributes.address.country_id', $secondFixtures['country_id'])
         ->assertJsonMissingPath('data.record.attributes.address.line1')
@@ -338,8 +343,9 @@ it('allows sparse venue address updates without resending the existing country t
     ])->assertCreated();
 
     $venueId = (string) $createResponse->json('data.record.id');
+    $venueRouteKey = (string) Venue::query()->findOrFail($venueId)->getRouteKey();
 
-    $this->putJson('/api/v1/admin/venues/'.$venueId, [
+    $this->putJson('/api/v1/admin/venues/'.$venueRouteKey, [
         'name' => 'Admin API Sparse Venue Country',
         'type' => 'dewan',
         'status' => 'verified',
@@ -369,8 +375,9 @@ it('exposes admin institution write schema and can create and update institution
         ->json('data.schema');
 
     expect(collect($institutionSchema['fields'] ?? [])->pluck('name')->all())
-        ->toContain('address.country_id', 'address.country_code', 'address.country_key')
-        ->and(collect($institutionSchema['conditional_rules'] ?? [])->pluck('field')->all())->toContain('address.country_id');
+        ->toContain('address.country_id')
+        ->and(collect($institutionSchema['fields'] ?? [])->pluck('name')->all())->not->toContain('address.country_code', 'address.country_key')
+        ->and(collect($institutionSchema['conditional_rules'] ?? [])->pluck('field')->all())->not->toContain('address.country_id');
 
     $createResponse = $this->postJson('/api/v1/admin/institutions', [
         'name' => 'Admin API Institution',
@@ -385,12 +392,13 @@ it('exposes admin institution write schema and can create and update institution
 
     $institutionId = (string) $createResponse->json('data.record.id');
     $institution = Institution::query()->findOrFail($institutionId);
+    $institutionRouteKey = (string) $institution->getRouteKey();
 
     expect($institution->display_name)->toBe('Admin API Institution (API Surau)')
         ->and($institution->status)->toBe('verified')
         ->and($institution->allow_public_event_submission)->toBeTrue();
 
-    $this->putJson('/api/v1/admin/institutions/'.$institutionId, [
+    $this->putJson('/api/v1/admin/institutions/'.$institutionRouteKey, [
         'name' => 'Admin API Institution Updated',
         'nickname' => 'API Masjid',
         'type' => 'masjid',
@@ -458,6 +466,7 @@ it('exposes admin venue write schema and can create and update venues through th
 
     $venueId = (string) $createResponse->json('data.record.id');
     $venue = Venue::query()->with(['address', 'contacts', 'socialMedia'])->findOrFail($venueId);
+    $venueRouteKey = (string) $venue->getRouteKey();
 
     expect($venue->name)->toBe('Admin API Venue')
         ->and($venue->slug)->toBe('admin-api-venue-my')
@@ -473,7 +482,7 @@ it('exposes admin venue write schema and can create and update venues through th
         ->and($venue->socialMedia)->toHaveCount(1)
         ->and($venue->socialMedia->first()?->platform)->toBe('website');
 
-    $this->putJson('/api/v1/admin/venues/'.$venueId, [
+    $this->putJson('/api/v1/admin/venues/'.$venueRouteKey, [
         'name' => 'Admin API Venue Updated',
         'type' => 'auditorium',
         'status' => 'pending',
@@ -641,6 +650,8 @@ it('exposes admin reference write schema and can create and update references th
         ->assertJsonPath('data.record.route_key', $referenceRouteKey)
         ->assertJsonPath('data.record.attributes.slug', 'admin-api-reference');
 
+    $this->getJson('/api/v1/admin/references/'.$referenceId)->assertNotFound();
+
     $this->getJson('/api/v1/admin/references/schema?operation=update&recordKey='.$referenceRouteKey)
         ->assertOk()
         ->assertJsonPath('data.schema.method', 'PUT')
@@ -719,22 +730,23 @@ it('exposes admin subdistrict write schema and can create and update subdistrict
 
     $subdistrictId = (string) $createResponse->json('data.record.id');
     $subdistrict = Subdistrict::query()->findOrFail($subdistrictId);
+    $subdistrictRouteKey = (string) $subdistrict->getRouteKey();
 
     expect((int) $subdistrict->country_id)->toBe($fixtures['country_id'])
         ->and((int) $subdistrict->state_id)->toBe($fixtures['federal_state_id'])
         ->and($subdistrict->district_id)->toBeNull()
         ->and($subdistrict->country_code)->toBe('MY');
 
-    $this->getJson('/api/v1/admin/subdistricts/schema?operation=update&recordKey='.$subdistrictId)
+    $this->getJson('/api/v1/admin/subdistricts/schema?operation=update&recordKey='.$subdistrictRouteKey)
         ->assertOk()
         ->assertJsonPath('data.schema.method', 'PUT')
-        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/subdistricts/'.$subdistrictId)
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/subdistricts/'.$subdistrictRouteKey)
         ->assertJsonPath('data.schema.defaults.country_id', $fixtures['country_id'])
         ->assertJsonPath('data.schema.defaults.state_id', $fixtures['federal_state_id'])
         ->assertJsonPath('data.schema.defaults.district_id', null)
         ->assertJsonPath('data.schema.defaults.name', 'Admin API Federal Territory Subdistrict');
 
-    $this->putJson('/api/v1/admin/subdistricts/'.$subdistrictId, [
+    $this->putJson('/api/v1/admin/subdistricts/'.$subdistrictRouteKey, [
         'country_id' => $fixtures['country_id'],
         'state_id' => $fixtures['state_id'],
         'district_id' => $fixtures['district_id'],
@@ -827,6 +839,7 @@ it('exposes admin event write schema and can create and update events through th
     $event = Event::query()
         ->with(['settings', 'references', 'series', 'tags', 'keyPeople'])
         ->findOrFail($eventId);
+    $eventRouteKey = (string) $event->getRouteKey();
 
     expect($event->title)->toBe('Admin API Event Created')
         ->and($event->live_url)->toBeNull()
@@ -840,7 +853,7 @@ it('exposes admin event write schema and can create and update events through th
         ->and($event->tags->pluck('id')->all())->toContain($domainTag->getKey(), $disciplineTag->getKey())
         ->and($event->keyPeople)->toHaveCount(2);
 
-    $this->putJson('/api/v1/admin/events/'.$eventId, adminApiEventPayload([
+    $this->putJson('/api/v1/admin/events/'.$eventRouteKey, adminApiEventPayload([
         'institution' => $institution,
         'speaker' => $speaker,
         'reference' => $reference,

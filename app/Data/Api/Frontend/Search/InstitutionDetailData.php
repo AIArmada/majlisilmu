@@ -49,7 +49,7 @@ class InstitutionDetailData extends Data
      * @param  array{street: ?string, locality: ?string, regional: ?string}  $addressLines
      * @param  array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}|null  $address
      * @param  array{id: int, name: string, iso2: string, key: ?string}|null  $country
-     * @param  array{public_image_url: string, image_url: string, logo_url: string, cover_url: ?string}  $media
+     * @param  array{public_image_url: string, logo_url: string, cover_url: ?string}  $media
      * @param  list<array<string, mixed>>  $contacts
      * @param  list<array<string, mixed>>  $socialMedia
      * @param  list<array<string, mixed>>  $donationChannels

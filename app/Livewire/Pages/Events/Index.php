@@ -73,10 +73,6 @@ class Index extends Component implements HasForms
     #[Url]
     public ?string $subdistrict_id = null;
 
-    // Legacy single-language query support.
-    #[Url]
-    public ?string $language = null;
-
     /**
      * @var list<string>
      */
@@ -1227,7 +1223,6 @@ class Index extends Component implements HasForms
             'state_id' => $filters['state_id'],
             'district_id' => $filters['district_id'],
             'subdistrict_id' => $filters['subdistrict_id'],
-            'language' => $filters['language'],
             'language_codes' => $filters['language_codes'],
             'event_type' => $filters['event_type'],
             'gender' => $filters['gender'],
@@ -1346,7 +1341,6 @@ class Index extends Component implements HasForms
             'state_id' => null,
             'district_id' => null,
             'subdistrict_id' => null,
-            'language' => null,
             'language_codes' => [],
             'event_type' => [],
             'gender' => null,
@@ -1393,10 +1387,6 @@ class Index extends Component implements HasForms
 
         $languageCodes = $this->normalizeStringArray($this->language_codes);
 
-        if ($languageCodes === [] && filled($this->language)) {
-            $languageCodes = [$this->language];
-        }
-
         $prayerTime = filled($this->prayer_time) ? $this->prayer_time : null;
 
         if ($this->timing_mode === TimingMode::Absolute->value) {
@@ -1409,7 +1399,6 @@ class Index extends Component implements HasForms
             'state_id' => filled($this->state_id) ? $this->state_id : null,
             'district_id' => filled($this->district_id) ? $this->district_id : null,
             'subdistrict_id' => filled($this->subdistrict_id) ? $this->subdistrict_id : null,
-            'language' => filled($this->language) ? $this->language : null,
             'language_codes' => $languageCodes,
             'event_type' => $this->normalizeStringArray($this->event_type),
             'gender' => filled($this->gender) ? $this->gender : null,
@@ -1459,7 +1448,6 @@ class Index extends Component implements HasForms
         $this->state_id = $filters['state_id'];
         $this->district_id = $filters['district_id'];
         $this->subdistrict_id = $filters['subdistrict_id'];
-        $this->language = $filters['language'];
         $this->language_codes = $filters['language_codes'];
         $this->event_type = $filters['event_type'];
         $this->gender = $filters['gender'];
@@ -1507,13 +1495,6 @@ class Index extends Component implements HasForms
         $normalized = array_replace($defaults, $raw);
 
         $languageCodes = $this->normalizeStringArray($normalized['language_codes'] ?? []);
-        $legacyLanguage = filled($normalized['language'] ?? null) ? (string) $normalized['language'] : null;
-
-        if ($languageCodes === [] && $legacyLanguage !== null) {
-            $languageCodes = [$legacyLanguage];
-        }
-
-        $normalizedLanguage = $languageCodes !== [] ? $languageCodes[0] : $legacyLanguage;
 
         $timeScope = (string) ($normalized['time_scope'] ?? $defaults['time_scope']);
 
@@ -1552,7 +1533,6 @@ class Index extends Component implements HasForms
             'state_id' => filled($normalized['state_id']) ? (string) $normalized['state_id'] : null,
             'district_id' => filled($normalized['district_id']) ? (string) $normalized['district_id'] : null,
             'subdistrict_id' => filled($normalized['subdistrict_id']) ? (string) $normalized['subdistrict_id'] : null,
-            'language' => $normalizedLanguage,
             'language_codes' => $languageCodes,
             'event_type' => $this->normalizeStringArray($normalized['event_type'] ?? []),
             'gender' => filled($normalized['gender']) ? (string) $normalized['gender'] : null,

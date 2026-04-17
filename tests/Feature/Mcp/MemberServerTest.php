@@ -10,11 +10,13 @@ use App\Mcp\Tools\Member\MemberListResourcesTool;
 use App\Mcp\Tools\Member\MemberUpdateRecordTool;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\PassportUser;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Passport\Passport;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -130,7 +132,7 @@ it('hides member write tools when the authenticated member has no writable acces
 });
 
 it('returns member update schema and updates institutions through member MCP write tools', function () {
-    ensureMcpMalaysiaCountryExists();
+    ensureMemberMcpMalaysiaCountryExists();
 
     [$member, $institution] = institutionMemberMcpContext(role: 'admin');
 
@@ -206,6 +208,63 @@ it('returns a bearer-auth challenge for unauthenticated member MCP stream reques
     $response->assertUnauthorized();
     $response->assertHeader('WWW-Authenticate');
     expect((string) $response->headers->get('WWW-Authenticate'))->toContain('Bearer realm="mcp"');
+});
+
+it('serves the member MCP stream for Passport-authenticated eligible users', function () {
+    [$member] = institutionMemberMcpContext();
+
+    Passport::actingAs(memberPassportUser($member), ['mcp:use']);
+
+    $response = $this->get('/mcp/member');
+
+    $response->assertOk();
+    expect($response->headers->get('content-type'))->toContain('text/event-stream');
+    expect($response->streamedContent())->toContain(': keep-alive');
+});
+
+it('initializes and lists member MCP tools over the HTTP endpoint for Passport-authenticated members', function () {
+    [$member] = institutionMemberMcpContext(role: 'admin');
+
+    Passport::actingAs(memberPassportUser($member), ['mcp:use']);
+
+    $initialize = $this->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'initialize-member-mcp-passport',
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => [
+                'name' => 'Pest',
+                'version' => '1.0.0',
+            ],
+        ],
+    ])->assertOk();
+
+    $sessionId = $initialize->headers->get('MCP-Session-Id');
+
+    expect($sessionId)->not->toBeNull();
+
+    $listTools = $this->withHeaders([
+        'MCP-Session-Id' => (string) $sessionId,
+    ])->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'list-tools-member-mcp-passport',
+        'method' => 'tools/list',
+        'params' => [],
+    ])->assertOk();
+
+    $toolNames = collect($listTools->json('result.tools'))->pluck('name')->all();
+
+    expect($toolNames)->toContain('member-list-resources', 'member-get-record');
+});
+
+it('returns forbidden for Passport-authenticated users without member access on the member MCP stream endpoint', function () {
+    $user = User::factory()->create();
+
+    Passport::actingAs(memberPassportUser($user), ['mcp:use']);
+
+    $this->get('/mcp/member')->assertForbidden();
 });
 
 it('returns forbidden for authenticated users without member access on the member MCP stream endpoint', function () {
@@ -308,6 +367,11 @@ function institutionMemberMcpContext(string $role = 'viewer', string $status = '
     return [$member, $institution];
 }
 
+function memberPassportUser(User $user): PassportUser
+{
+    return PassportUser::query()->findOrFail($user->getKey());
+}
+
 /**
  * @return array{0: User, 1: Speaker}
  */
@@ -344,7 +408,7 @@ function globalRoleMcpUser(string $role): User
     return $user;
 }
 
-function ensureMcpMalaysiaCountryExists(): int
+function ensureMemberMcpMalaysiaCountryExists(): int
 {
     $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
 

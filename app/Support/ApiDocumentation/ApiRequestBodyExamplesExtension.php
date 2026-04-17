@@ -102,9 +102,9 @@ final class ApiRequestBodyExamplesExtension extends OperationExtension
             'name' => 'Kuliah Maghrib Kuala Lumpur',
             'query' => 'muamalat',
             'filters' => [
-                'language' => 'malay',
-                'genre' => 'kuliah',
-                'audience' => 'general',
+                'language_codes' => ['ms'],
+                'event_type' => ['kuliah_ceramah'],
+                'age_group' => ['all_ages'],
             ],
             'radius_km' => 25,
             'lat' => 3.139,
@@ -114,8 +114,9 @@ final class ApiRequestBodyExamplesExtension extends OperationExtension
         'put saved-searches/{savedSearch}' => [
             'name' => 'Kuliah Maghrib KL',
             'filters' => [
-                'language' => 'mixed',
-                'genre' => 'forum',
+                'language_codes' => ['ms', 'en'],
+                'event_type' => ['forum'],
+                'age_group' => ['youth'],
             ],
             'notify' => 'instant',
         ],

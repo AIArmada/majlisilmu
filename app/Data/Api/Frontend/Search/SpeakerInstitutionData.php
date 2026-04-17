@@ -17,11 +17,10 @@ class SpeakerInstitutionData extends Data
         public string $public_image_url,
         public string $logo_url,
         public ?string $cover_url,
-        public string $chip_image_url,
     ) {}
 
     /**
-     * @param  array{public_image_url: string, image_url: string, logo_url: string, cover_url: ?string}  $media
+     * @param  array{public_image_url: string, logo_url: string, cover_url: ?string}  $media
      */
     public static function fromModel(Institution $institution, array $media): self
     {
@@ -39,7 +38,6 @@ class SpeakerInstitutionData extends Data
             public_image_url: $publicImageUrl,
             logo_url: (string) $media['logo_url'],
             cover_url: $media['cover_url'],
-            chip_image_url: $publicImageUrl,
         );
     }
 }

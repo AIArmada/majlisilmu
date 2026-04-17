@@ -44,6 +44,37 @@ function createVisibleEventForSearch(array $attributes = []): Event
     ], $attributes));
 }
 
+function eventsIndexUrl(array|string|null $query = null): string
+{
+    if (is_array($query)) {
+        return route('events.index', $query, false);
+    }
+
+    $url = route('events.index', [], false);
+
+    if ($query === null) {
+        return $url;
+    }
+
+    $query = ltrim($query, '?');
+
+    if ($query === '') {
+        return $url;
+    }
+
+    return $url.'?'.$query;
+}
+
+function eventShowUrl(Event $event): string
+{
+    return route('events.show', ['event' => $event->slug], false);
+}
+
+function eventRegistrationUrl(Event $event): string
+{
+    return route('events.register', ['event' => $event->slug], false);
+}
+
 function ensureMalaysiaStateForTests(string $name = 'Selangor'): State
 {
     $country = Country::query()->find(132);
@@ -100,7 +131,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        $response = $this->get('/events');
+        $response = $this->get(eventsIndexUrl());
 
         $response->assertOk()
             ->assertSee('Circle of')
@@ -133,7 +164,7 @@ describe('Event Search Filters', function () {
     });
 
     it('shows title-only search placeholder on events index', function () {
-        $this->get('/events')
+        $this->get(eventsIndexUrl())
             ->assertOk()
             ->assertSee('Cari mengikut tajuk...');
     });
@@ -179,7 +210,7 @@ describe('Event Search Filters', function () {
             'status' => 'verified',
         ]);
 
-        $this->get('/events')
+        $this->get(eventsIndexUrl())
             ->assertOk()
             ->assertDontSee('Speaker Hidden Filter Payload Test')
             ->assertDontSee('Institution Hidden Filter Payload Test')
@@ -190,7 +221,7 @@ describe('Event Search Filters', function () {
     });
 
     it('shows save this search link for guests when search query is active', function () {
-        $response = $this->get('/events?search=halaqah');
+        $response = $this->get(eventsIndexUrl('search=halaqah'));
 
         $response->assertOk()
             ->assertSee('Save This Search')
@@ -200,7 +231,7 @@ describe('Event Search Filters', function () {
     it('shows a saved searches re-entry link for authenticated users without active filters', function () {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get('/events');
+        $response = $this->actingAs($user)->get(eventsIndexUrl());
 
         $response->assertOk()
             ->assertSee('Saved Searches')
@@ -209,7 +240,10 @@ describe('Event Search Filters', function () {
     });
 
     it('keeps the nearby button visible while gating radius controls on geolocation permission', function () {
-        $defaultResponse = $this->get('/events?lat=3.1390&lng=101.6869');
+        $defaultResponse = $this->get(eventsIndexUrl([
+            'lat' => '3.1390',
+            'lng' => '101.6869',
+        ]));
 
         $defaultResponse->assertOk();
         expect($defaultResponse->getContent())->not->toMatch(hiddenAttributeRegexForTestId('near-me-button'));
@@ -217,7 +251,10 @@ describe('Event Search Filters', function () {
 
         $grantedResponse = $this
             ->withUnencryptedCookie(PublicGeolocationPermission::COOKIE_NAME, '1')
-            ->get('/events?lat=3.1390&lng=101.6869');
+            ->get(eventsIndexUrl([
+                'lat' => '3.1390',
+                'lng' => '101.6869',
+            ]));
 
         $grantedResponse->assertOk();
         expect($grantedResponse->getContent())->not->toMatch(hiddenAttributeRegexForTestId('near-me-button'));
@@ -318,7 +355,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?search=Maghrib');
+        $response = $this->get(eventsIndexUrl('search=Maghrib'));
 
         $response->assertOk()
             ->assertSee('Kuliah Maghrib Special')
@@ -349,7 +386,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $this->get('/events')
+        $this->get(eventsIndexUrl())
             ->assertOk()
             ->assertSee('Child Event Visible On Index')
             ->assertDontSee('Umbrella Program Hidden From Index');
@@ -384,7 +421,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        $response = $this->get('/events?search=Al%20Hikmah');
+        $response = $this->get(eventsIndexUrl('search=Al%20Hikmah'));
 
         $response->assertOk()
             ->assertDontSee('Kuliah Subuh Institusi A')
@@ -420,7 +457,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        $response = $this->get('/events?search=Melawati');
+        $response = $this->get(eventsIndexUrl('search=Melawati'));
 
         $response->assertOk()
             ->assertDontSee('Kuliah Malam Lokasi A')
@@ -458,7 +495,7 @@ describe('Event Search Filters', function () {
         ]);
         $otherEvent->speakers()->attach($otherSpeaker->id);
 
-        $response = $this->get('/events?search=Samad');
+        $response = $this->get(eventsIndexUrl('search=Samad'));
 
         $response->assertOk()
             ->assertDontSee('Kuliah Speaker A')
@@ -494,7 +531,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        $response = $this->get('/events?search=Melawti');
+        $response = $this->get(eventsIndexUrl('search=Melawti'));
 
         $response->assertOk()
             ->assertSee('Kuliah Maghrib Melawati')
@@ -631,7 +668,9 @@ describe('Event Search Filters', function () {
             'prayer_display_text' => 'Selepas Asar',
         ]);
 
-        $response = $this->get('/events?prayer_time='.EventPrayerTime::SelepasMaghrib->value);
+        $response = $this->get(eventsIndexUrl([
+            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        ]));
 
         $response->assertOk()
             ->assertSee('Enum Filter Match')
@@ -658,7 +697,9 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?institution_id='.$includedInstitution->id);
+        $response = $this->get(eventsIndexUrl([
+            'institution_id' => $includedInstitution->id,
+        ]));
 
         $response->assertOk()
             ->assertSee('Institution Match Event')
@@ -685,7 +726,9 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?venue_id='.$includedVenue->id);
+        $response = $this->get(eventsIndexUrl([
+            'venue_id' => $includedVenue->id,
+        ]));
 
         $response->assertOk()
             ->assertSee('Venue Match Event')
@@ -718,14 +761,14 @@ describe('Event Search Filters', function () {
             'speaker_ids' => [$includedSpeaker->id],
         ]);
 
-        $response = $this->get('/events?'.$query);
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Speaker Match Event')
             ->assertDontSee('Speaker Excluded Event');
     });
 
-    it('filters events by language', function () {
+    it('filters events by a single language_codes value', function () {
         $malay = Language::where('code', 'ms')->first() ?? Language::query()->create(['code' => 'ms', 'name' => 'Malay', 'name_native' => 'Bahasa Melayu', 'dir' => 'ltr']);
         $english = Language::where('code', 'en')->first() ?? Language::query()->create(['code' => 'en', 'name' => 'English', 'name_native' => 'English', 'dir' => 'ltr']);
 
@@ -747,7 +790,11 @@ describe('Event Search Filters', function () {
         ]);
         $event2->languages()->attach($english);
 
-        $response = $this->get('/events?language=en');
+        $query = http_build_query([
+            'language_codes' => ['en'],
+        ]);
+
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('English Event')
@@ -780,7 +827,7 @@ describe('Event Search Filters', function () {
             'language_codes' => ['en'],
         ]);
 
-        $response = $this->get('/events?'.$query);
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('English Language Codes Event')
@@ -810,7 +857,7 @@ describe('Event Search Filters', function () {
             'event_format' => [EventFormat::Online->value],
         ]);
 
-        $response = $this->get('/events?'.$query);
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Online Format Event')
@@ -844,7 +891,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        $response = $this->get('/events?is_muslim_only=1');
+        $response = $this->get(eventsIndexUrl('is_muslim_only=1'));
 
         $response->assertOk()
             ->assertSee('Muslim Only Event')
@@ -884,7 +931,7 @@ describe('Event Search Filters', function () {
             'has_end_time' => 1,
         ]);
 
-        $response = $this->get('/events?'.$query);
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Absolute With Links Event')
@@ -931,7 +978,7 @@ describe('Event Search Filters', function () {
 
         $response = $this
             ->withCookie('user_timezone', 'UTC')
-            ->get('/events?'.$query);
+            ->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Evening Absolute Event')
@@ -968,7 +1015,7 @@ describe('Event Search Filters', function () {
 
         $response = $this
             ->withCookie('user_timezone', 'UTC')
-            ->get('/events?'.$query);
+            ->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Start In Range Event')
@@ -1038,7 +1085,9 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?district_id='.$districtA->id);
+        $response = $this->get(eventsIndexUrl([
+            'district_id' => $districtA->id,
+        ]));
 
         $response->assertOk()
             ->assertSee('District Filter Match')
@@ -1240,7 +1289,9 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?subdistrict_id='.$subdistrictA->id);
+        $response = $this->get(eventsIndexUrl([
+            'subdistrict_id' => $subdistrictA->id,
+        ]));
 
         $response->assertOk()
             ->assertSee('Subdistrict Filter Match')
@@ -1300,14 +1351,17 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?state_id='.$state->id.'&subdistrict_id='.$subdistrictA->id);
+        $response = $this->get(eventsIndexUrl([
+            'state_id' => $state->id,
+            'subdistrict_id' => $subdistrictA->id,
+        ]));
 
         $response->assertOk()
             ->assertSee('Federal Territory Subdistrict Match')
             ->assertDontSee('Federal Territory Subdistrict Non Match');
     });
 
-    it('filters events by genre', function () {
+    it('filters events by event type', function () {
         createVisibleEventForSearch([
             'title' => 'Kuliah Event',
             'event_type' => [EventType::KuliahCeramah],
@@ -1326,7 +1380,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?event_type=forum');
+        $response = $this->get(eventsIndexUrl('event_type=forum'));
 
         $response->assertOk()
             ->assertSee('Forum Event')
@@ -1362,7 +1416,7 @@ describe('Event Search Filters', function () {
 
         $query = http_build_query(['topic_ids' => [$tafsirTag->id]]);
 
-        $response = $this->get("/events?{$query}");
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Tafsir Session')
@@ -1399,7 +1453,7 @@ describe('Event Search Filters', function () {
 
         $query = http_build_query(['domain_tag_ids' => [$aqidahTag->id]]);
 
-        $response = $this->get("/events?{$query}");
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Aqidah Intensive')
@@ -1436,7 +1490,7 @@ describe('Event Search Filters', function () {
 
         $query = http_build_query(['source_tag_ids' => [$quranTag->id]]);
 
-        $response = $this->get("/events?{$query}");
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Quran Study Circle')
@@ -1472,7 +1526,7 @@ describe('Event Search Filters', function () {
 
         $query = http_build_query(['issue_tag_ids' => [$familyTag->id]]);
 
-        $response = $this->get("/events?{$query}");
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Isu Keluarga Semasa')
@@ -1510,7 +1564,7 @@ describe('Event Search Filters', function () {
 
         $query = http_build_query(['reference_ids' => [$riyadhRef->id]]);
 
-        $response = $this->get("/events?{$query}");
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Riyadh Session')
@@ -1555,7 +1609,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(4),
         ]);
 
-        $response = $this->get('/events');
+        $response = $this->get(eventsIndexUrl());
 
         $response->assertOk()
             ->assertSee('Approved Event')
@@ -1582,7 +1636,7 @@ describe('Event Search Filters', function () {
             ]);
         }
 
-        $response = $this->get('/events');
+        $response = $this->get(eventsIndexUrl());
 
         $response->assertOk()
             ->assertSee('Event 12')
@@ -1642,7 +1696,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(1),
         ]);
 
-        $response = $this->get('/events');
+        $response = $this->get(eventsIndexUrl());
 
         $response->assertOk()
             ->assertSee('5')
@@ -1669,7 +1723,10 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2)->setTime(20, 0),
         ]);
 
-        $response = $this->get('/events?timing_mode='.TimingMode::Absolute->value.'&prayer_time=Selepas+Maghrib');
+        $response = $this->get(eventsIndexUrl([
+            'timing_mode' => TimingMode::Absolute->value,
+            'prayer_time' => 'Selepas Maghrib',
+        ]));
 
         $response->assertOk()
             ->assertSee('Absolute Timing Event')
@@ -1695,7 +1752,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?has_event_url=0');
+        $response = $this->get(eventsIndexUrl('has_event_url=0'));
 
         $response->assertOk()
             ->assertSee('No URL Event')
@@ -1747,7 +1804,7 @@ describe('Event Search Filters', function () {
             'starts_before' => now()->addDays(6)->toDateString(),
         ]);
 
-        $response = $this->get("/events?{$query}");
+        $response = $this->get(eventsIndexUrl($query));
 
         $response->assertOk()
             ->assertSee('Overlap Via End Time')
@@ -1779,7 +1836,7 @@ describe('Event Search Filters', function () {
             'prayer_display_text' => 'Selepas Subuh',
         ]);
 
-        $response = $this->get('/events?prayer_time=Selepas+Maghrib');
+        $response = $this->get(eventsIndexUrl('prayer_time=Selepas+Maghrib'));
 
         $response->assertOk()
             ->assertSee('Kuliah Selepas Maghrib')
@@ -1904,7 +1961,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?time_scope=past');
+        $response = $this->get(eventsIndexUrl('time_scope=past'));
 
         $response->assertOk()
             ->assertSee('Past Scope Match')
@@ -1928,7 +1985,7 @@ describe('Event Search Filters', function () {
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->get('/events?time_scope=all');
+        $response = $this->get(eventsIndexUrl('time_scope=all'));
 
         $response->assertOk()
             ->assertSee('All Scope Past')
@@ -2088,7 +2145,7 @@ describe('Event Detail Page', function () {
             'published_at' => now(),
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('My Amazing Event')
@@ -2102,7 +2159,7 @@ describe('Event Detail Page', function () {
             'visibility' => 'public',
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('Pending Detail Event')
@@ -2116,7 +2173,7 @@ describe('Event Detail Page', function () {
             'visibility' => 'public',
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('Cancelled Detail Event')
@@ -2132,7 +2189,7 @@ describe('Event Detail Page', function () {
             'visibility' => 'public',
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertNotFound();
     });
@@ -2144,7 +2201,7 @@ describe('Event Detail Page', function () {
             'published_at' => now(),
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertNotFound();
     });
@@ -2157,7 +2214,7 @@ describe('Event Detail Page', function () {
             'published_at' => now(),
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('application/ld+json', false);
@@ -2171,25 +2228,52 @@ describe('Event Detail Page', function () {
             'published_at' => now(),
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('og:title', false);
     });
 
     it('displays speakers', function () {
-        $event = Event::factory()
-            ->hasSpeakers(2)
-            ->create([
-                'status' => 'approved',
-                'visibility' => 'public',
-                'published_at' => now(),
-            ]);
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+        ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $speakerOne = Speaker::factory()->create([
+            'name' => 'Ustaz Speaker One',
+            'honorific' => null,
+            'pre_nominal' => null,
+            'post_nominal' => null,
+            'job_title' => 'Pensyarah',
+            'is_freelance' => false,
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $speakerTwo = Speaker::factory()->create([
+            'name' => 'Ustaz Speaker Two',
+            'honorific' => null,
+            'pre_nominal' => null,
+            'post_nominal' => null,
+            'job_title' => 'Mudir',
+            'is_freelance' => false,
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $event->speakers()->attach($speakerOne->id);
+        $event->speakers()->attach($speakerTwo->id);
+
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
-            ->assertSee('Speakers');
+            ->assertSee('Speakers')
+            ->assertSee('Ustaz Speaker One')
+            ->assertSee('Pensyarah')
+            ->assertSee('Ustaz Speaker Two')
+            ->assertSee('Mudir');
     });
 
     it('displays image gallery slider when gallery media exists', function () {
@@ -2208,7 +2292,7 @@ describe('Event Detail Page', function () {
         $event->addMedia(UploadedFile::fake()->image('gallery-2.jpg', 1200, 800))
             ->toMediaCollection('gallery');
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('Event Gallery');
@@ -2252,7 +2336,7 @@ describe('Event Detail Page', function () {
             'starts_at' => now()->addDays(4),
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('Main Related Event')
@@ -2267,7 +2351,7 @@ describe('Event Detail Page', function () {
             'published_at' => now(),
         ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('Share Preview')
@@ -2290,7 +2374,7 @@ describe('Event Registration', function () {
                 'published_at' => now(),
             ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertSee('Register');
@@ -2305,7 +2389,7 @@ describe('Event Registration', function () {
                 'published_at' => now(),
             ]);
 
-        $response = $this->get("/events/{$event->slug}");
+        $response = $this->get(eventShowUrl($event));
 
         $response->assertOk()
             ->assertDontSee('Registration Required')
@@ -2327,7 +2411,7 @@ describe('Event Registration', function () {
                 'registrations_count' => 0,
             ]);
 
-        $response = $this->post("/events/{$event->slug}/register", [
+        $response = $this->post(eventRegistrationUrl($event), [
             'name' => 'Ahmad',
             'email' => 'ahmad@example.com',
         ]);
@@ -2354,13 +2438,13 @@ describe('Event Registration', function () {
             ]);
 
         // First registration
-        $this->post("/events/{$event->slug}/register", [
+        $this->post(eventRegistrationUrl($event), [
             'name' => 'Ahmad',
             'email' => 'ahmad@example.com',
         ]);
 
         // Duplicate
-        $response = $this->post("/events/{$event->slug}/register", [
+        $response = $this->post(eventRegistrationUrl($event), [
             'name' => 'Ahmad Again',
             'email' => 'ahmad@example.com',
         ]);
@@ -2390,7 +2474,7 @@ describe('Event Registration', function () {
             'email' => 'existing-capacity@example.com',
         ]);
 
-        $response = $this->post("/events/{$event->slug}/register", [
+        $response = $this->post(eventRegistrationUrl($event), [
             'name' => 'Late Registrant',
             'email' => 'late@example.com',
         ]);

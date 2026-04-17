@@ -283,7 +283,7 @@ it('accepts a 16:9 poster upload on the admin event edit form', function () {
             'prayer_time' => EventPrayerTime::LainWaktu->value,
             'custom_time' => '20:00',
             'end_time' => '22:00',
-            'poster' => UploadedFile::fake()->image('poster-wide.jpg', 1600, 900),
+            'poster' => UploadedFile::fake()->image('poster-wide.jpg', 320, 180),
         ])
         ->call('save')
         ->assertHasNoErrors();

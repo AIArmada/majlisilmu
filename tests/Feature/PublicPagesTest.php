@@ -29,12 +29,18 @@ use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
 it('loads public index pages', function () {
-    $this->get('/')->assertSuccessful()->assertSee('Majlis Ilmu');
-    $this->get('/events')->assertSuccessful()->assertSee('Majlis Ilmu');
-    $this->get('/institutions')->assertSuccessful()->assertSee('Majlis Ilmu');
-    $this->get('/speakers')->assertSuccessful()->assertSee('Majlis Ilmu');
-    $this->get('/submit-event')->assertSuccessful()->assertSee('Hantar Majlis');
-    $this->get('/submit-event/success')->assertSuccessful()->assertSee(__('Event Submitted!'));
+    $this->get(route('home'))->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get(route('events.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get(route('institutions.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get(route('speakers.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get(route('submit-event.create'))->assertSuccessful()->assertSee('Hantar Majlis');
+    $this->get(route('submit-event.success'))->assertSuccessful()->assertSee(__('Event Submitted!'));
+
+    $this->get('/events')->assertNotFound();
+    $this->get('/institutions')->assertNotFound();
+    $this->get('/speakers')->assertNotFound();
+    $this->get('/submit-event')->assertNotFound();
+    $this->get('/submit-event/success')->assertNotFound();
 });
 
 it('respects the signals geolocation toggle in tracker markup', function () {
@@ -72,7 +78,7 @@ it('uses homepage-like vertical spacing on the public listing pages', function (
 });
 
 it('renders accessible labels on the public submit-event form', function () {
-    $this->get('/submit-event')
+    $this->get(route('submit-event.create'))
         ->assertSuccessful()
         ->assertSee('Hantar Majlis Ilmu')
         ->assertSee('Kongsi majlis ilmu dengan komuniti. Penghantaran anda akan disemak sebelum diterbitkan.')
@@ -83,7 +89,7 @@ it('renders accessible labels on the public submit-event form', function () {
 
 it('renders the submit-event upload copy in the selected locale', function () {
     $this->withSession(['locale' => 'en'])
-        ->get('/hantar-majlis')
+        ->get(route('submit-event.create'))
         ->assertSuccessful()
         ->assertSee('Submit Knowledge Event')
         ->assertSee('Share your knowledge event with the community. Your submission will be reviewed before it is published.')

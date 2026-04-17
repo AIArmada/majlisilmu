@@ -19,14 +19,12 @@ class InstitutionListData extends Data
         public ?string $nickname,
         public string $display_name,
         public int $events_count,
-        public int $event_count,
         public string $public_image_url,
-        public string $image_url,
         public string $logo_url,
         public ?string $cover_url,
         public ?array $country,
         public ?string $location,
-        public ?string $location_text,
+        public ?float $distance_km,
         public bool $is_following,
     ) {}
 
@@ -45,6 +43,7 @@ class InstitutionListData extends Data
             ? $logoUrl
             : ($logoFallbackUrl !== '' ? $logoFallbackUrl : $publicImageUrl);
         $location = AddressHierarchyFormatter::format($institution->address);
+        $distanceKm = self::distanceKm($attributes['distance_km'] ?? null);
 
         return new self(
             id: (string) $institution->id,
@@ -53,15 +52,22 @@ class InstitutionListData extends Data
             nickname: $institution->nickname,
             display_name: (string) $institution->display_name,
             events_count: $eventsCount,
-            event_count: $eventsCount,
             public_image_url: $publicImageUrl,
-            image_url: $publicImageUrl,
             logo_url: $resolvedLogoUrl,
             cover_url: $coverUrl !== '' ? $coverUrl : null,
             country: CountryData::fromAddress($institution->address)?->toArray(),
             location: $location !== '' ? $location : null,
-            location_text: $location !== '' ? $location : null,
+            distance_km: $distanceKm,
             is_following: $isFollowing,
         );
+    }
+
+    private static function distanceKm(mixed $distance): ?float
+    {
+        if (! is_numeric($distance)) {
+            return null;
+        }
+
+        return round((float) $distance, 2);
     }
 }

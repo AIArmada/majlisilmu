@@ -789,12 +789,4 @@ class Speaker extends Model implements AuditableContract, HasMedia
             ? "replace(cast(speakers.id as text), '-', '')"
             : "replace(speakers.id, '-', '')";
     }
-
-    /**
-     * Compatibility alias for job_title
-     */
-    public function getTitleAttribute(): ?string
-    {
-        return $this->job_title;
-    }
 }

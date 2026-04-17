@@ -49,7 +49,7 @@ it('allows authenticated users to create and delete saved searches', function ()
         ->set('name', 'Kuliah Maghrib KL')
         ->set('query', 'maghrib')
         ->set('notify', 'daily')
-        ->set('filters', ['language' => 'english'])
+        ->set('filters', ['language_codes' => ['en']])
         ->call('save')
         ->assertHasNoErrors();
 

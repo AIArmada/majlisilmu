@@ -336,21 +336,16 @@ class EventController extends Controller
 
         /** @var array<string, mixed> $payload */
         $payload = [
-            'current_page' => $events->currentPage(),
             'data' => $events->getCollection()
                 ->map(fn (Event $event): array => $this->serializeEventListPayload($event))
                 ->all(),
-            'first_page_url' => $events->url(1),
-            'from' => $events->firstItem(),
-            'last_page' => $events->lastPage(),
-            'last_page_url' => $events->url($events->lastPage()),
-            'links' => $events->linkCollection()->toArray(),
-            'next_page_url' => $events->nextPageUrl(),
-            'path' => $events->path(),
-            'per_page' => $events->perPage(),
-            'prev_page_url' => $events->previousPageUrl(),
-            'to' => $events->lastItem(),
-            'total' => $events->total(),
+            'meta' => [
+                'pagination' => [
+                    'page' => $events->currentPage(),
+                    'per_page' => $events->perPage(),
+                    'total' => $events->total(),
+                ],
+            ],
         ];
 
         $user = $request->user();

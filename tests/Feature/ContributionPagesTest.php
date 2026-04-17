@@ -1347,7 +1347,7 @@ it('stores reference reports from the public report page', function () {
     expect(SignalEvent::query()->where('event_name', 'report.submitted')->exists())->toBeTrue();
 });
 
-it('redirects guests to login before opening report and suggest update pages', function () {
+it('redirects guests to login on canonical report and suggest update pages while rejecting removed legacy aliases', function () {
     $institution = Institution::factory()->create([
         'status' => 'verified',
         'is_active' => true,
@@ -1385,28 +1385,28 @@ it('redirects guests to login before opening report and suggest update pages', f
         ->assertRedirect(route('login'));
 
     $this->get("/sumbangan/speaker/{$speaker->slug}/kemas-kini")
-        ->assertRedirect("/sumbangan/{$speakerRouteSegment}/{$speaker->slug}/kemas-kini");
+        ->assertNotFound();
 
     $this->get("/lapor/speaker/{$speaker->slug}")
-        ->assertRedirect("/lapor/{$speakerRouteSegment}/{$speaker->slug}");
+        ->assertNotFound();
 
     $this->get("/sumbangan/institution/{$institution->slug}/kemas-kini")
-        ->assertRedirect("/sumbangan/{$institutionRouteSegment}/{$institution->slug}/kemas-kini");
+        ->assertNotFound();
 
     $this->get("/lapor/institution/{$institution->slug}")
-        ->assertRedirect("/lapor/{$institutionRouteSegment}/{$institution->slug}");
+        ->assertNotFound();
 
     $this->get("/sumbangan/event/{$event->slug}/kemas-kini")
-        ->assertRedirect("/sumbangan/{$eventRouteSegment}/{$event->slug}/kemas-kini");
+        ->assertNotFound();
 
     $this->get("/lapor/event/{$event->slug}")
-        ->assertRedirect("/lapor/{$eventRouteSegment}/{$event->slug}");
+        ->assertNotFound();
 
     $this->get("/sumbangan/reference/{$reference->slug}/kemas-kini")
-        ->assertRedirect("/sumbangan/{$referenceRouteSegment}/{$reference->slug}/kemas-kini");
+        ->assertNotFound();
 
     $this->get("/lapor/reference/{$reference->slug}")
-        ->assertRedirect("/lapor/{$referenceRouteSegment}/{$reference->slug}");
+        ->assertNotFound();
 });
 
 it('forbids users banned from directory feedback from opening update and report pages', function () {

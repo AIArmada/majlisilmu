@@ -53,7 +53,7 @@ class AdminResourceService
                 ],
                 'rules' => [
                     'Use resource keys returned by the manifest to select the correct admin schema and route family.',
-                    'Use the admin record route_key returned by admin collection or record endpoints for record-specific paths; id remains accepted as a compatibility fallback.',
+                    'Use the admin record route_key returned by admin collection or record endpoints for record-specific paths.',
                     'Fetch the exact schema before every create or update because required fields and catalogs are resource-specific.',
                     'Admin PUT requests are full schema-guided updates, not partial patches.',
                     'Use authenticated /admin/catalogs/* endpoints for dependent selectors referenced by schema catalog metadata.',

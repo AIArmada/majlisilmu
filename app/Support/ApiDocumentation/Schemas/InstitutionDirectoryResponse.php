@@ -13,7 +13,7 @@ final readonly class InstitutionDirectoryResponse implements Arrayable
 {
     /**
      * @param  list<InstitutionListItem>  $data
-     * @param  array{pagination: array{page: int, per_page: int, total: int}, following?: array{total: int}, types?: list<array{value: string, label: string}>, cache: array{version: string}, request_id: string}  $meta
+     * @param  array{pagination: array{page: int, per_page: int, total: int}, following?: array{total: int}, location?: array{active: bool, lat: ?float, lng: ?float, radius_km: ?int}, types?: list<array{value: string, label: string}>, cache: array{version: string}, request_id: string}  $meta
      */
     public function __construct(
         public array $data,
@@ -21,7 +21,7 @@ final readonly class InstitutionDirectoryResponse implements Arrayable
     ) {}
 
     /**
-     * @return array{data: list<array<string, mixed>>, meta: array{pagination: array{page: int, per_page: int, total: int}, following?: array{total: int}, types?: list<array{value: string, label: string}>, cache: array{version: string}, request_id: string}}
+     * @return array{data: list<array<string, mixed>>, meta: array{pagination: array{page: int, per_page: int, total: int}, following?: array{total: int}, location?: array{active: bool, lat: ?float, lng: ?float, radius_km: ?int}, types?: list<array{value: string, label: string}>, cache: array{version: string}, request_id: string}}
      */
     public function toArray(): array
     {

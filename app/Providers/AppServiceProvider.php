@@ -63,6 +63,7 @@ use Laravel\Ai\Events\EmbeddingsGenerated;
 use Laravel\Ai\Events\ImageGenerated;
 use Laravel\Ai\Events\Reranked;
 use Laravel\Ai\Events\TranscriptionGenerated;
+use Laravel\Passport\Passport;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use PhpParser\PrettyPrinter;
 
@@ -103,6 +104,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Passport::authorizationView('mcp.authorize');
+
         $signalsRoutes = base_path('../commerce/packages/signals/routes/api.php');
 
         if (! $this->app->routesAreCached() && is_file($signalsRoutes) && ! app('router')->has('signals.collect.pageview')) {

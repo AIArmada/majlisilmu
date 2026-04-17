@@ -89,6 +89,7 @@ class ReportController extends Controller
         }
 
         return response()->json([
+            'message' => 'Report submitted successfully. Our team will review it.',
             'data' => ReportSubmissionData::fromModel($report)->toArray(),
             'meta' => [
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),

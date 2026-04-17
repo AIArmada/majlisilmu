@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\PassportUser;
 use App\Models\User;
 
 return [
@@ -44,6 +45,11 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'passport_users',
+        ],
     ],
 
     /*
@@ -67,6 +73,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'passport_users' => [
+            'driver' => 'eloquent',
+            'model' => PassportUser::class,
         ],
 
         // 'users' => [

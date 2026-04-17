@@ -42,7 +42,7 @@ it('requires authentication for user and institution dashboards', function () {
     $this->get('/dashboard/notifications')->assertRedirect(route('login'));
     $this->get('/tetapan-akaun')->assertRedirect(route('login'));
     $this->get('/dashboard/institusi')->assertRedirect(route('login'));
-    $this->get('/dashboard/events/create-advanced')->assertRedirect(route('login'));
+    $this->get(route('dashboard.events.create-advanced'))->assertRedirect(route('login'));
 });
 
 it('redirects the legacy papan pemuka URL to the canonical dashboard URL for authenticated users', function () {

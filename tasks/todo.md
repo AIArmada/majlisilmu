@@ -1,3 +1,69 @@
+# Uncommitted Change Audit
+
+- [ ] Audit the full uncommitted diff in three focused review passes
+- [ ] Fix every confirmed issue found during the audit
+- [ ] Run Rector and Pint on the resulting changes
+- [ ] Run PHPStan and Pest until the workspace is green
+
+## Review
+
+- In progress.
+
+# Mobile Institution Radius Search
+
+- [x] Extend the public institutions API to accept current `lat`, `lng`, and `radius_km` query parameters
+- [x] Return `distance_km` for nearby institution list items and sort nearby results by distance
+- [x] Update the mobile API reference and generated schema contract for the additive response field
+- [x] Add focused Pest coverage for radius filtering, distance metadata, and visibility constraints
+- [x] Re-run formatting, focused API tests, and targeted PHPStan
+
+## Review
+
+- Added nearby filtering to `GET /api/v1/institutions` using `lat`, `lng`, and `radius_km`; both coordinates must be valid before the radius filter activates, and radius is clamped from 1 to 100 km with a 15 km default.
+- Nearby institution results now select `distance_km`, sort nearest-first, and serialize `distance_km` as a nullable list-item field. Non-nearby directory responses keep the field as `null`.
+- Updated the public directory OpenAPI transformer and mobile API reference so native clients can discover the request parameters and response field.
+- Added focused coverage for radius filtering, distance metadata, and public visibility rules.
+- Verification:
+  - `vendor/bin/pint --format agent app/Http/Controllers/Api/Frontend/SearchController.php app/Data/Api/Frontend/Search/InstitutionListData.php app/Support/ApiDocumentation/Schemas/InstitutionListItem.php app/Support/ApiDocumentation/Schemas/InstitutionDirectoryResponse.php app/Support/ApiDocumentation/PublicDirectorySchemasTransformer.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tests/Feature/ScrambleDocsTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='public institutions by current location radius|clamps public institution directory'` => 2 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => 83 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='publishes named speaker and institution schemas'` => 1 passed
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Http/Controllers/Api/Frontend/SearchController.php app/Data/Api/Frontend/Search/InstitutionListData.php app/Support/ApiDocumentation/Schemas/InstitutionListItem.php app/Support/ApiDocumentation/Schemas/InstitutionDirectoryResponse.php app/Support/ApiDocumentation/PublicDirectorySchemasTransformer.php` => pass
+- Additional check:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => 23 passed, 1 failed on a separate saved-search docs-example assertion (`notify` missing at `tests/Feature/ScrambleDocsTest.php:675`), outside the institution radius endpoint.
+
+# API Compatibility Hard Cut
+
+- [ ] Remove admin/member record id fallback and legacy API guidance text
+- [ ] Remove response-shape compatibility behavior and old API alias fields
+- [ ] Remove legacy web aliases and align public-route tests with canonical URLs
+- [ ] Update API docs and focused tests for the hard-cut contract
+- [ ] Re-run formatting, focused Pest coverage, and targeted PHPStan
+
+# MCP OAuth Dual-Mode Passport
+
+- [x] Install Passport and publish the MCP authorization view plus Passport migrations
+- [x] Add a Passport-only auth provider model without breaking existing Sanctum PAT issuance
+- [x] Register MCP OAuth metadata/routes and accept both Sanctum and Passport auth on MCP endpoints
+- [x] Add focused MCP regressions for OAuth metadata and Passport-authenticated admin/member access
+- [x] Re-run formatting, focused tests, and targeted PHPStan
+
+## Review
+
+- Added Passport as a dependency and published the required runtime artifacts: the MCP authorization view at [resources/views/mcp/authorize.blade.php](resources/views/mcp/authorize.blade.php), Passport OAuth migrations in [database/migrations/2026_04_17_131610_create_oauth_auth_codes_table.php](database/migrations/2026_04_17_131610_create_oauth_auth_codes_table.php) through [database/migrations/2026_04_17_131614_create_oauth_device_codes_table.php](database/migrations/2026_04_17_131614_create_oauth_device_codes_table.php), plus local Passport keys in `storage/oauth-*.key`.
+- Added [app/Models/PassportUser.php](app/Models/PassportUser.php) as a standalone Passport-only model on the `users` table, plus [app/Support/Mcp/McpAuthenticatedUserResolver.php](app/Support/Mcp/McpAuthenticatedUserResolver.php) so MCP Passport requests are normalized back to the existing [app/Models/User.php](app/Models/User.php) authorization surface without colliding with Sanctum's `createToken()` contract.
+- Updated [config/auth.php](config/auth.php), [routes/ai.php](routes/ai.php), and [app/Providers/AppServiceProvider.php](app/Providers/AppServiceProvider.php) so MCP now advertises OAuth metadata, serves the published MCP authorization screen via Passport, and accepts either `auth:sanctum` or `auth:api` on the admin/member MCP routes.
+- Added hardened MCP OAuth registration config in [config/mcp.php](config/mcp.php) so redirect registration now defaults to an explicit allowlist instead of the vendor wildcard, with env-driven expansion points for hosted domains and custom schemes.
+- Extended [tests/Feature/Mcp/AdminServerTest.php](tests/Feature/Mcp/AdminServerTest.php) and [tests/Feature/Mcp/MemberServerTest.php](tests/Feature/Mcp/MemberServerTest.php) with OAuth metadata coverage, redirect allowlist/scheme registration checks, and Passport-authenticated admin/member stream plus HTTP tool access checks while preserving the existing Sanctum boundary regressions.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --compact tests/Feature/Mcp/AdminServerTest.php` => 25 passed
+  - `vendor/bin/pest --compact tests/Feature/Mcp/MemberServerTest.php` => 17 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp --filter='AdminServerTest|MemberServerTest'` => 42 passed
+  - `php -d xdebug.mode=off vendor/bin/phpstan analyse --no-progress --error-format=raw app/Models/PassportUser.php app/Support/Mcp/McpAuthenticatedUserResolver.php app/Providers/AppServiceProvider.php app/Http/Middleware/EnsureAdminMcpAccess.php app/Http/Middleware/EnsureMemberMcpAccess.php app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Member/AbstractMemberTool.php routes/ai.php` => pass
+  - `APP_PACKAGES_CACHE=bootstrap/cache/packages.testing.php APP_SERVICES_CACHE=bootstrap/cache/services.testing.php php artisan package:discover --ansi` was required so the PHPUnit-specific package manifest included Passport.
+  - The earlier `vendor/bin/pest --parallel ...` worker crash was traced to the incompatible PassportUser subclass shape; once replaced with the standalone Passport model plus MCP-side user normalization, the focused parallel MCP suite passed again.
+
 # Member MCP Writes and Token Self-Service
 
 - [x] Add member MCP write support for Ahli-scoped editable resources

@@ -80,14 +80,12 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 ->addProperty('nickname', (new StringType)->nullable(true))
                 ->addProperty('display_name', new StringType)
                 ->addProperty('events_count', new IntegerType)
-                ->addProperty('event_count', new IntegerType)
                 ->addProperty('public_image_url', new StringType)
-                ->addProperty('image_url', new StringType)
                 ->addProperty('logo_url', new StringType)
                 ->addProperty('cover_url', (new StringType)->nullable(true))
                 ->addProperty('country', $this->nullableReference($components, 'Country'))
                 ->addProperty('location', (new StringType)->nullable(true))
-                ->addProperty('location_text', (new StringType)->nullable(true))
+                ->addProperty('distance_km', (new NumberType)->nullable(true))
                 ->addProperty('is_following', new BooleanType)
                 ->setRequired([
                     'id',
@@ -96,14 +94,12 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                     'nickname',
                     'display_name',
                     'events_count',
-                    'event_count',
                     'public_image_url',
-                    'image_url',
                     'logo_url',
                     'cover_url',
                     'country',
                     'location',
-                    'location_text',
+                    'distance_km',
                     'is_following',
                 ]),
         );
@@ -409,6 +405,15 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
     private function institutionDirectoryMetaType(): ObjectType
     {
         return $this->directoryMetaType()
+            ->addProperty(
+                'location',
+                (new ObjectType)
+                    ->addProperty('active', new BooleanType)
+                    ->addProperty('lat', (new NumberType)->nullable(true))
+                    ->addProperty('lng', (new NumberType)->nullable(true))
+                    ->addProperty('radius_km', (new IntegerType)->nullable(true))
+                    ->setRequired(['active', 'lat', 'lng', 'radius_km']),
+            )
             ->addProperty('types', (new ArrayType)->setItems($this->directoryFilterOptionType()));
     }
 
@@ -470,8 +475,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 ->addProperty('public_image_url', new StringType)
                 ->addProperty('logo_url', new StringType)
                 ->addProperty('cover_url', (new StringType)->nullable(true))
-                ->addProperty('chip_image_url', new StringType)
-                ->setRequired(['id', 'name', 'display_name', 'slug', 'position', 'is_primary', 'public_image_url', 'logo_url', 'cover_url', 'chip_image_url']),
+                ->setRequired(['id', 'name', 'display_name', 'slug', 'position', 'is_primary', 'public_image_url', 'logo_url', 'cover_url']),
         );
     }
 

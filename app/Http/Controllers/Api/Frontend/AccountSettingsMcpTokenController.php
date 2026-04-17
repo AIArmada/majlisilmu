@@ -88,9 +88,7 @@ class AccountSettingsMcpTokenController extends FrontendController
         $this->tokenManager->revoke($user, $normalizedTokenId);
 
         return response()->json([
-            'data' => [
-                'message' => 'MCP token revoked successfully.',
-            ],
+            'message' => 'MCP token revoked successfully.',
             'meta' => [
                 'request_id' => $this->requestId($request),
             ],

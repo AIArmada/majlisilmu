@@ -61,7 +61,6 @@ it('lists only active public visible statuses (approved, pending, cancelled)', f
     $response = $this->getJson(route('api.events.index'));
 
     $response->assertOk()
-        ->assertJsonPath('total', 3)
         ->assertJsonPath('meta.pagination.total', 3)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
@@ -111,7 +110,7 @@ it('clamps public event index per_page values to the supported maximum', functio
 
     $this->getJson('/api/v1/events?per_page=500')
         ->assertOk()
-        ->assertJsonPath('per_page', 50)
+        ->assertJsonPath('meta.pagination.per_page', 50)
         ->assertJsonCount(50, 'data');
 });
 

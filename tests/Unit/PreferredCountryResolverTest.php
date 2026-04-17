@@ -36,7 +36,7 @@ it('falls back to Malaysia when the saved user timezone resolves to a disabled c
         'subregion' => 'South-Eastern Asia',
     ]);
 
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->cookies->set('user_timezone', 'Asia/Jakarta');
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);
@@ -55,7 +55,7 @@ it('falls back to Malaysia when CF-IPCountry resolves to a disabled country', fu
         'subregion' => 'South-Eastern Asia',
     ]);
 
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->headers->set('CF-IPCountry', 'ID');
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);
@@ -79,7 +79,7 @@ it('prefers the selected country over the viewer timezone', function () {
     app()->forgetInstance(PublicCountryRegistry::class);
     app()->forgetInstance(PublicCountryPreference::class);
 
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'singapore');
     $request->cookies->set('user_timezone', 'Asia/Kuala_Lumpur');
 
@@ -89,7 +89,7 @@ it('prefers the selected country over the viewer timezone', function () {
 });
 
 it('falls back to Malaysia when the selected country is invalid', function () {
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
     $request->cookies->set(PublicCountryPreference::COOKIE_NAME, 'unsupported-country');
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);
@@ -98,7 +98,7 @@ it('falls back to Malaysia when the selected country is invalid', function () {
 });
 
 it('falls back to Malaysia when timezone and CF-IPCountry are unavailable', function () {
-    $request = Request::create('/events', 'GET');
+    $request = Request::create(route('events.index', [], false), 'GET');
 
     $resolved = app(PreferredCountryResolver::class)->resolveId($request);
 

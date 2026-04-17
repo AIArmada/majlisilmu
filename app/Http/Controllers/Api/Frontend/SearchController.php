@@ -48,6 +48,7 @@ use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\QueryParameter;
 use Dedoc\Scramble\Attributes\Response;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Builder;
@@ -76,9 +77,9 @@ class SearchController extends FrontendController
     {
         $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
-        $lat = $this->normalizedFloat($request->query('lat'));
-        $lng = $this->normalizedFloat($request->query('lng'));
-        $radius = max(1, min($request->integer('radius_km', 15), 100));
+        $lat = $this->normalizedLatitude($request->query('lat'));
+        $lng = $this->normalizedLongitude($request->query('lng'));
+        $radius = $this->normalizedRadiusKm($request);
         $hasLocation = $lat !== null && $lng !== null;
 
         $eventPaginator = $hasLocation
@@ -97,6 +98,10 @@ class SearchController extends FrontendController
 
         $speakerQuery = $search !== null ? $this->speakerSearchQuery($search) : Speaker::query()->whereRaw('1 = 0');
         $institutionQuery = $search !== null ? $this->institutionSearchQuery($search) : Institution::query()->whereRaw('1 = 0');
+
+        if ($hasLocation) {
+            $this->applyInstitutionNearbyScope($institutionQuery, $lat, $lng, $radius);
+        }
 
         return response()->json([
             'data' => [
@@ -126,8 +131,20 @@ class SearchController extends FrontendController
     #[Group('Institution', 'Public institution directory and detail endpoints.')]
     #[Endpoint(
         title: 'List public institutions',
-        description: 'Returns the public institution directory with search, location, type, and follow-state filters.',
+        description: 'Returns the public institution directory with search, geography, nearby radius, type, and follow-state filters.',
     )]
+    #[QueryParameter('search', 'Optional free-text search across public institution names, nicknames, and descriptions.', required: false, type: 'string', infer: false, example: 'Masjid Biru')]
+    #[QueryParameter('lat', 'Current device latitude. Provide with `lng` to filter institutions within `radius_km`.', required: false, type: 'number', infer: false, example: 3.139)]
+    #[QueryParameter('lng', 'Current device longitude. Provide with `lat` to filter institutions within `radius_km`.', required: false, type: 'number', infer: false, example: 101.6869)]
+    #[QueryParameter('radius_km', 'Nearby search radius in kilometers. Values are clamped from 1 to 100 and default to 15 when `lat` and `lng` are present.', required: false, type: 'integer', infer: false, default: 15, example: 15)]
+    #[QueryParameter('type', 'Optional institution type filter.', required: false, type: 'string', infer: false, example: 'masjid')]
+    #[QueryParameter('country_id', 'Optional country filter.', required: false, type: 'integer', infer: false, example: 132)]
+    #[QueryParameter('state_id', 'Optional state filter.', required: false, type: 'integer', infer: false, example: 14)]
+    #[QueryParameter('district_id', 'Optional district filter.', required: false, type: 'integer', infer: false, example: 103)]
+    #[QueryParameter('subdistrict_id', 'Optional subdistrict filter.', required: false, type: 'integer', infer: false, example: 1201)]
+    #[QueryParameter('following', 'When authenticated, restrict results to institutions followed by the current user.', required: false, type: 'boolean', infer: false, example: false)]
+    #[QueryParameter('page', 'Pagination page number.', required: false, type: 'integer', infer: false, default: 1, example: 1)]
+    #[QueryParameter('per_page', 'Pagination page size. Values are clamped to the server-supported maximum.', required: false, type: 'integer', infer: false, default: 12, example: 12)]
     #[Response(
         status: 200,
         description: 'Institution directory response.',
@@ -142,6 +159,10 @@ class SearchController extends FrontendController
         $stateId = $this->normalizedInt($request->query('state_id'));
         $districtId = $this->normalizedInt($request->query('district_id'));
         $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
+        $lat = $this->normalizedLatitude($request->query('lat'));
+        $lng = $this->normalizedLongitude($request->query('lng'));
+        $radius = $this->normalizedRadiusKm($request);
+        $hasNearbyLocation = $lat !== null && $lng !== null;
         $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
         $followingOnly = $request->boolean('following');
 
@@ -154,6 +175,10 @@ class SearchController extends FrontendController
             user: $user,
         );
 
+        if ($hasNearbyLocation) {
+            $this->applyInstitutionNearbyScope($baseQuery, $lat, $lng, $radius);
+        }
+
         $followedInstitutionQuery = clone $baseQuery;
 
         $this->applyInstitutionFollowingScope($followedInstitutionQuery, $user);
@@ -165,7 +190,9 @@ class SearchController extends FrontendController
         }
 
         $institutions = $search === null
-            ? $baseQuery->publicDirectoryOrder()->paginate($perPage)
+            ? $baseQuery
+                ->when(! $hasNearbyLocation, fn (Builder $query) => $query->publicDirectoryOrder())
+                ->paginate($perPage)
             : $this->institutionDirectorySearchPaginator($request, $search, $perPage, $baseQuery);
 
         return response()->json([
@@ -178,6 +205,12 @@ class SearchController extends FrontendController
                 ],
                 'following' => [
                     'total' => $followingTotal,
+                ],
+                'location' => [
+                    'active' => $hasNearbyLocation,
+                    'lat' => $lat,
+                    'lng' => $lng,
+                    'radius_km' => $hasNearbyLocation ? $radius : null,
                 ],
                 'types' => $this->institutionTypeFiltersData(),
                 'cache' => $this->institutionDirectoryCacheData(),
@@ -825,6 +858,32 @@ class SearchController extends FrontendController
     }
 
     /**
+     * @param  Builder<Institution>  $query
+     */
+    private function applyInstitutionNearbyScope(Builder $query, float $lat, float $lng, int $radiusKm): void
+    {
+        $addressMorphType = (new Institution)->getMorphClass();
+        $distanceSql = '(6371 * acos(cos(radians(?)) * cos(radians(institution_addresses.lat)) * cos(radians(institution_addresses.lng) - radians(?)) + sin(radians(?)) * sin(radians(institution_addresses.lat))))';
+
+        if ($query->getQuery()->columns === null) {
+            $query->select('institutions.*');
+        }
+
+        $query
+            ->join('addresses as institution_addresses', function ($join) use ($addressMorphType): void {
+                $join->on('institution_addresses.addressable_id', '=', 'institutions.id')
+                    ->where('institution_addresses.addressable_type', $addressMorphType);
+            })
+            ->whereRaw('institution_addresses.lat is not null')
+            ->whereRaw('institution_addresses.lng is not null')
+            ->selectRaw("{$distanceSql} as distance_km", [$lat, $lng, $lat])
+            ->whereRaw("{$distanceSql} <= ?", [$lat, $lng, $lat, $radiusKm])
+            ->orderBy('distance_km')
+            ->orderBy('institutions.name')
+            ->orderBy('institutions.id');
+    }
+
+    /**
      * @param  Builder<Institution>  $base
      * @return LengthAwarePaginator<int, Institution>
      */
@@ -1301,9 +1360,7 @@ class SearchController extends FrontendController
         return InstitutionListData::fromModel($institution, $user)->toArray();
     }
 
-    /**
-     * @return array{public_image_url: string, image_url: string, logo_url: string, cover_url: ?string}
-     */
+    /** @return array{public_image_url: string, logo_url: string, cover_url: ?string} */
     private function institutionCardMediaData(Institution $institution): array
     {
         $publicImageUrl = $institution->public_image_url;
@@ -1316,7 +1373,6 @@ class SearchController extends FrontendController
 
         return [
             'public_image_url' => $publicImageUrl,
-            'image_url' => $publicImageUrl,
             'logo_url' => $resolvedLogoUrl,
             'cover_url' => $coverUrl !== '' ? $coverUrl : null,
         ];
@@ -1369,9 +1425,7 @@ class SearchController extends FrontendController
         ];
     }
 
-    /**
-     * @return array{id: string, name: string, display_name: string, slug: string, position: ?string, is_primary: bool, public_image_url: string, logo_url: string, cover_url: ?string, chip_image_url: string}
-     */
+    /** @return array{id: string, name: string, display_name: string, slug: string, position: ?string, is_primary: bool, public_image_url: string, logo_url: string, cover_url: ?string} */
     private function speakerInstitutionData(Institution $institution): array
     {
         return SpeakerInstitutionData::fromModel($institution, $this->institutionCardMediaData($institution))->toArray();
@@ -1456,6 +1510,29 @@ class SearchController extends FrontendController
         return (float) $value;
     }
 
+    private function normalizedLatitude(mixed $value): ?float
+    {
+        $latitude = $this->normalizedFloat($value);
+
+        return $latitude !== null && $latitude >= -90.0 && $latitude <= 90.0
+            ? $latitude
+            : null;
+    }
+
+    private function normalizedLongitude(mixed $value): ?float
+    {
+        $longitude = $this->normalizedFloat($value);
+
+        return $longitude !== null && $longitude >= -180.0 && $longitude <= 180.0
+            ? $longitude
+            : null;
+    }
+
+    private function normalizedRadiusKm(Request $request): int
+    {
+        return max(1, min($request->integer('radius_km', 15), 100));
+    }
+
     private function normalizedInt(mixed $value): ?int
     {
         if (! is_scalar($value)) {
@@ -1486,8 +1563,6 @@ class SearchController extends FrontendController
     {
         return app(PublicCountryRegistry::class)->resolveCountryId(
             $request->query('country_id'),
-            $request->query('country_code'),
-            $request->query('country_key'),
         );
     }
 
