@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Data\Api\Event\EventPayloadData;
+use App\Data\Api\Frontend\Search\EventListData;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventVisibility;
@@ -304,7 +305,14 @@ class EventController extends Controller
             'views_count',
         ];
 
-        $events = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media', 'references']))
+        $events = QueryBuilder::for(Event::query()->with([
+            'institution.address',
+            'institution.media' => fn ($query) => $query->whereIn('collection_name', ['logo', 'cover']),
+            'venue.address',
+            'speakers.media' => fn ($query) => $query->where('collection_name', 'avatar'),
+            'media' => fn ($query) => $query->where('collection_name', 'poster'),
+            'references',
+        ]))
             ->allowedFilters(...$allowedFilters)
             ->allowedIncludes(...$allowedIncludes)
             ->allowedSorts(...$allowedSorts)
@@ -316,10 +324,23 @@ class EventController extends Controller
             ->appends($request->query());
 
         /** @var array<string, mixed> $payload */
-        $payload = $events->toArray();
-        $payload['data'] = $events->getCollection()
-            ->map(fn (Event $event): array => $this->serializeEventPayload($event))
-            ->all();
+        $payload = [
+            'current_page' => $events->currentPage(),
+            'data' => $events->getCollection()
+                ->map(fn (Event $event): array => $this->serializeEventListPayload($event))
+                ->all(),
+            'first_page_url' => $events->url(1),
+            'from' => $events->firstItem(),
+            'last_page' => $events->lastPage(),
+            'last_page_url' => $events->url($events->lastPage()),
+            'links' => $events->linkCollection()->toArray(),
+            'next_page_url' => $events->nextPageUrl(),
+            'path' => $events->path(),
+            'per_page' => $events->perPage(),
+            'prev_page_url' => $events->previousPageUrl(),
+            'to' => $events->lastItem(),
+            'total' => $events->total(),
+        ];
 
         $user = $request->user();
 
@@ -393,6 +414,14 @@ class EventController extends Controller
     private function serializeEventPayload(Event $event): array
     {
         return EventPayloadData::fromModel($event)->toArray();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeEventListPayload(Event $event): array
+    {
+        return EventListData::fromModel($event)->toArray();
     }
 
     private function parseDate(mixed $value, bool $endOfDay): ?Carbon

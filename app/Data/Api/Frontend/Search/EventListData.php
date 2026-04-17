@@ -49,6 +49,7 @@ class EventListData extends Data
         public bool $is_pending,
         public bool $is_cancelled,
         public bool $has_poster,
+        public ?string $poster_url,
         public string $card_image_url,
         public ?array $institution,
         public ?array $venue,
@@ -87,6 +88,7 @@ class EventListData extends Data
             is_pending: $statusValue === 'pending',
             is_cancelled: $statusValue === 'cancelled',
             has_poster: $event->hasMedia('poster'),
+            poster_url: self::posterUrl($event),
             card_image_url: (string) $event->card_image_url,
             institution: $event->institution instanceof Institution
                 ? EventListInstitutionData::fromModel($event->institution)->toArray()
@@ -180,10 +182,21 @@ class EventListData extends Data
         return is_scalar($value) ? (string) $value : '';
     }
 
+    private static function posterUrl(Event $event): ?string
+    {
+        $poster = $event->getFirstMedia('poster');
+
+        if ($poster === null) {
+            return null;
+        }
+
+        return $poster->getAvailableUrl(['preview', 'thumb']) ?: $poster->getUrl();
+    }
+
     private static function optionalDateTimeString(mixed $value): ?string
     {
         if ($value instanceof CarbonInterface) {
-            return $value->toIso8601String();
+            return $value->copy()->utc()->format('Y-m-d\TH:i:s.u\Z');
         }
 
         return is_string($value) && $value !== '' ? $value : null;

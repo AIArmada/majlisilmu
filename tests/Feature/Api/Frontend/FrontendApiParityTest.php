@@ -1026,6 +1026,7 @@ it('serializes event list payloads with card image metadata for mobile clients',
     )();
 
     expect(data_get($item, 'has_poster'))->toBeTrue()
+        ->and(data_get($item, 'poster_url'))->toBeString()->not->toBe('')
         ->and(data_get($item, 'card_image_url'))->toBeString()->not->toBe('');
 });
 
@@ -1049,6 +1050,9 @@ it('returns card image metadata on public events index responses', function () {
     $posterEvent->addMedia(UploadedFile::fake()->image('home-poster.jpg', 1200, 1600))
         ->toMediaCollection('poster');
 
+    $speaker = Speaker::factory()->create();
+    $posterEvent->speakers()->attach($speaker);
+
     $placeholderEvent = Event::factory()->create([
         'title' => 'Home Placeholder Event',
         'status' => 'approved',
@@ -1062,9 +1066,15 @@ it('returns card image metadata on public events index responses', function () {
     $placeholderResponse = $this->getJson('/api/v1/events?include=institution,venue,speakers&filter[search]=Home%20Placeholder%20Event&per_page=1')
         ->assertOk();
 
+    $posterItem = $posterResponse->json('data.0');
+
     expect($posterResponse->json('data.0.has_poster'))->toBeTrue()
         ->and($posterResponse->json('data.0.card_image_url'))->toBeString()->not->toBe('')
         ->and($posterResponse->json('data.0.poster_url'))->toBeString()->not->toBe('')
+        ->and(array_keys($posterItem))->not->toContain('media', 'references', 'key_people')
+        ->and(data_get($posterItem, 'institution.media'))->toBeNull()
+        ->and(data_get($posterItem, 'speakers.0.id'))->toBe((string) $speaker->getKey())
+        ->and(data_get($posterItem, 'speakers.0.pivot'))->toBeNull()
         ->and($placeholderResponse->json('data.0.has_poster'))->toBeFalse()
         ->and($placeholderResponse->json('data.0.card_image_url'))->toContain('images/placeholders/event.png')
         ->and($placeholderResponse->json('data.0.poster_url'))->toBeNull();

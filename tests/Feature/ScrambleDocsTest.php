@@ -1,9 +1,16 @@
 <?php
 
+use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
+use App\Support\ApiDocumentation\ApiDocumentationVersionResolver;
+use Dedoc\Scramble\Generator;
 use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
+
+use function Pest\Laravel\mock;
 
 it('serves scramble docs only on the api host', function () {
     $this->get('https://api.majlisilmu.test/docs', [
@@ -39,6 +46,104 @@ it('publishes openapi json on the api host with the api v1 server url', function
         ->assertOk()
         ->assertJsonPath('openapi', '3.1.0')
         ->assertJsonPath('servers.0.url', 'https://api.majlisilmu.test/api/v1');
+});
+
+it('caches docs json generation between requests', function () {
+    forgetDocsJsonCacheKeys('release-a');
+
+    mock(ApiDocumentationVersionResolver::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('current')
+            ->twice()
+            ->andReturn('release-a');
+    });
+
+    mock(Generator::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('__invoke')
+            ->once()
+            ->andReturn([
+                'openapi' => '3.1.0',
+                'info' => ['title' => 'Majlis Ilmu API'],
+                'servers' => [['url' => 'https://api.majlisilmu.test/api/v1']],
+            ]);
+    });
+
+    try {
+        $firstResponse = $this->getJson('https://api.majlisilmu.test/docs.json', [
+            'Host' => 'api.majlisilmu.test',
+        ])->assertOk();
+
+        $secondResponse = $this->getJson('https://api.majlisilmu.test/docs.json', [
+            'Host' => 'api.majlisilmu.test',
+        ])->assertOk();
+
+        expect($firstResponse->json())->toBe($secondResponse->json());
+    } finally {
+        forgetDocsJsonCacheKeys('release-a');
+    }
+});
+
+it('busts docs json cache automatically when the documentation fingerprint changes', function () {
+    forgetDocsJsonCacheKeys('release-a', 'release-b');
+
+    $releaseAKey = docsJsonCacheKey('release-a');
+    $releaseBKey = docsJsonCacheKey('release-b');
+    $latestCacheKeyPointer = docsJsonLatestKeyPointer();
+
+    mock(ApiDocumentationVersionResolver::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('current')
+            ->twice()
+            ->andReturn('release-a', 'release-b');
+    });
+
+    mock(Generator::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('__invoke')
+            ->twice()
+            ->andReturn(
+                [
+                    'openapi' => '3.1.0',
+                    'info' => ['title' => 'Majlis Ilmu API Release A'],
+                    'servers' => [['url' => 'https://api.majlisilmu.test/api/v1']],
+                ],
+                [
+                    'openapi' => '3.1.0',
+                    'info' => ['title' => 'Majlis Ilmu API Release B'],
+                    'servers' => [['url' => 'https://api.majlisilmu.test/api/v1']],
+                ],
+            );
+    });
+
+    try {
+        $firstResponse = $this->getJson('https://api.majlisilmu.test/docs.json', [
+            'Host' => 'api.majlisilmu.test',
+        ])->assertOk();
+
+        $secondResponse = $this->getJson('https://api.majlisilmu.test/docs.json', [
+            'Host' => 'api.majlisilmu.test',
+        ])->assertOk();
+
+        expect($firstResponse->json('info.title'))->toBe('Majlis Ilmu API Release A')
+            ->and($secondResponse->json('info.title'))->toBe('Majlis Ilmu API Release B')
+            ->and(Cache::get($releaseAKey))->toBeNull()
+            ->and(Cache::get($releaseBKey))->toBeArray()
+            ->and(data_get(Cache::get($releaseBKey), 'info.title'))->toBe('Majlis Ilmu API Release B')
+            ->and(Cache::get($latestCacheKeyPointer))->toBe($releaseBKey);
+    } finally {
+        forgetDocsJsonCacheKeys('release-a', 'release-b');
+    }
+});
+
+it('changes the documentation fingerprint when scramble runtime config changes', function () {
+    $resolver = app(ApiDocumentationVersionResolver::class);
+    $baselineFingerprint = $resolver->current();
+    $originalVersion = config('scramble.info.version');
+
+    try {
+        config()->set('scramble.info.version', 'docs-config-test-version');
+
+        expect($resolver->current())->not->toBe($baselineFingerprint);
+    } finally {
+        config()->set('scramble.info.version', $originalVersion);
+    }
 });
 
 it('groups speaker endpoints under a dedicated speaker tag in scramble docs', function () {
@@ -566,3 +671,32 @@ it('publishes follow-up request examples for authenticated workflow mutations', 
         ->and(data_get($paths, '/follows/{type}/{subject}.post.requestBody'))->toBeNull()
         ->and(data_get($paths, '/follows/{type}/{subject}.post.parameters.0.example'))->toBe('institution');
 });
+
+function docsJsonCacheScope(): string
+{
+    return sha1(implode('|', [
+        app()->environment(),
+        app(ApiDocumentationUrlResolver::class)->apiBaseUrl(),
+        (string) config('scramble.api_domain', ''),
+        (string) config('scramble.api_path', 'api/v1'),
+    ]));
+}
+
+function docsJsonCacheKey(string $version): string
+{
+    return 'api-documentation:openapi-json:'.docsJsonCacheScope().':'.$version;
+}
+
+function docsJsonLatestKeyPointer(): string
+{
+    return 'api-documentation:openapi-json:latest-key:'.docsJsonCacheScope();
+}
+
+function forgetDocsJsonCacheKeys(string ...$versions): void
+{
+    foreach ($versions as $version) {
+        Cache::forget(docsJsonCacheKey($version));
+    }
+
+    Cache::forget(docsJsonLatestKeyPointer());
+}

@@ -56,6 +56,40 @@ it('loads the tonight events component when events exist', function () {
         ->assertSee('Malam Ini');
 });
 
+it('uses canonical date range query parameters on homepage date links', function () {
+    Carbon::setTestNow(Carbon::create(2026, 4, 16, 10, 0, 0, 'UTC'));
+
+    $response = $this->get('/');
+
+    $response->assertSuccessful()
+        ->assertSee(route('events.index', [
+            'starts_after' => '2026-04-16',
+            'starts_before' => '2026-04-16',
+            'time_scope' => 'all',
+        ]))
+        ->assertSee(route('events.index', [
+            'starts_after' => '2026-04-17',
+            'starts_before' => '2026-04-17',
+            'time_scope' => 'all',
+        ]))
+        ->assertSee(route('events.index', [
+            'starts_after' => '2026-04-16',
+            'starts_before' => '2026-04-19',
+            'time_scope' => 'all',
+        ]))
+        ->assertSee(route('events.index', [
+            'starts_after' => '2026-04-18',
+            'starts_before' => '2026-04-19',
+            'time_scope' => 'all',
+        ]))
+        ->assertDontSee('date=today', false)
+        ->assertDontSee('date=friday', false)
+        ->assertDontSee('date=this-week', false)
+        ->assertDontSee('date=weekend', false);
+
+    Carbon::setTestNow();
+});
+
 it('loads the featured events component with upcoming events', function () {
     // Create an event for this week
     Event::factory()->create([
@@ -114,6 +148,78 @@ it('loads the upcoming events component', function () {
 
     Livewire::test('home.upcoming-events')
         ->assertSee('Majlis Akan Datang');
+});
+
+it('groups homepage date filter counts by the viewer local date', function () {
+    $userTimezone = 'Asia/Kuala_Lumpur';
+
+    Carbon::setTestNow(Carbon::create(2026, 4, 16, 18, 0, 0, 'UTC'));
+
+    Event::factory()->create([
+        'title' => 'Local Today Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => Carbon::parse('2026-04-16 16:30:00', 'UTC'),
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Previous Local Day Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => Carbon::parse('2026-04-16 15:30:00', 'UTC'),
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Local Tomorrow Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => Carbon::parse('2026-04-17 16:30:00', 'UTC'),
+    ]);
+
+    $dates = Livewire::withCookie('user_timezone', $userTimezone)
+        ->test('home.date-filter')
+        ->instance()
+        ->upcomingDates;
+
+    $today = $dates->first(fn (array $dateItem): bool => $dateItem['date']->format('Y-m-d') === '2026-04-17');
+    $tomorrow = $dates->first(fn (array $dateItem): bool => $dateItem['date']->format('Y-m-d') === '2026-04-18');
+
+    expect($today)->not->toBeNull()
+        ->and($tomorrow)->not->toBeNull()
+        ->and($today['count'])->toBe(1)
+        ->and($tomorrow['count'])->toBe(1);
+
+    Carbon::setTestNow();
+});
+
+it('uses canonical date range query parameters in homepage date components', function () {
+    Carbon::setTestNow(Carbon::create(2026, 4, 16, 10, 0, 0, 'UTC'));
+
+    Livewire::test('home.tonight-events')
+        ->assertSee(route('events.index', [
+            'starts_after' => '2026-04-16',
+            'starts_before' => '2026-04-16',
+            'time_scope' => 'all',
+        ]))
+        ->assertDontSee('date=today', false);
+
+    Livewire::test('home.date-filter')
+        ->assertSee(route('events.index', [
+            'starts_after' => '2026-04-16',
+            'starts_before' => '2026-04-16',
+            'time_scope' => 'all',
+        ]))
+        ->assertSee(route('events.index', [
+            'starts_after' => '2026-04-17',
+            'starts_before' => '2026-04-17',
+            'time_scope' => 'all',
+        ]))
+        ->assertDontSee('date=', false);
+
+    Carbon::setTestNow();
 });
 
 it('renders the attached book title across homepage event components without parentheses', function () {

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Event;
+use App\Support\Timezone\UserDateTimeFormatter;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -9,17 +10,15 @@ new class extends Component {
     #[Computed]
     public function upcomingDates(): Collection
     {
-        $now = now();
+        $now = UserDateTimeFormatter::userNow();
         $startDate = $now->copy()->startOfDay();
         $endDate = $now->copy()->addDays(6)->endOfDay();
 
-        // Single query to get all event counts grouped by date
         $eventCounts = Event::query()
             ->active()
-            ->whereBetween('starts_at', [$startDate, $endDate])
-            ->selectRaw('DATE(starts_at) as date, COUNT(*) as count')
-            ->groupByRaw('DATE(starts_at)')
-            ->pluck('count', 'date');
+            ->whereBetween('starts_at', [$startDate->copy()->utc(), $endDate->copy()->utc()])
+            ->get(['starts_at'])
+            ->countBy(fn (Event $event): string => UserDateTimeFormatter::format($event->starts_at, 'Y-m-d'));
 
         $dates = collect();
 
@@ -56,7 +55,7 @@ new class extends Component {
 <div class="flex flex-wrap items-center justify-center gap-1.5">
     @foreach($this->upcomingDates as $dateItem)
         <a wire:key="date-{{ $dateItem['date']->format('Y-m-d') }}"
-            href="{{ route('events.index', ['date' => $dateItem['date']->format('Y-m-d')]) }}" wire:navigate
+            href="{{ route('events.index', ['starts_after' => $dateItem['date']->format('Y-m-d'), 'starts_before' => $dateItem['date']->format('Y-m-d'), 'time_scope' => 'all']) }}" wire:navigate
             class="group flex flex-col items-center py-1 px-3 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all min-w-[85px] {{ $loop->first ? 'bg-emerald-50 border-emerald-500' : '' }}">
             <span
                 class="text-xs font-semibold text-slate-400 uppercase tracking-wide group-hover:text-emerald-600 {{ $loop->first ? 'text-emerald-600' : '' }}">

@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\Tag;
+use App\Support\Timezone\UserDateTimeFormatter;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -16,6 +19,43 @@ new
                 'aqidah' => Tag::where('slug->en', 'aqidah')->orWhere('slug->ms', 'aqidah')->first()?->id,
                 'syariah' => Tag::where('slug->en', 'syariah')->orWhere('slug->ms', 'syariah')->first()?->id,
                 'akhlak' => Tag::where('slug->en', 'akhlak')->orWhere('slug->ms', 'akhlak')->first()?->id,
+            ];
+        }
+
+        #[Computed]
+        public function eventDateLinks(): array
+        {
+            $today = UserDateTimeFormatter::userNow()->startOfDay();
+            $friday = $today->isFriday() ? $today : $today->copy()->next(Carbon::FRIDAY);
+
+            if ($today->isSaturday()) {
+                $weekendStart = $today;
+                $weekendEnd = $today->copy()->next(Carbon::SUNDAY);
+            } elseif ($today->isSunday()) {
+                $weekendStart = $today;
+                $weekendEnd = $today;
+            } else {
+                $weekendStart = $today->copy()->next(Carbon::SATURDAY);
+                $weekendEnd = $weekendStart->copy()->next(Carbon::SUNDAY);
+            }
+
+            return [
+                'today' => $this->dateRangeEventIndexQuery($today, $today),
+                'friday' => $this->dateRangeEventIndexQuery($friday, $friday),
+                'this_week' => $this->dateRangeEventIndexQuery($today, $today->copy()->endOfWeek()),
+                'weekend' => $this->dateRangeEventIndexQuery($weekendStart, $weekendEnd),
+            ];
+        }
+
+        /**
+         * @return array{starts_after: string, starts_before: string, time_scope: string}
+         */
+        private function dateRangeEventIndexQuery(CarbonInterface $startDate, CarbonInterface $endDate): array
+        {
+            return [
+                'starts_after' => $startDate->toDateString(),
+                'starts_before' => $endDate->toDateString(),
+                'time_scope' => 'all',
             ];
         }
     };
@@ -34,6 +74,7 @@ new
 
 @php
     $showsGeolocationControls = app(\App\Support\Location\PublicGeolocationPermission::class)->isGranted();
+    $eventDateLinks = $this->eventDateLinks();
 @endphp
 
 <div>
@@ -204,21 +245,21 @@ new
 
                 {{-- Quick Links --}}
                 <div class="mt-10 flex flex-wrap justify-center gap-3 text-sm font-medium">
-                    <a href="{{ route('events.index', ['date' => 'today']) }}" wire:navigate
+                    <a href="{{ route('events.index', $eventDateLinks['today']) }}" wire:navigate
                         class="text-slate-400 hover:text-gold-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-gold-500/30">
                         <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                         {{ __('Malam Ini') }}
                     </a>
-                    <a href="{{ route('events.index', ['date' => 'friday']) }}" wire:navigate
+                    <a href="{{ route('events.index', $eventDateLinks['friday']) }}" wire:navigate
                         class="text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-emerald-500/30">
                         <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                         {{ __('Jumaat Ini') }}
                     </a>
-                    <a href="{{ route('events.index', ['date' => 'this-week']) }}" wire:navigate
+                    <a href="{{ route('events.index', $eventDateLinks['this_week']) }}" wire:navigate
                         class="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         {{ __('Minggu Ini') }}
                     </a>
-                    <a href="{{ route('events.index', ['date' => 'weekend']) }}" wire:navigate
+                    <a href="{{ route('events.index', $eventDateLinks['weekend']) }}" wire:navigate
                         class="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         {{ __('Hujung Minggu') }}
                     </a>
