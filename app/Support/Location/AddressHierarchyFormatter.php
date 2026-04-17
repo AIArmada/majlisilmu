@@ -77,7 +77,7 @@ class AddressHierarchyFormatter
                 array_shift($locationHierarchyParts),
                 $address->postcode,
             ]));
-            $regionalAddressLine = $locationHierarchyParts === [] ? '' : implode(', ', $locationHierarchyParts);
+            $regionalAddressLine = implode(', ', $locationHierarchyParts);
         } else {
             $localityAddressLine = implode(', ', array_filter([
                 $address->city?->name,

@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Venue;
@@ -124,6 +126,45 @@ it('searchable payload includes is_active and subdistrict_id location fields', f
         ->and($payload)->toHaveKey('state_id', $state->id)
         ->and($payload)->toHaveKey('district_id', $district->id)
         ->and($payload)->toHaveKey('subdistrict_id', $subdistrict->id);
+});
+
+it('deduplicates key person roles in the searchable payload', function () {
+    $event = Event::factory()->create([
+        'status' => Approved::class,
+        'visibility' => 'public',
+        'is_active' => true,
+    ]);
+
+    $moderator = Speaker::factory()->create();
+    $imam = Speaker::factory()->create();
+
+    $event->keyPeople()->create([
+        'speaker_id' => $moderator->getKey(),
+        'role' => EventKeyPersonRole::Moderator,
+        'name' => $moderator->name,
+    ]);
+
+    $event->keyPeople()->create([
+        'speaker_id' => $moderator->getKey(),
+        'role' => EventKeyPersonRole::Moderator,
+        'name' => $moderator->name,
+    ]);
+
+    $event->keyPeople()->create([
+        'speaker_id' => $imam->getKey(),
+        'role' => EventKeyPersonRole::Imam,
+        'name' => $imam->name,
+    ]);
+
+    $payload = $event->fresh()->toSearchableArray();
+
+    expect($payload['key_person_roles'])->toBe([
+        EventKeyPersonRole::Moderator->value,
+        EventKeyPersonRole::Imam->value,
+    ])->and($payload['key_person_speaker_ids'])->toBe([
+        (string) $moderator->getKey(),
+        (string) $imam->getKey(),
+    ]);
 });
 
 it('supports parent program and child event hierarchy helpers', function () {

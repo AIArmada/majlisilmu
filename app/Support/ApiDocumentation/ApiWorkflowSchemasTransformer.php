@@ -21,6 +21,7 @@ use Dedoc\Scramble\Support\Generator\Types\MixedType;
 use Dedoc\Scramble\Support\Generator\Types\NumberType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
+use Dedoc\Scramble\Support\Generator\Types\Type;
 
 final class ApiWorkflowSchemasTransformer implements DocumentTransformer
 {
@@ -400,6 +401,9 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
         );
     }
 
+    /**
+     * @param  array<string, Type|null>  $extraProperties
+     */
     private function standardFormContractType(Components $components, array $extraProperties = [], bool $includeDefaults = true): ObjectType
     {
         $object = (new ObjectType)

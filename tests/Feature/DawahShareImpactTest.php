@@ -1101,6 +1101,116 @@ test('provider visitor counts fall back to visit metadata when attribution provi
         ->and($providerBreakdown->first()['unique_visitors'])->toBe(1);
 });
 
+test('link outcome breakdown returns integer counts ordered by volume', function () {
+    $payload = $this->actingAs($this->sharer)
+        ->getJson(route('dawah-share.payload', [
+            'url' => route('events.index', ['search' => 'outcome-breakdown']),
+            'text' => 'Outcome Breakdown Link',
+            'title' => 'Outcome Breakdown Link',
+        ]))
+        ->assertOk()
+        ->json();
+
+    $link = AffiliateLink::query()
+        ->where('destination_url', route('events.index', ['search' => 'outcome-breakdown']))
+        ->firstOrFail();
+
+    $affiliate = Affiliate::query()->findOrFail($link->affiliate_id);
+
+    $attribution = AffiliateAttribution::query()->create([
+        'affiliate_id' => $affiliate->id,
+        'affiliate_code' => $affiliate->code,
+        'subject_identifier' => $link->id,
+        'subject_instance' => 'share_tracking_link',
+        'cookie_value' => 'outcome-breakdown-cookie',
+        'landing_url' => $payload['url'],
+        'metadata' => [
+            'link_id' => $link->id,
+            'subject_type' => 'search',
+            'subject_key' => 'search:outcome-breakdown',
+        ],
+        'first_seen_at' => now()->subMinutes(10),
+        'last_seen_at' => now()->subMinutes(10),
+    ]);
+
+    AffiliateConversion::query()->create([
+        'affiliate_id' => $affiliate->id,
+        'affiliate_code' => $affiliate->code,
+        'affiliate_attribution_id' => $attribution->id,
+        'conversion_type' => 'event_checkin',
+        'external_reference' => 'event_checkin:outcome-breakdown:1',
+        'value_minor' => 0,
+        'subtotal_minor' => 0,
+        'total_minor' => 0,
+        'commission_minor' => 0,
+        'commission_currency' => 'MYR',
+        'status' => ApprovedConversion::class,
+        'occurred_at' => now()->subMinutes(9),
+        'metadata' => [
+            'link_id' => $link->id,
+            'link_title_snapshot' => 'Outcome Breakdown Link',
+            'sharer_user_id' => $this->sharer->id,
+            'subject_type' => 'search',
+            'subject_key' => 'search:outcome-breakdown',
+        ],
+    ]);
+
+    AffiliateConversion::query()->create([
+        'affiliate_id' => $affiliate->id,
+        'affiliate_code' => $affiliate->code,
+        'affiliate_attribution_id' => $attribution->id,
+        'conversion_type' => 'event_checkin',
+        'external_reference' => 'event_checkin:outcome-breakdown:2',
+        'value_minor' => 0,
+        'subtotal_minor' => 0,
+        'total_minor' => 0,
+        'commission_minor' => 0,
+        'commission_currency' => 'MYR',
+        'status' => ApprovedConversion::class,
+        'occurred_at' => now()->subMinutes(8),
+        'metadata' => [
+            'link_id' => $link->id,
+            'link_title_snapshot' => 'Outcome Breakdown Link',
+            'sharer_user_id' => $this->sharer->id,
+            'subject_type' => 'search',
+            'subject_key' => 'search:outcome-breakdown',
+        ],
+    ]);
+
+    AffiliateConversion::query()->create([
+        'affiliate_id' => $affiliate->id,
+        'affiliate_code' => $affiliate->code,
+        'affiliate_attribution_id' => $attribution->id,
+        'conversion_type' => 'event_submission',
+        'external_reference' => 'event_submission:outcome-breakdown:1',
+        'value_minor' => 0,
+        'subtotal_minor' => 0,
+        'total_minor' => 0,
+        'commission_minor' => 0,
+        'commission_currency' => 'MYR',
+        'status' => ApprovedConversion::class,
+        'occurred_at' => now()->subMinutes(7),
+        'metadata' => [
+            'link_id' => $link->id,
+            'link_title_snapshot' => 'Outcome Breakdown Link',
+            'sharer_user_id' => $this->sharer->id,
+            'subject_type' => 'search',
+            'subject_key' => 'search:outcome-breakdown',
+        ],
+    ]);
+
+    $linkData = app(ShareTrackingAnalyticsService::class)->findLinkForUser($this->sharer, $link->id);
+
+    expect($linkData)->not->toBeNull();
+
+    $breakdown = app(ShareTrackingAnalyticsService::class)->outcomeBreakdownForLink($linkData);
+
+    expect($breakdown)->toHaveCount(2)
+        ->and($breakdown->pluck('outcome_type')->all())->toBe(['event_checkin', 'event_submission'])
+        ->and($breakdown->pluck('count')->all())->toBe([2, 1])
+        ->and($breakdown->every(fn (array $row): bool => is_int($row['count'])))->toBeTrue();
+});
+
 test('impact dashboard can sort by check-ins and filter by response type', function () {
     $checkinPayload = $this->actingAs($this->sharer)
         ->getJson(route('dawah-share.payload', [

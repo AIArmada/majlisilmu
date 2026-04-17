@@ -51,6 +51,7 @@ final class ExampleRequestBodyObject extends RequestBodyObject
     /**
      * @return array<string, mixed>
      */
+    #[\Override]
     public function toArray(): array
     {
         $result = array_filter([

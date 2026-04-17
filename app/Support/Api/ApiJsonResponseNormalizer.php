@@ -61,11 +61,11 @@ final class ApiJsonResponseNormalizer
         $validationErrors = is_array($payload['errors'] ?? null) ? $payload['errors'] : null;
         $error = is_array($payload['error'] ?? null) ? $payload['error'] : [];
 
-        $error['code'] = is_string($error['code'] ?? null) && trim((string) $error['code']) !== ''
-            ? (string) $error['code']
+        $error['code'] = is_string($error['code'] ?? null) && trim($error['code']) !== ''
+            ? $error['code']
             : ApiResponseFactory::errorCodeForStatus($validationErrors !== null ? 422 : $status);
-        $error['message'] = is_string($error['message'] ?? null) && trim((string) $error['message']) !== ''
-            ? (string) $error['message']
+        $error['message'] = is_string($error['message'] ?? null) && trim($error['message']) !== ''
+            ? $error['message']
             : $message;
 
         if ($validationErrors !== null) {
@@ -96,7 +96,7 @@ final class ApiJsonResponseNormalizer
             return $payload;
         }
 
-        if (! is_string($payload['message'] ?? null) || trim((string) $payload['message']) === '') {
+        if (! is_string($payload['message'] ?? null) || trim($payload['message']) === '') {
             $payload['message'] = $message;
         }
 
@@ -159,8 +159,8 @@ final class ApiJsonResponseNormalizer
     private function appendRequestId(array $payload, Request $request): array
     {
         $meta = $this->meta($payload);
-        $meta['request_id'] = is_string($meta['request_id'] ?? null) && trim((string) $meta['request_id']) !== ''
-            ? (string) $meta['request_id']
+        $meta['request_id'] = is_string($meta['request_id'] ?? null) && trim($meta['request_id']) !== ''
+            ? $meta['request_id']
             : ApiResponseFactory::requestId($request);
 
         $payload['meta'] = $meta;

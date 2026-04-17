@@ -7,6 +7,13 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-import-type CountryArray from Country
+ *
+ * @phpstan-type InstitutionListItemArray array{id: string, slug: string, name: string, nickname: ?string, display_name: string, events_count: int, event_count: int, public_image_url: string, image_url: string, logo_url: string, cover_url: ?string, country: CountryArray|null, location: ?string, location_text: ?string, is_following: bool}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('InstitutionListItem')]
 final readonly class InstitutionListItem implements Arrayable
 {
@@ -28,9 +35,7 @@ final readonly class InstitutionListItem implements Arrayable
         public bool $is_following,
     ) {}
 
-    /**
-     * @return array{id: string, slug: string, name: string, nickname: ?string, display_name: string, events_count: int, event_count: int, public_image_url: string, image_url: string, logo_url: string, cover_url: ?string, country: array{id: int, name: string, iso2: string, key: ?string}|null, location: ?string, location_text: ?string, is_following: bool}
-     */
+    /** @return InstitutionListItemArray */
     public function toArray(): array
     {
         return [

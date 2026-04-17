@@ -7,6 +7,13 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-import-type CountryArray from Country
+ *
+ * @phpstan-type SpeakerListItemArray array{id: string, slug: string, name: string, formatted_name: string, events_count: int, avatar_url: string, country: CountryArray|null, is_following: bool}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('SpeakerListItem')]
 final readonly class SpeakerListItem implements Arrayable
 {
@@ -21,9 +28,7 @@ final readonly class SpeakerListItem implements Arrayable
         public bool $is_following,
     ) {}
 
-    /**
-     * @return array{id: string, slug: string, name: string, formatted_name: string, events_count: int, avatar_url: string, country: array{id: int, name: string, iso2: string, key: ?string}|null, is_following: bool}
-     */
+    /** @return SpeakerListItemArray */
     public function toArray(): array
     {
         return [

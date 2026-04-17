@@ -391,16 +391,16 @@ class Event extends Model implements AuditableContract, HasMedia
         /** @var \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson> $keyPeople */
         $keyPeople = $this->keyPeople;
 
-        $keyPersonRoles = $keyPeople
-            ->map(function (EventKeyPerson $keyPerson): string {
-                $role = $keyPerson->role;
+        /** @var list<string> $keyPersonRoles */
+        $keyPersonRoles = [];
 
-                return $role instanceof EventKeyPersonRole ? $role->value : '';
-            })
-            ->reject(static fn (string $role): bool => $role === '')
-            ->unique()
-            ->values()
-            ->all();
+        foreach ($keyPeople as $keyPerson) {
+            $role = $keyPerson->role;
+
+            if ($role instanceof EventKeyPersonRole && ! in_array($role->value, $keyPersonRoles, true)) {
+                $keyPersonRoles[] = $role->value;
+            }
+        }
 
         $keyPersonSpeakerIds = $keyPeople
             ->pluck('speaker_id')

@@ -186,12 +186,10 @@ class SpeakerSearchService
     private function publicSearchIdsFromScoutDatabase(string $normalizedSearch): array
     {
         return Speaker::search($normalizedSearch)
-            ->query(function (Builder $query): Builder {
-                return $query
-                    ->where('speakers.is_active', true)
-                    ->where('status', 'verified')
-                    ->limit($this->typesenseResultLimit());
-            })
+            ->query(fn (Builder $query): Builder => $query
+                ->where('speakers.is_active', true)
+                ->where('status', 'verified')
+                ->limit($this->typesenseResultLimit()))
             ->get()
             ->pluck('id')
             ->map(static fn (mixed $id): string => (string) $id)

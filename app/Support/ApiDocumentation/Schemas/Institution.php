@@ -7,6 +7,15 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-import-type AddressSelectionArray from AddressSelection
+ * @phpstan-import-type CountryArray from Country
+ *
+ * @phpstan-type InstitutionMediaArray array{public_image_url: string, logo_url: string, cover_url: ?string}
+ * @phpstan-type InstitutionArray array{id: string, slug: string, name: string, nickname: ?string, display_name: string, description: ?string, status: string, type_label: ?string, address_line: ?string, address: AddressSelectionArray|null, country: CountryArray|null, map_url: ?string, followers_count: int, speaker_count: int, is_following: bool, media: InstitutionMediaArray, contacts: list<array<string, mixed>>, social_media: list<array<string, mixed>>, waze_url: ?string, donation_channels: list<array<string, mixed>>}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('Institution')]
 final readonly class Institution implements Arrayable
 {
@@ -39,9 +48,7 @@ final readonly class Institution implements Arrayable
         public array $donation_channels,
     ) {}
 
-    /**
-     * @return array{id: string, slug: string, name: string, nickname: ?string, display_name: string, description: ?string, status: string, type_label: ?string, address_line: ?string, address: array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}|null, country: array{id: int, name: string, iso2: string, key: ?string}|null, map_url: ?string, followers_count: int, speaker_count: int, is_following: bool, media: array{public_image_url: string, logo_url: string, cover_url: ?string}, contacts: list<array<string, mixed>>, social_media: list<array<string, mixed>>, waze_url: ?string, donation_channels: list<array<string, mixed>>}
-     */
+    /** @return InstitutionArray */
     public function toArray(): array
     {
         return [

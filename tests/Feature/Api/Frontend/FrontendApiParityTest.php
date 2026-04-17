@@ -2209,10 +2209,8 @@ it('uses the same stable public directory ordering in the frontend speaker api',
 it('uses an explicit mobile directory seed for speaker ordering', function () {
     $seedPairs = collect(['mobile-seed-a', 'mobile-seed-b', 'mobile-seed-c', 'mobile-seed-d'])
         ->crossJoin(['mobile-seed-a', 'mobile-seed-b', 'mobile-seed-c', 'mobile-seed-d'])
-        ->first(function (array $pair): bool {
-            return $pair[0] !== $pair[1]
-                && Speaker::publicDirectoryOrderOffset($pair[0]) !== Speaker::publicDirectoryOrderOffset($pair[1]);
-        });
+        ->first(fn (array $pair): bool => $pair[0] !== $pair[1]
+            && Speaker::publicDirectoryOrderOffset($pair[0]) !== Speaker::publicDirectoryOrderOffset($pair[1]));
 
     expect($seedPairs)->not->toBeNull();
 
@@ -2472,12 +2470,10 @@ it('scopes the spaces catalog to global spaces unless an institution is selected
 });
 
 it('returns all matching spaces without truncating the catalog payload', function () {
-    $spaces = collect(range(1, 105))->map(function (int $index): Space {
-        return Space::factory()->create([
-            'name' => sprintf('Catalog Overflow Space %03d', $index),
-            'is_active' => true,
-        ]);
-    });
+    $spaces = collect(range(1, 105))->map(fn (int $index): Space => Space::factory()->create([
+        'name' => sprintf('Catalog Overflow Space %03d', $index),
+        'is_active' => true,
+    ]));
 
     $response = $this->getJson(route('api.client.catalogs.spaces'))
         ->assertOk()

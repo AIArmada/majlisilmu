@@ -7,6 +7,13 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-import-type EventSummaryArray from EventSummary
+ *
+ * @phpstan-type EventParticipationArray array{id: string, role: string, role_label: ?string, display_name: ?string, event: EventSummaryArray|null}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('EventParticipation')]
 final readonly class EventParticipation implements Arrayable
 {
@@ -18,9 +25,7 @@ final readonly class EventParticipation implements Arrayable
         public ?EventSummary $event,
     ) {}
 
-    /**
-     * @return array{id: string, role: string, role_label: ?string, display_name: ?string, event: EventSummary|null}
-     */
+    /** @return EventParticipationArray */
     public function toArray(): array
     {
         return [

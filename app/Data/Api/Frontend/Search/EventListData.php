@@ -18,6 +18,7 @@ use Filament\Support\Contracts\HasLabel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\LaravelData\Data;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class EventListData extends Data
 {
@@ -186,7 +187,7 @@ class EventListData extends Data
     {
         $poster = $event->getFirstMedia('poster');
 
-        if ($poster === null) {
+        if (! $poster instanceof Media) {
             return null;
         }
 

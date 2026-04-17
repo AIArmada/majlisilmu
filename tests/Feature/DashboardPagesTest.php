@@ -169,14 +169,14 @@ it('renders the attendee-first planner dashboard without saved search or digest 
         ->assertDontSee('Institution Managed Event')
         ->assertDontSee('External Event');
 
-    expect(strpos($response->getContent(), 'id="planner-saved"'))->toBeLessThan(strpos($response->getContent(), 'id="planner-going"'));
+    expect(strpos((string) $response->getContent(), 'id="planner-saved"'))->toBeLessThan(strpos((string) $response->getContent(), 'id="planner-going"'));
 
     $response->assertDontSee('Other User Search');
     $response->assertDontSee('x-show="cell.entries.length > 0"', false);
     $response->assertDontSee("entry.role_badges.map(badge => badge.label).join(' • ')", false);
     $response->assertDontSee('bg-emerald-50/80', false);
 
-    expect(substr_count($response->getContent(), route('dashboard.dawah-impact')))->toBe(1);
+    expect(substr_count((string) $response->getContent(), route('dashboard.dawah-impact')))->toBe(1);
 });
 
 it('renders a valid event management link on the user dashboard for manageable events', function () {

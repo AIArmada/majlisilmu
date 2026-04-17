@@ -7,6 +7,7 @@ namespace App\Support\ApiDocumentation;
 use Dedoc\Scramble\Extensions\OperationExtension;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Reference;
+use Dedoc\Scramble\Support\Generator\RequestBodyObject;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\RouteInfo;
 use Illuminate\Support\Str;
@@ -16,7 +17,7 @@ final class ApiRequestBodyExamplesExtension extends OperationExtension
     /**
      * @var array<string, array<string, mixed>>
      */
-    private const EXAMPLES = [
+    private const array EXAMPLES = [
         'post auth/login' => [
             'login' => 'superadmin@majlisilmu.my',
             'password' => 'password',
@@ -128,7 +129,7 @@ final class ApiRequestBodyExamplesExtension extends OperationExtension
 
     public function handle(Operation $operation, RouteInfo $routeInfo): void
     {
-        if (! $operation->requestBodyObject) {
+        if (! $operation->requestBodyObject instanceof RequestBodyObject) {
             return;
         }
 

@@ -675,7 +675,7 @@ class ContributionEntityMutationService
             'qualifications' => $this->normalizeQualificationEntries($speaker->qualifications ?? []),
             'language_ids' => $speaker->languages->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all(),
             'institution_id' => $affiliatedInstitution?->getKey(),
-            'institution_position' => $this->institutionPivotPosition($affiliatedInstitution),
+            'institution_position' => self::institutionPivotPosition($affiliatedInstitution),
             'address' => $this->addressState($speaker->addressModel),
             'contacts' => $this->contactsState($speaker->contacts),
             'social_media' => $this->socialMediaState($speaker->socialMedia),
@@ -863,7 +863,7 @@ class ContributionEntityMutationService
 
         $position = array_key_exists('institution_position', $payload)
             ? $this->normalizeOptionalString($payload['institution_position'])
-            : $this->institutionPivotPosition($currentAffiliation);
+            : self::institutionPivotPosition($currentAffiliation);
 
         if ($currentAffiliation instanceof Institution && (string) $currentAffiliation->getKey() !== $institutionId) {
             $speaker->institutions()->detach($currentAffiliation->getKey());
@@ -937,14 +937,12 @@ class ContributionEntityMutationService
             ->orderByPivot('is_primary', 'desc')
             ->orderBy('institutions.name')
             ->get()
-            ->map(static function (Institution $institution): array {
-                return [
-                    'id' => (string) $institution->getKey(),
-                    'name' => $institution->name,
-                    'position' => self::institutionPivotPosition($institution),
-                    'is_primary' => self::institutionPivotIsPrimary($institution),
-                ];
-            })
+            ->map(static fn (Institution $institution): array => [
+                'id' => (string) $institution->getKey(),
+                'name' => $institution->name,
+                'position' => self::institutionPivotPosition($institution),
+                'is_primary' => self::institutionPivotIsPrimary($institution),
+            ])
             ->values()
             ->all();
     }

@@ -7,6 +7,11 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-type CountryArray array{id: int, name: string, iso2: string, key: ?string}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('Country')]
 final readonly class Country implements Arrayable
 {
@@ -17,9 +22,7 @@ final readonly class Country implements Arrayable
         public ?string $key,
     ) {}
 
-    /**
-     * @return array{id: int, name: string, iso2: string, key: ?string}
-     */
+    /** @return CountryArray */
     public function toArray(): array
     {
         return [

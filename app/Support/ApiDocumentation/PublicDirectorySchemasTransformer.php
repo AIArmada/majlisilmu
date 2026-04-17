@@ -25,7 +25,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
 
         $this->putSchema($components, 'AddressSelection', $this->addressSelectionSchema());
         $this->putSchema($components, 'Country', $this->countrySchema());
-        $this->putSchema($components, 'EventSummary', $this->eventSummarySchema($components));
+        $this->putSchema($components, 'EventSummary', $this->eventSummarySchema());
         $this->putSchema($components, 'EventParticipation', $this->eventParticipationSchema($components));
         $this->putSchema($components, 'InstitutionListItem', $this->institutionListItemSchema($components));
         $this->putSchema($components, 'SpeakerListItem', $this->speakerListItemSchema($components));
@@ -233,7 +233,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         );
     }
 
-    private function eventSummarySchema(Components $components): Schema
+    private function eventSummarySchema(): Schema
     {
         return Schema::fromType(
             (new ObjectType)

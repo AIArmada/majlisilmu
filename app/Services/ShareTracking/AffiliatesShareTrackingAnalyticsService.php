@@ -254,11 +254,7 @@ final readonly class AffiliatesShareTrackingAnalyticsService
         return $this->conversionsQueryForLink($link->id)
             ->get()
             ->groupBy('conversion_type')
-            ->map(fn (Collection $collection, string $type): array => [
-                'outcome_type' => $type,
-                'label' => $this->outcomeTypeLabel($type),
-                'count' => $collection->count(),
-            ])
+            ->map(fn (Collection $collection, string $type): array => $this->outcomeBreakdownRow($collection, $type))
             ->sortByDesc('count')
             ->values();
     }
@@ -318,6 +314,19 @@ final readonly class AffiliatesShareTrackingAnalyticsService
     private function affiliateForUser(User $user): ?Affiliate
     {
         return $this->shareTrackingService->findAffiliateForUser($user);
+    }
+
+    /**
+     * @param  Collection<int, AffiliateConversion>  $collection
+     * @return array{outcome_type: string, label: string, count: int}
+     */
+    private function outcomeBreakdownRow(Collection $collection, string $type): array
+    {
+        return [
+            'outcome_type' => $type,
+            'label' => $this->outcomeTypeLabel($type),
+            'count' => $collection->count(),
+        ];
     }
 
     /**
