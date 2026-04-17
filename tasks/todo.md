@@ -1,3 +1,31 @@
+# API Report Triage
+
+- [ ] Verify the report claims against the current events API and docs behavior
+- [ ] Harden `/docs.json` generation so repeated requests do not timeout under load
+- [ ] Replace heavy event index serialization with a lean response path that preserves the public contract
+- [ ] Add focused regressions for docs stability and lean event list payloads
+- [ ] Re-run formatting and focused verification
+
+# Homepage Date Filter Alignment
+
+- [x] Audit the homepage day-count and `/majlis?date=...` flows against the timezone-aware API behavior
+- [x] Fix homepage date counts to use viewer-local day boundaries
+- [x] Translate `date` query presets on the public events index into concrete local date filters
+- [x] Add focused regressions for homepage date counts and public date-query filtering
+- [x] Re-run formatting and focused verification
+
+## Review
+
+- Confirmed against production that the public API returns the expected timezone-aware counts when `X-Timezone: Asia/Kuala_Lumpur` is supplied: `2026-04-17` => 6 events and `2026-04-19` => 4 events, while the same `2026-04-17` request without a timezone resolves to 7 because it falls back to UTC date boundaries.
+- Fixed [resources/views/components/home/⚡date-filter.blade.php](resources/views/components/home/%E2%9A%A1date-filter.blade.php) so the homepage date-strip counts are grouped in PHP by the viewer-local day instead of `DATE(starts_at)` in UTC.
+- Fixed [resources/views/components/pages/⚡home.blade.php](resources/views/components/pages/%E2%9A%A1home.blade.php), [resources/views/components/home/⚡date-filter.blade.php](resources/views/components/home/%E2%9A%A1date-filter.blade.php), and [resources/views/components/home/⚡tonight-events.blade.php](resources/views/components/home/%E2%9A%A1tonight-events.blade.php) so every homepage date link now emits the canonical `/majlis` filter contract directly: `starts_after`, `starts_before`, and `time_scope=all`.
+- Removed the legacy `date` query alias from [app/Livewire/Pages/Events/Index.php](app/Livewire/Pages/Events/Index.php), leaving `starts_after` / `starts_before` as the only public date-filter URL inputs for the events index.
+- Added focused regressions in [tests/Feature/EventSearchTest.php](tests/Feature/EventSearchTest.php) and [tests/Feature/HomePageTest.php](tests/Feature/HomePageTest.php) covering direct canonical query hydration into both the public filter props and `filterData`, plus the canonical homepage date-link contract and the local-day homepage count boundary behavior around Malaysia midnight.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` => 71 passed
+  - `vendor/bin/pest --parallel --compact tests/Feature/HomePageTest.php` => 13 passed
+
 # AI API Documentation Hardening
 
 - [x] Audit the current API docs and discovery manifests from an AI-consumer perspective

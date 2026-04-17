@@ -1765,6 +1765,65 @@ describe('Event Search Filters', function () {
             ->not->toContain('Timezone Excluded Event');
     });
 
+    it('hydrates canonical date range query params into public filters and form state', function () {
+        $userTimezone = 'Asia/Kuala_Lumpur';
+        $expectedDate = '2026-04-17';
+
+        createVisibleEventForSearch([
+            'title' => 'Date Query Included Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => Carbon::parse('2026-04-16 17:00:00', 'UTC'),
+            'ends_at' => null,
+        ]);
+
+        createVisibleEventForSearch([
+            'title' => 'Date Query Previous Day Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => Carbon::parse('2026-04-16 15:30:00', 'UTC'),
+            'ends_at' => null,
+        ]);
+
+        createVisibleEventForSearch([
+            'title' => 'Date Query Next Day Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => Carbon::parse('2026-04-17 16:30:00', 'UTC'),
+            'ends_at' => null,
+        ]);
+
+        $component = Livewire::withCookie('user_timezone', $userTimezone)
+            ->withQueryParams([
+                'starts_after' => $expectedDate,
+                'starts_before' => $expectedDate,
+                'time_scope' => 'all',
+            ])
+            ->test(Index::class);
+
+        $eventTitles = $component->instance()
+            ->events
+            ->getCollection()
+            ->pluck('title')
+            ->all();
+
+        expect($eventTitles)
+            ->toContain('Date Query Included Event')
+            ->not->toContain('Date Query Previous Day Event')
+            ->not->toContain('Date Query Next Day Event');
+
+        $component
+            ->assertSet('starts_after', $expectedDate)
+            ->assertSet('starts_before', $expectedDate)
+            ->assertSet('time_scope', 'all')
+            ->assertSet('filterData.starts_after', $expectedDate)
+            ->assertSet('filterData.starts_before', $expectedDate)
+            ->assertSet('filterData.time_scope', 'all');
+    });
+
     it('filters events to past only when time scope is past', function () {
         createVisibleEventForSearch([
             'title' => 'Past Scope Match',

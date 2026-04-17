@@ -38,6 +38,7 @@ final readonly class EventSummary implements Arrayable
         public bool $is_pending,
         public bool $is_cancelled,
         public bool $has_poster,
+        public ?string $poster_url,
         public ?string $card_image_url,
         public ?array $institution,
         public ?array $venue,
@@ -45,7 +46,7 @@ final readonly class EventSummary implements Arrayable
     ) {}
 
     /**
-     * @return array{id: string, slug: string, title: string, starts_at: ?string, ends_at: ?string, timing_display: ?string, prayer_display_text: ?string, end_time_display: ?string, visibility: string, status: string, status_label: string, event_type: list<string>, event_type_label: ?string, event_format: string, event_format_label: ?string, reference_study_subtitle: ?string, location: ?string, is_remote: bool, is_pending: bool, is_cancelled: bool, has_poster: bool, card_image_url: ?string, institution: array{id: string, name: string, slug: string, display_name: ?string, public_image_url: ?string, logo_url: ?string}|null, venue: array{id: string, name: string, slug: string}|null, speakers: list<array{id: string, name: string, formatted_name: string, slug: string, avatar_url: ?string}>}
+     * @return array{id: string, slug: string, title: string, starts_at: ?string, ends_at: ?string, timing_display: ?string, prayer_display_text: ?string, end_time_display: ?string, visibility: string, status: string, status_label: string, event_type: list<string>, event_type_label: ?string, event_format: string, event_format_label: ?string, reference_study_subtitle: ?string, location: ?string, is_remote: bool, is_pending: bool, is_cancelled: bool, has_poster: bool, poster_url: ?string, card_image_url: ?string, institution: array{id: string, name: string, slug: string, display_name: ?string, public_image_url: ?string, logo_url: ?string}|null, venue: array{id: string, name: string, slug: string}|null, speakers: list<array{id: string, name: string, formatted_name: string, slug: string, avatar_url: ?string}>}
      */
     public function toArray(): array
     {
@@ -71,6 +72,7 @@ final readonly class EventSummary implements Arrayable
             'is_pending' => $this->is_pending,
             'is_cancelled' => $this->is_cancelled,
             'has_poster' => $this->has_poster,
+            'poster_url' => $this->poster_url,
             'card_image_url' => $this->card_image_url,
             'institution' => $this->institution,
             'venue' => $this->venue,

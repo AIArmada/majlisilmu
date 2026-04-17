@@ -26,6 +26,12 @@ new class extends Component {
 
 @php
     $hasEvents = $this->events->isNotEmpty();
+    $todayDate = UserDateTimeFormatter::userNow()->toDateString();
+    $todayFilterQuery = [
+        'starts_after' => $todayDate,
+        'starts_before' => $todayDate,
+        'time_scope' => 'all',
+    ];
 @endphp
 
 @placeholder
@@ -60,7 +66,7 @@ style="display: none;" @endif>
                     </p>
                 </div>
             </div>
-            <a href="{{ route('events.index', ['date' => 'today']) }}" wire:navigate
+            <a href="{{ route('events.index', $todayFilterQuery) }}" wire:navigate
                 class="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 text-white font-medium hover:bg-white/30 transition-colors">
                 {{ __('Lihat Semua') }}
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

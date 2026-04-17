@@ -258,6 +258,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 ->addProperty('is_pending', new BooleanType)
                 ->addProperty('is_cancelled', new BooleanType)
                 ->addProperty('has_poster', new BooleanType)
+                ->addProperty('poster_url', (new StringType)->nullable(true))
                 ->addProperty('card_image_url', (new StringType)->nullable(true))
                 ->addProperty('institution', $this->eventInstitutionType())
                 ->addProperty('venue', $this->eventVenueType())
@@ -284,6 +285,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                     'is_pending',
                     'is_cancelled',
                     'has_poster',
+                    'poster_url',
                     'card_image_url',
                     'institution',
                     'venue',
