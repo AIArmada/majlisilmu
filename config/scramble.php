@@ -46,13 +46,15 @@ return [
 
     TIMEZONE:
 
-    All API timestamps are stored and returned in UTC (ISO 8601 with Z suffix).
+    Raw API timestamp fields are stored and returned in UTC (ISO 8601 with Z suffix).
 
-    The server timezone is UTC; the default display timezone is Asia/Kuala_Lumpur (MYT, UTC+8).
+    Viewer-facing helper fields such as event timing_display and end_time_display are localized only when the request provides timezone context (authenticated user preference, X-Timezone, user_timezone, cookie, or session). Without timezone context, bare API requests fall back to UTC.
 
-    Date filter values such as filter[starts_after] and filter[starts_before] must be expressed in UTC.
+    Date-only event filters such as filter[starts_after] and filter[starts_before] are interpreted in the resolved request timezone and converted to UTC day boundaries before querying.
 
-    Example: MYT April 12 today = filter[starts_after]=2026-04-11T16:00:00Z&filter[starts_before]=2026-04-12T15:59:59Z.
+    For MYT today requests, send X-Timezone: Asia/Kuala_Lumpur and date-only values such as filter[starts_after]=2026-04-12&filter[starts_before]=2026-04-12.
+
+    The server timezone is UTC. The web application commonly supplies Asia/Kuala_Lumpur as user timezone context, but API consumers should not assume MYT unless they send it explicitly.
 
     PUBLIC FLOWS:
 

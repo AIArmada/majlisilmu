@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-12
+**Last Updated:** 2026-04-16
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -20,7 +20,7 @@ If you are building an AI client, use this read order:
 3. Call `GET /manifest` for public workflow discovery or `GET /admin/manifest` for admin resource discovery.
 4. Before any write, fetch the exact contract first: `GET /forms/*` for public flows, or `GET /admin/{resourceKey}/schema` for admin writes.
 5. Use admin UUID `id` values for mutation paths. Do not use public slugs or `route_key` values on admin write routes.
-6. Send UTC timestamps and build date filters in UTC even when the user-facing timezone is MYT.
+6. Send raw timestamp fields in UTC. For date-only filters, send the user's local calendar date together with timezone context so the server can convert it to UTC boundaries.
 7. Treat `error.code` as the machine-readable failure classifier and `meta.request_id` as the trace identifier for retries and support.
 
 ---
@@ -45,19 +45,23 @@ Key routing rules:
 
 ## Timezone Semantics
 
-**All API timestamps are stored and returned in UTC (ISO 8601 with `Z` suffix).**
+**Raw API timestamp fields are stored and returned in UTC (ISO 8601 with `Z` suffix).**
 
-| Context | Timezone |
+| Context | Behavior |
 |---|---|
-| All API timestamps (`created_at`, `updated_at`, `starts_at`, `ends_at`, etc.) | UTC (`...Z`) |
-| UI display (web and mobile defaults) | MYT — UTC+8 (Asia/Kuala_Lumpur) |
-| Event `event_date` field (submitted/stored) | UTC date string (no time component) |
+| Raw API timestamps (`created_at`, `updated_at`, `starts_at`, `ends_at`, etc.) | Always UTC (`...Z`) |
+| Viewer-facing helper fields (`timing_display`, `end_time_display`) | Localized only when the request provides timezone context; otherwise they fall back to UTC |
+| Request timezone context | Authenticated user preference, `X-Timezone`, `user_timezone`, cookie, or session |
+| Date-only inputs (`event_date`, `filter[starts_after]`, `filter[starts_before]`, etc.) | Interpreted in the resolved request timezone, then converted to UTC day boundaries for storage or querying |
+| Application/browser defaults | The web client commonly supplies `Asia/Kuala_Lumpur`, but generic API consumers should not assume that default |
 
 **Implications for API consumers:**
 
 - When you receive `starts_at: "2026-04-12T00:00:00Z"`, that is midnight UTC, which is **08:00 MYT** on the same calendar date.
-- "Today" and "tomorrow" filtering using `filter[starts_after]` and `filter[starts_before]` must be expressed as UTC boundaries. For example, to fetch events on MYT April 12 ("today" in Malaysia), query `filter[starts_after]=2026-04-11T16:00:00Z&filter[starts_before]=2026-04-12T15:59:59Z` — that is, MYT midnight (00:00 MYT) maps to 16:00 UTC the previous calendar day.
-- The app config stores `timezone = UTC` for the server, and `default_user_timezone = Asia/Kuala_Lumpur` for UI rendering. AI agents and background jobs must translate between these when building date filters.
+- Helper fields such as `timing_display` and `end_time_display` are localized only when the request provides timezone context. A bare API request with no `X-Timezone`, `user_timezone`, cookie, session, or authenticated user preference will see those helper fields in UTC.
+- `filter[starts_after]`, `filter[starts_before]`, `filter[ends_after]`, and `filter[ends_before]` are date-boundary filters. Send date-only values in the user's local calendar together with timezone context, and the API will convert them to UTC boundaries internally.
+- To fetch events on MYT April 12 ("today" in Malaysia), send `X-Timezone: Asia/Kuala_Lumpur` with `filter[starts_after]=2026-04-12&filter[starts_before]=2026-04-12`. If you omit timezone context, the same filter values are interpreted in UTC instead.
+- The app config stores `timezone = UTC` for the server. The web application often supplies `Asia/Kuala_Lumpur` automatically, but standalone API consumers must send timezone context explicitly when they need localized helper fields or local-date filtering.
 - Push notification payloads embed a `timezone` field (e.g., `"Asia/Kuala_Lumpur"`) so the server can localize scheduled reminders.
 
 ---
@@ -524,7 +528,7 @@ status=verified
 
 ### `GET /events`
 
-> **Timezone note:** All date/time filter values must be expressed in UTC. `filter[starts_after]=2026-04-12T00:00:00Z` means midnight UTC, which is 08:00 MYT. When building "today" or "this week" filters for Malaysian users, offset your boundaries by +8 hours relative to UTC midnight.
+> **Timezone note:** `filter[starts_after]`, `filter[starts_before]`, `filter[ends_after]`, and `filter[ends_before]` are date-boundary filters. Send date-only values in the user's local calendar and provide timezone context via `X-Timezone` or `user_timezone`; the API converts them to UTC start/end-of-day boundaries. If you omit timezone context, these filters default to UTC.
 
 Supported filters:
 

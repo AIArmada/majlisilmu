@@ -143,6 +143,22 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain('Current admin write support includes events, institutions, speakers, references, venues, and subdistricts.');
 });
 
+it('documents utc transport fields and request-timezone helper behavior clearly', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    expect((string) $response->json('info.description'))
+        ->toContain('Raw API timestamp fields are stored and returned in UTC')
+        ->toContain('Viewer-facing helper fields such as event timing_display and end_time_display are localized only when the request provides timezone context')
+        ->toContain('Without timezone context, bare API requests fall back to UTC.')
+        ->toContain('Date-only event filters such as filter[starts_after] and filter[starts_before] are interpreted in the resolved request timezone')
+        ->toContain('send X-Timezone: Asia/Kuala_Lumpur and date-only values such as filter[starts_after]=2026-04-12&filter[starts_before]=2026-04-12')
+        ->toContain('If you omit timezone context, the same filter values are interpreted in UTC instead.')
+        ->not->toContain('The server timezone is UTC; the default display timezone is Asia/Kuala_Lumpur (MYT, UTC+8).')
+        ->not->toContain('All date/time filter values must be expressed in UTC.');
+});
+
 it('does not leak local-only docs urls into the published api description', function () {
     $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
         'Host' => 'api.majlisilmu.test',
