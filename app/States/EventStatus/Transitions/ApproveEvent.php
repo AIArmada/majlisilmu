@@ -5,6 +5,7 @@ namespace App\States\EventStatus\Transitions;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\ModerationReview;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
@@ -67,49 +68,66 @@ class ApproveEvent extends Transition implements HasColor, HasIcon, HasLabel
      */
     protected function verifyPendingRelatedRecords(Event $event): void
     {
+        $speakerIds = $event->keyPeople()->whereNotNull('speaker_id')->pluck('speaker_id');
+
+        if ($event->organizer_type === Speaker::class && $event->organizer_id) {
+            $speakerIds->push($event->organizer_id);
+        }
+
         // Verify linked speaker profiles across all event roles.
         Speaker::query()
-            ->whereIn('id', $event->keyPeople()->whereNotNull('speaker_id')->pluck('speaker_id'))
+            ->whereIn('id', $speakerIds->unique()->values())
             ->where('status', 'pending')
-            ->update(['status' => 'verified']);
+            ->get()
+            ->each(function (Speaker $speaker): void {
+                $speaker->forceFill(['status' => 'verified'])->save();
+            });
 
-        // Verify organizer if Speaker
-        if ($event->organizer_type === Speaker::class && $event->organizer_id) {
-            Speaker::where('id', $event->organizer_id)
-                ->where('status', 'pending')
-                ->update(['status' => 'verified']);
-        }
+        $institutionIds = collect();
 
-        // Verify organizer if Institution
         if ($event->organizer_type === Institution::class && $event->organizer_id) {
-            Institution::where('id', $event->organizer_id)
-                ->where('status', 'pending')
-                ->update(['status' => 'verified']);
+            $institutionIds->push($event->organizer_id);
         }
 
-        // Verify location institution
         if ($event->institution_id) {
-            Institution::where('id', $event->institution_id)
-                ->where('status', 'pending')
-                ->update(['status' => 'verified']);
+            $institutionIds->push($event->institution_id);
         }
+
+        Institution::query()
+            ->whereIn('id', $institutionIds->unique()->values())
+            ->where('status', 'pending')
+            ->get()
+            ->each(function (Institution $institution): void {
+                $institution->forceFill(['status' => 'verified'])->save();
+            });
 
         // Verify venue
         if ($event->venue_id) {
-            Venue::where('id', $event->venue_id)
+            Venue::query()
+                ->whereKey($event->venue_id)
                 ->where('status', 'pending')
-                ->update(['status' => 'verified']);
+                ->get()
+                ->each(function (Venue $venue): void {
+                    $venue->forceFill(['status' => 'verified'])->save();
+                });
         }
 
         // Verify tags
-        Tag::whereIn('id', $event->tags->pluck('id'))
+        Tag::query()
+            ->whereIn('id', $event->tags->pluck('id')->unique()->values())
             ->where('status', 'pending')
-            ->update(['status' => 'verified']);
+            ->get()
+            ->each(function (Tag $tag): void {
+                $tag->forceFill(['status' => 'verified'])->save();
+            });
 
         // Verify references
         $event->references()
             ->where('status', 'pending')
-            ->update(['status' => 'verified']);
+            ->get()
+            ->each(function (Reference $reference): void {
+                $reference->forceFill(['status' => 'verified'])->save();
+            });
 
         Log::info('Auto-verified pending related records', [
             'event_id' => $event->id,

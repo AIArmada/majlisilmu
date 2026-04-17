@@ -11,6 +11,7 @@ use App\Enums\EventVisibility;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
+use App\Support\Api\ApiPagination;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -36,7 +37,7 @@ class EventSaveController extends Controller
             ->whereIn('status', Event::PUBLIC_STATUSES)
             ->where('visibility', 'public')
             ->orderBy('starts_at')
-            ->paginate($request->input('per_page', 20));
+            ->paginate(ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 100));
 
         return response()->json([
             'data' => collect($savedEvents->items())

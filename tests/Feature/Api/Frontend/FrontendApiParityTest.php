@@ -23,6 +23,7 @@ use App\Models\Institution;
 use App\Models\MembershipClaim;
 use App\Models\Reference;
 use App\Models\Series;
+use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
@@ -116,7 +117,7 @@ it('exposes corrected frontend contract metadata', function () {
         ->and($manifest['docs']['openapi'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($manifest['routing_surfaces']['public']['manifest_endpoint'] ?? null)->toContain('/api/v1/manifest')
         ->and($manifest['routing_surfaces']['admin']['manifest_endpoint'] ?? null)->toContain('/api/v1/admin/manifest')
-        ->and($manifest['rules'] ?? [])->toContain('Use admin UUID id values for admin mutation paths; do not use route_key or public slugs.')
+        ->and($manifest['rules'] ?? [])->toContain('Use the admin record route_key returned by admin collection or detail payloads for record-specific schema and mutation paths; id remains accepted as a compatibility fallback.')
         ->and($quickstart[0]['endpoint'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($submitEventFields)->toContain('parent_event_id', 'scoped_institution_id')
         ->and($submitEventFields)->toContain('submission_country_id', 'submission_country_code', 'submission_country_key')
@@ -150,6 +151,20 @@ it('exposes corrected frontend contract metadata', function () {
     $institutionFields = collect($institutionContract['fields'] ?? [])->pluck('name')->all();
 
     expect($institutionFields)->not->toContain('logo');
+});
+
+it('clamps public institution directory per_page values to the supported maximum', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    Institution::factory()->count(55)->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->getJson('/api/v1/institutions?per_page=500')
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.per_page', 50)
+        ->assertJsonCount(50, 'data');
 });
 
 it('exposes authenticated contribution update contracts and permission-gated direct edit media support', function () {
@@ -2075,9 +2090,36 @@ it('bumps public directory cache versions when country metadata changes', functi
         ->assertOk()
         ->json('meta.cache.version');
 
-    Country::query()->whereKey($countryId)->update([
-        'name' => 'Malaysia Baru',
-    ]);
+    $country = Country::query()->findOrFail($countryId);
+    $country->name = 'Malaysia Baru';
+    $country->save();
+
+    $updatedInstitutionVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+    $updatedSpeakerVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    expect($updatedInstitutionVersion)->toBeString()->not->toBe('')
+        ->and($updatedInstitutionVersion)->not->toBe($initialInstitutionVersion)
+        ->and($updatedSpeakerVersion)->toBeString()->not->toBe('')
+        ->and($updatedSpeakerVersion)->not->toBe($initialSpeakerVersion);
+});
+
+it('bumps public directory cache versions when public country config changes', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    $initialInstitutionVersion = $this->getJson(route('api.client.institutions.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+    $initialSpeakerVersion = $this->getJson(route('api.client.speakers.index'))
+        ->assertOk()
+        ->json('meta.cache.version');
+
+    $countries = config('public-countries.countries', []);
+    $countries['malaysia']['label'] = 'Malaysia Config Refresh';
+    config()->set('public-countries.countries', $countries);
 
     $updatedInstitutionVersion = $this->getJson(route('api.client.institutions.index'))
         ->assertOk()
@@ -2386,6 +2428,98 @@ it('allows institution member management over bearer tokens for admins without t
         ->assertJsonPath('data.member.email', $newMember->email);
 
     expect($institution->members()->whereKey($newMember->getKey())->exists())->toBeTrue();
+});
+
+it('scopes the spaces catalog to global spaces unless an institution is selected', function () {
+    $institution = Institution::factory()->create();
+    $otherInstitution = Institution::factory()->create();
+
+    $globalSpace = Space::factory()->create([
+        'name' => 'Global Space Catalog',
+        'is_active' => true,
+    ]);
+    $institutionSpace = Space::factory()->create([
+        'name' => 'Institution Space Catalog',
+        'is_active' => true,
+    ]);
+    $otherInstitutionSpace = Space::factory()->create([
+        'name' => 'Other Institution Space Catalog',
+        'is_active' => true,
+    ]);
+
+    $institutionSpace->institutions()->attach($institution);
+    $otherInstitutionSpace->institutions()->attach($otherInstitution);
+
+    $globalResponse = $this->getJson(route('api.client.catalogs.spaces'))
+        ->assertOk()
+        ->json('data');
+
+    expect(collect($globalResponse)->pluck('id')->all())
+        ->toContain((string) $globalSpace->getKey())
+        ->not->toContain((string) $institutionSpace->getKey())
+        ->not->toContain((string) $otherInstitutionSpace->getKey());
+
+    $scopedResponse = $this->getJson(route('api.client.catalogs.spaces', [
+        'institution_id' => $institution->getKey(),
+    ]))
+        ->assertOk()
+        ->json('data');
+
+    expect(collect($scopedResponse)->pluck('id')->all())
+        ->toContain((string) $globalSpace->getKey())
+        ->toContain((string) $institutionSpace->getKey())
+        ->not->toContain((string) $otherInstitutionSpace->getKey());
+});
+
+it('returns all matching spaces without truncating the catalog payload', function () {
+    $spaces = collect(range(1, 105))->map(function (int $index): Space {
+        return Space::factory()->create([
+            'name' => sprintf('Catalog Overflow Space %03d', $index),
+            'is_active' => true,
+        ]);
+    });
+
+    $response = $this->getJson(route('api.client.catalogs.spaces'))
+        ->assertOk()
+        ->json('data');
+
+    $responseIds = collect($response)->pluck('id')->all();
+
+    expect($spaces->map(fn (Space $space): string => (string) $space->getKey())->diff($responseIds)->all())
+        ->toBe([]);
+});
+
+it('returns the institution workspace payload for the selected accessible institution', function () {
+    $institution = Institution::factory()->create(['name' => 'Workspace Institution']);
+    $secondInstitution = Institution::factory()->create(['name' => 'Second Workspace Institution']);
+    $admin = User::factory()->create();
+    $viewer = User::factory()->create();
+
+    app(AddMemberToSubject::class)->handle($institution, $admin, 'admin');
+    app(AddMemberToSubject::class)->handle($institution, $viewer, 'viewer');
+    app(AddMemberToSubject::class)->handle($secondInstitution, $admin, 'admin');
+
+    Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'title' => 'Workspace Event',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => now()->addDay(),
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->getJson(route('api.client.institution-workspace.show', [
+        'institution_id' => $institution->getKey(),
+    ]))
+        ->assertOk();
+
+    expect($response->json('data.selected_institution.id'))->toBe($institution->getKey())
+        ->and($response->json('data.events.0.title'))->toBe('Workspace Event')
+        ->and($response->json('data.members.0.email'))->not->toBe('')
+        ->and($response->json('data.can_manage_members'))->toBeTrue()
+        ->and($response->json('meta.members_pagination.total'))->toBe(2);
 });
 
 it('submits events with media through the frontend api', function () {

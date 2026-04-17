@@ -118,7 +118,7 @@ class MembershipClaimPresenter
     /**
      * @return array{subject_label: string, subject_title: string, redirect_url: string, admin_url: string}|null
      */
-    private static function subjectPresentation(MembershipClaim $claim): ?array
+    public static function subjectPresentation(MembershipClaim $claim): ?array
     {
         $subjectType = $claim->subject_type instanceof MemberSubjectType
             ? $claim->subject_type

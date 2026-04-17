@@ -11,6 +11,7 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\Venue;
+use App\Support\Cache\PublicDirectoryCacheVersion;
 use App\Support\Cache\PublicListingsCache;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
@@ -21,17 +22,20 @@ class AddressObserver
         protected GenerateInstitutionSlugAction $generateInstitutionSlugAction,
         protected GenerateSpeakerSlugAction $generateSpeakerSlugAction,
         protected GenerateVenueSlugAction $generateVenueSlugAction,
+        protected PublicDirectoryCacheVersion $publicDirectoryCacheVersion,
         protected PublicListingsCache $publicListingsCache,
     ) {}
 
     public function saved(Address $address): void
     {
         $this->syncInstitutionSlug($address);
+        $this->publicDirectoryCacheVersion->bumpForAddress($address);
     }
 
     public function deleted(Address $address): void
     {
         $this->syncInstitutionSlug($address);
+        $this->publicDirectoryCacheVersion->bumpForAddress($address);
     }
 
     private function syncInstitutionSlug(Address $address): void

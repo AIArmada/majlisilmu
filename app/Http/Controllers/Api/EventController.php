@@ -13,6 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\Signals\ProductSignalsService;
+use App\Support\Api\ApiPagination;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Illuminate\Database\Connection;
@@ -320,7 +321,7 @@ class EventController extends Controller
             ->where('is_active', true)
             ->whereIn('status', self::PUBLIC_STATUSES)
             ->where('visibility', 'public')
-            ->paginate((int) $request->input('per_page', 20))
+            ->paginate(ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 50))
             ->appends($request->query());
 
         /** @var array<string, mixed> $payload */

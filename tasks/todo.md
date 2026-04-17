@@ -1,3 +1,62 @@
+# API Docs Alignment Audit
+
+- [x] Audit the live API surface, generated docs, and checked-in mobile reference for drift
+- [x] Update stale admin record-key guidance and newer public contract notes in the docs sources
+- [x] Add or adjust focused docs regression assertions for the refreshed guidance
+- [x] Re-run focused verification for docs and API parity
+
+## Review
+
+- Audited the generated OpenAPI surface against the current `api/v1` routes and confirmed the real drift was in the checked-in docs source rather than the route registration layer; the only strict diff left was the accepted PUT/PATCH alias pattern on `saved-searches`.
+- Updated [config/scramble.php](config/scramble.php), [app/Support/ApiDocumentation/ApiDocumentationConfigFactory.php](app/Support/ApiDocumentation/ApiDocumentationConfigFactory.php), and [docs/MAJLISILMU_MOBILE_API_REFERENCE.md](docs/MAJLISILMU_MOBILE_API_REFERENCE.md) so the docs now match the current admin record-key contract: prefer `route_key`, with `id` retained only as a compatibility fallback.
+- Refreshed the public contract notes to document current page-size clamping, global-plus-institution space catalog behavior, and institution-workspace auto-selection semantics.
+- Tightened the generated-docs descriptions in [app/Http/Controllers/Api/Frontend/CatalogController.php](app/Http/Controllers/Api/Frontend/CatalogController.php), [app/Http/Controllers/Api/Frontend/ManifestController.php](app/Http/Controllers/Api/Frontend/ManifestController.php), and [app/Http/Controllers/Api/Frontend/InstitutionWorkspaceController.php](app/Http/Controllers/Api/Frontend/InstitutionWorkspaceController.php), then locked the changes with focused assertions in [tests/Feature/ScrambleDocsTest.php](tests/Feature/ScrambleDocsTest.php).
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress ...` on touched PHP source files => pass
+  - `tests/Feature/ScrambleDocsTest.php`, `tests/Feature/Api/Admin/AdminApiTest.php`, and `tests/Feature/Api/Frontend/FrontendApiParityTest.php` => 126 passed
+
+# API Audit Remediation
+
+- [x] Fix admin record-key resolution and schema endpoint record-key contracts
+- [x] Fix Subdistrict admin update-schema generation
+- [x] Clamp high-traffic public, authenticated, and admin collection page sizes
+- [x] Add focused regressions for route-key resolution, Subdistrict schema generation, and per-page clamping
+- [x] Re-run formatting and focused verification
+
+## Review
+
+- Added [app/Support/Api/ApiPagination.php](app/Support/Api/ApiPagination.php) and applied it to the public events index, public institution and speaker directories, saved-events, going-events, user registrations, notification inbox, and admin generic resource collections so oversized `per_page` requests are now bounded consistently.
+- Reworked admin record lookup in [app/Support/Api/Admin/AdminResourceRegistry.php](app/Support/Api/Admin/AdminResourceRegistry.php) to honor Laravel route-key resolution first and only fall back to the primary key if no route-key match exists, which avoids slug versus UUID ambiguity and keeps slug-backed admin resources addressable through their `route_key` values.
+- Fixed the Subdistrict update-schema crash in [app/Support/Api/Admin/AdminResourceMutationService.php](app/Support/Api/Admin/AdminResourceMutationService.php) by skipping the shared contribution-state builder for Subdistrict records and using the dedicated Subdistrict defaults path directly.
+- Updated the admin-facing rule text in [app/Support/Api/Admin/AdminResourceService.php](app/Support/Api/Admin/AdminResourceService.php) and [app/Support/Api/Frontend/FrontendFormContractService.php](app/Support/Api/Frontend/FrontendFormContractService.php) so API clients are told to use the admin `route_key` for record-specific paths, with `id` retained as a compatibility fallback.
+- Added focused regressions in [tests/Feature/Api/Admin/AdminApiTest.php](tests/Feature/Api/Admin/AdminApiTest.php), [tests/Feature/Api/Frontend/FrontendApiParityTest.php](tests/Feature/Api/Frontend/FrontendApiParityTest.php), [tests/Feature/Api/EventApiContractTest.php](tests/Feature/Api/EventApiContractTest.php), and [tests/Feature/Api/EventSaveTest.php](tests/Feature/Api/EventSaveTest.php) covering admin route-key reads and update schemas, Subdistrict update-schema defaults, and bounded `per_page` behavior.
+- Verification:
+  - `vendor/bin/pest --parallel` on the focused API files => 131 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse` on touched PHP source files => pass
+
+# API Audit Performance Remediation Wave 2
+
+- [x] Replace public directory live cache-version hashing with explicit invalidation hooks
+- [x] Bound event, institution, and speaker fuzzy fallback candidate sets before PHP scoring
+- [x] Tighten frontend spaces catalog scoping and trim saved/going list payloads
+- [x] Reduce authenticated and admin read-path reloads, duplicate queries, and repeated metadata work
+- [x] Add focused regressions and rerun formatting, targeted tests, and focused PHPStan
+
+## Review
+
+- Added [app/Support/Cache/PublicDirectoryCacheVersion.php](app/Support/Cache/PublicDirectoryCacheVersion.php) plus [app/Observers/EventKeyPersonObserver.php](app/Observers/EventKeyPersonObserver.php), and wired the relevant observers/providers so institution and speaker directory cache versions are now bumped on model, address, media, geography, event, and event-key-person changes instead of being recomputed through live fingerprint queries on every request.
+- Reworked [app/Http/Controllers/Api/Frontend/SearchController.php](app/Http/Controllers/Api/Frontend/SearchController.php), [app/Services/EventSearchService.php](app/Services/EventSearchService.php), [app/Support/Search/InstitutionSearchService.php](app/Support/Search/InstitutionSearchService.php), and [app/Support/Search/SpeakerSearchService.php](app/Support/Search/SpeakerSearchService.php) so public directory/search responses use explicit cache versions and fuzzy fallbacks prefilter SQL candidates before in-memory similarity ranking.
+- Corrected [app/Support/Api/Frontend/FrontendCatalogService.php](app/Support/Api/Frontend/FrontendCatalogService.php) to return only global spaces by default and global plus linked spaces when an institution is selected, matching the actual many-to-many relationship instead of the previous invalid direct-column assumption.
+- Reduced authenticated overhead in [app/Services/Notifications/NotificationSettingsManager.php](app/Services/Notifications/NotificationSettingsManager.php), [app/Http/Controllers/Api/Frontend/InstitutionWorkspaceController.php](app/Http/Controllers/Api/Frontend/InstitutionWorkspaceController.php), [app/Http/Controllers/Api/Frontend/MembershipClaimController.php](app/Http/Controllers/Api/Frontend/MembershipClaimController.php), and [app/Support/Api/Admin/AdminResourceRegistry.php](app/Support/Api/Admin/AdminResourceRegistry.php) by batching missing notification-rule creation with generated UUIDs, removing unnecessary refreshed-user reloads, reusing accessible-institution/member state work, reusing membership subject presentation, and memoizing admin metadata/search column derivation.
+- Slimmed engagement list serialization in [app/Data/Api/EventEngagement/EventEngagementListItemData.php](app/Data/Api/EventEngagement/EventEngagementListItemData.php) so saved/going event responses ship curated event, institution, venue, and speaker fields instead of full related-model arrays.
+- Expanded focused regression coverage in [tests/Feature/Api/Frontend/FrontendApiParityTest.php](tests/Feature/Api/Frontend/FrontendApiParityTest.php) and revalidated the surrounding frontend/auth/admin surfaces.
+- Verification:
+  - `vendor/bin/pest --parallel` on the focused API/search/admin files => 206 passed
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse` in three focused batches across all touched PHP source files => pass
+
 # API Report Triage
 
 - [ ] Verify the report claims against the current events API and docs behavior

@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Support\Auditing\MediaCollectionAuditSnapshot;
+use App\Support\Cache\PublicDirectoryCacheVersion;
 use Illuminate\Database\Eloquent\Model;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -23,6 +24,8 @@ class AuditedMediaObserver extends MediaObserver
 
     public function created(Media $media): void
     {
+        app(PublicDirectoryCacheVersion::class)->bumpForMedia($media);
+
         $owner = $this->resolveAuditableOwner($this->resolveCurrentOwner($media));
 
         if (! $owner instanceof Model) {
@@ -78,6 +81,7 @@ class AuditedMediaObserver extends MediaObserver
     public function updated(Media $media): void
     {
         parent::updated($media);
+        app(PublicDirectoryCacheVersion::class)->bumpForMedia($media);
 
         $pendingSnapshots = $this->pendingUpdateSnapshots();
         $snapshot = $pendingSnapshots[$media] ?? null;
@@ -154,6 +158,7 @@ class AuditedMediaObserver extends MediaObserver
     public function deleted(Media $media): void
     {
         parent::deleted($media);
+        app(PublicDirectoryCacheVersion::class)->bumpForMedia($media);
 
         $pendingSnapshots = $this->pendingDeleteSnapshots();
         $snapshot = $pendingSnapshots[$media] ?? null;

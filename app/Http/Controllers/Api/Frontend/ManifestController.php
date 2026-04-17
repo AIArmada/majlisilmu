@@ -125,7 +125,7 @@ class ManifestController extends FrontendController
 
     #[Endpoint(
         title: 'Get institution-workspace field contract',
-        description: 'Returns the authenticated member-management contract for institution workspaces, including add, update, and remove endpoint templates.',
+        description: 'Returns the authenticated member-management contract for institution workspaces, including the workspace endpoint, add/update/remove endpoint templates, and event filter defaults.',
     )]
     public function institutionWorkspace(): JsonResponse
     {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Api\Admin;
 
 use App\Models\User;
+use App\Support\Api\ApiPagination;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
@@ -52,7 +53,7 @@ class AdminResourceService
                 ],
                 'rules' => [
                     'Use resource keys returned by the manifest to select the correct admin schema and route family.',
-                    'Use UUID id values returned by admin collection or record endpoints as recordKey inputs.',
+                    'Use the admin record route_key returned by admin collection or record endpoints for record-specific paths; id remains accepted as a compatibility fallback.',
                     'Fetch the exact schema before every create or update because required fields and catalogs are resource-specific.',
                     'Admin PUT requests are full schema-guided updates, not partial patches.',
                     'Use authenticated /admin/catalogs/* endpoints for dependent selectors referenced by schema catalog metadata.',
@@ -104,7 +105,7 @@ class AdminResourceService
         $this->applyDefaultOrdering($query, $resourceClass);
 
         $records = $query->paginate(
-            perPage: min(max($perPage, 1), 100),
+            perPage: ApiPagination::normalizePerPage($perPage, default: 15, max: 100),
             page: max($page, 1),
         );
 

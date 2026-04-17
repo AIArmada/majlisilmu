@@ -70,6 +70,7 @@ it('lists the current users going events', function () {
         'status' => 'approved',
         'visibility' => 'public',
         'starts_at' => now()->addDays(1),
+        'event_url' => 'https://example.com/events/going-event-one',
         'institution_id' => $institution->id,
         'venue_id' => $venue->id,
     ]);
@@ -92,6 +93,7 @@ it('lists the current users going events', function () {
         ->assertJsonPath('data.0.slug', 'going-event-one')
         ->assertJsonPath('data.0.status', 'approved')
         ->assertJsonPath('data.0.visibility', 'public')
+        ->assertJsonPath('data.0.event_url', 'https://example.com/events/going-event-one')
         ->assertJsonPath('data.0.institution.id', $institution->id)
         ->assertJsonPath('data.0.institution.name', 'Masjid Going')
         ->assertJsonPath('data.0.institution.slug', $institution->slug)
@@ -149,6 +151,27 @@ it('rejects marking going for past events', function () {
         ->assertForbidden()
         ->assertJsonPath('error.message', 'Cannot mark going for past events.');
 
+});
+
+it('keeps missing institution and venue relations as null in the going events list', function () {
+    Sanctum::actingAs($this->user);
+
+    $event = Event::factory()->create([
+        'title' => 'Going Event Without Relations',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(4),
+        'institution_id' => null,
+        'venue_id' => null,
+    ]);
+
+    $this->user->goingEvents()->attach($event->id);
+
+    $this->getJson(route('api.user.going-events.index'))
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $event->id)
+        ->assertJsonPath('data.0.institution', null)
+        ->assertJsonPath('data.0.venue', null);
 });
 
 it('returns a conflict response when the user already marked going', function () {

@@ -19,7 +19,7 @@ abstract class FrontendController extends Controller
             return null;
         }
 
-        return $user->fresh() ?? $user;
+        return $user;
     }
 
     protected function requireUser(Request $request): User

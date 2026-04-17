@@ -2,8 +2,12 @@
 
 use App\Filament\Resources\Events\Pages\ViewEvent;
 use App\Models\Event;
+use App\Models\Institution;
 use App\Models\ModerationReview;
+use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\SpeakerSearchService;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Notification;
@@ -46,6 +50,50 @@ describe('Approve Action (ViewEvent)', function () {
             'user_id' => $submitter->id,
             'trigger' => 'submission_approved',
         ]);
+    });
+
+    it('refreshes public search caches when approval verifies related speakers and institutions', function () {
+        config()->set('scout.driver', 'collection');
+
+        $moderator = User::factory()->create();
+        $moderator->assignRole('super_admin');
+
+        $submitter = User::factory()->create();
+        $institution = Institution::factory()->create([
+            'name' => 'Samad Institution',
+            'status' => 'pending',
+            'is_active' => true,
+        ]);
+        $speaker = Speaker::factory()->create([
+            'name' => 'Samad Speaker',
+            'status' => 'pending',
+            'is_active' => true,
+        ]);
+
+        $event = Event::factory()->create([
+            'status' => 'pending',
+            'submitter_id' => $submitter->id,
+            'published_at' => null,
+            'institution_id' => $institution->id,
+        ]);
+        $event->speakers()->attach($speaker->id);
+
+        $institutionSearchService = app(InstitutionSearchService::class);
+        $speakerSearchService = app(SpeakerSearchService::class);
+
+        expect($institutionSearchService->publicSearchIds('samad'))->toBe([])
+            ->and($speakerSearchService->publicSearchIds('samad'))->toBe([]);
+
+        $this->actingAs($moderator);
+
+        Livewire::test(ViewEvent::class, ['record' => $event->id])
+            ->callAction('approve', ['note' => 'Looks great!'])
+            ->assertNotified();
+
+        expect($institution->fresh()?->status)->toBe('verified')
+            ->and($speaker->fresh()?->status)->toBe('verified')
+            ->and($institutionSearchService->publicSearchIds('samad'))->toContain((string) $institution->id)
+            ->and($speakerSearchService->publicSearchIds('samad'))->toContain((string) $speaker->id);
     });
 
     it('hides approve action for non-pending events', function () {

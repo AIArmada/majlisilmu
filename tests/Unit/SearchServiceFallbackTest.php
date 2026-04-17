@@ -79,6 +79,83 @@ it('falls back to local speaker fuzzy search when typesense lookup fails', funct
     expect($service->publicFuzzySearchIds('Smad'))->toContain((string) $speaker->id);
 });
 
+it('keeps transposed speaker typos reachable through fallback candidate filtering', function () {
+    $speaker = Speaker::factory()->create([
+        'name' => 'Ahmad Fauzi',
+        'honorific' => null,
+        'pre_nominal' => [],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(SpeakerSearchService::class)->syncSpeakerRecord($speaker);
+
+    $service = new class extends SpeakerSearchService
+    {
+        protected function shouldUseTypesenseSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    };
+
+    expect($service->publicFuzzySearchIds('Ahmda'))->toContain((string) $speaker->id);
+});
+
+it('keeps exact speaker fuzzy matches inside the capped fallback candidate set', function () {
+    foreach (range(1, 5) as $index) {
+        Speaker::factory()->create([
+            'name' => "Samadx Alpha {$index}",
+            'honorific' => null,
+            'pre_nominal' => [],
+            'post_nominal' => [],
+            'qualifications' => [],
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+    }
+
+    $exactSpeaker = Speaker::factory()->create([
+        'name' => 'Samadx',
+        'honorific' => null,
+        'pre_nominal' => [],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $service = new class extends SpeakerSearchService
+    {
+        protected function shouldUseTypesenseSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+
+        protected function typesenseResultLimit(): int
+        {
+            return 5;
+        }
+    };
+
+    expect($service->publicFuzzySearchIds('Samadx'))->toContain((string) $exactSpeaker->id);
+});
+
 it('falls back to database institution search when typesense lookup fails', function () {
     $institution = Institution::factory()->create([
         'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
@@ -137,6 +214,72 @@ it('falls back to database institution fuzzy search when typesense lookup fails'
     };
 
     expect($service->publicFuzzySearchIds('Hidayh'))->toContain((string) $institution->id);
+});
+
+it('keeps transposed institution typos reachable through fallback candidate filtering', function () {
+    $institution = Institution::factory()->create([
+        'name' => 'Pusat Ahmad',
+        'description' => 'Kuliah dan komuniti',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $service = new class extends InstitutionSearchService
+    {
+        protected function shouldUseTypesenseSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    };
+
+    expect($service->publicFuzzySearchIds('Ahmda'))->toContain((string) $institution->id);
+});
+
+it('keeps exact institution fuzzy matches inside the capped fallback candidate set', function () {
+    foreach (range(1, 5) as $index) {
+        Institution::factory()->create([
+            'name' => "Samadx Alpha {$index}",
+            'description' => 'Kuliah dan komuniti',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+    }
+
+    $exactInstitution = Institution::factory()->create([
+        'name' => 'Samadx',
+        'description' => 'Kuliah dan komuniti',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $service = new class extends InstitutionSearchService
+    {
+        protected function shouldUseTypesenseSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+
+        protected function typesenseResultLimit(): int
+        {
+            return 5;
+        }
+    };
+
+    expect($service->publicFuzzySearchIds('Samadx'))->toContain((string) $exactInstitution->id);
 });
 
 it('uses scout database search for speakers when the database driver is configured', function () {

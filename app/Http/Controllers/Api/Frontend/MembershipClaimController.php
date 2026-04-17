@@ -100,7 +100,7 @@ class MembershipClaimController extends FrontendController
 
         return response()->json([
             'data' => [
-                'claim' => $this->claimData($claim->fresh(['reviewer', 'media']) ?? $claim, $user),
+                'claim' => $this->claimData($claim->fresh(['reviewer', 'media']) ?? $claim, $user, $presentation),
                 'subject' => $presentation,
             ],
             'meta' => [
@@ -143,16 +143,22 @@ class MembershipClaimController extends FrontendController
     }
 
     /**
+     * @param  array<string, mixed>|null  $subjectPresentation
      * @return array<string, mixed>
      */
-    private function claimData(MembershipClaim $claim, User $currentUser): array
+    private function claimData(MembershipClaim $claim, User $currentUser, ?array $subjectPresentation = null): array
     {
+        $subjectPresentation ??= MembershipClaimPresenter::subjectPresentation($claim);
+        $evidenceItems = $claim->relationLoaded('media')
+            ? $claim->media->where('collection_name', 'evidence')->values()
+            : $claim->getMedia('evidence');
+
         return [
             'id' => $claim->getKey(),
             'subject_type' => $this->enumValue($claim->subject_type),
             'subject_label' => MembershipClaimPresenter::labelForSubject($claim->subject_type),
-            'subject_title' => MembershipClaimPresenter::subjectTitle($claim),
-            'subject_public_url' => MembershipClaimPresenter::subjectPublicUrl($claim),
+            'subject_title' => $subjectPresentation['subject_title'] ?? (string) $claim->subject_id,
+            'subject_public_url' => $subjectPresentation['redirect_url'] ?? null,
             'status' => $this->enumValue($claim->status),
             'status_label' => MembershipClaimPresenter::labelForStatus($claim->status),
             'role_label' => MembershipClaimPresenter::roleLabel($claim),
@@ -164,7 +170,7 @@ class MembershipClaimController extends FrontendController
             'cancelled_at' => $this->optionalDateTimeString($claim->cancelled_at),
             'can_cancel' => $claim->isPending() && (string) $claim->claimant_id === (string) $currentUser->getKey(),
             'reviewer' => $claim->reviewer?->only(['id', 'name', 'email']),
-            'evidence' => $claim->getMedia('evidence')->map(fn (Media $media): array => [
+            'evidence' => $evidenceItems->map(fn (Media $media): array => [
                 'id' => $media->getKey(),
                 'name' => $media->name !== '' ? $media->name : $media->file_name,
                 'url' => $media->getAvailableUrl(['thumb']) ?: $media->getUrl(),

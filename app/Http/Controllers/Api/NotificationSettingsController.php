@@ -105,6 +105,6 @@ class NotificationSettingsController extends Controller
 
         abort_unless($user instanceof User, 403);
 
-        return $user->fresh() ?? $user;
+        return $user;
     }
 }

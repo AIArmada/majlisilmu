@@ -9,6 +9,7 @@ use App\Data\Api\Notification\NotificationReadAllResultData;
 use App\Http\Controllers\Controller;
 use App\Models\NotificationMessage;
 use App\Models\User;
+use App\Support\Api\ApiPagination;
 use App\Support\Notifications\NotificationCatalog;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
@@ -27,7 +28,7 @@ class NotificationMessageController extends Controller
         $user = $this->currentUser($request);
         $family = $request->string('family', 'all')->toString();
         $status = $request->string('status', 'unread')->toString();
-        $perPage = min(max($request->integer('per_page', 20), 1), 100);
+        $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 100);
 
         $query = $user->notificationMessages()
             ->visibleInInbox()
@@ -89,6 +90,6 @@ class NotificationMessageController extends Controller
 
         abort_unless($user instanceof User, 403);
 
-        return $user->fresh() ?? $user;
+        return $user;
     }
 }

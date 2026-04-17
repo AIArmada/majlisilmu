@@ -32,40 +32,40 @@ class InstitutionWorkspaceController extends FrontendController
 
     #[Endpoint(
         title: 'Get institution workspace',
-        description: 'Returns the current user\'s institution workspace payload, including accessible institutions, events, members, and role options.',
+        description: 'Returns the current user\'s institution workspace payload, including accessible institutions, the selected institution, events, members, and role options. When `institution_id` is omitted, the first accessible institution is selected automatically.',
     )]
     public function show(Request $request): JsonResponse
     {
         $user = $this->requireUser($request);
 
-        abort_unless($this->availableInstitutionsQuery($user)->exists(), 403);
+        $availableInstitutions = $this->availableInstitutionsQuery($user)
+            ->withCount([
+                'events',
+                'events as public_events_count' => function (Builder $query): void {
+                    $query
+                        ->where('events.is_active', true)
+                        ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                        ->where('events.visibility', EventVisibility::Public);
+                },
+            ])
+            ->orderBy('name')
+            ->get(['institutions.id', 'institutions.name', 'institutions.nickname']);
+
+        abort_unless($availableInstitutions->isNotEmpty(), 403);
 
         $institutionId = $this->normalizeInstitutionId($request->query('institution_id'));
 
         if ($institutionId === null) {
-            $institutionId = $this->availableInstitutionsQuery($user)
-                ->orderBy('name')
-                ->value('institutions.id');
+            $institutionId = (string) $availableInstitutions->first()->getKey();
         }
 
-        if ($institutionId !== null && ! $this->availableInstitutionsQuery($user)->whereKey($institutionId)->exists()) {
+        $institution = $availableInstitutions->first(
+            fn (Institution $availableInstitution): bool => (string) $availableInstitution->getKey() === $institutionId
+        );
+
+        if (! $institution instanceof Institution) {
             abort(403);
         }
-
-        $institution = $institutionId !== null
-            ? $this->availableInstitutionsQuery($user)
-                ->withCount([
-                    'events',
-                    'events as public_events_count' => function (Builder $query): void {
-                        $query
-                            ->where('events.is_active', true)
-                            ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                            ->where('events.visibility', EventVisibility::Public);
-                    },
-                ])
-                ->whereKey($institutionId)
-                ->first()
-            : null;
 
         $eventSearch = trim((string) $request->query('event_search', ''));
         $eventStatus = $this->normalizeEventStatus((string) $request->query('event_status', 'all'));
@@ -75,21 +75,21 @@ class InstitutionWorkspaceController extends FrontendController
 
         $events = $this->institutionEvents($institution, $eventSearch, $eventStatus, $eventVisibility, $eventSort, $eventPerPage);
         $members = $this->institutionMembers($institution);
+        $memberRoleState = collect($members->getCollection())
+            ->mapWithKeys(fn (User $member): array => [
+                (string) $member->getKey() => [
+                    'roles' => $this->memberRoleCatalog->roleNamesFor($member, MemberSubjectType::Institution),
+                    'role_ids' => $this->memberRoleCatalog->roleIdsFor($member, MemberSubjectType::Institution),
+                    'is_owner' => $this->memberIsOwner($member),
+                    'has_protected_role' => $this->memberHasProtectedRole($member),
+                ],
+            ])
+            ->all();
+        $canManageMembers = $this->userHasInstitutionManagementRole($user);
 
         return response()->json([
             'data' => [
-                'institutions' => $this->availableInstitutionsQuery($user)
-                    ->withCount([
-                        'events',
-                        'events as public_events_count' => function (Builder $query): void {
-                            $query
-                                ->where('events.is_active', true)
-                                ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                                ->where('events.visibility', EventVisibility::Public);
-                        },
-                    ])
-                    ->orderBy('name')
-                    ->get()
+                'institutions' => $availableInstitutions
                     ->map(fn (Institution $availableInstitution): array => [
                         'id' => $availableInstitution->getKey(),
                         'name' => $availableInstitution->name,
@@ -97,19 +97,17 @@ class InstitutionWorkspaceController extends FrontendController
                         'events_count' => $this->countValue($availableInstitution, 'events_count'),
                         'public_events_count' => $this->countValue($availableInstitution, 'public_events_count'),
                     ])->all(),
-                'selected_institution' => $institution instanceof Institution
-                    ? [
-                        'id' => $institution->getKey(),
-                        'name' => $institution->name,
-                        'display_name' => $institution->display_name,
-                        'events_count' => $this->countValue($institution, 'events_count'),
-                        'public_events_count' => $this->countValue($institution, 'public_events_count'),
-                        'internal_events_count' => max(
-                            $this->countValue($institution, 'events_count') - $this->countValue($institution, 'public_events_count'),
-                            0,
-                        ),
-                    ]
-                    : null,
+                'selected_institution' => [
+                    'id' => $institution->getKey(),
+                    'name' => $institution->name,
+                    'display_name' => $institution->display_name,
+                    'events_count' => $this->countValue($institution, 'events_count'),
+                    'public_events_count' => $this->countValue($institution, 'public_events_count'),
+                    'internal_events_count' => max(
+                        $this->countValue($institution, 'events_count') - $this->countValue($institution, 'public_events_count'),
+                        0,
+                    ),
+                ],
                 'events' => $events->getCollection()->map(fn (Event $event): array => [
                     'id' => $event->getKey(),
                     'title' => $event->title,
@@ -131,12 +129,12 @@ class InstitutionWorkspaceController extends FrontendController
                     'id' => $member->getKey(),
                     'name' => $member->name,
                     'email' => $member->email,
-                    'roles' => $this->memberRoleCatalog->roleNamesFor($member, MemberSubjectType::Institution),
-                    'role_ids' => $this->memberRoleCatalog->roleIdsFor($member, MemberSubjectType::Institution),
-                    'is_owner' => $this->memberIsOwner($member),
-                    'has_protected_role' => $this->memberHasProtectedRole($member),
+                    'roles' => data_get($memberRoleState, [(string) $member->getKey(), 'roles'], []),
+                    'role_ids' => data_get($memberRoleState, [(string) $member->getKey(), 'role_ids'], []),
+                    'is_owner' => (bool) data_get($memberRoleState, [(string) $member->getKey(), 'is_owner'], false),
+                    'has_protected_role' => (bool) data_get($memberRoleState, [(string) $member->getKey(), 'has_protected_role'], false),
                 ])->all(),
-                'can_manage_members' => $institution instanceof Institution && $this->userHasInstitutionManagementRole($user),
+                'can_manage_members' => $canManageMembers,
                 'institution_role_options' => $this->institutionRoleOptions(),
             ],
             'meta' => [
@@ -227,7 +225,7 @@ class InstitutionWorkspaceController extends FrontendController
                     'id' => $member->getKey(),
                     'name' => $member->name,
                     'email' => $member->email,
-                    'roles' => $this->memberRoleCatalog->roleNamesFor($member->fresh() ?? $member, MemberSubjectType::Institution),
+                    'roles' => $this->memberRoleCatalog->roleNamesFor($member, MemberSubjectType::Institution),
                 ],
             ],
             'meta' => [
@@ -423,9 +421,10 @@ class InstitutionWorkspaceController extends FrontendController
         }
 
         /** @var LengthAwarePaginator<int, User> $paginator */
-        $paginator = User::query()
-            ->whereIn('id', $institution->members()->select('users.id'))
-            ->orderBy('name')
+        $paginator = $institution->members()
+            ->select('users.id', 'users.name', 'users.email')
+            ->with('roles')
+            ->orderBy('users.name')
             ->paginate(8);
 
         return $paginator;

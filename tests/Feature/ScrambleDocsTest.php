@@ -240,6 +240,11 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain('https://api.majlisilmu.test/docs.json')
         ->toContain("\n\nROUTING SURFACES:\n")
         ->toContain("\n\nTIMEZONE:\n")
+        ->toContain('record route_key returned by the admin collection or record-detail responses')
+        ->toContain('legacy id remains accepted as a compatibility fallback')
+        ->toContain('Collection endpoints clamp per_page to server-supported maxima')
+        ->toContain('Get the update schema using the route_key returned by the record payload')
+        ->toContain('PUT /api/v1/admin/speakers/ahmad-fauzi-my')
         ->toContain('Public create flows currently exist for events, institutions, and speakers.')
         ->toContain('must include an explicit country selection')
         ->toContain('Public update flows currently exist for events, institutions, speakers, and references')
@@ -248,6 +253,10 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain('GET /admin/manifest')
         ->toContain('GET /admin/{resourceKey}/schema?operation=create')
         ->toContain('GET /admin/catalogs/*')
+        ->toContain('GET /catalogs/spaces returns only global spaces when institution_id is omitted')
+        ->toContain('GET /institution-workspace auto-selects the first accessible institution when institution_id is omitted')
+        ->not->toContain('The recordKey parameter must be the UUID primary key')
+        ->not->toContain('Get the update schema using the id (UUID primary key, not the slug)')
         ->toContain('Current admin write support includes events, institutions, speakers, references, venues, and subdistricts.');
 });
 
@@ -446,6 +455,7 @@ it('adds workflow summaries to public contract and mutation endpoints', function
         ->and($paths['/contributions/speakers']['post']['description'] ?? null)->toContain('address.country_code')
         ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['summary'] ?? null)->toBe('Get editable contribution context')
         ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['description'] ?? null)->toContain('event `poster`/`gallery`')
+        ->and($paths['/forms/institution-workspace']['get']['description'] ?? null)->toContain('workspace endpoint')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['summary'] ?? null)->toBe('Submit a contribution update')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['description'] ?? null)->toContain('direct_edit')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['description'] ?? null)->toContain('review');
@@ -621,10 +631,12 @@ it('adds summaries and descriptions to catalog and authenticated workflow endpoi
 
     expect($paths['/catalogs/countries']['get']['summary'] ?? null)->toBe('List public countries catalog')
         ->and($paths['/catalogs/membership-claim-subjects/{subjectType}']['get']['summary'] ?? null)->toBe('List membership-claim subjects')
+        ->and($paths['/catalogs/spaces']['get']['description'] ?? null)->toContain('global space options when no `institution_id` is selected')
         ->and($paths['/user/going-events']['get']['summary'] ?? null)->toBe('List going events')
         ->and($paths['/events/{event}/check-ins']['post']['summary'] ?? null)->toBe('Record an event check-in')
         ->and($paths['/account-settings']['get']['summary'] ?? null)->toBe('Get account settings')
         ->and($paths['/institution-workspace']['get']['summary'] ?? null)->toBe('Get institution workspace')
+        ->and($paths['/institution-workspace']['get']['description'] ?? null)->toContain('first accessible institution is selected automatically')
         ->and($paths['/membership-claims/{subjectType}/{subject}']['post']['summary'] ?? null)->toBe('Submit a membership claim')
         ->and($paths['/reports']['post']['summary'] ?? null)->toBe('Submit a report')
         ->and($paths['/events/{event}/registrations/export']['get']['summary'] ?? null)->toBe('Export registrations as CSV')
