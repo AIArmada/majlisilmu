@@ -434,9 +434,7 @@ class UserDashboard extends Component
     protected function sortEventsForPlanner(Collection $events): Collection
     {
         return $events
-            ->sort(function (Event $left, Event $right): int {
-                return $this->comparePlannerDates($left->starts_at, $right->starts_at);
-            })
+            ->sort(fn (Event $left, Event $right): int => $this->comparePlannerDates($left->starts_at, $right->starts_at))
             ->values();
     }
 

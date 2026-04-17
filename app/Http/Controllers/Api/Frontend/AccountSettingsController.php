@@ -29,6 +29,7 @@ class AccountSettingsController extends FrontendController
     public function show(Request $request): JsonResponse
     {
         $user = $this->requireUser($request);
+        $user = $user->fresh() ?? $user;
 
         return response()->json([
             'data' => [
@@ -47,6 +48,7 @@ class AccountSettingsController extends FrontendController
     public function update(Request $request): JsonResponse
     {
         $user = $this->requireUser($request);
+        $user = $user->fresh() ?? $user;
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

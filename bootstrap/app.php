@@ -45,11 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(SetFilamentTimezone::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->shouldRenderJsonWhen(static function (Request $request): bool {
-            return ApiResponseFactory::isApiRequest($request) || $request->expectsJson();
-        });
+        $exceptions->shouldRenderJsonWhen(static fn (Request $request): bool => ApiResponseFactory::isApiRequest($request) || $request->expectsJson());
 
-        $exceptions->respond(static function ($response, Throwable $exception, Request $request) {
-            return app(ApiJsonResponseNormalizer::class)->normalize($request, $response);
-        });
+        $exceptions->respond(static fn ($response, Throwable $exception, Request $request) => app(ApiJsonResponseNormalizer::class)->normalize($request, $response));
     })->create();

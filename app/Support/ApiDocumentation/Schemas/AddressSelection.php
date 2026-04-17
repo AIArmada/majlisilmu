@@ -7,6 +7,11 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-type AddressSelectionArray array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('AddressSelection')]
 final readonly class AddressSelection implements Arrayable
 {
@@ -17,9 +22,7 @@ final readonly class AddressSelection implements Arrayable
         public ?int $subdistrict_id,
     ) {}
 
-    /**
-     * @return array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}
-     */
+    /** @return AddressSelectionArray */
     public function toArray(): array
     {
         return [

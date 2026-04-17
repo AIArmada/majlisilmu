@@ -322,7 +322,7 @@ it('keeps live api routes and generated scramble operations aligned', function (
                 continue;
             }
 
-            $normalizedMethod = strtolower($method);
+            $normalizedMethod = strtolower((string) $method);
             $key = $normalizedMethod.' '.$normalizedPath;
 
             $liveOperations[$key] = [
@@ -379,7 +379,7 @@ it('keeps live api routes and generated scramble operations aligned', function (
 
         $hasSecurity = is_array($documentedOperation['security'] ?? null) && ($documentedOperation['security'] ?? []) !== [];
 
-        if ((bool) $operation['requires_auth'] !== $hasSecurity) {
+        if ($operation['requires_auth'] !== $hasSecurity) {
             $authMismatches[] = $key.' auth='.($operation['requires_auth'] ? 'required' : 'public');
         }
 

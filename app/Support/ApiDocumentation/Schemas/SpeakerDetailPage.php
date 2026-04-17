@@ -7,6 +7,15 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-import-type SpeakerArray from Speaker
+ * @phpstan-import-type EventSummaryArray from EventSummary
+ * @phpstan-import-type EventParticipationArray from EventParticipation
+ *
+ * @phpstan-type SpeakerDetailPageArray array{speaker: SpeakerArray, upcoming_events: list<EventSummaryArray>, upcoming_total: int, past_events: list<EventSummaryArray>, past_total: int, other_role_upcoming_participations: list<EventParticipationArray>, other_role_upcoming_total: int, other_role_past_participations: list<EventParticipationArray>, other_role_past_total: int}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('SpeakerDetailPage')]
 final readonly class SpeakerDetailPage implements Arrayable
 {
@@ -28,9 +37,7 @@ final readonly class SpeakerDetailPage implements Arrayable
         public int $other_role_past_total,
     ) {}
 
-    /**
-     * @return array{speaker: Speaker, upcoming_events: list<EventSummary>, upcoming_total: int, past_events: list<EventSummary>, past_total: int, other_role_upcoming_participations: list<EventParticipation>, other_role_upcoming_total: int, other_role_past_participations: list<EventParticipation>, other_role_past_total: int}
-     */
+    /** @return SpeakerDetailPageArray */
     public function toArray(): array
     {
         return [

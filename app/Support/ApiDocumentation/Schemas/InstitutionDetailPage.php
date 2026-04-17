@@ -7,6 +7,14 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-import-type InstitutionArray from Institution
+ * @phpstan-import-type EventSummaryArray from EventSummary
+ *
+ * @phpstan-type InstitutionDetailPageArray array{institution: InstitutionArray, upcoming_events: list<EventSummaryArray>, upcoming_total: int, past_events: list<EventSummaryArray>, past_total: int}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('InstitutionDetailPage')]
 final readonly class InstitutionDetailPage implements Arrayable
 {
@@ -22,9 +30,7 @@ final readonly class InstitutionDetailPage implements Arrayable
         public int $past_total,
     ) {}
 
-    /**
-     * @return array{institution: Institution, upcoming_events: list<EventSummary>, upcoming_total: int, past_events: list<EventSummary>, past_total: int}
-     */
+    /** @return InstitutionDetailPageArray */
     public function toArray(): array
     {
         return [

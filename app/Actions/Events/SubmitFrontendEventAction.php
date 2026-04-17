@@ -80,9 +80,9 @@ class SubmitFrontendEventAction
 
         $this->assertSubmissionEntitiesAreAccessible($validated, $submitter, $validationKeyPrefix);
 
-        $submissionCountryId = $this->resolveSubmissionCountryId($validated, $request);
-        $startsAt = $this->resolveStartsAt($validated, $request);
-        $timezone = $this->resolveSubmissionTimezone($validated, $request, $submissionCountryId);
+        $submissionCountryId = $this->resolveSubmissionCountryId($validated);
+        $startsAt = $this->resolveStartsAt($validated);
+        $timezone = $this->resolveSubmissionTimezone($validated, $submissionCountryId);
 
         if (
             $this->hasCommunityEventTypeSelection($validated['event_type'] ?? [])
@@ -108,13 +108,13 @@ class SubmitFrontendEventAction
             ]);
         }
 
-        if ($selectedPrayer === EventPrayerTime::SebelumMaghrib && ! $this->isRamadhan($eventDate, $request, $timezone)) {
+        if ($selectedPrayer === EventPrayerTime::SebelumMaghrib && ! $this->isRamadhan($eventDate, $timezone)) {
             throw ValidationException::withMessages([
                 $this->validationKey('prayer_time', $validationKeyPrefix) => __('Sebelum Maghrib hanya boleh dipilih semasa bulan Ramadhan.'),
             ]);
         }
 
-        if ($selectedPrayer === EventPrayerTime::SelepasTarawih && ! $this->isRamadhan($eventDate, $request, $timezone)) {
+        if ($selectedPrayer === EventPrayerTime::SelepasTarawih && ! $this->isRamadhan($eventDate, $timezone)) {
             throw ValidationException::withMessages([
                 $this->validationKey('prayer_time', $validationKeyPrefix) => __('Selepas Tarawih hanya boleh dipilih semasa bulan Ramadhan.'),
             ]);
@@ -429,9 +429,9 @@ class SubmitFrontendEventAction
     /**
      * @param  array{event_date: string, prayer_time: string|EventPrayerTime, custom_time?: string|null, submission_country_id?: int|string|null, timezone?: string|null}  $validated
      */
-    private function resolveStartsAt(array $validated, Request $request): Carbon
+    private function resolveStartsAt(array $validated): Carbon
     {
-        $timezone = $this->resolveSubmissionTimezone($validated, $request);
+        $timezone = $this->resolveSubmissionTimezone($validated);
         $eventDate = Carbon::parse($validated['event_date'], $timezone)->startOfDay();
         $prayerTimeValue = $validated['prayer_time'] ?? '';
         $prayerTime = $prayerTimeValue instanceof EventPrayerTime
@@ -507,9 +507,9 @@ class SubmitFrontendEventAction
         ];
     }
 
-    private function isRamadhan(Carbon $date, Request $request, ?string $timezone = null): bool
+    private function isRamadhan(Carbon $date, ?string $timezone = null): bool
     {
-        $timezone ??= $this->resolveSubmissionTimezone([], $request);
+        $timezone ??= $this->resolveSubmissionTimezone([]);
         $year = $date->year;
         $ramadhanPeriods = [
             2026 => ['start' => '02-18', 'end' => '03-19'],
@@ -553,7 +553,7 @@ class SubmitFrontendEventAction
     /**
      * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
      */
-    private function resolveSubmissionCountryId(array $validated, Request $request): int
+    private function resolveSubmissionCountryId(array $validated): int
     {
         $normalizedCountryId = $this->normalizedSubmissionCountryId($validated);
 
@@ -569,9 +569,9 @@ class SubmitFrontendEventAction
     /**
      * @param  array{submission_country_id?: int|string|null, submission_country_code?: string|null, submission_country_key?: string|null}  $validated
      */
-    private function resolveSubmissionTimezone(array $validated, Request $request, ?int $submissionCountryId = null): string
+    private function resolveSubmissionTimezone(array $validated, ?int $submissionCountryId = null): string
     {
-        $resolvedCountryId = $submissionCountryId ?? $this->resolveSubmissionCountryId($validated, $request);
+        $resolvedCountryId = $submissionCountryId ?? $this->resolveSubmissionCountryId($validated);
 
         return app(PublicCountryRegistry::class)->defaultTimezoneForCountryId($resolvedCountryId);
     }

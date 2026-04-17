@@ -7,6 +7,15 @@ namespace App\Support\ApiDocumentation\Schemas;
 use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
+/**
+ * @phpstan-import-type AddressSelectionArray from AddressSelection
+ * @phpstan-import-type CountryArray from Country
+ *
+ * @phpstan-type SpeakerMediaArray array{avatar_url: string, cover_url: ?string, share_image_url: ?string}
+ * @phpstan-type SpeakerArray array{id: string, slug: string, name: string, formatted_name: string, job_title: ?string, is_freelance: bool, bio: ?string, bio_html: ?string, bio_text: ?string, bio_excerpt: ?string, should_collapse_bio: bool, qualifications: list<string>, address: AddressSelectionArray|null, country: CountryArray|null, location: ?string, status: string, is_active: bool, is_following: bool, media: SpeakerMediaArray, gallery: list<array<string, mixed>>, institutions: list<array<string, mixed>>, contacts: list<array<string, mixed>>, social_media: list<array<string, mixed>>}
+ *
+ * @implements Arrayable<string, mixed>
+ */
 #[SchemaName('Speaker')]
 final readonly class Speaker implements Arrayable
 {
@@ -44,9 +53,7 @@ final readonly class Speaker implements Arrayable
         public array $social_media,
     ) {}
 
-    /**
-     * @return array{id: string, slug: string, name: string, formatted_name: string, job_title: ?string, is_freelance: bool, bio: ?string, bio_html: ?string, bio_text: ?string, bio_excerpt: ?string, should_collapse_bio: bool, qualifications: list<string>, address: array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}|null, country: array{id: int, name: string, iso2: string, key: ?string}|null, location: ?string, status: string, is_active: bool, is_following: bool, media: array{avatar_url: string, cover_url: ?string, share_image_url: ?string}, gallery: list<array<string, mixed>>, institutions: list<array<string, mixed>>, contacts: list<array<string, mixed>>, social_media: list<array<string, mixed>>}
-     */
+    /** @return SpeakerArray */
     public function toArray(): array
     {
         return [

@@ -119,12 +119,10 @@ class InstitutionSearchService
     private function publicSearchIdsFromScoutDatabase(string $normalizedSearch): array
     {
         return Institution::search($normalizedSearch)
-            ->query(function (Builder $query): Builder {
-                return $query
-                    ->where('institutions.is_active', true)
-                    ->where('status', 'verified')
-                    ->limit($this->typesenseResultLimit());
-            })
+            ->query(fn (Builder $query): Builder => $query
+                ->where('institutions.is_active', true)
+                ->where('status', 'verified')
+                ->limit($this->typesenseResultLimit()))
             ->get()
             ->pluck('id')
             ->map(static fn (mixed $id): string => (string) $id)

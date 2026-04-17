@@ -506,7 +506,7 @@ class AccountSettings extends Component implements HasForms
 
     protected function timezoneOffsetLabel(string $timezone): string
     {
-        $offsetSeconds = (new DateTimeZone($timezone))->getOffset(new DateTimeImmutable);
+        $offsetSeconds = new DateTimeZone($timezone)->getOffset(new DateTimeImmutable);
 
         if ($offsetSeconds === 0) {
             return 'GMT';
