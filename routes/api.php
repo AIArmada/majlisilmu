@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\EventGoingController;
 use App\Http\Controllers\Api\EventRegistrationController;
 use App\Http\Controllers\Api\EventSaveController;
 use App\Http\Controllers\Api\Frontend\AccountSettingsController;
+use App\Http\Controllers\Api\Frontend\AccountSettingsMcpTokenController;
 use App\Http\Controllers\Api\Frontend\AdvancedEventController;
 use App\Http\Controllers\Api\Frontend\CatalogController;
 use App\Http\Controllers\Api\Frontend\ContributionController;
@@ -134,6 +135,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
         Route::get('/account-settings', [AccountSettingsController::class, 'show'])->name('account-settings.show');
         Route::put('/account-settings', [AccountSettingsController::class, 'update'])->name('account-settings.update');
+        Route::get('/account-settings/mcp-tokens', [AccountSettingsMcpTokenController::class, 'index'])->name('account-settings.mcp-tokens.index');
+        Route::post('/account-settings/mcp-tokens', [AccountSettingsMcpTokenController::class, 'store'])->name('account-settings.mcp-tokens.store');
+        Route::delete('/account-settings/mcp-tokens/{tokenId}', [AccountSettingsMcpTokenController::class, 'destroy'])->name('account-settings.mcp-tokens.destroy');
 
         Route::get('/contributions', [ContributionController::class, 'index'])->name('contributions.index');
         Route::post('/contributions/institutions', [ContributionController::class, 'storeInstitution'])->name('contributions.institutions.store');

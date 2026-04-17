@@ -1,3 +1,40 @@
+# Member MCP Writes and Token Self-Service
+
+- [x] Add member MCP write support for Ahli-scoped editable resources
+- [x] Add authenticated account-settings MCP token list, create, and revoke endpoints
+- [x] Enforce MCP token server abilities at the admin and member MCP boundaries
+- [x] Add focused regressions for member MCP writes, token issuance, and scoped route access
+- [x] Re-run formatting, focused Pest coverage, and targeted PHPStan
+
+## Review
+
+- Added scoped MCP token management in [app/Support/Mcp/McpTokenManager.php](app/Support/Mcp/McpTokenManager.php), updated [app/Console/Commands/IssueMcpToken.php](app/Console/Commands/IssueMcpToken.php), and tightened [app/Http/Middleware/EnsureAdminMcpAccess.php](app/Http/Middleware/EnsureAdminMcpAccess.php) plus [app/Http/Middleware/EnsureMemberMcpAccess.php](app/Http/Middleware/EnsureMemberMcpAccess.php) so admin and member MCP routes now require matching server-scoped token abilities instead of any Sanctum bearer token.
+- Added member-side mutation support in [app/Support/Api/Member/MemberResourceMutationService.php](app/Support/Api/Member/MemberResourceMutationService.php), [app/Support/Api/Member/MemberResourceService.php](app/Support/Api/Member/MemberResourceService.php), [app/Support/Api/Member/MemberResourceRegistry.php](app/Support/Api/Member/MemberResourceRegistry.php), [app/Mcp/Tools/Member/MemberGetWriteSchemaTool.php](app/Mcp/Tools/Member/MemberGetWriteSchemaTool.php), and [app/Mcp/Tools/Member/MemberUpdateRecordTool.php](app/Mcp/Tools/Member/MemberUpdateRecordTool.php), exposing schema-guided Ahli updates for resources the authenticated member can already edit.
+- Added authenticated self-serve MCP token endpoints in [app/Http/Controllers/Api/Frontend/AccountSettingsMcpTokenController.php](app/Http/Controllers/Api/Frontend/AccountSettingsMcpTokenController.php) and [routes/api.php](routes/api.php), then surfaced those endpoints and field metadata through [app/Support/Api/Frontend/FrontendFormContractService.php](app/Support/Api/Frontend/FrontendFormContractService.php) and [app/Support/ApiDocumentation/ApiWorkflowSchemasTransformer.php](app/Support/ApiDocumentation/ApiWorkflowSchemasTransformer.php).
+- Locked the slice with focused coverage in [tests/Feature/Mcp/MemberServerTest.php](tests/Feature/Mcp/MemberServerTest.php), [tests/Feature/Mcp/AdminServerTest.php](tests/Feature/Mcp/AdminServerTest.php), [tests/Feature/Api/Frontend/AccountSettingsApiTest.php](tests/Feature/Api/Frontend/AccountSettingsApiTest.php), [tests/Feature/Console/IssueMcpTokenCommandTest.php](tests/Feature/Console/IssueMcpTokenCommandTest.php), and [tests/Feature/ScrambleDocsTest.php](tests/Feature/ScrambleDocsTest.php).
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact` on the five focused files => 65 passed
+  - `vendor/bin/phpstan analyse --ansi` on touched MCP/account-settings/test files => pass
+
+# MCP Boundary Implementation
+
+- [x] Add explicit admin/member MCP eligibility methods and middleware boundaries
+- [x] Add a member MCP server with scoped read tools for Ahli-visible resources
+- [x] Register separate admin and member MCP routes plus SSE compatibility endpoints
+- [x] Add focused MCP regression coverage for member access and route protection
+- [x] Re-run formatting and focused MCP tests
+
+## Review
+
+- Added explicit `User` MCP eligibility checks plus dedicated admin/member middleware so MCP access now follows the intended boundary instead of reusing the broader admin API guard.
+- Registered a separate `/mcp/member` server and SSE compatibility controller, with read-only member tools backed by a member-scoped registry/service for Ahli-visible institutions, speakers, references, and events.
+- Added focused MCP coverage in `tests/Feature/Mcp/MemberServerTest.php` for institution and speaker memberships, non-member denial, admin/member separation, and authenticated HTTP MCP initialization/stream access.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel tests/Feature/Mcp --filter='AdminServerTest|MemberServerTest'` => 28 passed
+  - `vendor/bin/phpstan analyse --ansi --no-progress ...` on touched MCP source files => pass
+
 # API Docs Alignment Audit
 
 - [x] Audit the live API surface, generated docs, and checked-in mobile reference for drift

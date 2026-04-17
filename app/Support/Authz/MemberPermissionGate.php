@@ -53,6 +53,18 @@ final readonly class MemberPermissionGate
             && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->event());
     }
 
+    public function hasAnySpeakerPermission(User $user, string $permission): bool
+    {
+        return $user->speakers()->exists()
+            && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->speaker());
+    }
+
+    public function hasAnyReferencePermission(User $user, string $permission): bool
+    {
+        return $user->references()->exists()
+            && Authz::userCanInScope($user, $permission, $this->memberRoleScopes->reference());
+    }
+
     /**
      * @return Collection<int, User>
      */

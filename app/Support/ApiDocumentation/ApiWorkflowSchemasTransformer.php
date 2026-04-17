@@ -284,6 +284,11 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
                     'show_endpoint' => new StringType,
                     'notification_settings_endpoint' => new StringType,
                     'notification_update_endpoint' => new StringType,
+                    'mcp_tokens_endpoint' => new StringType,
+                    'mcp_token_store_endpoint' => new StringType,
+                    'mcp_token_revoke_endpoint_template' => new StringType,
+                    'mcp_token_fields' => (new ArrayType)->setItems($components->getSchemaReference('PublicFormFieldContract')),
+                    'mcp_servers' => $this->mixedObjectType(),
                 ]))
                 ->addProperty('meta', $this->requestMetaType())
                 ->setRequired(['data', 'meta']),

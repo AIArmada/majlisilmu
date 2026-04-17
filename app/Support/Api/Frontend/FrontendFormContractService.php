@@ -21,12 +21,14 @@ use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\Location\GooglePlacesConfiguration;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Location\PublicCountryRegistry;
+use App\Support\Mcp\McpTokenManager;
 
 class FrontendFormContractService
 {
     public function __construct(
         private readonly FrontendCatalogService $catalogService,
         private readonly ApiDocumentationUrlResolver $urlResolver,
+        private readonly McpTokenManager $mcpTokenManager,
     ) {}
 
     /**
@@ -215,6 +217,12 @@ class FrontendFormContractService
                 'account_settings' => [
                     'method' => 'PUT',
                     'endpoint' => route('api.client.account-settings.update'),
+                    'auth_required' => true,
+                ],
+                'mcp_tokens' => [
+                    'index_endpoint' => route('api.client.account-settings.mcp-tokens.index'),
+                    'store_endpoint' => route('api.client.account-settings.mcp-tokens.store'),
+                    'destroy_endpoint_template' => route('api.client.account-settings.mcp-tokens.destroy', ['tokenId' => 'token'], false),
                     'auth_required' => true,
                 ],
                 'advanced_event' => [
@@ -495,6 +503,8 @@ class FrontendFormContractService
      */
     public function accountSettings(User $user): array
     {
+        $mcpServers = $this->mcpTokenManager->availableServers($user);
+
         return [
             'flow' => 'account_settings',
             'method' => 'PUT',
@@ -523,6 +533,14 @@ class FrontendFormContractService
             ],
             'notification_settings_endpoint' => route('api.notification-settings.show'),
             'notification_update_endpoint' => route('api.notification-settings.update'),
+            'mcp_tokens_endpoint' => route('api.client.account-settings.mcp-tokens.index'),
+            'mcp_token_store_endpoint' => route('api.client.account-settings.mcp-tokens.store'),
+            'mcp_token_revoke_endpoint_template' => route('api.client.account-settings.mcp-tokens.destroy', ['tokenId' => 'token'], false),
+            'mcp_token_fields' => [
+                $this->field('name', 'string', required: true, maxLength: 255),
+                $this->field('server', 'string', required: true, allowedValues: array_keys($mcpServers)),
+            ],
+            'mcp_servers' => $mcpServers,
         ];
     }
 

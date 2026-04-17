@@ -617,6 +617,8 @@ it('publishes explicit schemas for search manifest and public form contracts', f
         ->and(data_get($paths, '/forms/institution-workspace.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/InstitutionWorkspaceFormResponse')
         ->and(data_get($paths, '/forms/membership-claims/{subjectType}.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/MembershipClaimFormResponse')
         ->and(data_get($paths, '/forms/contributions/{subjectType}/{subject}/suggest.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/ContributionSuggestContextResponse')
+        ->and(data_get($schemas, 'AccountSettingsFormResponse.properties.data.properties.mcp_tokens_endpoint.type'))->toBe('string')
+        ->and(data_get($schemas, 'AccountSettingsFormResponse.properties.data.properties.mcp_token_fields.type'))->toBe('array')
         ->and(data_get($schemas, 'SearchIndexResponse.properties.data.properties.speakers.properties.items.type'))->toBe('array')
         ->and(data_get($schemas, 'PublicFormFieldContract.properties.name.type'))->toBe('string')
         ->and(data_get($schemas, 'PublicConditionalRule.properties.field.type'))->toBe('string');

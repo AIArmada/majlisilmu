@@ -592,6 +592,21 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         return $this->hasGlobalRoleAssignment();
     }
 
+    public function hasAdminMcpAccess(): bool
+    {
+        return $this->hasApplicationAdminAccess();
+    }
+
+    public function hasMemberMcpAccess(): bool
+    {
+        return $this->hasAhliPanelAccess();
+    }
+
+    public function hasAnyMcpAccess(): bool
+    {
+        return $this->hasAdminMcpAccess() || $this->hasMemberMcpAccess();
+    }
+
     public function hasGlobalAdminAccess(): bool
     {
         return $this->globalRoles()
