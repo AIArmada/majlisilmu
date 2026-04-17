@@ -37,7 +37,7 @@
         <!-- Abstract Background -->
         <div class="absolute inset-0 bg-slate-950">
             <div
-                class="absolute inset-0 opacity-40 bg-[url('/images/about/islamic_geometry.png')] bg-cover bg-center mix-blend-screen mix-blend-luminosity">
+                class="absolute inset-0 opacity-40 bg-cover bg-center mix-blend-screen mix-blend-luminosity" style="background-image: url('{{ asset('images/about/islamic_geometry.png') }}');">
             </div>
             <div
                 class="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(16,185,129,0.3),rgba(255,255,255,0))]">
@@ -208,7 +208,7 @@
     <!-- CAUSES / WHY WE DO THIS -->
     <section class="relative isolate overflow-hidden bg-slate-950 py-32 text-white">
         <div
-            class="absolute inset-0 bg-[url('/images/about/islamic_geometry.png')] bg-[size:400px] opacity-[0.05] mix-blend-screen">
+            class="absolute inset-0 bg-[size:400px] opacity-[0.05] mix-blend-screen" style="background-image: url('{{ asset('images/about/islamic_geometry.png') }}');">
         </div>
         <div class="absolute top-0 w-full h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent">
         </div>
@@ -277,7 +277,7 @@
             <div
                 class="relative flex flex-col overflow-hidden rounded-[2.5rem] bg-slate-950 p-8 text-white shadow-[0_30px_60px_-15px_rgba(15,23,42,0.5)] sm:p-12">
                 <div
-                    class="absolute top-0 right-0 w-full h-full opacity-20 bg-[url('/images/about/islamic_geometry.png')] bg-cover mix-blend-screen">
+                    class="absolute top-0 right-0 w-full h-full opacity-20 bg-cover mix-blend-screen" style="background-image: url('{{ asset('images/about/islamic_geometry.png') }}');">
                 </div>
                 <!-- glow -->
                 <div class="absolute -right-20 -top-20 w-80 h-80 bg-emerald-500/30 rounded-full blur-[100px]"></div>

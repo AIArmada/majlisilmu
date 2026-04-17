@@ -161,7 +161,7 @@ new
     <!-- Hero Section -->
     <div class="relative pt-12 pb-16 bg-white border-b border-slate-100 overflow-hidden">
         <div class="absolute inset-0 bg-emerald-50/50"></div>
-        <div class="absolute inset-0 bg-[url('/images/pattern-bg.png')] opacity-5"></div>
+        <div class="absolute inset-0 opacity-5" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
 
         <div class="container relative mx-auto px-6 lg:px-12 text-center">
             <h1
