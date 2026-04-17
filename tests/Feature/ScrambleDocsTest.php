@@ -1,5 +1,8 @@
 <?php
 
+use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
 it('serves scramble docs only on the api host', function () {
@@ -157,6 +160,156 @@ it('documents utc transport fields and request-timezone helper behavior clearly'
         ->toContain('If you omit timezone context, the same filter values are interpreted in UTC instead.')
         ->not->toContain('The server timezone is UTC; the default display timezone is Asia/Kuala_Lumpur (MYT, UTC+8).')
         ->not->toContain('All date/time filter values must be expressed in UTC.');
+});
+
+it('keeps live api routes and generated scramble operations aligned', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    $paths = $response->json('paths');
+
+    expect($paths)->toBeArray();
+
+    $httpMethods = ['get', 'post', 'put', 'patch', 'delete', 'options'];
+    $documentedOperations = [];
+
+    foreach ($paths as $path => $operations) {
+        if (! is_array($operations)) {
+            continue;
+        }
+
+        foreach ($operations as $method => $operation) {
+            $normalizedMethod = strtolower((string) $method);
+
+            if (! in_array($normalizedMethod, $httpMethods, true)) {
+                continue;
+            }
+
+            $documentedOperations[$normalizedMethod.' '.$path] = is_array($operation) ? $operation : [];
+        }
+    }
+
+    $liveOperations = [];
+
+    foreach (Route::getRoutes() as $route) {
+        $uri = $route->uri();
+
+        if (! Str::startsWith($uri, 'api/v1')) {
+            continue;
+        }
+
+        $normalizedPath = '/'.ltrim((string) Str::of($uri)->after('api/v1'), '/');
+        $normalizedPath = preg_replace('/\{([^}:]+):[^}]+\}/', '{$1}', $normalizedPath);
+        $normalizedPath = is_string($normalizedPath) ? $normalizedPath : '/';
+
+        foreach ($route->methods() as $method) {
+            if ($method === 'HEAD') {
+                continue;
+            }
+
+            $normalizedMethod = strtolower($method);
+            $key = $normalizedMethod.' '.$normalizedPath;
+
+            $liveOperations[$key] = [
+                'path' => $normalizedPath,
+                'method' => $normalizedMethod,
+                'name' => $route->getName(),
+                'requires_auth' => collect($route->gatherMiddleware())->contains(
+                    static fn (mixed $middleware): bool => is_string($middleware)
+                        && ($middleware === 'auth'
+                            || Str::startsWith($middleware, 'auth:')
+                            || $middleware === Authenticate::class
+                            || Str::startsWith($middleware, Authenticate::class.':')),
+                ),
+            ];
+        }
+    }
+
+    $findDocumentedOperation = static function (string $method, string $path) use ($documentedOperations): ?array {
+        $key = $method.' '.$path;
+
+        if (array_key_exists($key, $documentedOperations)) {
+            return ['key' => $key, 'operation' => $documentedOperations[$key]];
+        }
+
+        if ($method === 'patch' && array_key_exists('put '.$path, $documentedOperations)) {
+            return ['key' => 'put '.$path, 'operation' => $documentedOperations['put '.$path]];
+        }
+
+        if ($method === 'put' && array_key_exists('patch '.$path, $documentedOperations)) {
+            return ['key' => 'patch '.$path, 'operation' => $documentedOperations['patch '.$path]];
+        }
+
+        return null;
+    };
+
+    $missingFromDocs = [];
+    $authMismatches = [];
+    $summaryGaps = [];
+    $responseGaps = [];
+    $coveredDocumentationKeys = [];
+
+    foreach ($liveOperations as $key => $operation) {
+        $documentedOperationMatch = $findDocumentedOperation($operation['method'], $operation['path']);
+
+        if ($documentedOperationMatch === null) {
+            $missingFromDocs[] = $key.' ['.($operation['name'] ?? 'unnamed').']';
+
+            continue;
+        }
+
+        $coveredDocumentationKeys[] = $documentedOperationMatch['key'];
+
+        $documentedOperation = $documentedOperationMatch['operation'];
+
+        $hasSecurity = is_array($documentedOperation['security'] ?? null) && ($documentedOperation['security'] ?? []) !== [];
+
+        if ((bool) $operation['requires_auth'] !== $hasSecurity) {
+            $authMismatches[] = $key.' auth='.($operation['requires_auth'] ? 'required' : 'public');
+        }
+
+        if (blank($documentedOperation['summary'] ?? null)) {
+            $summaryGaps[] = $key;
+        }
+
+        $responses = is_array($documentedOperation['responses'] ?? null) ? $documentedOperation['responses'] : [];
+        $hasSuccessResponse = collect(array_keys($responses))
+            ->contains(static fn (mixed $status): bool => Str::startsWith((string) $status, '2'));
+
+        if (! $hasSuccessResponse) {
+            $responseGaps[] = $key;
+        }
+    }
+
+    $coveredDocumentationKeys = array_unique($coveredDocumentationKeys);
+    $extraDocs = [];
+
+    foreach (array_keys($documentedOperations) as $documentedKey) {
+        if (in_array($documentedKey, $coveredDocumentationKeys, true)) {
+            continue;
+        }
+
+        [$method, $path] = explode(' ', $documentedKey, 2);
+
+        if ($method === 'put' && array_key_exists('patch '.$path, $liveOperations)) {
+            continue;
+        }
+
+        if ($method === 'patch' && array_key_exists('put '.$path, $liveOperations)) {
+            continue;
+        }
+
+        $extraDocs[] = $documentedKey;
+    }
+
+    expect($missingFromDocs)->toBe([])
+        ->and($extraDocs)->toBe([])
+        ->and($authMismatches)->toBe([])
+        ->and($summaryGaps)->toBe([])
+        ->and($responseGaps)->toBe([])
+        ->and(array_key_exists('/saved-searches/{savedSearch}', $paths))->toBeTrue()
+        ->and(array_key_exists('/saved-searches/{saved_search}', $paths))->toBeFalse();
 });
 
 it('does not leak local-only docs urls into the published api description', function () {

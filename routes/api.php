@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Data\Api\User\CurrentUserData;
 use App\Enums\ContributionSubjectType;
 use App\Enums\MemberSubjectType;
 use App\Http\Controllers\Api\Admin\CatalogController as AdminCatalogController;
 use App\Http\Controllers\Api\Admin\ManifestController as AdminManifestController;
 use App\Http\Controllers\Api\Admin\ResourceController as AdminResourceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CurrentUserController;
 use App\Http\Controllers\Api\EventCheckInController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventGoingController;
@@ -32,9 +32,6 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SavedSearchController;
 use App\Http\Controllers\Api\UserRegistrationController;
 use App\Http\Middleware\EnsureAdminApiAccess;
-use App\Models\User;
-use App\Support\Api\ApiResponseFactory;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Public API endpoints
@@ -178,18 +175,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         ->name('api.reports.store');
 
     // User
-    Route::get('/user', function (Request $request) {
-        $user = $request->user();
-
-        abort_unless($user instanceof User, 403);
-
-        return response()->json([
-            'data' => CurrentUserData::fromModel($user)->toArray(),
-            'meta' => [
-                'request_id' => ApiResponseFactory::requestId($request),
-            ],
-        ]);
-    })->name('api.user.show');
+    Route::get('/user', CurrentUserController::class)->name('api.user.show');
     Route::get('/user/registrations', [UserRegistrationController::class, 'index'])
         ->name('api.user.registrations.index');
     Route::get('/user/going-events', [EventGoingController::class, 'index'])
@@ -210,6 +196,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
     // Saved Searches (per documentation B5a)
     Route::apiResource('saved-searches', SavedSearchController::class)
+        ->parameters(['saved-searches' => 'savedSearch'])
         ->names('api.saved-searches');
     Route::post('/saved-searches/{savedSearch}/execute', [SavedSearchController::class, 'execute'])
         ->name('api.saved-searches.execute');
