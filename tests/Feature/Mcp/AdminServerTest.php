@@ -117,7 +117,7 @@ it('returns resource metadata, record listings, and record detail for speakers',
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
             ->where('data.resource.key', 'speakers')
-            ->where('data.record.id', $speaker->getKey())
+            ->where('data.record.route_key', $speaker->getRouteKey())
             ->where('data.record.attributes.name', 'Admin MCP Speaker')
             ->etc());
 });

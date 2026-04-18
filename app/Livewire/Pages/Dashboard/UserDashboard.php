@@ -5,7 +5,10 @@ namespace App\Livewire\Pages\Dashboard;
 use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\EventSubmission;
+use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Registration;
+use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ShareTrackingAnalyticsService;
 use App\Support\Timezone\UserDateTimeFormatter;
@@ -90,6 +93,51 @@ class UserDashboard extends Component
                 ->with($this->plannerEventRelations())
                 ->get()
         );
+    }
+
+    /**
+     * @return Collection<int, Institution>
+     */
+    #[Computed]
+    public function followingInstitutions(): Collection
+    {
+        /** @var Collection<int, Institution> $institutions */
+        $institutions = $this->user()->followingInstitutions()
+            ->with(['media'])
+            ->orderBy('name')
+            ->get();
+
+        return $institutions;
+    }
+
+    /**
+     * @return Collection<int, Reference>
+     */
+    #[Computed]
+    public function followingReferences(): Collection
+    {
+        /** @var Collection<int, Reference> $references */
+        $references = $this->user()->followingReferences()
+            ->with(['media'])
+            ->orderBy('title')
+            ->get();
+
+        return $references;
+    }
+
+    /**
+     * @return Collection<int, Speaker>
+     */
+    #[Computed]
+    public function followingSpeakers(): Collection
+    {
+        /** @var Collection<int, Speaker> $speakers */
+        $speakers = $this->user()->followingSpeakers()
+            ->with(['media'])
+            ->orderBy('name')
+            ->get();
+
+        return $speakers;
     }
 
     /**
@@ -332,6 +380,33 @@ class UserDashboard extends Component
     public function paginatedGoingEvents(): LengthAwarePaginator
     {
         return $this->paginateCollection($this->goingEvents(), self::PLANNER_BUCKET_PER_PAGE, 'going_page');
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Institution>
+     */
+    #[Computed]
+    public function paginatedFollowingInstitutions(): LengthAwarePaginator
+    {
+        return $this->paginateCollection($this->followingInstitutions(), self::PLANNER_BUCKET_PER_PAGE, 'following_institutions_page');
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Reference>
+     */
+    #[Computed]
+    public function paginatedFollowingReferences(): LengthAwarePaginator
+    {
+        return $this->paginateCollection($this->followingReferences(), self::PLANNER_BUCKET_PER_PAGE, 'following_references_page');
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Speaker>
+     */
+    #[Computed]
+    public function paginatedFollowingSpeakers(): LengthAwarePaginator
+    {
+        return $this->paginateCollection($this->followingSpeakers(), self::PLANNER_BUCKET_PER_PAGE, 'following_speakers_page');
     }
 
     /**
@@ -680,7 +755,8 @@ class UserDashboard extends Component
             return __('Time to be confirmed');
         }
 
-        return UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M, h:i A');
+        return UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M')
+            .', '.UserDateTimeFormatter::format($event->starts_at, 'h:i A');
     }
 
     protected function checkinTimeLabel(EventCheckin $checkin): string
@@ -692,7 +768,8 @@ class UserDashboard extends Component
         $event = $checkin->event;
 
         if ($event instanceof Event && $event->starts_at instanceof CarbonInterface) {
-            return UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M, h:i A');
+            return UserDateTimeFormatter::translatedFormat($event->starts_at, 'd M')
+                .', '.UserDateTimeFormatter::format($event->starts_at, 'h:i A');
         }
 
         return __('Attendance recorded');

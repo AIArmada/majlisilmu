@@ -21,6 +21,12 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Project Docs
+
+- [MCP usage guide](docs/MAJLISILMU_MCP_GUIDE.md)
+- [Developer technical documentation](docs/MAJLISILMU_TECHNICAL_DOCUMENTATION.md)
+- [Visitor guide](docs/MAJLISILMU_VISITOR_GUIDE.md)
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.

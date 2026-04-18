@@ -240,6 +240,33 @@ class MemberResourceRegistry
     }
 
     /**
+     * @return array{
+     *   route_key: string,
+     *   title: string|null,
+     *   attributes: array<string, mixed>,
+     *   abilities: array<string, bool>,
+     *   panel_routes: array<string, string|null>
+     * }
+     */
+    public function serializeRecordDetail(string $resourceClass, Model $record): array
+    {
+        $pages = $resourceClass::getPages();
+
+        $this->loadMissingApiRelations($record);
+
+        return [
+            'route_key' => (string) $record->getRouteKey(),
+            'title' => $this->htmlableToString($resourceClass::getRecordTitle($record)),
+            'attributes' => $this->serializeAttributes($record),
+            'abilities' => $this->recordAbilities($record),
+            'panel_routes' => [
+                'view' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => $record], panel: 'ahli') : null,
+                'edit' => array_key_exists('edit', $pages) ? $resourceClass::getUrl('edit', ['record' => $record], panel: 'ahli') : null,
+            ],
+        ];
+    }
+
+    /**
      * @return list<string>
      */
     public function searchableColumns(string $resourceClass): array
