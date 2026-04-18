@@ -177,6 +177,10 @@ Accept: application/json
 | `POST` | `/auth/logout` | Revoke the current bearer token |
 | `GET` | `/user` | Return the authenticated user |
 
+Notes:
+
+- The `user` payload includes a `roles` array with the authenticated user's global role names.
+
 ### `POST /auth/register`
 
 Request body:

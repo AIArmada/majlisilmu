@@ -2,6 +2,7 @@
 
 namespace App\Data\Api\User;
 
+use AIArmada\FilamentAuthz\Facades\Authz;
 use App\Models\User;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Support\Transformation\TransformationContext;
@@ -20,6 +21,11 @@ class CurrentUserData extends Data
     {
         /** @var array<string, mixed> $payload */
         $payload = $user->toArray();
+        $payload['roles'] = Authz::withScope(
+            null,
+            fn (): array => $user->getRoleNames()->sort()->values()->all(),
+            $user,
+        );
 
         return new self(payload: $payload);
     }

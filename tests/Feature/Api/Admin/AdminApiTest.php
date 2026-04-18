@@ -408,6 +408,17 @@ it('exposes admin institution write schema and can create and update institution
         ->assertJsonPath('data.record.attributes.nickname', 'API Masjid');
 });
 
+it('requires a record key when requesting an admin update schema', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/institutions/schema?operation=update')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['recordKey'])
+        ->assertJsonPath('error.code', 'validation_error');
+});
+
 it('exposes admin venue write schema and can create and update venues through the api', function () {
     ensureAdminApiMalaysiaCountryExists();
 
