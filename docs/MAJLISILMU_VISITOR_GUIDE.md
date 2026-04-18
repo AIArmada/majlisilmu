@@ -54,9 +54,9 @@ MajlisIlmu addresses this with structured event listings, moderation workflows, 
 4. Open event details and navigate to location or join online.
 
 ### B. “I want to follow a specific topic or speaker”
-1. Search by topic, or search for the speaker profile.
-2. Open the speaker profile to see their upcoming and past events.
-3. Save relevant events or follow the search for future updates.
+1. Search for the topic, or search for the speaker by name.
+2. Open the speaker profile to see upcoming and past events.
+3. Save the events you like, or revisit the search later for new updates.
 
 ### C. “I want to submit an event”
 1. Open the submit-event page.
@@ -100,7 +100,7 @@ Yes. Listings support filters such as age group, gender restrictions, and childr
 Some events include registration when organizers enable it.
 
 ### Can I find events by a specific speaker?
-Yes. Search for the speaker profile, then open it to view upcoming and past events tied to that speaker.
+Yes. Search for the speaker by name, then open the speaker profile to view upcoming and past events tied to that speaker.
 
 ### Can I trust every listing?
 Use the event status and details as guidance. The system supports moderation and reporting, but users should still verify critical details when needed.
