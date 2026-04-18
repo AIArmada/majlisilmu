@@ -174,6 +174,7 @@ Accept: application/json
 |---|---|---|
 | `POST` | `/auth/register` | Create a user account and issue a bearer token |
 | `POST` | `/auth/login` | Issue a bearer token for an existing user |
+| `POST` | `/auth/social/google` | Exchange a Google access token for a bearer token |
 | `POST` | `/auth/logout` | Revoke the current bearer token |
 | `GET` | `/user` | Return the authenticated user |
 
@@ -217,6 +218,25 @@ Notes:
 
 - `login` accepts either email or phone.
 - Response includes `access_token`, `token_type`, and `user`.
+
+### `POST /auth/social/google`
+
+Request body:
+
+```json
+{
+  "access_token": "google-oauth-access-token",
+  "device_name": "Pixel 9"
+}
+```
+
+Notes:
+
+- `access_token` must be a Google OAuth access token obtained by the client.
+- `device_name` is required and is used as the Sanctum token name.
+- Response includes `access_token`, `token_type`, and `user`.
+
+Use this endpoint when the client has already completed Google sign-in and only needs to exchange the Google token for a Majlis Ilmu API session.
 
 Public vs admin routing:
 
