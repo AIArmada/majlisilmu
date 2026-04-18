@@ -2,6 +2,7 @@
 
 namespace App\Support\Api\Admin;
 
+use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -28,7 +29,10 @@ use UnitEnum;
  *   abilities: array<string, bool>,
  *   write_support: array<string, bool>,
  *   api_routes: array<string, string|null>,
- *   panel_routes: array<string, string|null>
+ *   mcp_tools: array<string, mixed>,
+ *   panel_routes: array<string, string|null>,
+ *   timezone_sensitive: bool,
+ *   date_semantics: array<string, mixed>|null
  * }
  */
 class AdminResourceRegistry
@@ -155,12 +159,22 @@ class AdminResourceRegistry
                     ? route('api.admin.resources.update', ['resourceKey' => $key, 'recordKey' => 'record'], false)
                     : null,
             ],
+            'mcp_tools' => $this->mcpTools($key, $supportsMutation, $pages),
             'panel_routes' => [
                 'index' => array_key_exists('index', $pages) ? $resourceClass::getUrl('index', panel: 'admin') : null,
                 'create' => array_key_exists('create', $pages) ? $resourceClass::getUrl('create', panel: 'admin') : null,
                 'view_template' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => 'record'], panel: 'admin') : null,
                 'edit_template' => array_key_exists('edit', $pages) ? $resourceClass::getUrl('edit', ['record' => 'record'], panel: 'admin') : null,
             ],
+            'timezone_sensitive' => is_a($resourceClass::getModel(), Event::class, true),
+            'date_semantics' => is_a($resourceClass::getModel(), Event::class, true)
+                ? [
+                    'storage_timezone' => 'UTC',
+                    'viewer_timezone' => 'resolved at request time',
+                    'local_fields' => ['starts_at_local', 'starts_on_local_date', 'ends_at_local'],
+                    'local_date_filter' => 'starts_on_local_date',
+                ]
+                : null,
         ];
     }
 
@@ -213,6 +227,83 @@ class AdminResourceRegistry
         $modelClass = $resourceClass::getModel();
 
         return Str::kebab(Str::pluralStudly(class_basename($modelClass)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $pages
+     * @return array<string, mixed>
+     */
+    private function mcpTools(string $key, bool $supportsMutation, array $pages): array
+    {
+        return [
+            'list_resources' => [
+                'tool' => 'admin-list-resources',
+                'arguments' => [
+                    'verbose' => true,
+                    'writable_only' => false,
+                ],
+            ],
+            'get_meta' => [
+                'tool' => 'admin-get-resource-meta',
+                'arguments' => [
+                    'resource_key' => $key,
+                ],
+            ],
+            'list_records' => [
+                'tool' => 'admin-list-records',
+                'arguments' => [
+                    'resource_key' => $key,
+                    'search' => null,
+                    'page' => 1,
+                    'per_page' => 15,
+                ],
+            ],
+            'get_record' => [
+                'tool' => 'admin-get-record',
+                'arguments' => [
+                    'resource_key' => $key,
+                    'record_key' => 'record',
+                ],
+            ],
+            'get_create_schema' => $supportsMutation
+                ? [
+                    'tool' => 'admin-get-write-schema',
+                    'arguments' => [
+                        'resource_key' => $key,
+                        'operation' => 'create',
+                    ],
+                ]
+                : null,
+            'get_update_schema' => $supportsMutation
+                ? [
+                    'tool' => 'admin-get-write-schema',
+                    'arguments' => [
+                        'resource_key' => $key,
+                        'operation' => 'update',
+                        'record_key' => 'record',
+                    ],
+                ]
+                : null,
+            'create' => $supportsMutation && array_key_exists('create', $pages)
+                ? [
+                    'tool' => 'admin-create-record',
+                    'arguments' => [
+                        'resource_key' => $key,
+                        'payload' => 'object',
+                    ],
+                ]
+                : null,
+            'update' => $supportsMutation && array_key_exists('edit', $pages)
+                ? [
+                    'tool' => 'admin-update-record',
+                    'arguments' => [
+                        'resource_key' => $key,
+                        'record_key' => 'record',
+                        'payload' => 'object',
+                    ],
+                ]
+                : null,
+        ];
     }
 
     /**

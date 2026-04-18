@@ -130,6 +130,7 @@ final class UpdateSavedSearchAction
             'gender',
             'starts_after',
             'starts_before',
+            'starts_on_local_date',
             'time_scope',
             'prayer_time',
             'timing_mode',

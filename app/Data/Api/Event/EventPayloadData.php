@@ -8,6 +8,7 @@ use App\Models\Institution;
 use App\Models\Speaker;
 use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Timezone\UserDateTimeFormatter;
+use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Spatie\LaravelData\Data;
@@ -33,6 +34,9 @@ class EventPayloadData extends Data
             'card_image_url' => $event->card_image_url,
             'poster_url' => self::preferredMediaUrl($event->getFirstMedia('poster'), ['preview', 'card', 'thumb']),
             'has_poster' => $event->hasMedia('poster'),
+            'starts_at_local' => self::localDateTimeString($event->starts_at),
+            'starts_on_local_date' => self::localDateString($event->starts_at),
+            'ends_at_local' => self::localDateTimeString($event->ends_at),
             'timing_display' => $event->timing_display,
             'end_time_display' => $event->ends_at instanceof DateTimeInterface
                 ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
@@ -125,5 +129,23 @@ class EventPayloadData extends Data
         $originalUrl = $media->getUrl();
 
         return $originalUrl !== '' ? $originalUrl : null;
+    }
+
+    private static function localDateTimeString(mixed $value): ?string
+    {
+        if ($value instanceof CarbonInterface) {
+            return $value->copy()->timezone(UserDateTimeFormatter::resolveTimezone())->format(DATE_ATOM);
+        }
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    private static function localDateString(mixed $value): ?string
+    {
+        if ($value instanceof CarbonInterface) {
+            return $value->copy()->timezone(UserDateTimeFormatter::resolveTimezone())->format('Y-m-d');
+        }
+
+        return is_string($value) && $value !== '' ? substr($value, 0, 10) : null;
     }
 }

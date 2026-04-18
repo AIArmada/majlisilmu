@@ -210,7 +210,7 @@ class AdminResourceMutationService
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
-    public function normalizeValidatedPayload(string $resourceClass, array $validated): array
+    public function normalizeValidatedPayload(string $resourceClass, array $validated, ?Model $record = null): array
     {
         if (! in_array($resourceClass, [InstitutionResource::class, SpeakerResource::class], true)) {
             return $validated;
@@ -222,6 +222,16 @@ class AdminResourceMutationService
 
         $countryProvided = SharedFormSchema::countrySelectionProvided($validated['address']);
         $validated['address'] = SharedFormSchema::prepareAddressPersistenceData($validated['address']);
+
+        if (
+            $resourceClass === InstitutionResource::class
+            && ! $countryProvided
+            && $record instanceof Institution
+            && is_int($record->addressModel?->country_id)
+        ) {
+            $validated['address']['country_id'] = $record->addressModel->country_id;
+            $countryProvided = true;
+        }
 
         if (! $countryProvided) {
             throw ValidationException::withMessages([

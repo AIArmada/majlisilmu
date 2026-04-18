@@ -138,6 +138,51 @@ it('returns the updated account settings profile payload after saving', function
         ->and($user->friday_prayer_institution_id)->toBe($fridayInstitution->id);
 });
 
+it('preserves omitted account settings fields during sparse updates', function () {
+    $dailyInstitution = Institution::factory()->create([
+        'name' => 'Masjid Harian Asal',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $fridayInstitution = Institution::factory()->create([
+        'name' => 'Masjid Jumaat Asal',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create([
+        'name' => 'Sparse User',
+        'email' => 'sparse@example.test',
+        'phone' => '+60123334444',
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'daily_prayer_institution_id' => $dailyInstitution->id,
+        'friday_prayer_institution_id' => $fridayInstitution->id,
+        'email_verified_at' => now()->subDay()->startOfSecond(),
+        'phone_verified_at' => now()->subHours(12)->startOfSecond(),
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $response = $this->putJson(route('api.client.account-settings.update'), [
+        'name' => 'Sparse User Updated',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('message', __('Account settings updated.'))
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+
+    $user->refresh();
+
+    expect($user->name)->toBe('Sparse User Updated')
+        ->and($user->email)->toBe('sparse@example.test')
+        ->and($user->phone)->toBe('+60123334444')
+        ->and($user->timezone)->toBe('Asia/Kuala_Lumpur')
+        ->and($user->daily_prayer_institution_id)->toBe($dailyInstitution->id)
+        ->and($user->friday_prayer_institution_id)->toBe($fridayInstitution->id)
+        ->and($user->email_verified_at)->not->toBeNull()
+        ->and($user->phone_verified_at)->not->toBeNull();
+});
+
 it('lists, creates, and revokes member MCP tokens through account settings', function () {
     $institution = Institution::factory()->create([
         'name' => 'MCP Token Institution',

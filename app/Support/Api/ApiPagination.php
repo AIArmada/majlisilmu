@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Api;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+
 final class ApiPagination
 {
     public static function normalizePerPage(int $value, int $default = 20, int $max = 100): int
@@ -16,5 +18,22 @@ final class ApiPagination
         }
 
         return min($value, $normalizedMax);
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, mixed>  $records
+     * @return array{page: int, per_page: int, total: int, has_more: bool, next_page: int|null}
+     */
+    public static function paginationMeta(LengthAwarePaginator $records): array
+    {
+        $hasMorePages = $records->hasMorePages();
+
+        return [
+            'page' => $records->currentPage(),
+            'per_page' => $records->perPage(),
+            'total' => $records->total(),
+            'has_more' => $hasMorePages,
+            'next_page' => $hasMorePages ? $records->currentPage() + 1 : null,
+        ];
     }
 }

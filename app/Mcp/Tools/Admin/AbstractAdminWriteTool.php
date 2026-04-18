@@ -7,6 +7,7 @@ namespace App\Mcp\Tools\Admin;
 use App\Models\User;
 use App\Support\Api\Admin\AdminResourceService;
 use App\Support\Location\PreferredCountryResolver;
+use App\Support\Mcp\McpAuthenticatedUserResolver;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 
@@ -51,7 +52,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
 
     public function shouldRegister(Request $request, AdminResourceService $resourceService): bool
     {
-        $user = $request->user();
+        $user = app(McpAuthenticatedUserResolver::class)->resolve($request->user());
 
         return $user instanceof User && $resourceService->hasAnyWritableResourceAccess($user);
     }

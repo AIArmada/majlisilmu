@@ -1,5 +1,6 @@
 # Lessons
 
+- When a user provides both PDF and Markdown versions of a report and asks to use the md file, treat the Markdown copy as the source of truth and keep subsequent implementation notes aligned to it.
 - Keep the origin query param free-form for API clients, but hide `origin=web` from the visible URL so the default web case stays clean while iOS/Android/macOS and future clients can still identify themselves explicitly.
 - When the user needs to see where a share came from, put the resolved origin directly into the generated tracked URL (`origin=web`, `origin=iosapp`, etc.); storing origin only in backend metadata is not enough for the UI copy-link surface.
 - When a share modal still copies a bare canonical URL, audit the payload source and caller identity together; the client can be wired correctly while the backend still returns an anonymous fallback, so copy-link, social, and native-share paths all need the same tracked payload contract.

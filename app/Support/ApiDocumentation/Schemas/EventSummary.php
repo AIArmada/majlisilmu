@@ -11,7 +11,7 @@ use Illuminate\Contracts\Support\Arrayable;
  * @phpstan-type EventSummaryInstitutionArray array{id: string, name: string, slug: string, display_name: ?string, public_image_url: ?string, logo_url: ?string}
  * @phpstan-type EventSummaryVenueArray array{id: string, name: string, slug: string}
  * @phpstan-type EventSummarySpeakerArray array{id: string, name: string, formatted_name: string, slug: string, avatar_url: ?string}
- * @phpstan-type EventSummaryArray array{id: string, slug: string, title: string, starts_at: ?string, ends_at: ?string, timing_display: ?string, prayer_display_text: ?string, end_time_display: ?string, visibility: string, status: string, status_label: string, event_type: list<string>, event_type_label: ?string, event_format: string, event_format_label: ?string, reference_study_subtitle: ?string, location: ?string, is_remote: bool, is_pending: bool, is_cancelled: bool, has_poster: bool, poster_url: ?string, card_image_url: ?string, institution: EventSummaryInstitutionArray|null, venue: EventSummaryVenueArray|null, speakers: list<EventSummarySpeakerArray>}
+ * @phpstan-type EventSummaryArray array{id: string, slug: string, title: string, starts_at: ?string, starts_at_local: ?string, starts_on_local_date: ?string, ends_at: ?string, ends_at_local: ?string, timing_display: ?string, prayer_display_text: ?string, end_time_display: ?string, visibility: string, status: string, status_label: string, event_type: list<string>, event_type_label: ?string, event_format: string, event_format_label: ?string, reference_study_subtitle: ?string, location: ?string, is_remote: bool, is_pending: bool, is_cancelled: bool, has_poster: bool, poster_url: ?string, card_image_url: ?string, institution: EventSummaryInstitutionArray|null, venue: EventSummaryVenueArray|null, speakers: list<EventSummarySpeakerArray>}
  *
  * @implements Arrayable<string, mixed>
  */
@@ -29,7 +29,10 @@ final readonly class EventSummary implements Arrayable
         public string $slug,
         public string $title,
         public ?string $starts_at,
+        public ?string $starts_at_local,
+        public ?string $starts_on_local_date,
         public ?string $ends_at,
+        public ?string $ends_at_local,
         public ?string $timing_display,
         public ?string $prayer_display_text,
         public ?string $end_time_display,
@@ -61,7 +64,10 @@ final readonly class EventSummary implements Arrayable
             'slug' => $this->slug,
             'title' => $this->title,
             'starts_at' => $this->starts_at,
+            'starts_at_local' => $this->starts_at_local,
+            'starts_on_local_date' => $this->starts_on_local_date,
             'ends_at' => $this->ends_at,
+            'ends_at_local' => $this->ends_at_local,
             'timing_display' => $this->timing_display,
             'prayer_display_text' => $this->prayer_display_text,
             'end_time_display' => $this->end_time_display,

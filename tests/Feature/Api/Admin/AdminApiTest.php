@@ -408,6 +408,49 @@ it('exposes admin institution write schema and can create and update institution
         ->assertJsonPath('data.record.attributes.nickname', 'API Masjid');
 });
 
+it('preserves institution address line1 when sparse map fields are updated through the admin api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/institutions', [
+        'name' => 'Admin API Sparse Institution',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Alamat Asal Institusi',
+        ],
+    ])->assertCreated();
+
+    $institutionRouteKey = (string) $createResponse->json('data.record.route_key');
+
+    $this->putJson('/api/v1/admin/institutions/'.$institutionRouteKey, [
+        'name' => 'Admin API Sparse Institution',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'address' => [
+            'google_maps_url' => 'https://example.com/maps/institution',
+            'lat' => 3.123456,
+            'lng' => 101.654321,
+        ],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Asal Institusi')
+        ->assertJsonPath('data.record.attributes.address.google_maps_url', fn (string $url): bool => str_contains($url, 'google.com/maps/search'))
+        ->assertJsonPath('data.record.attributes.address.lat', 3.123456)
+        ->assertJsonPath('data.record.attributes.address.lng', 101.654321);
+
+    $institution = Institution::query()->findOrFail($institutionRouteKey);
+
+    expect($institution->addressModel)->not->toBeNull()
+        ->and($institution->addressModel?->line1)->toBe('Alamat Asal Institusi')
+        ->and($institution->addressModel?->google_maps_url)->toContain('google.com/maps/search')
+        ->and($institution->addressModel?->lat)->toBe(3.123456)
+        ->and($institution->addressModel?->lng)->toBe(101.654321);
+});
+
 it('requires a record key when requesting an admin update schema', function () {
     $admin = adminApiUser('super_admin');
 
@@ -533,6 +576,22 @@ it('exposes admin venue write schema and can create and update venues through th
         ->and($venue->contacts->first()?->getRawOriginal('category'))->toBe('whatsapp')
         ->and($venue->socialMedia)->toHaveCount(1)
         ->and($venue->socialMedia->first()?->getRawOriginal('platform'))->toBe('facebook');
+
+    $this->putJson('/api/v1/admin/venues/'.$venueRouteKey, [
+        'name' => 'Admin API Venue Updated',
+        'type' => 'auditorium',
+        'status' => 'pending',
+        'is_active' => false,
+        'address' => [
+            'google_maps_url' => 'https://example.com/venues/admin-api-venue-updated',
+            'lat' => 3.147,
+            'lng' => 101.694,
+        ],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.address.line1', 'Auditorium API Baharu')
+        ->assertJsonPath('data.record.attributes.address.google_maps_url', fn (string $url): bool => str_contains($url, 'google.com/maps/search'))
+        ->assertJsonPath('data.record.attributes.address.lat', 3.147)
+        ->assertJsonPath('data.record.attributes.address.lng', 101.694);
 });
 
 it('lists admin geography catalogs and exposes catalog metadata through admin write schemas', function () {

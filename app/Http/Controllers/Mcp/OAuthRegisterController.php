@@ -39,7 +39,7 @@ class OAuthRegisterController extends BaseOAuthRegisterController
                     return;
                 }
 
-                if (! Str::startsWith($value, $this->allowedDomains())) {
+                if (! $this->isAllowedHttpRedirectUri($value)) {
                     $fail($attribute.' is not a permitted redirect domain.');
                 }
             }],
@@ -97,5 +97,47 @@ class OAuthRegisterController extends BaseOAuthRegisterController
             ['localhost', '127.0.0.1', '[::1]'],
             true,
         ));
+    }
+
+    private function isAllowedHttpRedirectUri(string $uri): bool
+    {
+        $normalizedUri = $this->normalizeHttpRedirectBase($uri);
+
+        if (! is_string($normalizedUri)) {
+            return false;
+        }
+
+        /** @var array<int, string> $domains */
+        $domains = config('mcp.redirect_domains', []);
+
+        return collect($domains)
+            ->map(fn (string $domain): ?string => $this->normalizeHttpRedirectBase($domain))
+            ->filter(static fn (mixed $domain): bool => is_string($domain))
+            ->contains($normalizedUri);
+    }
+
+    private function normalizeHttpRedirectBase(string $uri): ?string
+    {
+        $scheme = parse_url($uri, PHP_URL_SCHEME);
+        $host = parse_url($uri, PHP_URL_HOST);
+
+        if (! is_string($scheme) || ! in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+
+        $port = parse_url($uri, PHP_URL_PORT);
+        $defaultPort = $scheme === 'https' ? 443 : 80;
+        $normalizedPort = is_int($port) && $port !== $defaultPort ? ':'.$port : '';
+
+        return sprintf(
+            '%s://%s%s/',
+            $scheme,
+            $host,
+            $normalizedPort,
+        );
     }
 }

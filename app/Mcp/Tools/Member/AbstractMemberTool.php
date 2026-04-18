@@ -34,6 +34,8 @@ abstract class AbstractMemberTool extends Tool
 
         abort_unless($user instanceof User && $user->hasMemberMcpAccess(), 403);
 
+        auth()->setUser($user);
+
         return $user;
     }
 

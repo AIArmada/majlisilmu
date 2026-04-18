@@ -62,6 +62,8 @@ it('lists only active public visible statuses (approved, pending, cancelled)', f
 
     $response->assertOk()
         ->assertJsonPath('meta.pagination.total', 3)
+        ->assertJsonPath('meta.pagination.has_more', false)
+        ->assertJsonPath('meta.pagination.next_page', null)
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $eventIds = collect($response->json('data'))->pluck('id')->all();
@@ -111,6 +113,8 @@ it('clamps public event index per_page values to the supported maximum', functio
     $this->getJson('/api/v1/events?per_page=500')
         ->assertOk()
         ->assertJsonPath('meta.pagination.per_page', 50)
+        ->assertJsonPath('meta.pagination.has_more', true)
+        ->assertJsonPath('meta.pagination.next_page', 2)
         ->assertJsonCount(50, 'data');
 });
 
@@ -264,11 +268,53 @@ it('interprets starts_after filter in the user timezone', function () {
         ->not()->toContain($excluded->id);
 });
 
+it('filters events by starts_on_local_date in the user timezone', function () {
+    $userTimezone = 'Asia/Kuala_Lumpur';
+    $localFilterDate = now($userTimezone)->addDays(2)->toDateString();
+
+    $includedStartUtc = Carbon::parse($localFilterDate.' 01:00:00', $userTimezone)->setTimezone('UTC');
+    $excludedStartUtc = Carbon::parse($localFilterDate.' 23:30:00', $userTimezone)
+        ->subDay()
+        ->setTimezone('UTC');
+
+    $included = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => $includedStartUtc,
+    ]);
+
+    $excluded = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => $excludedStartUtc,
+    ]);
+
+    $response = $this
+        ->withHeader('X-Timezone', $userTimezone)
+        ->getJson('/api/v1/events?filter[starts_on_local_date]='.$localFilterDate);
+
+    $response->assertOk();
+
+    $eventIds = collect($response->json('data'))->pluck('id')->all();
+
+    expect($eventIds)
+        ->toContain($included->id)
+        ->not()->toContain($excluded->id);
+});
+
 it('keeps raw utc event timestamps stable while localizing helper fields from request timezone context', function () {
     $startsAt = Carbon::create(2026, 4, 12, 0, 30, 0, 'UTC');
     $endsAt = Carbon::create(2026, 4, 12, 2, 0, 0, 'UTC');
     $expectedStartsAt = $startsAt->copy()->format('Y-m-d\TH:i:s.u\Z');
     $expectedEndsAt = $endsAt->copy()->format('Y-m-d\TH:i:s.u\Z');
+    $expectedUtcStartsAtLocal = $startsAt->copy()->timezone('UTC')->format(DATE_ATOM);
+    $expectedMytStartsAtLocal = $startsAt->copy()->timezone('Asia/Kuala_Lumpur')->format(DATE_ATOM);
+    $expectedUtcStartsOnLocalDate = $startsAt->copy()->timezone('UTC')->format('Y-m-d');
+    $expectedMytStartsOnLocalDate = $startsAt->copy()->timezone('Asia/Kuala_Lumpur')->format('Y-m-d');
+    $expectedUtcEndsAtLocal = $endsAt->copy()->timezone('UTC')->format(DATE_ATOM);
+    $expectedMytEndsAtLocal = $endsAt->copy()->timezone('Asia/Kuala_Lumpur')->format(DATE_ATOM);
 
     $event = Event::factory()->create([
         'status' => 'approved',
@@ -294,8 +340,14 @@ it('keeps raw utc event timestamps stable while localizing helper fields from re
         ->and($mytEvent)->toBeArray()
         ->and($utcEvent['starts_at'])->toBe($expectedStartsAt)
         ->and($mytEvent['starts_at'])->toBe($expectedStartsAt)
+        ->and($utcEvent['starts_at_local'])->toBe($expectedUtcStartsAtLocal)
+        ->and($mytEvent['starts_at_local'])->toBe($expectedMytStartsAtLocal)
+        ->and($utcEvent['starts_on_local_date'])->toBe($expectedUtcStartsOnLocalDate)
+        ->and($mytEvent['starts_on_local_date'])->toBe($expectedMytStartsOnLocalDate)
         ->and($utcEvent['ends_at'])->toBe($expectedEndsAt)
         ->and($mytEvent['ends_at'])->toBe($expectedEndsAt)
+        ->and($utcEvent['ends_at_local'])->toBe($expectedUtcEndsAtLocal)
+        ->and($mytEvent['ends_at_local'])->toBe($expectedMytEndsAtLocal)
         ->and($utcEvent['timing_display'])->toBe($startsAt->copy()->timezone('UTC')->format('g:i A'))
         ->and($mytEvent['timing_display'])->toBe($startsAt->copy()->timezone('Asia/Kuala_Lumpur')->format('g:i A'))
         ->and($utcEvent['end_time_display'])->toBe($endsAt->copy()->timezone('UTC')->format('h:i A'))

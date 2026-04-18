@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Admin;
 
 use App\Support\Api\Admin\AdminResourceService;
+use App\Support\Mcp\McpWriteSchemaFormatter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
+#[IsIdempotent]
 class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
 {
     protected string $name = 'admin-get-write-schema';
@@ -19,6 +24,7 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
+        private readonly McpWriteSchemaFormatter $schemaFormatter,
     ) {}
 
     public function handle(Request $request): ResponseFactory|Response
@@ -32,13 +38,46 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
                 'record_key' => ['nullable', 'string', 'required_if:operation,update'],
             ]);
 
-            return $this->resourceService->writeSchema(
-                resourceKey: (string) $validated['resource_key'],
-                operation: (string) $validated['operation'],
-                recordKey: isset($validated['record_key']) ? (string) $validated['record_key'] : null,
+            $resourceKey = (string) $validated['resource_key'];
+            $operation = (string) $validated['operation'];
+            $recordKey = isset($validated['record_key']) ? (string) $validated['record_key'] : null;
+
+            $response = $this->resourceService->writeSchema(
+                resourceKey: $resourceKey,
+                operation: $operation,
+                recordKey: $recordKey,
                 actor: $actor,
             );
+
+            if (is_array($response['data']['schema'] ?? null)) {
+                /** @var array<string, mixed> $schema */
+                $schema = $response['data']['schema'];
+                $response['data']['schema'] = $this->schemaFormatter->formatSchema(
+                    $schema,
+                    $operation === 'create' ? 'admin-create-record' : 'admin-update-record',
+                    $this->toolArguments($resourceKey, $operation, $recordKey),
+                );
+            }
+
+            return $response;
         });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function toolArguments(string $resourceKey, string $operation, ?string $recordKey): array
+    {
+        $arguments = [
+            'resource_key' => $resourceKey,
+            'payload' => 'object',
+        ];
+
+        if ($operation === 'update') {
+            $arguments['record_key'] = $recordKey ?? 'record';
+        }
+
+        return $arguments;
     }
 
     /**

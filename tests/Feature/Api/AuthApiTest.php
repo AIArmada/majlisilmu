@@ -150,6 +150,25 @@ it('rejects invalid api login credentials', function () {
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
+it('rate limits repeated api login attempts for the same account fingerprint', function () {
+    User::factory()->create([
+        'email' => 'rate-limited@example.test',
+        'password' => 'password',
+    ]);
+
+    $payload = [
+        'login' => 'rate-limited@example.test',
+        'password' => 'wrong-password',
+        'device_name' => 'Pixel 9',
+    ];
+
+    for ($attempt = 1; $attempt <= 5; $attempt++) {
+        $this->postJson(route('api.auth.login'), $payload)->assertUnprocessable();
+    }
+
+    $this->postJson(route('api.auth.login'), $payload)->assertTooManyRequests();
+});
+
 it('logs in through google api token exchange and returns a bearer token', function () {
     $provider = Mockery::mock();
     $provider->shouldReceive('stateless')->once()->andReturnSelf();

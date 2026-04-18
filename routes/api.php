@@ -38,11 +38,21 @@ use Illuminate\Support\Facades\Route;
 
 // Public API endpoints
 Route::prefix('v1')->group(function () {
-    Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
-    Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
-    Route::post('/auth/social/google', [AuthController::class, 'google'])->name('api.auth.social.google');
-    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('api.auth.forgot-password');
-    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.auth.reset-password');
+    Route::post('/auth/register', [AuthController::class, 'register'])
+        ->middleware('throttle:api-auth-register')
+        ->name('api.auth.register');
+    Route::post('/auth/login', [AuthController::class, 'login'])
+        ->middleware('throttle:api-auth-login')
+        ->name('api.auth.login');
+    Route::post('/auth/social/google', [AuthController::class, 'google'])
+        ->middleware('throttle:api-auth-social')
+        ->name('api.auth.social.google');
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
+        ->middleware('throttle:api-auth-password')
+        ->name('api.auth.forgot-password');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
+        ->middleware('throttle:api-auth-password')
+        ->name('api.auth.reset-password');
 
     Route::name('api.client.')->group(function () {
         Route::get('/manifest', [ManifestController::class, 'manifest'])->name('manifest');

@@ -1052,6 +1052,26 @@ class ContributionEntityMutationService
         ];
 
         if ($existingAddress instanceof Address) {
+            foreach ([
+                'line1',
+                'line2',
+                'postcode',
+                'state_id',
+                'district_id',
+                'subdistrict_id',
+                'lat',
+                'lng',
+                'google_maps_url',
+                'google_place_id',
+                'waze_url',
+            ] as $field) {
+                if (! array_key_exists($field, $payload)) {
+                    $attributes[$field] = $existingAddress->{$field};
+                }
+            }
+        }
+
+        if ($existingAddress instanceof Address) {
             $existingAddress->fill($attributes)->save();
 
             return;
