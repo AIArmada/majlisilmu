@@ -1,6 +1,6 @@
 # MajlisIlmu MCP Guide
 
-Updated: April 18, 2026
+Updated: April 19, 2026
 Audience: developers and AI-client integrators.
 
 ## What MCP Means in MajlisIlmu
@@ -142,6 +142,7 @@ Useful environment variables:
 - `MCP_REDIRECT_DOMAINS` — add hosted OAuth redirect domains here.
 - `MCP_CUSTOM_SCHEMES` — allow private-use callback schemes for desktop clients such as `vscode` or `claude`.
 - `MCP_AUTHORIZATION_SERVER` — override the OAuth issuer identifier if needed.
+- `PASSPORT_PRIVATE_KEY` / `PASSPORT_PUBLIC_KEY` — optional raw PEM secrets for Passport; leave them blank to use the generated `storage/oauth-*.key` files. Do not set file paths here.
 
 ## Common Troubleshooting Checks
 

@@ -46,6 +46,7 @@ use App\Observers\TagObserver;
 use App\Observers\VenueObserver;
 use App\Policies\FilamentAuditPolicy;
 use App\Support\Media\MediaFileNamer;
+use App\Support\Passport\PassportKeyProvisioner;
 use BezhanSalleh\LanguageSwitch\LanguageSwitch;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Support\Assets\Js;
@@ -107,6 +108,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        PassportKeyProvisioner::ensure();
+
         Passport::authorizationView('mcp.authorize');
 
         $signalsRoutes = base_path('../commerce/packages/signals/routes/api.php');
