@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Laravel\Passport\Client;
 use Laravel\Passport\ClientRepository;
@@ -44,4 +45,27 @@ it('registers MCP OAuth clients without using Passport schema introspection', fu
         'name' => 'ChatGPT',
         'revoked' => false,
     ]);
+});
+
+it('renders the Passport authorization screen for a registered MCP client', function (): void {
+    config()->set('mcp.redirect_domains', [
+        'https://majlisilmu.test',
+        'https://chatgpt.com',
+        'http://localhost',
+    ]);
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $client = app(ClientRepository::class)->createAuthorizationCodeGrantClient(
+        'ChatGPT',
+        ['https://chatgpt.com/connector/oauth/callback-123'],
+        true,
+        null,
+        false,
+    );
+
+    $response = $this->get('/oauth/authorize?client_id='.$client->id.'&redirect_uri='.urlencode('https://chatgpt.com/connector/oauth/callback-123').'&response_type=code&scope=mcp:use&state=test-state');
+
+    $response->assertOk();
 });
