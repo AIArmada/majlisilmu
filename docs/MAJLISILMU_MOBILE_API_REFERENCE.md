@@ -41,6 +41,12 @@ Key routing rules:
 - **Admin mutation routes** (POST / PUT) use the resource key and the record's admin **route_key** for record-specific paths. The format is `/api/v1/admin/{resourceKey}/{recordKey}`. Use the `route_key` returned by the admin collection or detail payloads.
 - Do not send public contribution payloads to `/api/v1/admin`, and do not expect admin schemas from `/api/v1/forms/...`.
 
+Speaker-specific discovery tip:
+
+- Public event text search uses `filter[search]` for event title and description only.
+- Exact speaker matching uses `filter[speaker]` with one or more speaker UUIDs.
+- For a speaker-centric event history, open `GET /api/v1/speakers/{speakerKey}` and read the `upcoming_events` and `past_events` arrays.
+
 ---
 
 ## Timezone Semantics
@@ -80,6 +86,8 @@ The `search` parameter on public and admin surfaces queries different record sco
 | Admin | `GET /api/v1/admin/institutions?search=...` | **All** records — active, inactive, pending, rejected |
 
 This is intentional. The admin surface mirrors Filament's resource query, which does not apply visibility filters. A speaker that returns zero results on the public surface may appear on the admin surface because it is inactive or has `status = 'pending'`.
+
+Public event discovery follows the same principle: use `filter[search]` for event title/description text matching and `filter[speaker]` when you need an exact speaker UUID match.
 
 **AI agent guidance:** Never assume that a search result from one surface tells you anything definitive about results from the other. If you need to verify whether a speaker is visible to the public, check `is_active` and `status` in the record attributes.
 
@@ -504,6 +512,7 @@ Current scope:
 - Resource-specific write schema discovery for supported resources
 - Generic record listing with search
 - Generic record detail with per-record abilities
+- Named relation traversal for related admin records
 - Shared create/update write support for `speakers`, `institutions`, `venues`, `references`, `events`, and `subdistricts`
 
 Current limitation:
@@ -519,6 +528,7 @@ Current limitation:
 | `GET` | `/admin/{resourceKey}/schema?operation=create` | Required Filament admin-panel access | Return the create contract for supported write resources |
 | `GET` | `/admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` | Required Filament admin-panel access | Return the update contract plus current defaults/media for one supported record |
 | `GET` | `/admin/{resourceKey}` | Required Filament admin-panel access | Paginated record listing for the selected resource |
+| `GET` | `/admin/{resourceKey}/{recordKey}/relations/{relation}` | Required Filament admin-panel access | Paginated listing for a named relation on one admin record |
 | `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources |
 | `GET` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
 | `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources |
@@ -670,6 +680,12 @@ Supported filters:
 - `filter[search]`
 - `filter[prayer_time]`
 
+Notes:
+
+- `filter[search]` matches event title and description text only. It does **not** search nested speaker payloads.
+- `filter[speaker]` accepts one or more speaker UUIDs and returns events linked to those speakers.
+- If you need to discover all events for a specific speaker, use `GET /api/v1/speakers/{speakerKey}`; the speaker detail payload includes `upcoming_events` and `past_events`.
+
 Supported includes:
 
 - `venue`
@@ -703,10 +719,14 @@ Supported sorts:
 - `updated_at`
 - `views_count`
 
-Example:
+Examples:
 
 ```http
 GET /api/v1/events?filter[search]=kuliah&filter[state_id]=10&include=institution,venue,speakers,settings&sort=starts_at
+```
+
+```http
+GET /api/v1/events?filter[speaker]=019d5cb5-7de1-7055-a4d3-b57ab007331e&include=institution,venue,speakers&sort=starts_at
 ```
 
 Mobile recommendation:

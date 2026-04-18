@@ -94,6 +94,20 @@ class AdminResourceRegistry
         return null;
     }
 
+    /**
+     * @param  class-string<Model>  $modelClass
+     */
+    public function resolveForModel(string $modelClass): ?string
+    {
+        foreach ($this->resources() as $resourceClass) {
+            if ($resourceClass::getModel() === $modelClass) {
+                return $resourceClass;
+            }
+        }
+
+        return null;
+    }
+
     public function canAccessResource(string $resourceClass): bool
     {
         return $this->canViewAny($resourceClass)
@@ -154,6 +168,7 @@ class AdminResourceRegistry
                 'store' => $supportsMutation && array_key_exists('create', $pages)
                     ? route('api.admin.resources.store', ['resourceKey' => $key], false)
                     : null,
+                'related_collection' => route('api.admin.resources.related', ['resourceKey' => $key, 'recordKey' => 'record', 'relation' => 'relation'], false),
                 'item_template' => route('api.admin.resources.show', ['resourceKey' => $key, 'recordKey' => 'record'], false),
                 'update_template' => $supportsMutation && array_key_exists('edit', $pages)
                     ? route('api.admin.resources.update', ['resourceKey' => $key, 'recordKey' => 'record'], false)
@@ -253,6 +268,17 @@ class AdminResourceRegistry
                 'tool' => 'admin-list-records',
                 'arguments' => [
                     'resource_key' => $key,
+                    'search' => null,
+                    'page' => 1,
+                    'per_page' => 15,
+                ],
+            ],
+            'list_related_records' => [
+                'tool' => 'admin-list-related-records',
+                'arguments' => [
+                    'resource_key' => $key,
+                    'record_key' => 'record',
+                    'relation' => 'relation',
                     'search' => null,
                     'page' => 1,
                     'per_page' => 15,
@@ -418,20 +444,33 @@ class AdminResourceRegistry
             $relationNames[] = $name;
         }
 
-        return $relationNames;
+        return array_values(array_unique($relationNames));
     }
 
     private function relationName(mixed $relation): ?string
     {
-        if (is_string($relation)) {
-            return class_basename($relation);
+        $relationClass = is_object($relation) ? $relation::class : (is_string($relation) ? $relation : null);
+
+        if (! is_string($relationClass) || $relationClass === '') {
+            return null;
         }
 
-        if (is_object($relation)) {
-            return class_basename($relation::class);
+        $reflection = new \ReflectionClass($relationClass);
+
+        if ($reflection->hasProperty('relationship')) {
+            $property = $reflection->getProperty('relationship');
+
+            if ($property->isStatic()) {
+                /** @var mixed $value */
+                $value = $property->getValue();
+
+                if (is_string($value) && $value !== '') {
+                    return Str::snake($value);
+                }
+            }
         }
 
-        return null;
+        return Str::snake(class_basename($relationClass));
     }
 
     /**

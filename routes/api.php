@@ -122,6 +122,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::post('/{resourceKey}', [AdminResourceController::class, 'storeRecord'])->name('resources.store');
             Route::get('/{resourceKey}/meta', [AdminResourceController::class, 'show'])->name('resources.meta');
             Route::get('/{resourceKey}/schema', [AdminResourceController::class, 'schema'])->name('resources.schema');
+            Route::get('/{resourceKey}/{recordKey}/relations/{relation}', [AdminResourceController::class, 'relatedRecords'])->name('resources.related');
             Route::get('/{resourceKey}/{recordKey}', [AdminResourceController::class, 'showRecord'])->name('resources.show');
             Route::put('/{resourceKey}/{recordKey}', [AdminResourceController::class, 'updateRecord'])->name('resources.update');
         });

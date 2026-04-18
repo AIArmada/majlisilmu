@@ -10,9 +10,11 @@ use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -55,6 +57,7 @@ class AdminResourceService
                 'rules' => [
                     'Use resource keys returned by the manifest to select the correct admin schema and route family.',
                     'Use the admin record route_key returned by admin collection or detail payloads for record-specific paths.',
+                    'Use the relation keys returned by admin resource metadata when traversing nested related records through the related-record route or MCP tool.',
                     'Fetch the exact schema before every create or update because required fields and catalogs are resource-specific.',
                     'Admin PUT requests are full schema-guided updates, not partial patches.',
                     'Use api_routes for HTTP API clients and mcp_tools for MCP clients; MCP tools take structured arguments instead of URL paths.',
@@ -117,6 +120,75 @@ class AdminResourceService
                 $records->items(),
             )),
             'meta' => $this->recordsMeta($resourceClass, $records, $normalizedSearch),
+        ];
+    }
+
+    /**
+     * @return array{data: list<array<string, mixed>>, meta: array<string, mixed>}
+     */
+    public function listRelatedRecords(string $resourceKey, string $recordKey, string $relation, string $search = '', int $page = 1, int $perPage = 15): array
+    {
+        $resourceClass = $this->resolveAccessibleResource($resourceKey);
+        $record = $this->registry->resolveRecord($resourceClass, $recordKey);
+        $abilities = $this->registry->recordAbilities($resourceClass, $record);
+
+        abort_unless(collect($abilities)->contains(true), 403);
+
+        $resourceMeta = $this->registry->metadata($resourceClass);
+        $relationName = Str::snake(trim($relation));
+
+        abort_unless(in_array($relationName, $resourceMeta['relations'], true), 404);
+
+        $relationMethod = Str::camel($relationName);
+
+        if (! method_exists($record, $relationMethod)) {
+            throw new NotFoundHttpException;
+        }
+
+        /** @var Relation<Model, Model, mixed> $relationQuery */
+        $relationQuery = $record->{$relationMethod}();
+        $query = $relationQuery->getQuery();
+        $relatedModel = $relationQuery->getRelated();
+        $relatedResourceClass = $this->registry->resolveForModel($relatedModel::class);
+        $query->select($relatedModel->qualifyColumn('*'));
+        $normalizedSearch = trim($search);
+
+        if ($normalizedSearch !== '') {
+            if ($relatedResourceClass !== null) {
+                $this->applySearch($query, $relatedResourceClass, $normalizedSearch);
+            } else {
+                $this->applyGenericSearch($query, $relatedModel, $normalizedSearch);
+            }
+        }
+
+        if ($relatedResourceClass !== null) {
+            $this->applyDefaultOrdering($query, $relatedResourceClass);
+        } else {
+            $this->applyDefaultOrderingForModel($query, $relatedModel);
+        }
+
+        $records = $query->paginate(
+            perPage: ApiPagination::normalizePerPage($perPage, default: 15, max: 100),
+            page: max($page, 1),
+        );
+
+        return [
+            'data' => array_values(array_map(
+                fn (Model $relatedRecord): array => $this->serializeRelatedRecord($relatedResourceClass, $relatedRecord),
+                $records->items(),
+            )),
+            'meta' => [
+                'resource' => $resourceMeta,
+                'parent_record' => $this->registry->serializeRecordDetail($resourceClass, $record),
+                'relation' => [
+                    'name' => $relationName,
+                    'method' => $relationMethod,
+                    'related_model_class' => $relatedModel::class,
+                    'related_resource' => $relatedResourceClass !== null ? $this->registry->metadata($relatedResourceClass) : null,
+                ],
+                'search' => $normalizedSearch !== '' ? $normalizedSearch : null,
+                'pagination' => ApiPagination::paginationMeta($records),
+            ],
         ];
     }
 
@@ -257,6 +329,122 @@ class AdminResourceService
     }
 
     /**
+     * @return array{
+     *   id: string,
+     *   route_key: string,
+     *   title: string|null,
+     *   attributes: array<string, mixed>,
+     *   abilities?: array<string, bool>,
+     *   panel_routes?: array<string, string|null>
+     * }
+     */
+    private function serializeRelatedRecord(?string $resourceClass, Model $record): array
+    {
+        if ($resourceClass !== null) {
+            return $this->registry->serializeRecord($resourceClass, $record);
+        }
+
+        return [
+            'id' => (string) $record->getKey(),
+            'route_key' => (string) $record->getRouteKey(),
+            'title' => $this->genericRecordTitle($record),
+            'attributes' => $this->serializeAttributes($record),
+        ];
+    }
+
+    private function genericRecordTitle(Model $record): ?string
+    {
+        $table = $record->getTable();
+        $candidates = [
+            'title',
+            'name',
+            'label',
+            'slug',
+            'email',
+            $record->getRouteKeyName(),
+        ];
+
+        foreach (array_values(array_unique(array_filter($candidates, static fn (string $column): bool => $column !== ''))) as $column) {
+            if (! Schema::hasColumn($table, $column)) {
+                continue;
+            }
+
+            $value = $record->getAttribute($column);
+
+            if (is_string($value) && trim($value) !== '') {
+                return $value;
+            }
+
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return (string) $value;
+            }
+        }
+
+        return (string) $record->getRouteKey();
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function applyDefaultOrderingForModel(Builder $query, Model $model): void
+    {
+        $table = $model->getTable();
+        $candidates = [
+            'name',
+            'title',
+            'label',
+            'slug',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! Schema::hasColumn($table, $candidate)) {
+                continue;
+            }
+
+            $query->orderBy($model->qualifyColumn($candidate));
+
+            return;
+        }
+
+        if (Schema::hasColumn($table, 'created_at')) {
+            $query->orderBy($model->qualifyColumn('created_at'), 'desc');
+
+            return;
+        }
+
+        $query->orderBy($model->qualifyColumn($model->getKeyName()));
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function applyGenericSearch(Builder $query, Model $model, string $search): void
+    {
+        $table = $model->getTable();
+        $candidates = [
+            'title',
+            'name',
+            'label',
+            'slug',
+            'email',
+            'description',
+            $model->getRouteKeyName(),
+        ];
+        $columns = array_values(array_filter(array_unique($candidates), static fn (string $column): bool => Schema::hasColumn($table, $column)));
+
+        if ($columns === []) {
+            return;
+        }
+
+        $query->where(function (Builder $builder) use ($columns, $search, $model): void {
+            foreach ($columns as $index => $column) {
+                $method = $index === 0 ? 'where' : 'orWhere';
+                $builder->{$method}($model->qualifyColumn($column), 'like', "%{$search}%");
+            }
+        });
+    }
+
+    /**
      * @param  Builder<Model>  $query
      * @param  class-string<\Filament\Resources\Resource>  $resourceClass
      */
@@ -332,6 +520,7 @@ class AdminResourceService
                 'meta' => $resource['api_routes']['meta'],
                 'schema' => $resource['api_routes']['schema'],
                 'store' => $resource['api_routes']['store'],
+                'related_collection' => $resource['api_routes']['related_collection'],
                 'item_template' => $resource['api_routes']['item_template'],
                 'update_template' => $resource['api_routes']['update_template'],
             ],

@@ -53,6 +53,29 @@ class ResourceController extends Controller
     }
 
     #[PathParameter('resourceKey', 'Admin resource key from `GET /admin/manifest`, for example `events`, `institutions`, or `speakers`.', example: 'events')]
+    #[PathParameter('recordKey', 'Existing admin record route key returned by the collection or record endpoints.', example: '0195b86a-3c15-73fa-a2d8-5a45f6a7f701')]
+    #[PathParameter('relation', 'Admin relation key from the resource metadata `relations` list. Use the exact key returned by `GET /admin/{resourceKey}/meta`.', example: 'speakers')]
+    #[QueryParameter('search', 'Optional free-text search across the related resource or related model columns.', required: false, type: 'string', infer: false, example: 'maghrib')]
+    #[QueryParameter('page', 'Pagination page number.', required: false, type: 'integer', infer: false, default: 1, example: 1)]
+    #[QueryParameter('per_page', 'Pagination page size. Values are clamped to the server\'s allowed range.', required: false, type: 'integer', infer: false, default: 15, example: 15)]
+    #[Endpoint(
+        title: 'List admin related records',
+        description: 'Lists the records attached to one named relation on a specific admin record. '
+            .'Use the relation keys from `GET /admin/{resourceKey}/meta` to discover what this endpoint accepts.',
+    )]
+    public function relatedRecords(Request $request, string $resourceKey, string $recordKey, string $relation): JsonResponse
+    {
+        return response()->json($this->resourceService->listRelatedRecords(
+            resourceKey: $resourceKey,
+            recordKey: $recordKey,
+            relation: $relation,
+            search: (string) $request->query('search', ''),
+            page: $request->integer('page', 1),
+            perPage: $request->integer('per_page', 15),
+        ));
+    }
+
+    #[PathParameter('resourceKey', 'Admin resource key from `GET /admin/manifest`, for example `events`, `institutions`, or `speakers`.', example: 'events')]
     #[QueryParameter('operation', 'Schema mode. Use `create` for new records or `update` for existing records.', required: false, type: 'string', infer: false, default: 'create', example: 'update')]
     #[QueryParameter('recordKey', 'Required when `operation=update`. Use the record route key returned by the admin collection or record endpoints.', required: false, type: 'string', infer: false, example: '0195b86a-3c15-73fa-a2d8-5a45f6a7f701')]
     #[Endpoint(
