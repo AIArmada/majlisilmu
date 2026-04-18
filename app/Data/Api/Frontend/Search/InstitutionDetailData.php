@@ -27,9 +27,6 @@ class InstitutionDetailData extends Data
         public string $status,
         public ?string $type_label,
         public ?string $address_line,
-        public ?string $street_address_line,
-        public ?string $locality_address_line,
-        public ?string $regional_address_line,
         public ?array $address,
         public ?array $country,
         public ?string $map_url,
@@ -46,7 +43,6 @@ class InstitutionDetailData extends Data
     ) {}
 
     /**
-     * @param  array{street: ?string, locality: ?string, regional: ?string}  $addressLines
      * @param  array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}|null  $address
      * @param  array{id: int, name: string, iso2: string, key: ?string}|null  $country
      * @param  array{public_image_url: string, logo_url: string, cover_url: ?string}  $media
@@ -57,7 +53,6 @@ class InstitutionDetailData extends Data
     public static function fromModel(
         Institution $institution,
         ?User $user,
-        array $addressLines,
         ?array $address,
         ?array $country,
         ?string $addressLine,
@@ -77,9 +72,6 @@ class InstitutionDetailData extends Data
             status: (string) $institution->status,
             type_label: $institution->type instanceof HasLabel ? $institution->type->getLabel() : null,
             address_line: $addressLine,
-            street_address_line: $addressLines['street'],
-            locality_address_line: $addressLines['locality'],
-            regional_address_line: $addressLines['regional'],
             address: $address,
             country: $country,
             map_url: $institution->addressModel?->google_maps_url,

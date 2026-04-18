@@ -22,9 +22,41 @@ final class ShareTrackingUrlService
     /**
      * @return list<string>
      */
+    public function supportedOrigins(): array
+    {
+        return ['web', 'iosapp', 'android', 'macapp'];
+    }
+
+    /**
+     * @return list<string>
+     */
     public function supportedProviders(): array
     {
         return ['whatsapp', 'telegram', 'threads', 'facebook', 'x', 'instagram', 'tiktok', 'email'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function trackedChannels(): array
+    {
+        return [
+            ...$this->supportedProviders(),
+            'copy_link',
+            'native_share',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function channelUrls(string $url): array
+    {
+        return collect($this->trackedChannels())
+            ->mapWithKeys(fn (string $channel): array => [
+                $channel => $this->channelUrl($url, $channel),
+            ])
+            ->all();
     }
 
     /**
@@ -56,6 +88,11 @@ final class ShareTrackingUrlService
             'email' => "mailto:?subject={$encodedText}&body={$encodedBody}",
             default => $url,
         };
+    }
+
+    public function channelUrl(string $url, ?string $provider): string
+    {
+        return $this->appendShareProvider($url, $provider);
     }
 
     public function normalizeAbsoluteInternalUrl(string $url): string
@@ -218,7 +255,22 @@ final class ShareTrackingUrlService
             return null;
         }
 
-        return in_array($provider, $this->supportedProviders(), true) ? $provider : null;
+        return in_array($provider, $this->trackedChannels(), true) ? $provider : null;
+    }
+
+    public function normalizeOrigin(?string $origin): ?string
+    {
+        if (! is_string($origin)) {
+            return null;
+        }
+
+        $normalizedOrigin = Str::lower(trim($origin));
+
+        if ($normalizedOrigin === '') {
+            return null;
+        }
+
+        return $normalizedOrigin;
     }
 
     private function appendShareProvider(string $url, ?string $provider): string
@@ -243,6 +295,7 @@ final class ShareTrackingUrlService
 
         $query = Arr::where($query, fn (mixed $value): bool => $this->filledQueryValue($value));
         unset($query[(string) config('dawah-share.query_parameter', 'share')]);
+        unset($query[(string) config('dawah-share.provider_query_parameter', 'channel')]);
 
         return $this->sortQueryRecursively($query);
     }

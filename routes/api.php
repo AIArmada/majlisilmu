@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\RegistrationExportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SavedSearchController;
 use App\Http\Controllers\Api\UserRegistrationController;
+use App\Http\Controllers\DawahShareController;
 use App\Http\Middleware\EnsureAdminApiAccess;
 use Illuminate\Support\Facades\Route;
 
@@ -71,7 +72,11 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::get('/search', [SearchController::class, 'search'])->name('search.index');
+        Route::get('/share/payload', [DawahShareController::class, 'payload'])
+            ->middleware('throttle:share-tracking')
+            ->name('share.payload');
         Route::get('/institutions', [SearchController::class, 'institutions'])->name('institutions.index');
+        Route::get('/institutions/near', [SearchController::class, 'institutionsNear'])->name('institutions.near');
         Route::get('/institutions/{institutionKey}', [SearchController::class, 'showInstitution'])->name('institutions.show');
         Route::get('/speakers', [SearchController::class, 'speakers'])->name('speakers.index');
         Route::get('/speakers/{speakerKey}', [SearchController::class, 'showSpeaker'])->name('speakers.show');
@@ -116,6 +121,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         ->name('api.auth.verification-notification');
 
     Route::name('api.client.')->group(function () {
+        Route::post('/share/track', [DawahShareController::class, 'track'])
+            ->middleware('throttle:30,1')
+            ->name('share.track');
+
         Route::prefix('forms')->name('forms.')->group(function () {
             Route::get('/report', [ManifestController::class, 'report'])->name('report');
             Route::get('/account-settings', [ManifestController::class, 'accountSettings'])->name('account-settings');

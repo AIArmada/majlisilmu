@@ -19,7 +19,7 @@ If you are building an AI client, use this read order:
 2. Choose the correct routing surface: `/api/v1` for public and client behavior, `/api/v1/admin` for admin-only reads and writes.
 3. Call `GET /manifest` for public workflow discovery or `GET /admin/manifest` for admin resource discovery.
 4. Before any write, fetch the exact contract first: `GET /forms/*` for public flows, or `GET /admin/{resourceKey}/schema` for admin writes.
-5. Use the admin record `route_key` returned by collection or detail payloads for record-specific schema and mutation paths.
+5. Use the admin record `route_key` returned by admin collection or detail payloads for record-specific schema and mutation paths.
 6. Send raw timestamp fields in UTC. For date-only filters, send the user's local calendar date together with timezone context so the server can convert it to UTC boundaries.
 7. Treat `error.code` as the machine-readable failure classifier and `meta.request_id` as the trace identifier for retries and support.
 
@@ -38,7 +38,7 @@ Key routing rules:
 
 - **Public query routes** (`/api/v1/speakers`, `/api/v1/institutions`, etc.) return only records where `is_active = true` AND `status = 'verified'`. They never return drafts or rejected records.
 - **Admin routes** (`/api/v1/admin/speakers`, etc.) use Filament's own Eloquent query, which includes all records regardless of active or status state. The same `search=...` parameter on both surfaces therefore returns different result sets.
-- **Admin mutation routes** (POST / PUT) use the resource key and the record's admin **route_key** for record-specific paths. The format is `/api/v1/admin/{resourceKey}/{recordKey}`. For slug-backed resources this is the slug; for UUID-backed resources it may still equal the primary key.
+- **Admin mutation routes** (POST / PUT) use the resource key and the record's admin **route_key** for record-specific paths. The format is `/api/v1/admin/{resourceKey}/{recordKey}`. Use the `route_key` returned by the admin collection or detail payloads.
 - Do not send public contribution payloads to `/api/v1/admin`, and do not expect admin schemas from `/api/v1/forms/...`.
 
 ---
@@ -80,6 +80,73 @@ The `search` parameter on public and admin surfaces queries different record sco
 This is intentional. The admin surface mirrors Filament's resource query, which does not apply visibility filters. A speaker that returns zero results on the public surface may appear on the admin surface because it is inactive or has `status = 'pending'`.
 
 **AI agent guidance:** Never assume that a search result from one surface tells you anything definitive about results from the other. If you need to verify whether a speaker is visible to the public, check `is_active` and `status` in the record attributes.
+
+---
+
+## Share Payload and Tracking
+
+Mobile and native clients can now use the same share-tracking contract as the web share modal through the public API surface.
+
+### Endpoints
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/share/payload` | Optional bearer | Builds a canonical share payload for a public Majlis Ilmu URL |
+| `POST` | `/share/track` | Bearer required | Records that the user actually invoked a share action |
+
+### `GET /share/payload`
+
+Query parameters:
+
+- `url` required internal Majlis Ilmu URL to share.
+- `text` required share text.
+- `title` optional fallback title.
+- `origin` optional share origin. Current advertised values are `web`, `iosapp`, `android`, and `macapp`; future client identifiers are accepted and normalized to lowercase.
+
+Response highlights:
+
+- `url`: canonical tracked share URL. Authenticated callers receive personalized tracking; anonymous callers receive reusable guest-scoped tracking when request context is available.
+- `platform_links`: provider intent links for channels such as WhatsApp, Telegram, Threads, Facebook, X, Instagram, TikTok, and email.
+- `channel_urls`: tracked destination URLs per channel, including `copy_link` and `native_share`.
+- `native_share`: ready-to-use `{ title, text, url, message }` payload for iOS, Android, and macOS share sheets.
+- `tracking_token`: returned with tracked payloads. Authenticated API clients can send it back to `/share/track` after the client actually performs the share action; anonymous web callers use the public web tracking route.
+
+Example:
+
+```http
+GET /api/v1/share/payload?url=https://majlisilmu.test/events/my-event&text=Join%20this%20majlis&title=Weekly%20Kuliah&origin=iosapp
+Authorization: Bearer <access_token>
+```
+
+### `POST /share/track`
+
+Request body:
+
+```json
+{
+  "provider": "copy_link",
+  "tracking_token": "abcd1234wxyz6789"
+}
+```
+
+Supported `provider` values include all social channels plus `copy_link` and `native_share`.
+
+Recommended client flow:
+
+1. Call `GET /share/payload` with the public URL, share text, and the current client `origin`.
+2. Use `platform_links` for provider intents, `channel_urls.copy_link` for clipboard copy, or `native_share` for system share sheets.
+3. After the share action is actually triggered, authenticated API clients call `POST /share/track` with the chosen channel and returned `tracking_token`.
+
+---
+
+## Nearby Institutions
+
+The public institution directory supports both the original coordinate parameters and a nearby alias route for native clients.
+
+- Existing directory route: `GET /institutions?lat=3.139&lng=101.6869&radius_km=15`
+- Nearby alias route: `GET /institutions/near?near=3.139,101.6869&radius_km=15`
+- `radius_km` is always expressed in kilometers, clamped from `1` to `100`, and defaults to `15`.
+- `near` must use `lat,lng` order.
 
 ---
 
@@ -205,6 +272,23 @@ Paginated list endpoints generally return:
 
 List endpoints clamp `per_page` to server-supported maxima. Public `/events`, `/institutions`, and `/speakers` currently cap at 50. Most authenticated collections and admin resource listings currently cap at 100.
 
+### Sparse list fields
+
+Public list endpoints now support an optional top-level `fields` query parameter for lighter mobile pagination payloads.
+
+- Supported endpoints: `GET /events`, `GET /institutions`, `GET /institutions/near`, and `GET /speakers`.
+- Format: comma-separated top-level field names, for example `fields=id,name,location`.
+- Unsupported field names return HTTP `422` with a `fields` validation error.
+- When omitted, each endpoint returns its full default list payload.
+
+Examples:
+
+```http
+GET /api/v1/institutions?fields=id,name,location
+GET /api/v1/events?fields=id,title,starts_at,card_image_url
+GET /api/v1/speakers?fields=id,name,avatar_url
+```
+
 Validation failures use the same `error` envelope with a field-level bag preserved for direct form binding:
 
 ```json
@@ -260,7 +344,9 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/search` | Unified search payload for events, speakers, and institutions |
+| `GET` | `/share/payload` | Build a share payload for web, iOS, Android, and native share sheets |
 | `GET` | `/institutions` | Public institution listing filters |
+| `GET` | `/institutions/near` | Nearby institution alias using `near=lat,lng` |
 | `GET` | `/institutions/{institutionKey}` | Public institution detail by slug or UUID |
 | `GET` | `/speakers` | Public speaker listing filters |
 | `GET` | `/speakers/{speakerKey}` | Public speaker detail by slug or UUID |
@@ -274,7 +360,8 @@ Notes:
 - **Visibility rule:** `/speakers` and `/institutions` return **only** records where `is_active = true` AND `status = 'verified'`. Inactive or unverified records are invisible on the public surface. To access all records including drafts, use the admin surface.
 - These detail payloads now mirror the web client media collections and public-contact visibility rules.
 - Institution payloads expose `public_image_url` as the canonical cover -> logo -> placeholder image. Use that for cards and previews. Use `logo_url` or `cover_url` only when you need those explicit assets.
-- Institution directory requests can filter by the device's current location: `GET /api/v1/institutions?lat=3.1390&lng=101.6869&radius_km=15`. Both `lat` and `lng` are required to activate the radius filter. `radius_km` defaults to 15 and is clamped between 1 and 100. Nearby results are sorted nearest-first and include `distance_km`; non-nearby requests return `distance_km: null`.
+- Institution directory requests can filter by the device's current location: `GET /api/v1/institutions?lat=3.1390&lng=101.6869&radius_km=15` or `GET /api/v1/institutions/near?near=3.1390,101.6869&radius_km=15`. `radius_km` defaults to 15, is clamped between 1 and 100, and is always expressed in kilometers. Nearby results are sorted nearest-first and include `distance_km`; non-nearby requests return `distance_km: null`.
+- Public `/events`, `/institutions`, `/institutions/near`, and `/speakers` list endpoints accept `fields=` for sparse top-level responses when mobile clients need smaller pagination payloads.
 - The inspiration endpoint returns `title`, plain-text `content`, `content_html`, `preview_text`, `source`, category metadata, and both thumb/full media URLs when an image exists.
 - `speakerKey`, `venueKey`, `institutionKey`, and `referenceKey` intentionally bypass the app-wide public-slug route binders so the API can safely resolve slug or UUID itself.
 - `GET /catalogs/spaces` returns only global spaces when `institution_id` is omitted. When `institution_id` is provided, the response includes those global spaces plus spaces linked to the selected institution.
@@ -284,6 +371,7 @@ Notes:
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/submit-event` | Submit the public/authenticated event form, including poster/gallery uploads |
+| `POST` | `/share/track` | Record an authenticated outbound share action for analytics |
 | `GET` | `/account-settings` | Return current profile settings |
 | `PUT` | `/account-settings` | Update current profile settings |
 | `GET` | `/contributions` | Contribution inbox for the current user |
@@ -409,7 +497,7 @@ Current limitation:
 | `GET` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
 | `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources |
 
-> **Record-key format:** `{recordKey}` in GET and PUT admin record routes should use the `route_key` field returned by the admin collection or record-detail endpoints. For slug-backed resources this is the slug; for UUID-backed resources it may still equal the primary key.
+> **Record-key format:** `{recordKey}` in GET and PUT admin record routes should use the `route_key` field returned by the admin collection or detail endpoints.
 
 Authorization note:
 
@@ -503,7 +591,7 @@ address[state_id]=14
 # 4. Note the returned admin route_key
 # { "data": { "record": { "id": "0195b86a-3c15-73fa-a2d8-5a45f6a7f701", "route_key": "ahmad-fauzi-my", ... } } }
 
-# 5. Get the update schema using the route_key returned by the record payload
+# 5. Get the update schema using the route_key returned by the record detail payload
 GET /api/v1/admin/speakers/schema?operation=update&recordKey=ahmad-fauzi-my
 
 # 6. Update — name, gender, status are always required

@@ -45,7 +45,7 @@ it('lists accessible admin resources for privileged users', function () {
         ->and($response->json('data.docs.ui'))->toBe('https://api.majlisilmu.test/docs')
         ->and($response->json('data.docs.openapi'))->toBe('https://api.majlisilmu.test/docs.json')
         ->and($response->json('data.write_workflow.discover_resources'))->toContain('/api/v1/admin/manifest')
-        ->and($response->json('data.rules'))->toContain('Use the admin record route_key returned by admin collection or record endpoints for record-specific paths.');
+        ->and($response->json('data.rules'))->toContain('Use the admin record route_key returned by admin collection or detail payloads for record-specific paths.');
 
     $resourceKeys = collect($response->json('data.resources'))->pluck('key')->all();
 

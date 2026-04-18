@@ -42,11 +42,14 @@ Route::get('/oauth/{provider}/callback', [SocialiteController::class, 'callback'
     ->name('socialite.callback')
     ->whereIn('provider', ['google']);
 
-Route::get('/kongsi/payload', [DawahShareController::class, 'payload'])->name('dawah-share.payload');
+Route::get('/kongsi/payload', [DawahShareController::class, 'payload'])
+    ->middleware('throttle:share-tracking')
+    ->name('dawah-share.payload');
 Route::post('/kongsi/track', [DawahShareController::class, 'track'])
-    ->middleware(['auth', 'throttle:30,1'])
+    ->middleware('throttle:30,1')
     ->name('dawah-share.track');
 Route::get('/kongsi/{provider}', [DawahShareController::class, 'redirect'])
+    ->middleware('throttle:share-tracking')
     ->whereIn('provider', ['whatsapp', 'telegram', 'threads', 'facebook', 'x', 'instagram', 'tiktok', 'email'])
     ->name('dawah-share.redirect');
 
@@ -73,16 +76,14 @@ Route::livewire('/hantar-majlis/berjaya', 'pages.submit-event.success')->name('s
 
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard', UserDashboard::class)->name('dashboard');
-    Route::redirect('/papan-pemuka', '/dashboard', 301);
     Route::livewire('/dashboard/dawah-impact', DawahImpactIndex::class)->name('dashboard.dawah-impact');
     Route::livewire('/dashboard/dawah-impact/links', DawahImpactIndex::class)->name('dashboard.dawah-impact.links');
     Route::livewire('/dashboard/dawah-impact/links/{link}', DawahImpactLinkShow::class)->name('dashboard.dawah-impact.links.show');
     Route::livewire('/dashboard/notifications', NotificationsIndex::class)->name('dashboard.notifications');
-    Route::redirect('/papan-pemuka/notifikasi', '/dashboard/notifications', 301);
     Route::livewire('/tetapan-akaun', AccountSettings::class)->name('dashboard.account-settings');
     Route::livewire('/dashboard/institusi', InstitutionDashboard::class)->name('dashboard.institutions');
     Route::livewire('/dashboard/institusi/hantar-majlis', 'pages.submit-event.create')->name('dashboard.institutions.submit-event');
-    Route::livewire('/papan-pemuka/majlis/cipta-lanjutan', CreateAdvanced::class)->name('dashboard.events.create-advanced');
+    Route::livewire('/dashboard/majlis/cipta-lanjutan', CreateAdvanced::class)->name('dashboard.events.create-advanced');
     Route::livewire('/carian-tersimpan', Index::class)->name('saved-searches.index');
     Route::livewire('/jemputan-ahli/{token}', ShowMemberInvitation::class)->name('member-invitations.show');
     Route::livewire('/sumbangan', ContributionsIndex::class)->name('contributions.index');

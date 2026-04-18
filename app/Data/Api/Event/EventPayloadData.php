@@ -93,15 +93,11 @@ class EventPayloadData extends Data
     private static function serializeInstitutionPayload(Institution $institution, array $payload): array
     {
         $address = $institution->addressModel;
-        $addressLines = AddressHierarchyFormatter::displayLines($address);
         $addressLine = AddressHierarchyFormatter::format($address);
 
         return [
             ...$payload,
             'address_line' => $addressLine !== '' ? $addressLine : null,
-            'street_address_line' => $addressLines['street'],
-            'locality_address_line' => $addressLines['locality'],
-            'regional_address_line' => $addressLines['regional'],
             'map_url' => $address?->google_maps_url,
             'map_lat' => $address?->lat,
             'map_lng' => $address?->lng,

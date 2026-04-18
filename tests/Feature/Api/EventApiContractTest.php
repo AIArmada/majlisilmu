@@ -114,6 +114,27 @@ it('clamps public event index per_page values to the supported maximum', functio
         ->assertJsonCount(50, 'data');
 });
 
+it('supports sparse fields on the public event index', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'title' => 'Sparse Event Payload',
+    ]);
+
+    $response = $this->getJson('/api/v1/events?fields=id,title,starts_at,card_image_url&filter[search]=Sparse%20Event%20Payload')
+        ->assertOk();
+
+    expect($response->json('data.0.id'))->toBe((string) $event->id)
+        ->and(array_keys($response->json('data.0')))->toBe(['id', 'title', 'starts_at', 'card_image_url']);
+});
+
+it('rejects unsupported sparse fields on the public event index', function () {
+    $this->getJson('/api/v1/events?fields=id,unknown_field')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('fields');
+});
+
 it('filters events by district_id and subdistrict_id', function () {
     $state = State::where('country_code', 'MY')->first();
 
@@ -665,9 +686,9 @@ it('serializes included institution address display fields on event detail paylo
     $response->assertOk()
         ->assertJsonPath('data.institution.id', $institution->id)
         ->assertJsonPath('data.institution.address_line', $subdistrict->name.', '.$district->name.', '.$state->name)
-        ->assertJsonPath('data.institution.street_address_line', 'No. 12 Jalan Ilmu, Blok B')
-        ->assertJsonPath('data.institution.locality_address_line', $subdistrict->name.', 43000')
-        ->assertJsonPath('data.institution.regional_address_line', $district->name.', '.$state->name)
+        ->assertJsonMissingPath('data.institution.street_address_line')
+        ->assertJsonMissingPath('data.institution.locality_address_line')
+        ->assertJsonMissingPath('data.institution.regional_address_line')
         ->assertJsonPath('data.institution.map_url', 'https://maps.google.com/?q=3.1390,101.6869')
         ->assertJsonPath('data.institution.map_lat', 3.139)
         ->assertJsonPath('data.institution.map_lng', 101.6869)

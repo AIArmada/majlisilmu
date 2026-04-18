@@ -37,7 +37,7 @@ it('requires authentication for user and institution dashboards', function () {
     expect(route('dashboard.account-settings'))->toEndWith('/tetapan-akaun');
     expect(route('dashboard.institutions'))->toEndWith('/dashboard/institusi');
 
-    $this->get('/papan-pemuka')->assertRedirect(route('login'));
+    $this->get('/papan-pemuka')->assertNotFound();
     $this->get('/dashboard')->assertRedirect(route('login'));
     $this->get('/dashboard/notifications')->assertRedirect(route('login'));
     $this->get('/tetapan-akaun')->assertRedirect(route('login'));
@@ -45,12 +45,12 @@ it('requires authentication for user and institution dashboards', function () {
     $this->get(route('dashboard.events.create-advanced'))->assertRedirect(route('login'));
 });
 
-it('redirects the legacy papan pemuka URL to the canonical dashboard URL for authenticated users', function () {
+it('does not expose the legacy papan pemuka dashboard URL', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
         ->get('/papan-pemuka')
-        ->assertRedirect('/dashboard');
+        ->assertNotFound();
 });
 
 it('renders the attendee-first planner dashboard without saved search or digest panels', function () {

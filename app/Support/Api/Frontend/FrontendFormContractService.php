@@ -17,6 +17,7 @@ use App\Enums\PreNominal;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Models\User;
+use App\Services\ShareTrackingService;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\Location\GooglePlacesConfiguration;
 use App\Support\Location\PreferredCountryResolver;
@@ -29,6 +30,7 @@ class FrontendFormContractService
         private readonly FrontendCatalogService $catalogService,
         private readonly ApiDocumentationUrlResolver $urlResolver,
         private readonly McpTokenManager $mcpTokenManager,
+        private readonly ShareTrackingService $shareTrackingService,
     ) {}
 
     /**
@@ -37,7 +39,7 @@ class FrontendFormContractService
     public function manifest(?User $user): array
     {
         return [
-            'version' => '2026-04-16',
+            'version' => '2026-04-17',
             'docs' => [
                 'ui' => $this->urlResolver->docsUrl(),
                 'openapi' => $this->urlResolver->docsJsonUrl(),
@@ -123,10 +125,31 @@ class FrontendFormContractService
                     'endpoint' => route('api.client.institutions.index'),
                     'auth_required' => false,
                 ],
+                'institutions_near' => [
+                    'method' => 'GET',
+                    'endpoint' => route('api.client.institutions.near'),
+                    'auth_required' => false,
+                    'supports_near' => true,
+                    'near_format' => 'lat,lng',
+                    'radius_parameter' => 'radius_km',
+                ],
                 'institutions_show' => [
                     'method' => 'GET',
                     'endpoint_template' => route('api.client.institutions.show', ['institutionKey' => 'subject'], false),
                     'auth_required' => false,
+                ],
+                'share' => [
+                    'payload_method' => 'GET',
+                    'payload_endpoint' => route('api.client.share.payload'),
+                    'track_method' => 'POST',
+                    'track_endpoint' => route('api.client.share.track'),
+                    'auth_required' => false,
+                    'payload_bearer_auth_optional' => true,
+                    'authenticated_tracking_required' => true,
+                    'origins' => $this->shareTrackingService->supportedOrigins(),
+                    'channels' => $this->shareTrackingService->supportedChannels(),
+                    'copy_link_channel' => 'copy_link',
+                    'native_share_channel' => 'native_share',
                 ],
                 'speakers_index' => [
                     'method' => 'GET',

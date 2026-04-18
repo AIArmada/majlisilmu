@@ -27,10 +27,6 @@ class SpeakerDetailData extends Data
         public ?string $job_title,
         public bool $is_freelance,
         public array|string|null $bio,
-        public string $bio_html,
-        public string $bio_text,
-        public ?string $bio_excerpt,
-        public bool $should_collapse_bio,
         public array $qualifications,
         public ?array $address,
         public ?array $country,
@@ -47,7 +43,6 @@ class SpeakerDetailData extends Data
     ) {}
 
     /**
-     * @param  array{html: string, text: string, excerpt: ?string, should_collapse: bool}  $bio
      * @param  array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}|null  $address
      * @param  array{id: int, name: string, iso2: string, key: ?string}|null  $country
      * @param  array<string, string>  $media
@@ -59,7 +54,6 @@ class SpeakerDetailData extends Data
     public static function fromModel(
         Speaker $speaker,
         ?User $user,
-        array $bio,
         ?array $address,
         ?array $country,
         ?string $location,
@@ -77,10 +71,6 @@ class SpeakerDetailData extends Data
             job_title: $speaker->job_title,
             is_freelance: (bool) $speaker->is_freelance,
             bio: $speaker->bio,
-            bio_html: $bio['html'],
-            bio_text: $bio['text'],
-            bio_excerpt: $bio['excerpt'],
-            should_collapse_bio: $bio['should_collapse'],
             qualifications: is_array($speaker->qualifications) ? array_values($speaker->qualifications) : [],
             address: $address,
             country: $country,

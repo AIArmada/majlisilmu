@@ -74,6 +74,7 @@
                                     'payloadEndpoint' => route('dawah-share.payload'),
                                 ]),
                                 trackEndpoint: @js(route('dawah-share.track')),
+                                providerQueryParameter: @js(config('dawah-share.provider_query_parameter', 'channel')),
                                 attributedShareData: null,
                                 async resolveShareData() {
                                     if (this.attributedShareData) {
@@ -104,6 +105,25 @@
 
                                     return this.attributedShareData;
                                 },
+                                async sharePayloadForChannel(provider = null) {
+                                    const shareData = await this.resolveShareData();
+
+                                    if (! shareData || ! provider || ! shareData.tracking_token) {
+                                        return shareData;
+                                    }
+
+                                    try {
+                                        const shareUrl = new URL(shareData.url, window.location.origin);
+                                        shareUrl.searchParams.set(this.providerQueryParameter, provider);
+
+                                        return {
+                                            ...shareData,
+                                            url: shareUrl.toString(),
+                                        };
+                                    } catch (error) {
+                                        return shareData;
+                                    }
+                                },
                                 async trackShare(provider) {
                                     const shareData = await this.resolveShareData();
 
@@ -131,7 +151,7 @@
                                     });
                                 },
                                 async nativeShare() {
-                                    const shareData = await this.resolveShareData();
+                                    const shareData = await this.sharePayloadForChannel('native_share');
                                     if (navigator.share) {
                                         try {
                                             await navigator.share(shareData);
@@ -144,13 +164,13 @@
 
                                     await this.copyLink();
                                 },
-                                async copyLink(shouldTrack = true) {
-                                    const shareData = await this.resolveShareData();
+                                async copyLink(shouldTrack = true, provider = 'copy_link') {
+                                    const shareData = await this.sharePayloadForChannel(provider);
                                     if (!navigator.clipboard) {
                                         window.prompt(@js(__('Copy this link:')), shareData.url);
 
                                         if (shouldTrack) {
-                                            await this.trackShare('copy_link');
+                                            await this.trackShare(provider);
                                         }
 
                                         return;
@@ -158,7 +178,7 @@
 
                                     navigator.clipboard.writeText(shareData.url).then(async () => {
                                         if (shouldTrack) {
-                                            await this.trackShare('copy_link');
+                                            await this.trackShare(provider);
                                         }
 
                                         this.copied = true;
@@ -167,7 +187,7 @@
                                         window.prompt(@js(__('Copy this link:')), shareData.url);
 
                                         if (shouldTrack) {
-                                            await this.trackShare('copy_link');
+                                            await this.trackShare(provider);
                                         }
                                     });
                                 },
