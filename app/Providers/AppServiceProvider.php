@@ -51,10 +51,13 @@ use BezhanSalleh\LanguageSwitch\LanguageSwitch;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -111,6 +114,22 @@ class AppServiceProvider extends ServiceProvider
         PassportKeyProvisioner::ensure();
 
         Passport::authorizationView('mcp.authorize');
+
+        RateLimiter::for('api-auth-login', static function (Request $request): Limit {
+            return Limit::perMinute(5)->by(sprintf('%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('login')))));
+        });
+
+        RateLimiter::for('api-auth-register', static function (Request $request): Limit {
+            return Limit::perMinute(5)->by(sprintf('%s|%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('email'))), strtolower(trim((string) $request->input('phone')))));
+        });
+
+        RateLimiter::for('api-auth-social', static function (Request $request): Limit {
+            return Limit::perMinute(5)->by(sprintf('%s|%s', $request->ip(), $request->path()));
+        });
+
+        RateLimiter::for('api-auth-password', static function (Request $request): Limit {
+            return Limit::perMinute(5)->by(sprintf('%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('email')))));
+        });
 
         $signalsRoutes = base_path('../commerce/packages/signals/routes/api.php');
 

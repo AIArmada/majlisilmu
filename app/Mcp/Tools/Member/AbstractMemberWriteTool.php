@@ -7,6 +7,7 @@ namespace App\Mcp\Tools\Member;
 use App\Models\User;
 use App\Support\Api\Member\MemberResourceService;
 use App\Support\Location\PreferredCountryResolver;
+use App\Support\Mcp\McpAuthenticatedUserResolver;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 
@@ -51,7 +52,7 @@ abstract class AbstractMemberWriteTool extends AbstractMemberTool
 
     public function shouldRegister(Request $request, MemberResourceService $resourceService): bool
     {
-        $user = $request->user();
+        $user = app(McpAuthenticatedUserResolver::class)->resolve($request->user());
 
         return $user instanceof User && $resourceService->hasAnyWritableResourceAccess($user);
     }

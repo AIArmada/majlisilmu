@@ -12,6 +12,7 @@ use App\Exceptions\SavedSearchLimitReachedException;
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
 use App\Models\User;
+use App\Support\Api\ApiPagination;
 use Dedoc\Scramble\Attributes\BodyParameter;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
@@ -51,6 +52,7 @@ class SavedSearchController extends Controller
         'language_codes' => ['ms'],
         'event_type' => ['kuliah_ceramah'],
         'age_group' => ['all_ages'],
+        'starts_on_local_date' => '2026-02-01',
     ])]
     #[BodyParameter('radius_km', 'Optional search radius in kilometers when latitude and longitude are provided.', required: false, type: 'integer', infer: false, example: 25)]
     #[BodyParameter('lat', 'Latitude anchor used with `radius_km`.', required: false, type: 'number', infer: false, example: 3.139)]
@@ -113,6 +115,7 @@ class SavedSearchController extends Controller
         'language_codes' => ['ms', 'en'],
         'event_type' => ['forum'],
         'age_group' => ['youth'],
+        'starts_on_local_date' => '2026-02-01',
     ])]
     #[BodyParameter('radius_km', 'Updated search radius in kilometers when latitude and longitude are provided.', required: false, type: 'integer', infer: false, example: 25)]
     #[BodyParameter('lat', 'Updated latitude anchor used with `radius_km`.', required: false, type: 'number', infer: false, example: 3.139)]
@@ -171,11 +174,7 @@ class SavedSearchController extends Controller
         return response()->json([
             'data' => $events->items(),
             'meta' => [
-                'pagination' => [
-                    'page' => $events->currentPage(),
-                    'per_page' => $events->perPage(),
-                    'total' => $events->total(),
-                ],
+                'pagination' => ApiPagination::paginationMeta($events),
             ],
         ]);
     }
@@ -199,6 +198,7 @@ class SavedSearchController extends Controller
             'filters.event_type.*' => ['string', Rule::in(array_column(EventType::cases(), 'value'))],
             'filters.age_group' => 'nullable|array',
             'filters.age_group.*' => ['string', Rule::in(array_column(EventAgeGroup::cases(), 'value'))],
+            'filters.starts_on_local_date' => 'nullable|date_format:Y-m-d',
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
             'filters.key_person_roles' => 'nullable|array',
@@ -253,6 +253,7 @@ class SavedSearchController extends Controller
             'source_tag_ids',
             'issue_tag_ids',
             'reference_ids',
+            'starts_on_local_date',
             'language_codes',
             'event_type',
             'event_format',

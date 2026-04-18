@@ -59,12 +59,31 @@ class AccountSettingsController extends FrontendController
             'friday_prayer_institution_id' => ['nullable', 'uuid'],
         ]);
 
-        $normalizedName = trim((string) ($validated['name'] ?? ''));
-        $normalizedEmail = $this->normalizeOptionalString($validated['email'] ?? null);
-        $normalizedPhone = $this->normalizeOptionalString($validated['phone'] ?? null);
-        $normalizedTimezone = $this->normalizeOptionalString($validated['timezone'] ?? null);
-        $dailyPrayerInstitutionId = $this->normalizeOptionalString($validated['daily_prayer_institution_id'] ?? null);
-        $fridayPrayerInstitutionId = $this->normalizeOptionalString($validated['friday_prayer_institution_id'] ?? null);
+        $nameProvided = $request->exists('name');
+        $emailProvided = $request->exists('email');
+        $phoneProvided = $request->exists('phone');
+        $timezoneProvided = $request->exists('timezone');
+        $dailyPrayerInstitutionProvided = $request->exists('daily_prayer_institution_id');
+        $fridayPrayerInstitutionProvided = $request->exists('friday_prayer_institution_id');
+
+        $normalizedName = $nameProvided
+            ? trim((string) ($validated['name'] ?? ''))
+            : $user->name;
+        $normalizedEmail = $emailProvided
+            ? $this->normalizeOptionalString($validated['email'] ?? null)
+            : $user->email;
+        $normalizedPhone = $phoneProvided
+            ? $this->normalizeOptionalString($validated['phone'] ?? null)
+            : $user->phone;
+        $normalizedTimezone = $timezoneProvided
+            ? $this->normalizeOptionalString($validated['timezone'] ?? null)
+            : $user->timezone;
+        $dailyPrayerInstitutionId = $dailyPrayerInstitutionProvided
+            ? $this->normalizeOptionalString($validated['daily_prayer_institution_id'] ?? null)
+            : $user->daily_prayer_institution_id;
+        $fridayPrayerInstitutionId = $fridayPrayerInstitutionProvided
+            ? $this->normalizeOptionalString($validated['friday_prayer_institution_id'] ?? null)
+            : $user->friday_prayer_institution_id;
 
         if ($normalizedEmail === null && $normalizedPhone === null) {
             throw ValidationException::withMessages([

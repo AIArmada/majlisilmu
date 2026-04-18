@@ -245,7 +245,10 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             ->addProperty('slug', new StringType)
             ->addProperty('title', new StringType)
             ->addProperty('starts_at', (new StringType)->nullable(true))
+            ->addProperty('starts_at_local', (new StringType)->nullable(true))
+            ->addProperty('starts_on_local_date', (new StringType)->nullable(true))
             ->addProperty('ends_at', (new StringType)->nullable(true))
+            ->addProperty('ends_at_local', (new StringType)->nullable(true))
             ->addProperty('timing_display', (new StringType)->nullable(true))
             ->addProperty('prayer_display_text', (new StringType)->nullable(true))
             ->addProperty('end_time_display', (new StringType)->nullable(true))
@@ -274,7 +277,10 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 'slug',
                 'title',
                 'starts_at',
+                'starts_at_local',
+                'starts_on_local_date',
                 'ends_at',
+                'ends_at_local',
                 'timing_display',
                 'prayer_display_text',
                 'end_time_display',
@@ -349,7 +355,9 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                                 ->addProperty('page', new IntegerType)
                                 ->addProperty('per_page', new IntegerType)
                                 ->addProperty('total', new IntegerType)
-                                ->setRequired(['page', 'per_page', 'total']),
+                                ->addProperty('has_more', new BooleanType)
+                                ->addProperty('next_page', (new IntegerType)->nullable(true))
+                                ->setRequired(['page', 'per_page', 'total', 'has_more', 'next_page']),
                         )
                         ->setRequired(['pagination']),
                 )

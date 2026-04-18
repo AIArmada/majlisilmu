@@ -94,6 +94,8 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->where('data.resource.key', 'speakers')
             ->where('data.resource.api_routes.collection', '/api/v1/admin/speakers')
             ->where('data.resource.api_routes.schema', '/api/v1/admin/speakers/schema')
+            ->where('data.resource.mcp_tools.list_records.tool', 'admin-list-records')
+            ->where('data.resource.mcp_tools.list_records.arguments.resource_key', 'speakers')
             ->etc());
 
     AdminServer::actingAs($admin)
@@ -122,6 +124,25 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->etc());
 });
 
+it('exposes timezone-aware metadata for admin event resources', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetResourceMetaTool::class, [
+            'resource_key' => 'events',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'events')
+            ->where('data.resource.timezone_sensitive', true)
+            ->where('data.resource.date_semantics.storage_timezone', 'UTC')
+            ->where('data.resource.date_semantics.local_date_filter', 'starts_on_local_date')
+            ->where('data.resource.mcp_tools.get_record.tool', 'admin-get-record')
+            ->where('data.resource.mcp_tools.get_record.arguments.resource_key', 'events')
+            ->where('data.resource.mcp_tools.get_record.arguments.record_key', 'record')
+            ->etc());
+});
+
 it('returns write schema for supported resources and rejects unknown resources', function () {
     $admin = adminMcpUser('super_admin');
 
@@ -134,6 +155,14 @@ it('returns write schema for supported resources and rejects unknown resources',
         ->assertStructuredContent(fn ($json) => $json
             ->where('data.schema.resource_key', 'speakers')
             ->where('data.schema.method', 'POST')
+            ->where('data.schema.transport', 'mcp')
+            ->where('data.schema.tool', 'admin-create-record')
+            ->where('data.schema.tool_arguments.resource_key', 'speakers')
+            ->where('data.schema.tool_arguments.payload', 'object')
+            ->where('data.schema.endpoint', null)
+            ->where('data.schema.content_type', 'application/json')
+            ->where('data.schema.media_uploads_supported', false)
+            ->where('data.schema.unsupported_fields', fn ($fields): bool => collect($fields)->contains('avatar') && collect($fields)->contains('gallery'))
             ->etc());
 
     AdminServer::actingAs($admin)
@@ -175,6 +204,18 @@ it('returns write schema for supported resources and rejects unknown resources',
             'operation' => 'create',
         ])
         ->assertHasErrors(['Resource not found.']);
+});
+
+it('registers admin write tools when the MCP actor is a normalized Passport user', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs(adminPassportUser($admin))
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'speakers',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertHasNoErrors();
 });
 
 it('creates and updates speakers through MCP write tools', function () {
@@ -582,6 +623,12 @@ it('only registers OAuth clients for allowed redirect domains and schemes', func
         ->assertJsonPath('scope', 'mcp:use');
 
     $this->postJson('/oauth/mcp/register', [
+        'client_name' => 'Prefix Attack',
+        'redirect_uris' => ['https://chatgpt.com.evil.example/callback'],
+    ])->assertStatus(400)
+        ->assertJsonPath('error', 'invalid_redirect_uri');
+
+    $this->postJson('/oauth/mcp/register', [
         'client_name' => 'VS Code',
         'redirect_uris' => ['vscode://copilot/mcp-callback'],
     ])->assertOk()
@@ -644,9 +691,34 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'params' => [],
     ])->assertOk();
 
-    $toolNames = collect($listTools->json('result.tools'))->pluck('name')->all();
+    $tools = collect($listTools->json('result.tools'))->keyBy('name');
 
-    expect($toolNames)->toContain('admin-list-resources', 'admin-get-record');
+    expect($tools->keys()->all())->toContain(
+        'admin-list-resources',
+        'admin-get-resource-meta',
+        'admin-list-records',
+        'admin-get-record',
+        'admin-get-write-schema',
+        'admin-create-record',
+        'admin-update-record',
+    );
+
+    expect($tools->get('admin-list-resources')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => true,
+        'idempotentHint' => true,
+    ]);
+
+    expect($tools->get('admin-get-write-schema')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => true,
+        'idempotentHint' => true,
+    ]);
+
+    expect($tools->get('admin-create-record')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => false,
+        'idempotentHint' => false,
+        'destructiveHint' => false,
+        'openWorldHint' => false,
+    ]);
 });
 
 it('rejects Passport-authenticated users without admin access on the admin MCP stream endpoint', function () {

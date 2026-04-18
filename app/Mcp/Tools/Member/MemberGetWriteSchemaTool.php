@@ -10,7 +10,11 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
+#[IsIdempotent]
 class MemberGetWriteSchemaTool extends AbstractMemberWriteTool
 {
     protected string $name = 'member-get-write-schema';

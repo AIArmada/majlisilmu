@@ -82,6 +82,7 @@ class ContributionController extends FrontendController
             .'The proposer is not automatically added as an institution owner, admin, editor, or member; they only receive review outcome notifications. '
             .'Duplicate institutions are rejected when the normalized name and locality match an existing institution. '
             .'Institution payloads must include an explicit address country via `address.country_id`. '
+            .'Any provided `address.google_maps_url` is normalized server-side into a canonical Google Maps URL and may populate `address.google_place_id`, `address.lat`, and `address.lng` before persistence. '
             .'Fetch `GET /forms/contributions/institutions` first to discover required fields, defaults, media support, and conditional rules.',
     )]
     public function storeInstitution(

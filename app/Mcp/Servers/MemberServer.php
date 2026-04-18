@@ -17,7 +17,7 @@ use Laravel\Mcp\Server\Attributes\Version;
 
 #[Name('majlisilmu-member')]
 #[Version('1.0.0')]
-#[Instructions('Authenticated member MCP server for Ahli-scoped institutions, speakers, references, and related events. Supports scoped resource discovery, record reads, and schema-guided updates for writable Ahli records when the authenticated member has the matching scoped permissions. Designed for bearer-token clients such as VS Code, ChatGPT, Gemini, Grok, Claude, and Opencode.')]
+#[Instructions('Authenticated member MCP server for Ahli-scoped institutions, speakers, references, and related events. Supports scoped resource discovery, record reads, and schema-guided non-media updates for writable Ahli records when the authenticated member has the matching scoped permissions. Designed for bearer-token clients such as VS Code, ChatGPT, Gemini, Grok, Claude, and Opencode.')]
 class MemberServer extends Server
 {
     protected array $tools = [

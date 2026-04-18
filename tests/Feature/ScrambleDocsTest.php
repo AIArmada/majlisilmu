@@ -240,7 +240,12 @@ it('documents sparse event list fields for public event index clients', function
         ->toContain('fields')
         ->and(data_get($paths, '/events.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/EventIndexResponse')
         ->and(data_get($schemas, 'EventListItem.properties.card_image_url'))->not->toBeNull()
-        ->and(data_get($schemas, 'EventSummary.required'))->toContain('title');
+        ->and(data_get($schemas, 'EventSummary.properties.starts_at_local'))->not->toBeNull()
+        ->and(data_get($schemas, 'EventSummary.properties.starts_on_local_date'))->not->toBeNull()
+        ->and(data_get($schemas, 'EventSummary.properties.ends_at_local'))->not->toBeNull()
+        ->and(data_get($schemas, 'EventSummary.required'))->toContain('title', 'starts_at_local', 'starts_on_local_date', 'ends_at_local')
+        ->and(data_get($schemas, 'EventIndexResponse.properties.meta.properties.pagination.properties.has_more'))->not->toBeNull()
+        ->and(data_get($schemas, 'EventIndexResponse.properties.meta.properties.pagination.properties.next_page'))->not->toBeNull();
 });
 
 it('exposes the admin api foundation in scramble docs under dedicated admin tags', function () {
@@ -292,7 +297,10 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain('https://api.majlisilmu.test/docs.json')
         ->toContain("\n\nROUTING SURFACES:\n")
         ->toContain("\n\nTIMEZONE:\n")
+        ->toContain('Resource manifests now expose explicit `mcp_tools` for collection, meta, schema, store, and update call surfaces; use those tool names and argument templates instead of guessing URLs.')
+        ->toContain('Event discovery supports `filter[starts_on_local_date]=YYYY-MM-DD` and returns `starts_at_local` / `starts_on_local_date` in event payloads.')
         ->toContain('use the admin record `route_key` returned by admin collection or detail payloads')
+        ->toContain('If you only have a public UUID-backed payload and route_key is unavailable, use the UUID id directly as recordKey.')
         ->toContain('Collection endpoints clamp per_page to server-supported maxima')
         ->toContain('Get the update schema using the route_key returned by the record detail payload')
         ->toContain('PUT /api/v1/admin/speakers/ahmad-fauzi-my')
@@ -320,7 +328,7 @@ it('documents utc transport fields and request-timezone helper behavior clearly'
         ->toContain('Raw API timestamp fields are stored and returned in UTC')
         ->toContain('Viewer-facing helper fields such as event timing_display and end_time_display are localized only when the request provides timezone context')
         ->toContain('Without timezone context, bare API requests fall back to UTC.')
-        ->toContain('Date-only event filters such as filter[starts_after] and filter[starts_before] are interpreted in the resolved request timezone')
+        ->toContain('Date-only event filters such as filter[starts_after], filter[starts_before], and filter[starts_on_local_date] are interpreted in the resolved request timezone')
         ->toContain('send X-Timezone: Asia/Kuala_Lumpur and date-only values such as filter[starts_after]=2026-04-12&filter[starts_before]=2026-04-12')
         ->toContain('If you omit timezone context, the same filter values are interpreted in UTC instead.')
         ->not->toContain('The server timezone is UTC; the default display timezone is Asia/Kuala_Lumpur (MYT, UTC+8).')
@@ -501,8 +509,10 @@ it('adds workflow summaries to public contract and mutation endpoints', function
         ->and($paths['/submit-event']['post']['description'] ?? null)->toContain('This route is create-only')
         ->and($paths['/submit-event']['post']['description'] ?? null)->toContain('submission_country_id')
         ->and($paths['/submit-event']['post']['description'] ?? null)->not->toContain('submission_country_code')
+        ->and($paths['/forms/contributions/institutions']['get']['description'] ?? null)->toContain('canonical Google Maps URL')
         ->and($paths['/contributions/institutions']['post']['summary'] ?? null)->toBe('Create an institution contribution')
         ->and($paths['/contributions/institutions']['post']['description'] ?? null)->toContain('address.country_id')
+        ->and($paths['/contributions/institutions']['post']['description'] ?? null)->toContain('canonical Google Maps URL')
         ->and($paths['/contributions/institutions']['post']['description'] ?? null)->not->toContain('address.country_code')
         ->and($paths['/contributions/speakers']['post']['summary'] ?? null)->toBe('Create a speaker contribution')
         ->and($paths['/contributions/speakers']['post']['description'] ?? null)->toContain('address.country_id')

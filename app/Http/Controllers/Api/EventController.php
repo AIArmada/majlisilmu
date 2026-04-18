@@ -56,7 +56,10 @@ class EventController extends Controller
         'slug',
         'title',
         'starts_at',
+        'starts_at_local',
+        'starts_on_local_date',
         'ends_at',
+        'ends_at_local',
         'timing_display',
         'prayer_display_text',
         'end_time_display',
@@ -87,11 +90,12 @@ class EventController extends Controller
      * /api/v1/events?filter[status]=approved
      * /api/v1/events?filter[event_format]=online
      * /api/v1/events?filter[starts_after]=2026-02-01
+     * /api/v1/events?filter[starts_on_local_date]=2026-02-01
      * /api/v1/events?include=venue,speakers
      * /api/v1/events?sort=-starts_at
      * /api/v1/events?filter[search]=kuliah
      */
-    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, title, starts_at, ends_at, timing_display, prayer_display_text, end_time_display, visibility, status, status_label, event_type, event_type_label, event_format, event_format_label, reference_study_subtitle, location, is_remote, is_pending, is_cancelled, has_poster, poster_url, card_image_url, institution, venue, speakers.', required: false, type: 'string', infer: false, example: 'id,title,starts_at,location,card_image_url')]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, title, starts_at, starts_at_local, starts_on_local_date, ends_at, ends_at_local, timing_display, prayer_display_text, end_time_display, visibility, status, status_label, event_type, event_type_label, event_format, event_format_label, reference_study_subtitle, location, is_remote, is_pending, is_cancelled, has_poster, poster_url, card_image_url, institution, venue, speakers.', required: false, type: 'string', infer: false, example: 'id,title,starts_at,starts_at_local,location,card_image_url')]
     public function index(Request $request): JsonResponse
     {
         $requestedFields = $this->requestedFields($request, self::EVENT_LIST_FIELDS);
@@ -136,6 +140,14 @@ class EventController extends Controller
                 $startsBefore = $this->parseDate($value, true);
                 if ($startsBefore instanceof Carbon) {
                     $query->where('starts_at', '<=', $startsBefore);
+                }
+            }),
+            AllowedFilter::callback('starts_on_local_date', function (Builder $query, mixed $value): void {
+                $startsOnLocalDateStart = $this->parseDate($value, false);
+                $startsOnLocalDateEnd = $this->parseDate($value, true);
+
+                if ($startsOnLocalDateStart instanceof Carbon && $startsOnLocalDateEnd instanceof Carbon) {
+                    $query->whereBetween('starts_at', [$startsOnLocalDateStart, $startsOnLocalDateEnd]);
                 }
             }),
             AllowedFilter::callback('ends_after', function (Builder $query, mixed $value): void {
@@ -377,11 +389,7 @@ class EventController extends Controller
                 ->map(fn (Event $event): array => $this->sparsePayload($this->serializeEventListPayload($event), $requestedFields))
                 ->all(),
             'meta' => [
-                'pagination' => [
-                    'page' => $events->currentPage(),
-                    'per_page' => $events->perPage(),
-                    'total' => $events->total(),
-                ],
+                'pagination' => ApiPagination::paginationMeta($events),
             ],
         ];
 

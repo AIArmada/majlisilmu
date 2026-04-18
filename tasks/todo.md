@@ -1,3 +1,78 @@
+# Official MCP Documentation Audit
+
+- [x] Read OpenAI Apps SDK MCP server documentation end to end
+- [x] Read Laravel 13 MCP documentation end to end
+- [x] Re-audit uncommitted MCP server, tool, OAuth, metadata, and test changes against those docs
+- [x] Fix confirmed MCP issues with minimal scoped changes
+- [x] Run focused MCP tests, formatting, static analysis, and repository policy checks
+- [x] Record the review findings and verification results
+
+## Review
+
+- OpenAI Apps SDK audit: tool descriptors should expose accurate names, schemas, structured results, and behavior annotations; file inputs require explicit `openai/fileParams`, which this server intentionally does not advertise because MCP v1 writes reject media uploads. Company knowledge compatibility still remains a future product gap because these servers do not expose exact `search` / `fetch` connector tools.
+- Laravel MCP audit: route registration, OAuth metadata, Passport authorization view, schema methods, `Response::structured(...)` responses, and middleware-based authentication are aligned with the Laravel 13 MCP lifecycle.
+- Fixed descriptor issues: write-schema tools now advertise `readOnlyHint=true` and `idempotentHint=true`; create/update tools now advertise explicit non-read-only, non-idempotent, non-destructive, closed-world annotations so ChatGPT does not infer an empty behavior contract.
+- Fixed Passport actor normalization issues: MCP tool authorization now sets the normalized application `User` on the active guard before calling Filament-backed services, and conditional write-tool registration resolves Passport users through `McpAuthenticatedUserResolver`. Write-access discovery now checks known resource classes directly instead of re-entering UI visibility checks that may depend on a Passport guard model.
+- Added regressions proving Passport-backed admin/member actors see write tools in `tools/list`, descriptor annotations are present, and direct Laravel MCP server test helpers can resolve write-schema tools with Passport-backed actors.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp --filter='AdminServerTest|MemberServerTest'` => 46 passed, 386 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp` => 49 passed, 401 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api --filter='AdminApiTest|AccountSettingsApiTest'` => 31 passed, 381 assertions
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Mcp app/Support/Mcp app/Http/Controllers/Mcp app/Support/Api/Admin/AdminResourceService.php app/Support/Api/Member/MemberResourceService.php tests/Feature/Mcp` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress` => pass
+  - `git diff --check` => pass
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app packages 2>/dev/null || true` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models 2>/dev/null || true` => no matches
+
+# API and MCP Capability Parity Audit
+
+- [x] Inventory public, authenticated, admin, and member API capabilities
+- [x] Inventory admin and member MCP tool capabilities
+- [x] Compare API behavior against MCP behavior and identify real gaps
+- [x] Audit the current uncommitted diff for regressions and implementation issues
+- [x] Fix confirmed issues with minimal scoped changes
+- [x] Run formatting, static analysis, focused tests, and repository policy checks
+- [x] Record the review findings and verification results
+
+## Review
+
+- API capability summary: the HTTP API covers public/mobile discovery and detail contracts, authenticated account settings, saved searches, follows/going/saved interactions, submissions, reports/contributions, notifications, institution workspace flows, MCP token self-service, and admin/member resource operations.
+- MCP capability summary: admin MCP covers resource discovery, list/get, schema inspection, and create/update for admin resources through generic tools; member MCP covers Ahli-scoped resource discovery, list/get, schema inspection, and non-media updates through generic tools.
+- Fixed confirmed parity/documentation bugs: resource metadata no longer advertises HTTP or Filament URLs as `mcp_paths`; it now exposes actual MCP tool names and argument templates through `mcp_tools`. MCP write schemas are now clearly JSON tool contracts, mark media uploads as unsupported, and annotate unsupported media/file fields instead of implying multipart upload support. Admin/member MCP instructions now describe schema-guided non-media writes accurately.
+- Fixed audit issues in the uncommitted diff: added `McpWriteSchemaFormatter`, wired it into admin/member write-schema flows, updated MCP/Scramble regressions, tightened the paginator type to the Laravel pagination contract for PHPStan, cleaned the MCP OAuth authorization view styling, and updated the API documentation schema serialization fixture for the new local-time event fields.
+- Remaining capability gaps and recommendation: binary media uploads are available through HTTP API/form flows but intentionally unsupported in MCP v1; add a dedicated MCP media upload/attach flow only if AI clients must manage posters, galleries, logos, QR files, or evidence files. Public/mobile workflows such as saved searches, follows/going/saved, account settings/MCP token self-service, contribution/report/member-claim submission, notifications, and institution member management do not yet have dedicated MCP tools; add thin MCP tools over the existing services if full mobile-user parity is required. Member MCP also has generic Ahli resource update capability that is broader than any one HTTP endpoint, which is acceptable but should stay documented as MCP-specific.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress` => pass
+  - `git diff --check` => pass
+  - `npm run build` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => 24 passed, 334 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/EventApiContractTest.php` => 22 passed, 128 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchApiTest.php` => 20 passed, 60 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/AccountSettingsApiTest.php` => 7 passed, 47 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => 27 passed, 287 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp --filter='AdminServerTest|MemberServerTest'` => 44 passed, 341 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/ApiDocumentationSchemaSerializationTest.php` => 2 passed, 11 assertions
+  - `vendor/bin/pest --parallel --compact` => 1639 passed, 8941 assertions
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app packages 2>/dev/null || true` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models 2>/dev/null || true` => no matches
+
+# Admin route_key Fallback Docs Note
+
+- [x] Verify the public institution payload does not expose a usable `route_key`
+- [x] Add the UUID/id fallback note to the Scramble docs source and AI quickstart
+- [x] Lock the new wording with a focused docs regression
+- [x] Run Pint and targeted Pest verification
+
+## Review
+
+- Clarified that when a UUID-backed resource only exposes a public payload without `route_key`, clients should use the UUID `id` directly as `recordKey` for admin schema and mutation calls.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='documents public and admin mutation capability boundaries in the api overview'` => pass
+  - `git diff --check` => pass
+
 # MCP DCR Registration Fix
 
 - [x] Reproduce the ChatGPT DCR registration failure against the live MCP metadata endpoints

@@ -52,6 +52,7 @@ class MemberResourceService
                     'Resource visibility follows the Ahli workspace boundary and live membership relationships, not the full admin panel.',
                     'Member MCP writes are limited to schema-guided updates for records the current user can already edit through the Ahli surface.',
                     'Fetch the exact update schema before every member write because required fields remain resource-specific.',
+                    'Use mcp_tools for MCP clients; panel_routes are browser destinations and are not MCP call surfaces.',
                 ],
                 'resources' => array_values(array_map(
                     fn (array $resource): array => $compact ? $this->summarizeResource($resource) : $resource,
@@ -162,7 +163,7 @@ class MemberResourceService
             $validated['address'] = $payload['address'];
         }
 
-        $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated);
+        $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated, $record);
 
         $record = $this->mutationService->update($resourceClass, $record, $validated, $actor);
 
@@ -180,7 +181,7 @@ class MemberResourceService
             return false;
         }
 
-        foreach ($this->registry->accessibleResources() as $resourceClass) {
+        foreach ($this->registry->resources() as $resourceClass) {
             if ($this->mutationService->supports($resourceClass) && $this->mutationService->canWriteResource($resourceClass, $user)) {
                 return true;
             }
@@ -242,11 +243,7 @@ class MemberResourceService
         return [
             'resource' => $this->registry->metadata($resourceClass),
             'search' => $search !== '' ? $search : null,
-            'pagination' => [
-                'page' => $records->currentPage(),
-                'per_page' => $records->perPage(),
-                'total' => $records->total(),
-            ],
+            'pagination' => ApiPagination::paginationMeta($records),
         ];
     }
 
@@ -269,6 +266,9 @@ class MemberResourceService
                 'view_template' => $resource['panel_routes']['view_template'],
                 'edit_template' => $resource['panel_routes']['edit_template'],
             ],
+            'mcp_tools' => $resource['mcp_tools'],
+            'timezone_sensitive' => $resource['timezone_sensitive'],
+            'date_semantics' => $resource['date_semantics'],
         ];
     }
 

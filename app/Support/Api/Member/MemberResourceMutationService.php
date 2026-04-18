@@ -15,6 +15,7 @@ use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\User;
 use App\Support\Api\Admin\AdminResourceMutationService;
 use App\Support\Authz\MemberPermissionGate;
+use App\Support\Mcp\McpWriteSchemaFormatter;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Model;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -24,6 +25,7 @@ class MemberResourceMutationService
     public function __construct(
         private readonly AdminResourceMutationService $adminMutationService,
         private readonly MemberPermissionGate $memberPermissionGate,
+        private readonly McpWriteSchemaFormatter $schemaFormatter,
     ) {}
 
     /**
@@ -72,16 +74,11 @@ class MemberResourceMutationService
             $record,
         );
 
-        $schema['transport'] = 'mcp';
-        $schema['tool'] = 'member-update-record';
-        $schema['tool_arguments'] = [
+        return $this->schemaFormatter->formatSchema($schema, 'member-update-record', [
             'resource_key' => $resourceKey,
             'record_key' => (string) $record->getRouteKey(),
-        ];
-        $schema['endpoint'] = null;
-        $schema['content_type'] = 'application/json';
-
-        return $schema;
+            'payload' => 'object',
+        ]);
     }
 
     /**
@@ -101,11 +98,12 @@ class MemberResourceMutationService
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
-    public function normalizeValidatedPayload(string $resourceClass, array $validated): array
+    public function normalizeValidatedPayload(string $resourceClass, array $validated, ?Model $record = null): array
     {
         return $this->adminMutationService->normalizeValidatedPayload(
             $this->adminResourceClass($resourceClass),
             $validated,
+            $record,
         );
     }
 

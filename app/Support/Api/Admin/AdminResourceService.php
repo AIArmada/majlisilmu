@@ -57,6 +57,7 @@ class AdminResourceService
                     'Use the admin record route_key returned by admin collection or detail payloads for record-specific paths.',
                     'Fetch the exact schema before every create or update because required fields and catalogs are resource-specific.',
                     'Admin PUT requests are full schema-guided updates, not partial patches.',
+                    'Use api_routes for HTTP API clients and mcp_tools for MCP clients; MCP tools take structured arguments instead of URL paths.',
                     'Use authenticated /admin/catalogs/* endpoints for dependent selectors referenced by schema catalog metadata.',
                 ],
                 'catalogs' => [
@@ -224,7 +225,7 @@ class AdminResourceService
             $validated['address'] = $payload['address'];
         }
 
-        $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated);
+        $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated, $record);
 
         $record = $this->mutationService->update($resourceClass, $record, $validated, $actor);
 
@@ -242,7 +243,7 @@ class AdminResourceService
             return false;
         }
 
-        foreach ($this->registry->accessibleResources() as $resourceClass) {
+        foreach ($this->registry->resources() as $resourceClass) {
             if (! $this->mutationService->supports($resourceClass)) {
                 continue;
             }
@@ -308,11 +309,7 @@ class AdminResourceService
         return [
             'resource' => $this->registry->metadata($resourceClass),
             'search' => $search !== '' ? $search : null,
-            'pagination' => [
-                'page' => $records->currentPage(),
-                'per_page' => $records->perPage(),
-                'total' => $records->total(),
-            ],
+            'pagination' => ApiPagination::paginationMeta($records),
         ];
     }
 
@@ -335,7 +332,12 @@ class AdminResourceService
                 'meta' => $resource['api_routes']['meta'],
                 'schema' => $resource['api_routes']['schema'],
                 'store' => $resource['api_routes']['store'],
+                'item_template' => $resource['api_routes']['item_template'],
+                'update_template' => $resource['api_routes']['update_template'],
             ],
+            'mcp_tools' => $resource['mcp_tools'],
+            'timezone_sensitive' => $resource['timezone_sensitive'],
+            'date_semantics' => $resource['date_semantics'],
         ];
     }
 

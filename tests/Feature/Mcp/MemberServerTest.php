@@ -91,6 +91,23 @@ it('returns member resource metadata, record listings, and record detail for ins
             ->etc());
 });
 
+it('exposes timezone-aware metadata for member event resources', function () {
+    [$member] = institutionMemberMcpContext();
+
+    MemberServer::actingAs($member)
+        ->tool(MemberGetResourceMetaTool::class, [
+            'resource_key' => 'events',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'events')
+            ->where('data.resource.timezone_sensitive', true)
+            ->where('data.resource.date_semantics.local_date_filter', 'starts_on_local_date')
+            ->where('data.resource.mcp_tools.list_records.tool', 'member-list-records')
+            ->where('data.resource.mcp_tools.list_records.arguments.resource_key', 'events')
+            ->etc());
+});
+
 it('lists related events for institution members through the member MCP server', function () {
     [$member, $institution] = institutionMemberMcpContext();
 
@@ -150,8 +167,11 @@ it('returns member update schema and updates institutions through member MCP wri
             ->where('data.schema.tool', 'member-update-record')
             ->where('data.schema.tool_arguments.resource_key', 'institutions')
             ->where('data.schema.tool_arguments.record_key', $institution->getRouteKey())
+            ->where('data.schema.tool_arguments.payload', 'object')
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
+            ->where('data.schema.media_uploads_supported', false)
+            ->where('data.schema.unsupported_fields', fn ($fields): bool => collect($fields)->contains('logo') && collect($fields)->contains('gallery'))
             ->etc());
 
     MemberServer::actingAs($member)
@@ -178,6 +198,18 @@ it('returns member update schema and updates institutions through member MCP wri
 
     expect($institution->fresh()?->name)->toBe('Member MCP Institution Updated')
         ->and($institution->fresh()?->nickname)->toBe('Member MCP Masjid');
+});
+
+it('registers member write tools when the MCP actor is a normalized Passport user', function () {
+    [$member, $institution] = institutionMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs(memberPassportUser($member))
+        ->tool(MemberGetWriteSchemaTool::class, [
+            'resource_key' => 'institutions',
+            'record_key' => $institution->getKey(),
+        ])
+        ->assertOk()
+        ->assertHasNoErrors();
 });
 
 it('keeps admin and member MCP boundaries separate', function () {
@@ -254,9 +286,33 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'params' => [],
     ])->assertOk();
 
-    $toolNames = collect($listTools->json('result.tools'))->pluck('name')->all();
+    $tools = collect($listTools->json('result.tools'))->keyBy('name');
 
-    expect($toolNames)->toContain('member-list-resources', 'member-get-record');
+    expect($tools->keys()->all())->toContain(
+        'member-list-resources',
+        'member-get-resource-meta',
+        'member-list-records',
+        'member-get-record',
+        'member-get-write-schema',
+        'member-update-record',
+    );
+
+    expect($tools->get('member-list-resources')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => true,
+        'idempotentHint' => true,
+    ]);
+
+    expect($tools->get('member-get-write-schema')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => true,
+        'idempotentHint' => true,
+    ]);
+
+    expect($tools->get('member-update-record')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => false,
+        'idempotentHint' => false,
+        'destructiveHint' => false,
+        'openWorldHint' => false,
+    ]);
 });
 
 it('returns forbidden for Passport-authenticated users without member access on the member MCP stream endpoint', function () {

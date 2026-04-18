@@ -45,6 +45,7 @@ describe('Saved Search API Endpoints', function () {
                         'language_codes' => ['ms'],
                         'key_person_roles' => [EventKeyPersonRole::Imam->value],
                         'imam_ids' => [$imamSpeaker->id],
+                        'starts_on_local_date' => '2026-04-12',
                     ],
                     'notify' => 'daily',
                 ]);
@@ -52,7 +53,8 @@ describe('Saved Search API Endpoints', function () {
                 $response->assertCreated()
                     ->assertJsonPath('data.name', 'Kuliah Maghrib')
                     ->assertJsonPath('data.filters.key_person_roles.0', EventKeyPersonRole::Imam->value)
-                    ->assertJsonPath('data.filters.imam_ids.0', $imamSpeaker->id);
+                    ->assertJsonPath('data.filters.imam_ids.0', $imamSpeaker->id)
+                    ->assertJsonPath('data.filters.starts_on_local_date', '2026-04-12');
 
                 $this->assertDatabaseHas('saved_searches', [
                     'user_id' => $this->user->id,
@@ -103,6 +105,19 @@ describe('Saved Search API Endpoints', function () {
 
                 $response->assertUnprocessable()
                     ->assertJsonValidationErrors(['filters.key_person_roles.0']);
+            });
+
+            it('validates local event date filters', function () {
+                $response = $this->postJson('/api/v1/saved-searches', [
+                    'name' => 'Local Date Search',
+                    'filters' => [
+                        'starts_on_local_date' => '12-04-2026',
+                    ],
+                    'notify' => 'daily',
+                ]);
+
+                $response->assertUnprocessable()
+                    ->assertJsonValidationErrors(['filters.starts_on_local_date']);
             });
 
             it('enforces max 10 saved searches per user', function () {
@@ -248,6 +263,8 @@ describe('Saved Search API Endpoints', function () {
                 $response->assertOk()
                     ->assertJsonStructure(['data', 'meta'])
                     ->assertJsonPath('meta.pagination.page', 1)
+                    ->assertJsonPath('meta.pagination.has_more', false)
+                    ->assertJsonPath('meta.pagination.next_page', null)
                     ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
             });
         });

@@ -326,6 +326,15 @@ class EventSearchService
             $filterParts[] = '(ends_at:>='.$startsAfterTimestamp.'||starts_at:>='.$startsAfterTimestamp.')';
         }
 
+        $startsOnLocalDateRange = $this->startsOnLocalDateRange($filters);
+
+        if ($startsOnLocalDateRange !== null) {
+            [$startsOnLocalDateStart, $startsOnLocalDateEnd] = $startsOnLocalDateRange;
+
+            $filterParts[] = 'starts_at:>='.$startsOnLocalDateStart->timestamp;
+            $filterParts[] = 'starts_at:<='.$startsOnLocalDateEnd->timestamp;
+        }
+
         $startsBeforeTimestamp = $this->startsBeforeTimestamp($filters, $timeScope);
 
         if ($startsBeforeTimestamp !== null) {
@@ -494,6 +503,14 @@ class EventSearchService
 
         if ($startsBefore instanceof CarbonInterface) {
             $queryBuilder->where("{$table}.starts_at", '<=', $startsBefore);
+        }
+
+        $startsOnLocalDateRange = $this->startsOnLocalDateRange($filters);
+
+        if ($startsOnLocalDateRange !== null) {
+            [$startsOnLocalDateStart, $startsOnLocalDateEnd] = $startsOnLocalDateRange;
+
+            $queryBuilder->whereBetween("{$table}.starts_at", [$startsOnLocalDateStart, $startsOnLocalDateEnd]);
         }
 
         if (filled($query)) {
@@ -1025,6 +1042,22 @@ class EventSearchService
         $startsBefore = $this->startsBeforeDateTime($filters, $timeScope);
 
         return $startsBefore?->timestamp;
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array{0: CarbonInterface, 1: CarbonInterface}|null
+     */
+    protected function startsOnLocalDateRange(array $filters): ?array
+    {
+        $startsOnLocalDateStart = $this->parseDateFilter($filters['starts_on_local_date'] ?? null, false);
+        $startsOnLocalDateEnd = $this->parseDateFilter($filters['starts_on_local_date'] ?? null, true);
+
+        if ($startsOnLocalDateStart instanceof CarbonInterface && $startsOnLocalDateEnd instanceof CarbonInterface) {
+            return [$startsOnLocalDateStart, $startsOnLocalDateEnd];
+        }
+
+        return null;
     }
 
     protected function normalizeTimeScope(mixed $value): string

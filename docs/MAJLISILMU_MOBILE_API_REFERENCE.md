@@ -55,6 +55,8 @@ Key routing rules:
 | Date-only inputs (`event_date`, `filter[starts_after]`, `filter[starts_before]`, etc.) | Interpreted in the resolved request timezone, then converted to UTC day boundaries for storage or querying |
 | Application/browser defaults | The web client commonly supplies `Asia/Kuala_Lumpur`, but generic API consumers should not assume that default |
 
+Date-only event filters such as filter[starts_after], filter[starts_before], and filter[starts_on_local_date] are interpreted in the resolved request timezone.
+
 **Implications for API consumers:**
 
 - When you receive `starts_at: "2026-04-12T00:00:00Z"`, that is midnight UTC, which is **08:00 MYT** on the same calendar date.

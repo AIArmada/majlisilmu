@@ -82,7 +82,7 @@ return [
 
     Admin create and update flows are schema-driven: discover writable resources with GET /admin/manifest, then fetch the exact contract with GET /admin/{resourceKey}/schema?operation=create or GET /admin/{resourceKey}/schema?operation=update&recordKey={recordKey}.
 
-    The recordKey parameter should use the record route_key returned by the admin collection or record-detail responses. For UUID-backed resources, route_key may still equal id.
+    The recordKey parameter should use the record route_key returned by the admin collection or record-detail responses. If you only have a public UUID-backed payload and route_key is unavailable, use the UUID id directly as recordKey.
 
     Admin PUT is not a partial update. Fields marked required in the schema must be sent on every update, not just on create.
 

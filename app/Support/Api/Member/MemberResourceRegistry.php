@@ -8,6 +8,7 @@ use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Filament\Ahli\Resources\Institutions\InstitutionResource as AhliInstitutionResource;
 use App\Filament\Ahli\Resources\References\ReferenceResource as AhliReferenceResource;
 use App\Filament\Ahli\Resources\Speakers\SpeakerResource as AhliSpeakerResource;
+use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\User;
 use Filament\Resources\Resource;
@@ -32,7 +33,10 @@ use UnitEnum;
  *   relations: list<string>,
  *   abilities: array<string, bool>,
  *   write_support: array<string, bool>,
- *   panel_routes: array<string, string|null>
+ *   mcp_tools: array<string, mixed>,
+ *   panel_routes: array<string, string|null>,
+ *   timezone_sensitive: bool,
+ *   date_semantics: array<string, mixed>|null
  * }
  */
 class MemberResourceRegistry
@@ -141,12 +145,22 @@ class MemberResourceRegistry
                 'store' => false,
                 'update' => $this->canWriteResource($resourceClass),
             ],
+            'mcp_tools' => $this->mcpTools($key, $this->canWriteResource($resourceClass)),
             'panel_routes' => [
                 'index' => array_key_exists('index', $pages) ? $resourceClass::getUrl('index', panel: 'ahli') : null,
                 'create' => null,
                 'view_template' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => 'record'], panel: 'ahli') : null,
                 'edit_template' => array_key_exists('edit', $pages) ? $resourceClass::getUrl('edit', ['record' => 'record'], panel: 'ahli') : null,
             ],
+            'timezone_sensitive' => is_a($resourceClass::getModel(), Event::class, true),
+            'date_semantics' => is_a($resourceClass::getModel(), Event::class, true)
+                ? [
+                    'storage_timezone' => 'UTC',
+                    'viewer_timezone' => 'resolved at request time',
+                    'local_fields' => ['starts_at_local', 'starts_on_local_date', 'ends_at_local'],
+                    'local_date_filter' => 'starts_on_local_date',
+                ]
+                : null,
         ];
     }
 
@@ -208,6 +222,62 @@ class MemberResourceRegistry
         $modelClass = $resourceClass::getModel();
 
         return Str::kebab(Str::pluralStudly(class_basename($modelClass)));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mcpTools(string $key, bool $canWrite): array
+    {
+        return [
+            'list_resources' => [
+                'tool' => 'member-list-resources',
+                'arguments' => [
+                    'verbose' => true,
+                ],
+            ],
+            'get_meta' => [
+                'tool' => 'member-get-resource-meta',
+                'arguments' => [
+                    'resource_key' => $key,
+                ],
+            ],
+            'list_records' => [
+                'tool' => 'member-list-records',
+                'arguments' => [
+                    'resource_key' => $key,
+                    'search' => null,
+                    'page' => 1,
+                    'per_page' => 15,
+                ],
+            ],
+            'get_record' => [
+                'tool' => 'member-get-record',
+                'arguments' => [
+                    'resource_key' => $key,
+                    'record_key' => 'record',
+                ],
+            ],
+            'get_update_schema' => $canWrite
+                ? [
+                    'tool' => 'member-get-write-schema',
+                    'arguments' => [
+                        'resource_key' => $key,
+                        'record_key' => 'record',
+                    ],
+                ]
+                : null,
+            'update' => $canWrite
+                ? [
+                    'tool' => 'member-update-record',
+                    'arguments' => [
+                        'resource_key' => $key,
+                        'record_key' => 'record',
+                        'payload' => 'object',
+                    ],
+                ]
+                : null,
+        ];
     }
 
     /**
