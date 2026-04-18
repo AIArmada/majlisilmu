@@ -43,9 +43,21 @@ Key routing rules:
 
 Speaker-specific discovery tip:
 
-- Public event text search uses `filter[search]` for event title and description only.
-- Exact speaker matching uses `filter[speaker]` with one or more speaker UUIDs.
-- For a speaker-centric event history, open `GET /api/v1/speakers/{speakerKey}` and read the `upcoming_events` and `past_events` arrays.
+- Use `filter[search]` when you want to search event titles and descriptions.
+- Use `filter[speaker]` when you want events for a specific speaker. Pass the speaker's UUID, not the name or slug.
+- If you only know the speaker's name, first search the speaker directory:
+
+```http
+GET /api/v1/speakers?search=Norhafizah
+```
+
+Then use the `id` from that response with the events filter:
+
+```http
+GET /api/v1/events?filter[speaker]=019d5cb5-7de1-7055-a4d3-b57ab007331e&filter[starts_after]=2026-04-18
+```
+
+- For a speaker's event history, open `GET /api/v1/speakers/{speakerKey}` and read the `upcoming_events` and `past_events` arrays.
 
 ---
 
