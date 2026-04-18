@@ -155,7 +155,6 @@ it('returns admin speaker resource metadata and records', function () {
     $this->getJson('/api/v1/admin/speakers/'.$speakerRouteKey)
         ->assertOk()
         ->assertJsonPath('data.resource.key', 'speakers')
-        ->assertJsonPath('data.record.id', $speaker->getKey())
         ->assertJsonPath('data.record.route_key', $speakerRouteKey)
         ->assertJsonPath('data.record.attributes.name', 'Admin API Speaker')
         ->assertJsonPath('data.record.abilities.view', true);
@@ -195,9 +194,8 @@ it('exposes admin speaker write schema and can create and update speakers throug
         ],
     ])->assertCreated();
 
-    $speakerId = (string) $createResponse->json('data.record.id');
-    $speaker = Speaker::query()->findOrFail($speakerId);
-    $speakerRouteKey = (string) $speaker->getRouteKey();
+    $speakerRouteKey = (string) $createResponse->json('data.record.route_key');
+    $speaker = Speaker::query()->findOrFail($speakerRouteKey);
 
     expect($speaker->name)->toBe('Admin API Created Speaker')
         ->and($speaker->slug)->toBe('admin-api-created-speaker-my')
@@ -279,8 +277,7 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
         ],
     ])->assertCreated();
 
-    $speakerId = (string) $createResponse->json('data.record.id');
-    $speakerRouteKey = (string) Speaker::query()->findOrFail($speakerId)->getRouteKey();
+    $speakerRouteKey = (string) $createResponse->json('data.record.route_key');
 
     $this->getJson('/api/v1/admin/speakers/'.$speakerRouteKey)
         ->assertOk()
@@ -342,8 +339,7 @@ it('allows sparse venue address updates without resending the existing country t
         ],
     ])->assertCreated();
 
-    $venueId = (string) $createResponse->json('data.record.id');
-    $venueRouteKey = (string) Venue::query()->findOrFail($venueId)->getRouteKey();
+    $venueRouteKey = (string) $createResponse->json('data.record.route_key');
 
     $this->putJson('/api/v1/admin/venues/'.$venueRouteKey, [
         'name' => 'Admin API Sparse Venue Country',
@@ -357,8 +353,8 @@ it('allows sparse venue address updates without resending the existing country t
         ->assertJsonPath('data.record.attributes.address.country_id', 132)
         ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Terkini Tanpa Country');
 
-    expect(Venue::query()->findOrFail($venueId)->addressModel?->country_id)->toBe(132)
-        ->and(Venue::query()->findOrFail($venueId)->addressModel?->line1)->toBe('Alamat Terkini Tanpa Country');
+    expect(Venue::query()->findOrFail($venueRouteKey)->addressModel?->country_id)->toBe(132)
+        ->and(Venue::query()->findOrFail($venueRouteKey)->addressModel?->line1)->toBe('Alamat Terkini Tanpa Country');
 });
 
 it('exposes admin institution write schema and can create and update institutions through the api', function () {
@@ -390,9 +386,8 @@ it('exposes admin institution write schema and can create and update institution
         ],
     ])->assertCreated();
 
-    $institutionId = (string) $createResponse->json('data.record.id');
-    $institution = Institution::query()->findOrFail($institutionId);
-    $institutionRouteKey = (string) $institution->getRouteKey();
+    $institutionRouteKey = (string) $createResponse->json('data.record.route_key');
+    $institution = Institution::query()->findOrFail($institutionRouteKey);
 
     expect($institution->display_name)->toBe('Admin API Institution (API Surau)')
         ->and($institution->status)->toBe('verified')
@@ -464,9 +459,8 @@ it('exposes admin venue write schema and can create and update venues through th
         ],
     ])->assertCreated();
 
-    $venueId = (string) $createResponse->json('data.record.id');
-    $venue = Venue::query()->with(['address', 'contacts', 'socialMedia'])->findOrFail($venueId);
-    $venueRouteKey = (string) $venue->getRouteKey();
+    $venueRouteKey = (string) $createResponse->json('data.record.route_key');
+    $venue = Venue::query()->with(['address', 'contacts', 'socialMedia'])->findOrFail($venueRouteKey);
 
     expect($venue->name)->toBe('Admin API Venue')
         ->and($venue->slug)->toBe('admin-api-venue-my')
@@ -633,9 +627,9 @@ it('exposes admin reference write schema and can create and update references th
         ],
     ])->assertCreated();
 
-    $referenceId = (string) $createResponse->json('data.record.id');
-    $reference = Reference::query()->with('socialMedia')->findOrFail($referenceId);
-    $referenceRouteKey = (string) $reference->getRouteKey();
+    $referenceRouteKey = (string) $createResponse->json('data.record.route_key');
+    $reference = Reference::query()->with('socialMedia')->where('slug', $referenceRouteKey)->firstOrFail();
+    $referenceId = (string) $reference->getKey();
 
     expect($reference->title)->toBe('Admin API Reference')
         ->and($reference->slug)->toBe('admin-api-reference')
@@ -728,9 +722,8 @@ it('exposes admin subdistrict write schema and can create and update subdistrict
         'name' => 'Admin API Federal Territory Subdistrict',
     ])->assertCreated();
 
-    $subdistrictId = (string) $createResponse->json('data.record.id');
-    $subdistrict = Subdistrict::query()->findOrFail($subdistrictId);
-    $subdistrictRouteKey = (string) $subdistrict->getRouteKey();
+    $subdistrictRouteKey = (string) $createResponse->json('data.record.route_key');
+    $subdistrict = Subdistrict::query()->findOrFail($subdistrictRouteKey);
 
     expect((int) $subdistrict->country_id)->toBe($fixtures['country_id'])
         ->and((int) $subdistrict->state_id)->toBe($fixtures['federal_state_id'])
@@ -835,11 +828,10 @@ it('exposes admin event write schema and can create and update events through th
         'discipline_tag' => $disciplineTag,
     ]))->assertCreated();
 
-    $eventId = (string) $createResponse->json('data.record.id');
+    $eventRouteKey = (string) $createResponse->json('data.record.route_key');
     $event = Event::query()
         ->with(['settings', 'references', 'series', 'tags', 'keyPeople'])
-        ->findOrFail($eventId);
-    $eventRouteKey = (string) $event->getRouteKey();
+        ->findOrFail($eventRouteKey);
 
     expect($event->title)->toBe('Admin API Event Created')
         ->and($event->live_url)->toBeNull()

@@ -518,7 +518,7 @@ GET /api/v1/admin/speakers/schema?operation=update&recordKey=ahmad-fauzi-my
 
 Rules:
 
-- `recordKey` should use the record `route_key` returned by the admin collection or record-detail payload. For resources whose route key remains the UUID primary key, `route_key` and `id` are the same value.
+- `recordKey` should use the record `route_key` returned by the admin collection or record-detail payload.
 - The schema response embeds an `endpoint` field with the exact URL you should POST or PUT to — use that directly.
 - The schema response also embeds `defaults` with current field values, and `current_media` with existing media URLs, enabling pre-population of edit forms.
 - The `method` field tells you whether to use `POST` or `PUT`.
@@ -589,7 +589,7 @@ is_active=true
 address[state_id]=14
 
 # 4. Note the returned admin route_key
-# { "data": { "record": { "id": "0195b86a-3c15-73fa-a2d8-5a45f6a7f701", "route_key": "ahmad-fauzi-my", ... } } }
+# { "data": { "record": { "route_key": "ahmad-fauzi-my", ... } } }
 
 # 5. Get the update schema using the route_key returned by the record detail payload
 GET /api/v1/admin/speakers/schema?operation=update&recordKey=ahmad-fauzi-my
@@ -943,7 +943,7 @@ This section summarizes the non-obvious rules that AI agents must internalize be
 | PUT to update a record via admin API | `route_key` in `/admin/{resourceKey}/{recordKey}` |
 | Resolve public speaker/institution | Slug or UUID both accepted (`/speakers/{speakerKey}`) |
 
-> The `route_key` field in admin API responses is the canonical record-specific path key. For resources that still use the UUID primary key as their route key, `route_key` and `id` are the same value.
+> The `route_key` field in admin API responses is the canonical record-specific path key.
 
 ### Field requirement rules
 

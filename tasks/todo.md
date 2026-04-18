@@ -1,3 +1,41 @@
+# MCP DCR Registration Fix
+
+- [x] Reproduce the ChatGPT DCR registration failure against the live MCP metadata endpoints
+- [x] Trace the failure to Passport's schema-inspecting client creation path
+- [x] Replace the registration path with an app-owned controller that creates MCP clients directly
+- [x] Add a regression proving MCP registration no longer depends on Passport's `ClientRepository`
+- [x] Run focused formatter, PHPStan, Pest, and diff checks
+
+## Review
+
+- Fixed the live MCP connector failure by binding the package's OAuth registration controller to `App\Http\Controllers\Mcp\OAuthRegisterController`, which validates the same redirect rules but creates the MCP OAuth client directly with Passport's client model instead of calling `ClientRepository::createAuthorizationCodeGrantClient()` and its schema inspection path.
+- Kept the existing MCP metadata and allowed redirect-domain behavior intact, including the ChatGPT allowlist and the `mcp:use` scope response expected by the connector.
+- Added a regression in `tests/Feature/Mcp/OAuthRegisterTest.php` that replaces `ClientRepository` with a throwing fake and still proves the registration route succeeds, so this failure mode is now locked down.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Providers/AppServiceProvider.php app/Http/Controllers/Mcp/OAuthRegisterController.php tests/Feature/Mcp/OAuthRegisterTest.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 25 passed, 177 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/OAuthRegisterTest.php` => 1 passed, 6 assertions
+  - `git diff --check` => pass
+
+# Dashboard Runtime Fix
+
+- [x] Reproduce the `/dashboard` failure and collect the concrete error
+- [x] Trace the dashboard route/component/view path and identify the root cause
+- [x] Apply the smallest code change that fixes the broken dashboard behavior
+- [x] Run focused verification for the dashboard plus static checks on touched code
+- [x] Record the result and any residual risk
+
+## Review
+
+- Fixed the dashboard crash by removing duplicated/corrupted Blade markup and restoring `resources/views/livewire/pages/dashboard/user-dashboard.blade.php` to a single Livewire root element.
+- Preserved the new planner sidebar and followed speaker/reference/institution sections while keeping the authenticated dashboard route, calendar, saved list, going list, and Dawah impact link intact.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => 28 passed, 252 assertions
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Livewire/Pages/Dashboard/UserDashboard.php` => pass
+  - `git diff --check -- resources/views/livewire/pages/dashboard/user-dashboard.blade.php app/Livewire/Pages/Dashboard/UserDashboard.php tests/Feature/DashboardPagesTest.php tasks/todo.md` => pass
+
 # Uncommitted Change Review
 
 - [x] Inspect the current uncommitted diff for API, share tracking, docs, route, Blade, and test regressions
@@ -2469,6 +2507,22 @@
     - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-mcp tests/Feature/Mcp/AdminServerTest.php` => **15 passed**, 91 assertions
     - `vendor/bin/pest --parallel --compact --tmp-dir=/tmp/pest-majlisilmu-api tests/Feature/Api/Admin/AdminApiTest.php` => **6 passed**, 49 assertions
     - `vendor/bin/phpstan analyse --ansi app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Admin/AdminListResourcesTool.php app/Support/Api/Admin/AdminResourceService.php tests/Feature/Mcp/AdminServerTest.php` => **No errors**
+
+    # MCP Documentation Guide
+
+    - [x] Confirm the current MCP routes, token flow, and inspector command
+    - [x] Add a user-facing MCP usage guide under `docs/`
+    - [x] Link the guide from the main README
+    - [x] Add a lightweight doc regression so the guide stays in sync
+
+    ## Review
+
+    - Added `docs/MAJLISILMU_MCP_GUIDE.md` with the app's admin/member MCP endpoints, authentication options, token management paths, inspector workflow, and configuration notes.
+    - Expanded the guide with ChatGPT OAuth advanced settings guidance so the connector setup uses DCR, the `mcp:use` scope, and no OpenID configuration.
+    - Linked the guide from `README.md` and added `tests/Unit/McpGuideTest.php` so the documentation stays anchored to the current MCP surface.
+    - Verification:
+      - `vendor/bin/pint --dirty --format agent` => pass
+      - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideTest.php` => 1 passed, 10 assertions
     - `vendor/bin/pint --test app/Mcp/Tools/Admin/AbstractAdminTool.php app/Mcp/Tools/Admin/AdminGetResourceMetaTool.php app/Mcp/Tools/Admin/AdminListRecordsTool.php app/Mcp/Tools/Admin/AdminGetRecordTool.php app/Mcp/Tools/Admin/AdminGetWriteSchemaTool.php app/Mcp/Tools/Admin/AdminCreateRecordTool.php app/Mcp/Tools/Admin/AdminUpdateRecordTool.php app/Mcp/Tools/Admin/AdminListResourcesTool.php app/Support/Api/Admin/AdminResourceService.php tests/Feature/Mcp/AdminServerTest.php` => **pass**
     - `git diff --check` => **clean**
 
@@ -10147,3 +10201,37 @@
   - `php -l app/Http/Middleware/SetLocale.php && php -l app/Providers/AppServiceProvider.php && php -l resources/lang/ar/about.php && php -l resources/lang/ar/notifications.php` => **No syntax errors**
   - `php -r 'foreach (["resources/lang/en.json", "resources/lang/ms.json", "resources/lang/ms_MY.json", "resources/lang/ar.json"] as $file) { json_decode(file_get_contents($file), true); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.": ".json_last_error_msg().PHP_EOL); exit(1); } } echo "json ok\n";'` => **json ok**
   - `git diff --check -- config/app.php app/Providers/AppServiceProvider.php app/Http/Middleware/SetLocale.php resources/views/layouts/app.blade.php resources/views/layouts/auth.blade.php resources/views/components/layouts/auth/simple.blade.php resources/views/errors/404.blade.php resources/views/errors/500.blade.php resources/views/welcome.blade.php resources/lang/ar.json resources/lang/ar/about.php resources/lang/ar/notifications.php tests/Feature/AboutPageTest.php tests/Feature/PublicCountrySelectorTest.php tests/Feature/SubmitEventTranslationCoverageTest.php tasks/todo.md` => **No diff formatting issues**
+
+# Uncommitted Changes Audit Todo
+
+- [x] Review uncommitted API/MCP changes for contract, auth, route, and PHPStan issues
+- [x] Review dashboard Livewire/Blade changes for query, state, layout, and translation issues
+- [x] Patch all confirmed issues with minimal scoped edits
+- [x] Run focused Pest/PHPStan/Pint/diff verification
+- [x] Document findings, fixes, and verification results
+
+## Review
+
+- Root cause:
+  - the new dashboard followed-entity sidebar added user-facing English strings without locale entries, so Malay dashboard sessions leaked raw English copy
+  - the touched dashboard card rendering still used `translatedFormat(..., 'h:i A')`, which can localize the meridiem text and diverge from the app's strict `AM/PM` display rule
+  - long followed-entity names and status badges could compete for the same flex row width on the new cards
+- Fix:
+  - added the missing followed-entity dashboard strings to `resources/lang/en.json`, `resources/lang/ms.json`, and `resources/lang/ms_MY.json`
+  - split dashboard date and time formatting so dates use `UserDateTimeFormatter::translatedFormat(..., 'd M')` while clock time uses `UserDateTimeFormatter::format(..., 'h:i A')`
+  - hardened new dashboard card title/status rows with `min-w-0`, `flex-1`, `break-words`, and `shrink-0` where needed
+  - updated dashboard tests to assert the new sidebar and Malay translations instead of the stale absence assertion
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => **28 passed**, 259 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/OAuthRegisterTest.php` => **1 passed**, 6 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideTest.php` => **1 passed**, 10 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => **22 passed**, 314 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => **25 passed**, 177 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php` => **17 passed**, 108 assertions
+  - `vendor/bin/phpstan analyse --ansi app/Livewire/Pages/Dashboard/UserDashboard.php app/Http/Controllers/Mcp/OAuthRegisterController.php app/Support/Api/Admin/AdminResourceRegistry.php app/Support/Api/Admin/AdminResourceService.php app/Support/Api/Member/MemberResourceRegistry.php app/Support/Api/Member/MemberResourceService.php tests/Feature/DashboardPagesTest.php tests/Feature/Mcp/OAuthRegisterTest.php tests/Unit/McpGuideTest.php` => **No errors**
+  - `vendor/bin/phpstan analyse --ansi` => **No errors**
+  - `vendor/bin/pint --test` => **pass**
+  - `vendor/bin/pest --parallel --compact` => **1627 passed**, 8801 assertions
+  - `php -r 'foreach (["resources/lang/en.json", "resources/lang/ms.json", "resources/lang/ms_MY.json"] as $file) { json_decode(file_get_contents($file), true); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.": ".json_last_error_msg().PHP_EOL); exit(1); } } echo "json ok\n";'` => **json ok**
+  - `git diff --check` => **clean**
+  - database rule checks => **no SoftDeletes matches** and **no package database dirs found for constraint/cascade scan**

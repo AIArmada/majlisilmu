@@ -86,7 +86,7 @@ it('returns member resource metadata, record listings, and record detail for ins
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
             ->where('data.resource.key', 'institutions')
-            ->where('data.record.id', $institution->getKey())
+            ->where('data.record.route_key', $institution->getRouteKey())
             ->where('data.record.attributes.name', $institution->name)
             ->etc());
 });

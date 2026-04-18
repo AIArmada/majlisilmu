@@ -179,6 +179,78 @@ it('renders the attendee-first planner dashboard without saved search or digest 
     expect(substr_count((string) $response->getContent(), route('dashboard.dawah-impact')))->toBe(1);
 });
 
+it('shows the planner sidebar and followed entity lists on the dashboard', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    $institution = Institution::factory()->create(['name' => 'Masjid Al-Hidayah']);
+    $followedInstitution = Institution::factory()->create(['name' => 'Masjid Al-Makmur']);
+
+    $savedEvent = Event::factory()->for($otherUser)->for($institution)->create([
+        'title' => 'Sidebar Saved Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $goingEvent = Event::factory()->for($otherUser)->for($institution)->create([
+        'title' => 'Sidebar Going Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(4),
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Menu Speaker',
+    ]);
+
+    $reference = Reference::factory()->create([
+        'title' => 'Menu Reference',
+        'author' => 'Menu Author',
+    ]);
+
+    $user->savedEvents()->attach($savedEvent->id);
+    $user->goingEvents()->attach($goingEvent->id);
+    $user->follow($speaker);
+    $user->follow($reference);
+    $user->follow($followedInstitution);
+
+    $response = $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get('/dashboard');
+
+    $response->assertOk()
+        ->assertSee('Planner menu')
+        ->assertSee('Jump to a section')
+        ->assertSee('hidden lg:block', false)
+        ->assertSee('planner-calendar', false)
+        ->assertSee('planner-saved', false)
+        ->assertSee('planner-going', false)
+        ->assertSee('planner-speakers', false)
+        ->assertSee('planner-references', false)
+        ->assertSee('planner-institutions', false)
+        ->assertSee('Saved')
+        ->assertSee('Going')
+        ->assertSee('Following Speakers')
+        ->assertSee('Following References')
+        ->assertSee('Following Institutions')
+        ->assertSee('Sidebar Saved Event')
+        ->assertSee('Sidebar Going Event')
+        ->assertSee('Menu Speaker')
+        ->assertSee('Menu Reference')
+        ->assertSee('Masjid Al-Makmur');
+
+    $this->withSession(['locale' => 'ms'])
+        ->actingAs($user)
+        ->get('/dashboard')
+        ->assertOk()
+        ->assertSee('Menu perancang')
+        ->assertSee('Pergi ke bahagian')
+        ->assertSee('Penceramah Diikuti')
+        ->assertSee('Rujukan Diikuti')
+        ->assertSee('Institusi Diikuti');
+});
+
 it('renders a valid event management link on the user dashboard for manageable events', function () {
     $user = User::factory()->create();
 
@@ -255,7 +327,8 @@ it('translates the attendee dashboard in Malay with the lean attendee-first sect
     $response->assertOk()
         ->assertSee('Dashboard')
         ->assertDontSee('Perancang Kehadiran')
-        ->assertDontSee('Pergi ke bahagian')
+        ->assertSee('Menu perancang')
+        ->assertSee('Pergi ke bahagian')
         ->assertSee('Dashboard Saya')
         ->assertSee('Urus Institusi')
         ->assertSee('Majlis Akan Hadir')

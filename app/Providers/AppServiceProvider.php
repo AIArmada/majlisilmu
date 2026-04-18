@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Slugs\ResolvePublicSlugAction;
 use App\Ai\Listeners\RecordAiUsage;
+use App\Http\Controllers\Mcp\OAuthRegisterController;
 use App\Models\Address;
 use App\Models\AiModelPricing;
 use App\Models\Audit as FilamentAudit;
@@ -63,6 +64,7 @@ use Laravel\Ai\Events\EmbeddingsGenerated;
 use Laravel\Ai\Events\ImageGenerated;
 use Laravel\Ai\Events\Reranked;
 use Laravel\Ai\Events\TranscriptionGenerated;
+use Laravel\Mcp\Server\Http\Controllers\OAuthRegisterController as McpOAuthRegisterController;
 use Laravel\Passport\Passport;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use PhpParser\PrettyPrinter;
@@ -86,6 +88,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(PrettyPrinter::class, PrettyPrinter\Standard::class);
+        $this->app->bind(McpOAuthRegisterController::class, OAuthRegisterController::class);
 
         $filamentAuditingViews = base_path('vendor/tapp/filament-auditing/resources/views');
         $filamentSignalsViews = base_path('../commerce/packages/filament-signals/resources/views');

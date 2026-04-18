@@ -132,7 +132,7 @@ class AdminResourceService
         return [
             'data' => [
                 'resource' => $this->registry->metadata($resourceClass),
-                'record' => $this->registry->serializeRecord($resourceClass, $record),
+                'record' => $this->registry->serializeRecordDetail($resourceClass, $record),
             ],
         ];
     }
@@ -192,7 +192,7 @@ class AdminResourceService
         return [
             'data' => [
                 'resource' => $this->registry->metadata($resourceClass),
-                'record' => $this->registry->serializeRecord($resourceClass, $record),
+                'record' => $this->registry->serializeRecordDetail($resourceClass, $record),
             ],
         ];
     }
@@ -226,7 +226,7 @@ class AdminResourceService
         return [
             'data' => [
                 'resource' => $this->registry->metadata($resourceClass),
-                'record' => $this->registry->serializeRecord($resourceClass, $record),
+                'record' => $this->registry->serializeRecordDetail($resourceClass, $record),
             ],
         ];
     }
