@@ -14,6 +14,7 @@ use App\Mcp\Tools\Admin\AdminGetRecordTool;
 use App\Mcp\Tools\Admin\AdminGetResourceMetaTool;
 use App\Mcp\Tools\Admin\AdminGetWriteSchemaTool;
 use App\Mcp\Tools\Admin\AdminListRecordsTool;
+use App\Mcp\Tools\Admin\AdminListRelatedRecordsTool;
 use App\Mcp\Tools\Admin\AdminListResourcesTool;
 use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
 use App\Models\Event;
@@ -121,6 +122,49 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->where('data.resource.key', 'speakers')
             ->where('data.record.route_key', $speaker->getRouteKey())
             ->where('data.record.attributes.name', 'Admin MCP Speaker')
+            ->etc());
+});
+
+it('lists related records through the admin MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $relatedTitle = 'Nested MCP Event '.Str::ulid();
+    $speaker = Speaker::factory()->create([
+        'name' => 'Nested MCP Speaker',
+    ]);
+    $event = Event::factory()->create([
+        'title' => $relatedTitle,
+    ]);
+
+    $event->speakers()->attach($speaker);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetResourceMetaTool::class, [
+            'resource_key' => 'speakers',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.api_routes.related_collection', '/api/v1/admin/speakers/record/relations/relation')
+            ->where('data.resource.mcp_tools.list_related_records.tool', 'admin-list-related-records')
+            ->where('data.resource.mcp_tools.list_related_records.arguments.resource_key', 'speakers')
+            ->where('data.resource.mcp_tools.list_related_records.arguments.record_key', 'record')
+            ->where('data.resource.mcp_tools.list_related_records.arguments.relation', 'relation')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRelatedRecordsTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => $speaker->getKey(),
+            'relation' => 'events',
+            'search' => $relatedTitle,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.0.route_key', $event->getRouteKey())
+            ->where('data.0.title', $relatedTitle)
+            ->where('meta.resource.key', 'speakers')
+            ->where('meta.parent_record.route_key', $speaker->getRouteKey())
+            ->where('meta.relation.name', 'events')
+            ->where('meta.relation.related_resource.key', 'events')
             ->etc());
 });
 

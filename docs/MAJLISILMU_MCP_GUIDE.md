@@ -18,7 +18,7 @@ Both servers are registered in `routes/ai.php` and protected by bearer-token or 
 
 - Route: `/mcp/admin`
 - Server class: `App\Mcp\Servers\AdminServer`
-- Intended for admin workflows such as resource discovery, record browsing, record detail, schema discovery, and supported create/update operations.
+- Intended for admin workflows such as resource discovery, record browsing, record detail, named relation traversal, schema discovery, and supported create/update operations.
 
 ### Member MCP
 
@@ -103,6 +103,7 @@ The admin server currently exposes tools for:
 - Reading resource metadata.
 - Listing records.
 - Reading a single record.
+- Traversing named relations on a specific record.
 - Discovering write schemas.
 - Creating supported records.
 - Updating supported records.

@@ -160,6 +160,40 @@ it('returns admin speaker resource metadata and records', function () {
         ->assertJsonPath('data.record.abilities.view', true);
 });
 
+it('lists related records for admin resource relations', function () {
+    $admin = adminApiUser('super_admin');
+    $relatedTitle = 'Nested Relation Event '.Str::ulid();
+    $speaker = Speaker::factory()->create([
+        'name' => 'Nested Relation Speaker',
+    ]);
+    $event = Event::factory()->create([
+        'title' => $relatedTitle,
+    ]);
+
+    $event->speakers()->attach($speaker);
+    $speakerRouteKey = (string) $speaker->getRouteKey();
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/speakers/meta')
+        ->assertOk()
+        ->assertJson(fn ($json) => $json
+            ->where('data.resource.api_routes.related_collection', '/api/v1/admin/speakers/record/relations/relation')
+            ->where('data.resource.relations', fn ($relations): bool => collect($relations)->contains('events'))
+            ->etc());
+
+    $response = $this->getJson('/api/v1/admin/speakers/'.$speakerRouteKey.'/relations/events?search='.urlencode($relatedTitle))
+        ->assertOk();
+
+    $response
+        ->assertJsonPath('data.0.route_key', $event->getRouteKey())
+        ->assertJsonPath('data.0.title', $relatedTitle)
+        ->assertJsonPath('meta.resource.key', 'speakers')
+        ->assertJsonPath('meta.parent_record.route_key', $speakerRouteKey)
+        ->assertJsonPath('meta.relation.name', 'events')
+        ->assertJsonPath('meta.relation.related_resource.key', 'events');
+});
+
 it('exposes admin speaker write schema and can create and update speakers through the api', function () {
     ensureAdminApiMalaysiaCountryExists();
 
