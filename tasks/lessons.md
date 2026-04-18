@@ -1,5 +1,10 @@
 # Lessons
 
+- Keep the origin query param free-form for API clients, but hide `origin=web` from the visible URL so the default web case stays clean while iOS/Android/macOS and future clients can still identify themselves explicitly.
+- When the user needs to see where a share came from, put the resolved origin directly into the generated tracked URL (`origin=web`, `origin=iosapp`, etc.); storing origin only in backend metadata is not enough for the UI copy-link surface.
+- When a share modal still copies a bare canonical URL, audit the payload source and caller identity together; the client can be wired correctly while the backend still returns an anonymous fallback, so copy-link, social, and native-share paths all need the same tracked payload contract.
+- When hard-cutting a public API contract, remove the runtime aliases, docs guidance, and regression expectations in the same pass; leaving any one of them behind makes the old behavior reappear through either the payload or the docs.
+- When a public endpoint supports optional bearer personalization, do not model it as required auth in OpenAPI unless the route actually enforces auth; keep the route public, describe the bearer variant in the contract text/manifest, and let alignment tests reflect the real middleware.
 - When you demote a destination from persistent navigation, audit page-level hero and shortcut CTAs in the same pass; a hero button can still keep that destination functionally first-class even after the menu is cleaned up.
 - When reworking navigation, audit each destination by its actual page responsibilities and contextual entry points before removing or demoting menu items; similar labels do not imply redundant workflows.
 - When correcting a permission-gated UI behavior, do not preserve a query-string or entry-point split unless the user explicitly confirms that split is part of the product requirement; keep the condition tied to authorization first.

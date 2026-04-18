@@ -329,6 +329,7 @@
                     copiedShareLink: false,
                     shareData: @js($searchShareData),
                     trackEndpoint: @js(route('dawah-share.track')),
+                    providerQueryParameter: @js(config('dawah-share.provider_query_parameter', 'channel')),
                     attributedShareData: null,
                     setLocationNotice(message) {
                         this.locationNotice = message;
@@ -407,6 +408,25 @@
 
                         return this.attributedShareData;
                     },
+                    async sharePayloadForChannel(provider = null) {
+                        const shareData = await this.resolveShareData();
+
+                        if (! shareData || ! provider || ! shareData.tracking_token) {
+                            return shareData;
+                        }
+
+                        try {
+                            const shareUrl = new URL(shareData.url, window.location.origin);
+                            shareUrl.searchParams.set(this.providerQueryParameter, provider);
+
+                            return {
+                                ...shareData,
+                                url: shareUrl.toString(),
+                            };
+                        } catch (error) {
+                            return shareData;
+                        }
+                    },
                     async trackShare(provider) {
                         const shareData = await this.resolveShareData();
 
@@ -434,7 +454,7 @@
                         });
                     },
                     async shareResults() {
-                        const shareData = await this.resolveShareData();
+                        const shareData = await this.sharePayloadForChannel('native_share');
                         if (!shareData) {
                             return;
                         }
@@ -451,8 +471,8 @@
 
                         await this.copyShareLink();
                     },
-                    async copyShareLink(shouldTrack = true) {
-                        const shareData = await this.resolveShareData();
+                    async copyShareLink(shouldTrack = true, provider = 'copy_link') {
+                        const shareData = await this.sharePayloadForChannel(provider);
                         if (!shareData) {
                             return;
                         }
@@ -461,7 +481,7 @@
                             window.prompt('{{ __("Copy this link:") }}', shareData.url);
 
                             if (shouldTrack) {
-                                await this.trackShare('copy_link');
+                                await this.trackShare(provider);
                             }
 
                             return;
@@ -469,7 +489,7 @@
 
                         navigator.clipboard.writeText(shareData.url).then(async () => {
                             if (shouldTrack) {
-                                await this.trackShare('copy_link');
+                                await this.trackShare(provider);
                             }
 
                             this.copiedShareLink = true;
@@ -478,7 +498,7 @@
                             window.prompt('{{ __("Copy this link:") }}', shareData.url);
 
                             if (shouldTrack) {
-                                await this.trackShare('copy_link');
+                                await this.trackShare(provider);
                             }
                         });
                     },

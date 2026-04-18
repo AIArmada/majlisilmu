@@ -28,11 +28,27 @@ final readonly class ShareTrackingService
     }
 
     /**
-     * @return array{url: string, platform_links: array<string, string>, tracking_token?: string}
+     * @return list<string>
      */
-    public function sharePayload(?User $user, string $url, string $shareText, ?string $fallbackTitle = null): array
+    public function supportedChannels(): array
     {
-        return $this->affiliatesShareTrackingService->sharePayload($user, $url, $shareText, $fallbackTitle);
+        return $this->affiliatesShareTrackingService->supportedChannels();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function supportedOrigins(): array
+    {
+        return $this->affiliatesShareTrackingService->supportedOrigins();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function sharePayload(?User $user, string $url, string $shareText, ?string $fallbackTitle = null, ?string $origin = null, ?Request $request = null): array
+    {
+        return $this->affiliatesShareTrackingService->sharePayload($user, $url, $shareText, $fallbackTitle, $origin, $request);
     }
 
     /**
@@ -49,14 +65,15 @@ final readonly class ShareTrackingService
         string $url,
         string $shareText,
         ?string $fallbackTitle = null,
+        ?string $origin = null,
         ?Request $request = null,
     ): string {
-        return $this->affiliatesShareTrackingService->redirectUrl($provider, $user, $url, $shareText, $fallbackTitle, $request);
+        return $this->affiliatesShareTrackingService->redirectUrl($provider, $user, $url, $shareText, $fallbackTitle, $origin, $request);
     }
 
-    public function attributedUrl(User $user, string $url, ?string $fallbackTitle = null): string
+    public function attributedUrl(User $user, string $url, ?string $fallbackTitle = null, ?string $origin = null): string
     {
-        return $this->affiliatesShareTrackingService->attributedUrl($user, $url, $fallbackTitle);
+        return $this->affiliatesShareTrackingService->attributedUrl($user, $url, $fallbackTitle, $origin);
     }
 
     public function recordShareAction(
@@ -97,9 +114,9 @@ final readonly class ShareTrackingService
         return $this->affiliatesShareTrackingService->recordOutcome($type, $outcomeKey, $subject, $actor, $request, $metadata);
     }
 
-    public function createOrReuseLink(User $user, string $url, ?string $fallbackTitle = null): ShareTrackingLinkData
+    public function createOrReuseLink(User $user, string $url, ?string $fallbackTitle = null, ?string $origin = null): ShareTrackingLinkData
     {
-        return $this->affiliatesShareTrackingService->createOrReuseLink($user, $url, $fallbackTitle);
+        return $this->affiliatesShareTrackingService->createOrReuseLink($user, $url, $fallbackTitle, $origin);
     }
 
     public function deleteUserTracking(User $user): void

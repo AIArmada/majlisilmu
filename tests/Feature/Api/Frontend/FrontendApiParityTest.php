@@ -41,7 +41,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -102,6 +101,8 @@ it('exposes corrected frontend contract metadata', function () {
     $membershipClaimFlow = $manifest['flows']['membership_claim'] ?? [];
     $followFlow = $manifest['flows']['follow'] ?? [];
     $inspirationFlow = $manifest['flows']['inspirations_random'] ?? [];
+    $shareFlow = $manifest['flows']['share'] ?? [];
+    $institutionsNearFlow = $manifest['flows']['institutions_near'] ?? [];
     $quickstart = $manifest['ai_quickstart']['read_order'] ?? [];
 
     $submitEvent = $this->getJson(route('api.client.forms.submit-event'))
@@ -112,7 +113,7 @@ it('exposes corrected frontend contract metadata', function () {
     $submitEventConditionalRules = collect($submitEvent['conditional_rules'] ?? []);
 
     expect($submitEvent['captcha_required_when_turnstile_enabled'])->toBeTrue()
-        ->and($manifest['version'] ?? null)->toBe('2026-04-16')
+        ->and($manifest['version'] ?? null)->toBe('2026-04-17')
         ->and($manifest['docs']['ui'] ?? null)->toBe('https://api.majlisilmu.test/docs')
         ->and($manifest['docs']['openapi'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($manifest['routing_surfaces']['public']['manifest_endpoint'] ?? null)->toContain('/api/v1/manifest')
@@ -134,7 +135,17 @@ it('exposes corrected frontend contract metadata', function () {
         ->and($contributionUpdateFlow['schema_endpoint_template'] ?? null)->toContain('/api/v1/forms/contributions/subjectType/subject/suggest')
         ->and($membershipClaimFlow['endpoint_template'] ?? null)->toContain('/api/v1/membership-claims/subjectType/subject')
         ->and($followFlow['state_endpoint_template'] ?? null)->toContain('/api/v1/follows/type/subject')
-        ->and($inspirationFlow['endpoint'] ?? null)->toContain('/api/v1/inspirations/random');
+        ->and($inspirationFlow['endpoint'] ?? null)->toContain('/api/v1/inspirations/random')
+        ->and($shareFlow['payload_endpoint'] ?? null)->toContain('/api/v1/share/payload')
+        ->and($shareFlow['track_endpoint'] ?? null)->toContain('/api/v1/share/track')
+        ->and($shareFlow['payload_bearer_auth_optional'] ?? null)->toBeTrue()
+        ->and($shareFlow['channels'] ?? [])->toContain('copy_link', 'native_share')
+        ->and($shareFlow['origins'] ?? [])->toContain('web', 'iosapp', 'android', 'macapp')
+        ->and($shareFlow['copy_link_channel'] ?? null)->toBe('copy_link')
+        ->and($shareFlow['native_share_channel'] ?? null)->toBe('native_share')
+        ->and($institutionsNearFlow['endpoint'] ?? null)->toContain('/api/v1/institutions/near')
+        ->and($institutionsNearFlow['near_format'] ?? null)->toBe('lat,lng')
+        ->and($institutionsNearFlow['radius_parameter'] ?? null)->toBe('radius_km');
 
     $speakerContract = $this->getJson(route('api.client.forms.contributions.speakers'))
         ->assertOk()
@@ -219,6 +230,66 @@ it('filters public institutions by current location radius and returns distance 
         ->not->toContain('Masjid Radius Pending')
         ->and($response->json('data.0.distance_km'))->toBeNumeric()
         ->and((float) $response->json('data.0.distance_km'))->toBeLessThan(1.0);
+});
+
+it('supports the nearby institution alias and sparse list fields', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    $nearInstitution = Institution::factory()->create([
+        'name' => 'Masjid Near Alias',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $nearInstitution->address()->update([
+        'lat' => 3.1390,
+        'lng' => 101.6869,
+    ]);
+
+    $farInstitution = Institution::factory()->create([
+        'name' => 'Masjid Far Alias',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $farInstitution->address()->update([
+        'lat' => 3.2600,
+        'lng' => 101.8600,
+    ]);
+
+    $response = $this->getJson('/api/v1/institutions/near?near=3.1390,101.6869&radius_km=12&fields=id,name,location,distance_km')
+        ->assertOk()
+        ->assertJsonPath('meta.location.active', true);
+
+    $names = collect($response->json('data'))->pluck('name')->all();
+    $item = $response->json('data.0');
+
+    expect($names)
+        ->toContain('Masjid Near Alias')
+        ->not->toContain('Masjid Far Alias')
+        ->and(array_keys($item))->toBe(['id', 'name', 'location', 'distance_km'])
+        ->and(data_get($item, 'distance_km'))->toBeNumeric();
+});
+
+it('rejects unsupported public institution sparse fields', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    $this->getJson('/api/v1/institutions?fields=id,unknown_field')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('fields');
+});
+
+it('supports sparse fields on the public speaker directory', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'name' => 'Sparse Speaker',
+    ]);
+
+    $response = $this->getJson('/api/v1/speakers?fields=id,name,avatar_url')
+        ->assertOk();
+
+    expect(array_keys($response->json('data.0')))->toBe(['id', 'name', 'avatar_url']);
 });
 
 it('exposes authenticated contribution update contracts and permission-gated direct edit media support', function () {
@@ -1640,7 +1711,7 @@ it('serializes institution detail payloads with address and donation metadata fo
         ->and(data_get($item, 'waze_url'))->toContain('waze.com');
 });
 
-it('exposes 7-item institution detail lists with address display lines and qr urls', function () {
+it('exposes 7-item institution detail lists with canonical address lines and qr urls', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
 
@@ -1727,15 +1798,17 @@ it('exposes 7-item institution detail lists with address display lines and qr ur
         'past_per_page' => 7,
     ]))->assertOk();
 
-    expect($response->json('data.institution.street_address_line'))->toBe('Persiaran Masjid, Seksyen 14')
-        ->and($response->json('data.institution.locality_address_line'))->toBe('Shah Alam, 40000')
-        ->and($response->json('data.institution.regional_address_line'))->toBe('Petaling, Selangor')
+    expect($response->json('data.institution.address_line'))->toBe('Shah Alam, Petaling, Selangor')
         ->and($response->json('data.institution.donation_channels.0.qr_url'))->toBeString()
         ->and($response->json('data.institution.donation_channels.0.qr_full_url'))->toBe($channel->getFirstMediaUrl('qr'))
         ->and(count($response->json('data.upcoming_events')))->toBe(7)
         ->and(count($response->json('data.past_events')))->toBe(7)
         ->and($response->json('data.upcoming_total'))->toBe(8)
         ->and($response->json('data.past_total'))->toBe(8);
+
+    $response->assertJsonMissingPath('data.institution.street_address_line')
+        ->assertJsonMissingPath('data.institution.locality_address_line')
+        ->assertJsonMissingPath('data.institution.regional_address_line');
 });
 
 it('rejects unsupported files on public contribution update suggestions', function () {
@@ -3147,10 +3220,7 @@ it('mirrors the public speaker page payload for app clients', function () {
         ->and($response->json('data.speaker.country.iso2'))->toBe('MY')
         ->and($response->json('data.speaker.country.key'))->toBe('malaysia')
         ->and($response->json('data.speaker.location'))->toBe('Temerloh, Pahang')
-        ->and($response->json('data.speaker.bio_text'))->toContain('Biodata speaker aplikasi ini panjang')
-        ->and($response->json('data.speaker.bio_html'))->toContain('<p')
-        ->and($response->json('data.speaker.bio_excerpt'))->toBe(Str::limit($bioText, 180))
-        ->and($response->json('data.speaker.should_collapse_bio'))->toBeTrue()
+        ->and(data_get($response->json('data.speaker.bio'), 'content.0.content.0.text'))->toBe($bioText)
         ->and($response->json('data.speaker.media.avatar_url'))->not->toBeEmpty()
         ->and($response->json('data.speaker.media.share_image_url'))->not->toBeEmpty()
         ->and($response->json('data.speaker.gallery'))->toHaveCount(2)
@@ -3174,6 +3244,11 @@ it('mirrors the public speaker page payload for app clients', function () {
         ->and($response->json('data.other_role_upcoming_participations.0.role'))->toBe('moderator')
         ->and($response->json('data.other_role_upcoming_participations.0.role_label'))->toBe(EventKeyPersonRole::Moderator->getLabel())
         ->and($response->json('data.other_role_upcoming_participations.0.event.title'))->toBe('Forum API Moderator');
+
+    $response->assertJsonMissingPath('data.speaker.bio_html')
+        ->assertJsonMissingPath('data.speaker.bio_text')
+        ->assertJsonMissingPath('data.speaker.bio_excerpt')
+        ->assertJsonMissingPath('data.speaker.should_collapse_bio');
 });
 
 it('allows following and unfollowing a speaker through the frontend api', function () {

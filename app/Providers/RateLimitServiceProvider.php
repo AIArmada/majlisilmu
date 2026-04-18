@@ -42,6 +42,9 @@ class RateLimitServiceProvider extends ServiceProvider
         // Saved searches: 20 per minute
         RateLimiter::for('saved-searches', fn (Request $request) => Limit::perMinute(20)->by($request->user()?->id ?: $request->ip()));
 
+        // Share tracking payloads can create guest-scoped affiliate records.
+        RateLimiter::for('share-tracking', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+
         // Admin/Moderation: Higher limits for moderators
         RateLimiter::for('moderation', function (Request $request) {
             $user = $request->user();

@@ -214,7 +214,7 @@ test('explicit copy-link and native-share actions record outbound share touchpoi
     expect($providers)->toContain('copy_link', 'native_share');
 });
 
-test('share payload includes a tracking token for authenticated sharers only', function () {
+test('share payload includes a tracking token for authenticated and anonymous sharers', function () {
     $event = Event::factory()->create([
         'status' => 'approved',
         'visibility' => 'public',
@@ -239,15 +239,172 @@ test('share payload includes a tracking token for authenticated sharers only', f
         ->assertOk()
         ->json();
 
+    parse_str((string) parse_url((string) data_get($authenticatedPayload, 'url'), PHP_URL_QUERY), $shareQuery);
+    $shareToken = (string) ($shareQuery['share'] ?? '');
+
+    expect(preg_match('/^[a-z0-9]{16}$/', $shareToken))->toBe(1)
+        ->and($shareToken)->toBe((string) data_get($authenticatedPayload, 'tracking_token'));
+
+    expect((string) data_get($authenticatedPayload, 'url'))->not->toContain('origin=web');
+
     expect(data_get($authenticatedPayload, 'tracking_token'))->toBeString()->not->toBe('')
-        ->and(data_get($guestPayload, 'tracking_token'))->toBeNull();
+        ->and(data_get($guestPayload, 'tracking_token'))->toBeString()->not->toBe('')
+        ->and((string) data_get($guestPayload, 'url'))->toContain((string) data_get($guestPayload, 'tracking_token'))
+        ->and((string) data_get($guestPayload, 'url'))->not->toContain('origin=web');
 });
 
-test('share tracking rejects invalid tokens and unauthenticated callers', function () {
+test('api share payload exposes origin-aware mobile and native share data', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $iosPayload = $this->actingAs($this->sharer)
+        ->getJson(route('api.client.share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+            'origin' => 'iosapp',
+        ]))
+        ->assertOk()
+        ->json();
+
+    $repeatedIosPayload = $this->actingAs($this->sharer)
+        ->getJson(route('api.client.share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+            'origin' => 'iosapp',
+        ]))
+        ->assertOk()
+        ->json();
+
+    $androidPayload = $this->actingAs($this->sharer)
+        ->getJson(route('api.client.share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+            'origin' => 'android',
+        ]))
+        ->assertOk()
+        ->json();
+
+    $ipadOsPayload = $this->actingAs($this->sharer)
+        ->getJson(route('api.client.share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+            'origin' => 'ipadOs',
+        ]))
+        ->assertOk()
+        ->json();
+
+    parse_str((string) parse_url((string) data_get($iosPayload, 'channel_urls.copy_link'), PHP_URL_QUERY), $copyLinkQuery);
+    parse_str((string) parse_url((string) data_get($iosPayload, 'channel_urls.native_share'), PHP_URL_QUERY), $nativeShareQuery);
+
+    expect(data_get($iosPayload, 'origin'))->toBe('iosapp')
+        ->and(data_get($iosPayload, 'supported_channels'))->toContain('copy_link', 'native_share', 'whatsapp')
+        ->and(data_get($iosPayload, 'supported_origins'))->toContain('web', 'iosapp', 'android', 'macapp')
+        ->and((string) data_get($iosPayload, 'url'))->toContain('origin=iosapp')
+        ->and((string) data_get($iosPayload, 'channel_urls.copy_link'))->toContain('origin=iosapp')
+        ->and(data_get($copyLinkQuery, config('dawah-share.provider_query_parameter', 'channel')))->toBe('copy_link')
+        ->and(data_get($nativeShareQuery, config('dawah-share.provider_query_parameter', 'channel')))->toBe('native_share')
+        ->and(data_get($iosPayload, 'native_share.url'))->toBe(data_get($iosPayload, 'channel_urls.native_share'))
+        ->and((string) data_get($iosPayload, 'native_share.message'))->toContain((string) data_get($iosPayload, 'channel_urls.native_share'))
+        ->and((string) data_get($iosPayload, 'tracking_token'))->toBe((string) data_get($repeatedIosPayload, 'tracking_token'))
+        ->and((string) data_get($iosPayload, 'tracking_token'))->not->toBe((string) data_get($androidPayload, 'tracking_token'))
+        ->and(data_get($ipadOsPayload, 'origin'))->toBe('ipados')
+        ->and((string) data_get($ipadOsPayload, 'url'))->toContain('origin=ipados');
+});
+
+test('share origin is stored on links outbound shares and landing attributions', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $payload = $this->actingAs($this->sharer)
+        ->getJson(route('api.client.share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+            'origin' => 'android',
+        ]))
+        ->assertOk()
+        ->json();
+
+    $trackingToken = (string) data_get($payload, 'tracking_token');
+    $link = AffiliateLink::query()->where('custom_slug', $trackingToken)->firstOrFail();
+
+    expect(data_get($link->subject_metadata, 'share_origin'))->toBe('android');
+
+    Sanctum::actingAs($this->sharer);
+
+    $this->postJson(route('api.client.share.track'), [
+        'provider' => 'native_share',
+        'tracking_token' => $trackingToken,
+    ])->assertNoContent();
+
+    $outboundTouchpoint = AffiliateTouchpoint::query()
+        ->where('metadata->event_type', 'outbound_share')
+        ->latest('touched_at')
+        ->firstOrFail();
+
+    expect(data_get($outboundTouchpoint->metadata, 'share_origin'))->toBe('android');
+
+    $this->get((string) data_get($payload, 'channel_urls.copy_link'))->assertOk();
+
+    $attribution = AffiliateAttribution::query()->latest('first_seen_at')->firstOrFail();
+    $visit = AffiliateTouchpoint::query()
+        ->where('metadata->event_type', 'visit')
+        ->latest('touched_at')
+        ->firstOrFail();
+
+    expect(data_get($attribution->metadata, 'share_origin'))->toBe('android')
+        ->and(data_get($visit->metadata, 'share_origin'))->toBe('android');
+});
+
+test('landing attributions preserve copy and native share channels', function (string $provider) {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $payload = $this->actingAs($this->sharer)
+        ->getJson(route('dawah-share.payload', [
+            'url' => route('events.show', $event),
+            'text' => 'Share this event',
+            'title' => $event->title,
+        ]))
+        ->assertOk()
+        ->json();
+
+    $landingUrl = (string) $payload['url'].'&'.http_build_query([
+        (string) config('dawah-share.provider_query_parameter', 'channel') => $provider,
+    ]);
+
+    $this->get($landingUrl)->assertOk();
+
+    $attribution = AffiliateAttribution::query()->latest('first_seen_at')->firstOrFail();
+    $visit = AffiliateTouchpoint::query()
+        ->where('metadata->event_type', 'visit')
+        ->latest('touched_at')
+        ->firstOrFail();
+
+    expect(data_get($attribution->metadata, 'share_provider'))->toBe($provider)
+        ->and(data_get($visit->metadata, 'share_provider'))->toBe($provider)
+        ->and($attribution->landing_url)->not->toContain('origin=web')
+        ->and($attribution->landing_url)->toContain(route('events.show', $event));
+})->with([
+    'copy link' => 'copy_link',
+    'native share' => 'native_share',
+]);
+
+test('share tracking rejects invalid tokens', function () {
     $this->postJson(route('dawah-share.track'), [
         'provider' => 'copy_link',
         'tracking_token' => 'invalid-token',
-    ])->assertUnauthorized();
+    ])->assertUnprocessable();
 
     $this->actingAs($this->sharer)
         ->postJson(route('dawah-share.track'), [
@@ -258,6 +415,53 @@ test('share tracking rejects invalid tokens and unauthenticated callers', functi
         ->assertJsonValidationErrors('tracking_token');
 
     expect(AffiliateTouchpoint::query()->where('metadata->event_type', 'outbound_share')->count())->toBe(0);
+});
+
+test('share redirects record outbound shares for guest callers', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $response = $this->get(route('dawah-share.redirect', [
+        'provider' => 'whatsapp',
+        'url' => route('events.show', $event),
+        'text' => 'Share this event',
+        'title' => $event->title,
+    ]));
+
+    $response->assertRedirect();
+
+    $location = (string) $response->headers->get('Location');
+
+    expect($location)->toContain('whatsapp')
+        ->and($location)->toContain((string) config('dawah-share.query_parameter', 'share'));
+
+    expect(AffiliateTouchpoint::query()->where('metadata->event_type', 'outbound_share')->count())->toBe(1);
+});
+
+test('share tracking records outbound shares for guest callers', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $payload = $this->getJson(route('dawah-share.payload', [
+        'url' => route('events.show', $event),
+        'text' => 'Share this event',
+        'title' => $event->title,
+    ]))
+        ->assertOk()
+        ->json();
+
+    $trackingToken = (string) data_get($payload, 'tracking_token');
+
+    $this->postJson(route('dawah-share.track'), [
+        'provider' => 'copy_link',
+        'tracking_token' => $trackingToken,
+    ])->assertNoContent();
+
+    expect(AffiliateTouchpoint::query()->where('metadata->event_type', 'outbound_share')->count())->toBe(1);
 });
 
 test('threads redirect records an outbound share touchpoint for authenticated users', function () {
@@ -1395,10 +1599,13 @@ test('tracked share ui renders across supported public surfaces', function () {
         route('events.show', $event),
         route('institutions.show', $institution),
         route('speakers.show', $speaker),
+        route('references.show', $reference),
     ] as $url) {
         $this->get($url)
             ->assertSuccessful()
             ->assertSee('payloadEndpoint', false)
+            ->assertSee("copyLink(false, 'instagram')", false)
+            ->assertSee("copyLink(false, 'tiktok')", false)
             ->assertSee('storage/social-media-icons/telegram.svg', false);
     }
 });

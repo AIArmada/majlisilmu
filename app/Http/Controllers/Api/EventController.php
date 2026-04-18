@@ -25,6 +25,7 @@ use App\Services\Signals\ProductSignalsService;
 use App\Support\Api\ApiPagination;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +33,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -47,6 +49,38 @@ class EventController extends Controller
     private const array PUBLIC_STATUSES = Event::PUBLIC_STATUSES;
 
     /**
+     * @var list<string>
+     */
+    private const array EVENT_LIST_FIELDS = [
+        'id',
+        'slug',
+        'title',
+        'starts_at',
+        'ends_at',
+        'timing_display',
+        'prayer_display_text',
+        'end_time_display',
+        'visibility',
+        'status',
+        'status_label',
+        'event_type',
+        'event_type_label',
+        'event_format',
+        'event_format_label',
+        'reference_study_subtitle',
+        'location',
+        'is_remote',
+        'is_pending',
+        'is_cancelled',
+        'has_poster',
+        'poster_url',
+        'card_image_url',
+        'institution',
+        'venue',
+        'speakers',
+    ];
+
+    /**
      * List events with filtering, sorting, and includes.
      *
      * Example API calls:
@@ -57,8 +91,11 @@ class EventController extends Controller
      * /api/v1/events?sort=-starts_at
      * /api/v1/events?filter[search]=kuliah
      */
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, title, starts_at, ends_at, timing_display, prayer_display_text, end_time_display, visibility, status, status_label, event_type, event_type_label, event_format, event_format_label, reference_study_subtitle, location, is_remote, is_pending, is_cancelled, has_poster, poster_url, card_image_url, institution, venue, speakers.', required: false, type: 'string', infer: false, example: 'id,title,starts_at,location,card_image_url')]
     public function index(Request $request): JsonResponse
     {
+        $requestedFields = $this->requestedFields($request, self::EVENT_LIST_FIELDS);
+
         /** @var list<AllowedFilter> $allowedFilters */
         $allowedFilters = [
             AllowedFilter::callback('status', function (Builder $query, mixed $value): void {
@@ -337,7 +374,7 @@ class EventController extends Controller
         /** @var array<string, mixed> $payload */
         $payload = [
             'data' => $events->getCollection()
-                ->map(fn (Event $event): array => $this->serializeEventListPayload($event))
+                ->map(fn (Event $event): array => $this->sparsePayload($this->serializeEventListPayload($event), $requestedFields))
                 ->all(),
             'meta' => [
                 'pagination' => [
@@ -514,6 +551,58 @@ class EventController extends Controller
         abort_unless($user instanceof User, 403);
 
         return $user;
+    }
+
+    /**
+     * @param  list<string>  $allowedFields
+     * @return list<string>|null
+     */
+    private function requestedFields(Request $request, array $allowedFields): ?array
+    {
+        $fields = $request->query('fields');
+
+        if (! is_string($fields) || trim($fields) === '') {
+            return null;
+        }
+
+        $requestedFields = collect(explode(',', $fields))
+            ->map(static fn (string $field): string => trim($field))
+            ->filter(static fn (string $field): bool => $field !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($requestedFields === []) {
+            throw ValidationException::withMessages([
+                'fields' => 'Provide at least one valid comma-separated event field name.',
+            ]);
+        }
+
+        $unsupportedFields = array_values(array_diff($requestedFields, $allowedFields));
+
+        if ($unsupportedFields !== []) {
+            throw ValidationException::withMessages([
+                'fields' => 'Unsupported event fields: '.implode(', ', $unsupportedFields).'. Supported fields: '.implode(', ', $allowedFields).'.',
+            ]);
+        }
+
+        return $requestedFields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<string>|null  $fields
+     * @return array<string, mixed>
+     */
+    private function sparsePayload(array $payload, ?array $fields): array
+    {
+        if ($fields === null) {
+            return $payload;
+        }
+
+        return collect($fields)
+            ->mapWithKeys(fn (string $field): array => array_key_exists($field, $payload) ? [$field => $payload[$field]] : [])
+            ->all();
     }
 
     private function parseDate(mixed $value, bool $endOfDay): ?Carbon

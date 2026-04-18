@@ -48,6 +48,20 @@ it('publishes openapi json on the api host with the api v1 server url', function
         ->assertJsonPath('servers.0.url', 'https://api.majlisilmu.test/api/v1');
 });
 
+it('serves docs json with cache and etag headers for agent and cdn clients', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    expect((string) $response->headers->get('Cache-Control'))
+        ->toContain('public')
+        ->toContain('max-age=300')
+        ->toContain('s-maxage=3600')
+        ->toContain('stale-while-revalidate=86400')
+        ->and((string) $response->headers->get('ETag'))->not->toBe('')
+        ->and((string) $response->headers->get('Vary'))->toContain('Accept');
+});
+
 it('caches docs json generation between requests', function () {
     forgetDocsJsonCacheKeys('release-a');
 
@@ -178,19 +192,55 @@ it('publishes named speaker and institution schemas for the public directory end
 
     $paths = $response->json('paths');
     $schemas = $response->json('components.schemas');
+    $institutionsNearParameters = collect(data_get($paths, '/institutions/near.get.parameters', []))->keyBy('name');
 
     expect($schemas)->toHaveKeys([
         'Speaker',
         'SpeakerListItem',
+        'SpeakerDirectoryItem',
         'Institution',
         'InstitutionListItem',
+        'InstitutionDirectoryItem',
     ])
         ->and(data_get($schemas, 'InstitutionListItem.properties.distance_km'))->not->toBeNull()
-        ->and(collect(data_get($paths, '/institutions.get.parameters', []))->pluck('name')->all())->toContain('lat', 'lng', 'radius_km')
+        ->and(collect(data_get($paths, '/institutions.get.parameters', []))->pluck('name')->all())->toContain('lat', 'lng', 'near', 'radius_km', 'fields')
+        ->and(collect(data_get($paths, '/institutions/near.get.parameters', []))->pluck('name')->all())->toContain('near', 'radius_km', 'fields')
+        ->and(data_get($institutionsNearParameters->get('lat'), 'schema.type'))->toBe('number')
+        ->and(data_get($institutionsNearParameters->get('lng'), 'schema.type'))->toBe('number')
+        ->and(collect(data_get($paths, '/speakers.get.parameters', []))->pluck('name')->all())->toContain('fields')
         ->and(data_get($paths, '/speakers.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/speakers/{speakerKey}.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/institutions.get.responses.200.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/institutions/near.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/institutions/{institutionKey}.get.responses.200.content.application/json.schema'))->not->toBeNull();
+});
+
+it('documents share payload and tracking endpoints for client integrations', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    $paths = $response->json('paths');
+
+    expect($paths['/share/payload']['get']['tags'] ?? null)->toContain('Share')
+        ->and($paths['/share/track']['post']['tags'] ?? null)->toContain('Share')
+        ->and(collect(data_get($paths, '/share/payload.get.parameters', []))->pluck('name')->all())->toContain('url', 'text', 'title', 'origin')
+        ->and(data_get($paths, '/share/track.post.requestBody.content.application/json.schema'))->not->toBeNull();
+});
+
+it('documents sparse event list fields for public event index clients', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    $paths = $response->json('paths');
+    $schemas = $response->json('components.schemas');
+
+    expect(collect(data_get($paths, '/events.get.parameters', []))->pluck('name')->all())
+        ->toContain('fields')
+        ->and(data_get($paths, '/events.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/EventIndexResponse')
+        ->and(data_get($schemas, 'EventListItem.properties.card_image_url'))->not->toBeNull()
+        ->and(data_get($schemas, 'EventSummary.required'))->toContain('title');
 });
 
 it('exposes the admin api foundation in scramble docs under dedicated admin tags', function () {
@@ -242,9 +292,9 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain('https://api.majlisilmu.test/docs.json')
         ->toContain("\n\nROUTING SURFACES:\n")
         ->toContain("\n\nTIMEZONE:\n")
-        ->toContain('use the admin record `route_key` returned by collection or record endpoints')
+        ->toContain('use the admin record `route_key` returned by admin collection or detail payloads')
         ->toContain('Collection endpoints clamp per_page to server-supported maxima')
-        ->toContain('Get the update schema using the route_key returned by the record payload')
+        ->toContain('Get the update schema using the route_key returned by the record detail payload')
         ->toContain('PUT /api/v1/admin/speakers/ahmad-fauzi-my')
         ->toContain('Public create flows currently exist for events, institutions, and speakers.')
         ->toContain('must include an explicit country selection')

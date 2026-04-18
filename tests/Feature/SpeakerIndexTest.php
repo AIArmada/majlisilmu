@@ -116,16 +116,32 @@ it('shows the total speaker count on the speaker index', function () {
 });
 
 it('uses a stable random speaker order instead of alphabetical sorting', function () {
-    $sessionSeed = 'speaker-index-test-seed';
-    session([Speaker::PUBLIC_DIRECTORY_SESSION_KEY => $sessionSeed]);
+    $directoryOffset = Speaker::publicDirectoryOrderOffset();
+    $speakerId = static function (string $sortCharacter, string $tailCharacter) use ($directoryOffset): string {
+        $characters = array_fill(0, 32, '0');
+        $characters[$directoryOffset - 1] = $sortCharacter;
+        $characters[31] = $tailCharacter;
+        $normalized = implode('', $characters);
+
+        return sprintf(
+            '%s-%s-%s-%s-%s',
+            substr($normalized, 0, 8),
+            substr($normalized, 8, 4),
+            substr($normalized, 12, 4),
+            substr($normalized, 16, 4),
+            substr($normalized, 20, 12),
+        );
+    };
 
     $firstAlphabetical = Speaker::factory()->create([
+        'id' => $speakerId('f', '1'),
         'name' => 'Adam Penceramah Rawak',
         'status' => 'verified',
         'is_active' => true,
     ]);
 
     $secondAlphabetical = Speaker::factory()->create([
+        'id' => $speakerId('0', '2'),
         'name' => 'Zaid Penceramah Rawak',
         'status' => 'verified',
         'is_active' => true,
@@ -137,23 +153,11 @@ it('uses a stable random speaker order instead of alphabetical sorting', functio
         ->pluck('id')
         ->all();
 
-    $expectedOrder = [$firstAlphabetical->id, $secondAlphabetical->id];
-
-    usort($expectedOrder, static function (string $left, string $right) use ($sessionSeed): int {
-        $leftParts = Speaker::publicDirectorySortParts($left, $sessionSeed);
-        $rightParts = Speaker::publicDirectorySortParts($right, $sessionSeed);
-
-        $primaryComparison = $leftParts['primary'] <=> $rightParts['primary'];
-
-        if ($primaryComparison !== 0) {
-            return $primaryComparison;
-        }
-
-        return $leftParts['secondary'] <=> $rightParts['secondary'];
-    });
+    $expectedOrder = [$secondAlphabetical->id, $firstAlphabetical->id];
 
     expect(array_values(array_intersect($orderedIds, [$firstAlphabetical->id, $secondAlphabetical->id])))
-        ->toBe($expectedOrder);
+        ->toBe($expectedOrder)
+        ->and($expectedOrder)->not->toBe([$firstAlphabetical->id, $secondAlphabetical->id]);
 });
 
 it('renders translated search placeholder on speaker index', function () {

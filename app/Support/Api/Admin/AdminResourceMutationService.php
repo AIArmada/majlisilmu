@@ -420,7 +420,7 @@ class AdminResourceMutationService
 
     private function recordKey(Model $record): string
     {
-        return (string) ($record->getRouteKey() ?? $record->getKey());
+        return (string) $record->getRouteKey();
     }
 
     /**

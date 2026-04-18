@@ -12,7 +12,7 @@ use Illuminate\Contracts\Support\Arrayable;
  * @phpstan-import-type CountryArray from Country
  *
  * @phpstan-type SpeakerMediaArray array{avatar_url: string, cover_url: ?string, share_image_url: ?string}
- * @phpstan-type SpeakerArray array{id: string, slug: string, name: string, formatted_name: string, job_title: ?string, is_freelance: bool, bio: ?string, bio_html: ?string, bio_text: ?string, bio_excerpt: ?string, should_collapse_bio: bool, qualifications: list<string>, address: AddressSelectionArray|null, country: CountryArray|null, location: ?string, status: string, is_active: bool, is_following: bool, media: SpeakerMediaArray, gallery: list<array<string, mixed>>, institutions: list<array<string, mixed>>, contacts: list<array<string, mixed>>, social_media: list<array<string, mixed>>}
+ * @phpstan-type SpeakerArray array{id: string, slug: string, name: string, formatted_name: string, job_title: ?string, is_freelance: bool, bio: ?string, qualifications: list<string>, address: AddressSelectionArray|null, country: CountryArray|null, location: ?string, status: string, is_active: bool, is_following: bool, media: SpeakerMediaArray, gallery: list<array<string, mixed>>, institutions: list<array<string, mixed>>, contacts: list<array<string, mixed>>, social_media: list<array<string, mixed>>}
  *
  * @implements Arrayable<string, mixed>
  */
@@ -35,10 +35,6 @@ final readonly class Speaker implements Arrayable
         public ?string $job_title,
         public bool $is_freelance,
         public ?string $bio,
-        public ?string $bio_html,
-        public ?string $bio_text,
-        public ?string $bio_excerpt,
-        public bool $should_collapse_bio,
         public array $qualifications,
         public ?AddressSelection $address,
         public ?Country $country,
@@ -64,10 +60,6 @@ final readonly class Speaker implements Arrayable
             'job_title' => $this->job_title,
             'is_freelance' => $this->is_freelance,
             'bio' => $this->bio,
-            'bio_html' => $this->bio_html,
-            'bio_text' => $this->bio_text,
-            'bio_excerpt' => $this->bio_excerpt,
-            'should_collapse_bio' => $this->should_collapse_bio,
             'qualifications' => $this->qualifications,
             'address' => $this->address?->toArray(),
             'country' => $this->country?->toArray(),

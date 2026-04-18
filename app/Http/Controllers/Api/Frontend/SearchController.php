@@ -50,17 +50,46 @@ use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Dedoc\Scramble\Attributes\Response;
-use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class SearchController extends FrontendController
 {
+    /** @var list<string> */
+    private const array INSTITUTION_LIST_FIELDS = [
+        'id',
+        'slug',
+        'name',
+        'nickname',
+        'display_name',
+        'events_count',
+        'public_image_url',
+        'logo_url',
+        'cover_url',
+        'country',
+        'location',
+        'distance_km',
+        'is_following',
+    ];
+
+    /** @var list<string> */
+    private const array SPEAKER_LIST_FIELDS = [
+        'id',
+        'slug',
+        'name',
+        'formatted_name',
+        'events_count',
+        'avatar_url',
+        'country',
+        'is_following',
+    ];
+
     public function __construct(
         private readonly EventSearchService $eventSearchService,
         private readonly InstitutionSearchService $institutionSearchService,
@@ -77,8 +106,9 @@ class SearchController extends FrontendController
     {
         $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
-        $lat = $this->normalizedLatitude($request->query('lat'));
-        $lng = $this->normalizedLongitude($request->query('lng'));
+        $coordinates = $this->resolvedNearbyCoordinates($request);
+        $lat = $coordinates['lat'];
+        $lng = $coordinates['lng'];
         $radius = $this->normalizedRadiusKm($request);
         $hasLocation = $lat !== null && $lng !== null;
 
@@ -133,10 +163,12 @@ class SearchController extends FrontendController
         title: 'List public institutions',
         description: 'Returns the public institution directory with search, geography, nearby radius, type, and follow-state filters.',
     )]
+    #[QueryParameter('near', 'Optional nearby coordinates in `lat,lng` form. Acts as a convenience alias for sending `lat` and `lng` separately.', required: false, type: 'string', infer: false, example: '3.139,101.6869')]
     #[QueryParameter('search', 'Optional free-text search across public institution names, nicknames, and descriptions.', required: false, type: 'string', infer: false, example: 'Masjid Biru')]
     #[QueryParameter('lat', 'Current device latitude. Provide with `lng` to filter institutions within `radius_km`.', required: false, type: 'number', infer: false, example: 3.139)]
     #[QueryParameter('lng', 'Current device longitude. Provide with `lat` to filter institutions within `radius_km`.', required: false, type: 'number', infer: false, example: 101.6869)]
     #[QueryParameter('radius_km', 'Nearby search radius in kilometers. Values are clamped from 1 to 100 and default to 15 when `lat` and `lng` are present.', required: false, type: 'integer', infer: false, default: 15, example: 15)]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, name, nickname, display_name, events_count, public_image_url, logo_url, cover_url, country, location, distance_km, is_following.', required: false, type: 'string', infer: false, example: 'id,name,location')]
     #[QueryParameter('type', 'Optional institution type filter.', required: false, type: 'string', infer: false, example: 'masjid')]
     #[QueryParameter('country_id', 'Optional country filter.', required: false, type: 'integer', infer: false, example: 132)]
     #[QueryParameter('state_id', 'Optional state filter.', required: false, type: 'integer', infer: false, example: 14)]
@@ -154,13 +186,15 @@ class SearchController extends FrontendController
     {
         $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
+        $requestedFields = $this->requestedFields($request, self::INSTITUTION_LIST_FIELDS, 'institution');
         $institutionType = $this->normalizedInstitutionType($request->query('type'));
         $countryId = $this->requestedCountryId($request);
         $stateId = $this->normalizedInt($request->query('state_id'));
         $districtId = $this->normalizedInt($request->query('district_id'));
         $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
-        $lat = $this->normalizedLatitude($request->query('lat'));
-        $lng = $this->normalizedLongitude($request->query('lng'));
+        $coordinates = $this->resolvedNearbyCoordinates($request);
+        $lat = $coordinates['lat'];
+        $lng = $coordinates['lng'];
         $radius = $this->normalizedRadiusKm($request);
         $hasNearbyLocation = $lat !== null && $lng !== null;
         $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
@@ -196,7 +230,9 @@ class SearchController extends FrontendController
             : $this->institutionDirectorySearchPaginator($request, $search, $perPage, $baseQuery);
 
         return response()->json([
-            'data' => collect($institutions->items())->map(fn (Institution $institution): array => $this->institutionListData($institution, $user))->all(),
+            'data' => collect($institutions->items())
+                ->map(fn (Institution $institution): array => $this->sparsePayload($this->institutionListData($institution, $user), $requestedFields))
+                ->all(),
             'meta' => [
                 'pagination' => [
                     'page' => $institutions->currentPage(),
@@ -218,11 +254,40 @@ class SearchController extends FrontendController
         ]);
     }
 
+    #[Group('Institution', 'Public institution directory and detail endpoints.')]
+    #[Endpoint(
+        title: 'List nearby public institutions',
+        description: 'Convenience alias for nearby institution discovery. Accepts `near=lat,lng` or explicit `lat` and `lng`, then returns the same payload shape as the public institutions directory.',
+    )]
+    #[QueryParameter('near', 'Nearby coordinates in `lat,lng` form. Example: `3.139,101.6869`.', required: false, type: 'string', infer: false, example: '3.139,101.6869')]
+    #[QueryParameter('lat', 'Current device latitude. Provide with `lng` if not using `near`.', required: false, type: 'number', infer: false, example: 3.139)]
+    #[QueryParameter('lng', 'Current device longitude. Provide with `lat` if not using `near`.', required: false, type: 'number', infer: false, example: 101.6869)]
+    #[QueryParameter('radius_km', 'Nearby search radius in kilometers. Values are clamped from 1 to 100 and default to 15.', required: false, type: 'integer', infer: false, default: 15, example: 15)]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return.', required: false, type: 'string', infer: false, example: 'id,name,location,distance_km')]
+    #[Response(
+        status: 200,
+        description: 'Institution directory response.',
+        type: InstitutionDirectoryResponse::class,
+    )]
+    public function institutionsNear(Request $request): JsonResponse
+    {
+        $coordinates = $this->resolvedNearbyCoordinates($request);
+
+        if ($coordinates['lat'] === null || $coordinates['lng'] === null) {
+            throw ValidationException::withMessages([
+                'near' => 'Provide `near=lat,lng` or both `lat` and `lng` to use the nearby institution endpoint.',
+            ]);
+        }
+
+        return $this->institutions($request);
+    }
+
     #[Group('Speaker', 'Public speaker directory and detail endpoints.')]
     #[Endpoint(
         title: 'List public speakers',
         description: 'Returns the public speaker directory with search, location, gender, and follow-state filters.',
     )]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, name, formatted_name, events_count, avatar_url, country, is_following.', required: false, type: 'string', infer: false, example: 'id,name,avatar_url')]
     #[Response(
         status: 200,
         description: 'Speaker directory response.',
@@ -232,6 +297,7 @@ class SearchController extends FrontendController
     {
         $user = $this->currentUser($request);
         $search = $this->normalizedString($request->query('search'));
+        $requestedFields = $this->requestedFields($request, self::SPEAKER_LIST_FIELDS, 'speaker');
         $directorySeed = $this->normalizedString($request->query('directory_seed'));
         $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
         $countryId = $this->requestedCountryId($request);
@@ -272,7 +338,9 @@ class SearchController extends FrontendController
         $speakerDirectoryCache = $this->speakerDirectoryCacheData();
 
         return response()->json([
-            'data' => collect($speakers->items())->map(fn (Speaker $speaker): array => $this->speakerListData($speaker, $user))->all(),
+            'data' => collect($speakers->items())
+                ->map(fn (Speaker $speaker): array => $this->sparsePayload($this->speakerListData($speaker, $user), $requestedFields))
+                ->all(),
             'meta' => [
                 'pagination' => [
                     'page' => $speakers->currentPage(),
@@ -1283,12 +1351,10 @@ class SearchController extends FrontendController
     {
         $addressModel = $institution->addressModel;
         $institutionMedia = $this->institutionCardMediaData($institution);
-        $addressLines = $this->addressDisplayLines($addressModel);
 
         return InstitutionDetailData::fromModel(
             institution: $institution,
             user: $user,
-            addressLines: $addressLines,
             address: $this->addressFilterData($addressModel),
             country: $this->countryData($addressModel),
             addressLine: $this->addressLocation($addressModel),
@@ -1310,13 +1376,11 @@ class SearchController extends FrontendController
      */
     private function speakerDetailData(Speaker $speaker, ?User $user): array
     {
-        $bio = $this->speakerBioData($speaker);
         $coverUrl = $speaker->getFirstMediaUrl('cover', 'banner') ?: $speaker->getFirstMediaUrl('cover');
 
         return SpeakerDetailData::fromModel(
             speaker: $speaker,
             user: $user,
-            bio: $bio,
             address: $this->addressFilterData($speaker->addressModel),
             country: $this->countryData($speaker->addressModel),
             location: $this->addressLocation($speaker->addressModel),
@@ -1449,30 +1513,6 @@ class SearchController extends FrontendController
         return InstitutionDonationChannelData::fromModel($channel)->toArray();
     }
 
-    /**
-     * @return array{html: string, text: string, excerpt: ?string, should_collapse: bool}
-     */
-    private function speakerBioData(Speaker $speaker): array
-    {
-        $bio = $speaker->bio;
-
-        if (is_array($bio)) {
-            $renderer = RichContentRenderer::make($bio);
-            $html = $renderer->toHtml();
-            $text = trim($renderer->toText());
-        } else {
-            $html = (string) $bio;
-            $text = trim(strip_tags((string) $bio));
-        }
-
-        return [
-            'html' => $html,
-            'text' => $text,
-            'excerpt' => $text !== '' ? Str::limit($text, 180) : null,
-            'should_collapse' => Str::length($text) > 680,
-        ];
-    }
-
     private function keyPersonRoleLabel(mixed $role): string
     {
         if ($role instanceof EventKeyPersonRole) {
@@ -1488,6 +1528,109 @@ class SearchController extends FrontendController
         }
 
         return '';
+    }
+
+    /**
+     * @param  list<string>  $allowedFields
+     * @return list<string>|null
+     */
+    private function requestedFields(Request $request, array $allowedFields, string $resourceLabel): ?array
+    {
+        $fields = $this->normalizedString($request->query('fields'));
+
+        if ($fields === null) {
+            return null;
+        }
+
+        $requestedFields = collect(explode(',', $fields))
+            ->map(static fn (string $field): string => trim($field))
+            ->filter(static fn (string $field): bool => $field !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($requestedFields === []) {
+            throw ValidationException::withMessages([
+                'fields' => 'Provide at least one valid comma-separated '.$resourceLabel.' field name.',
+            ]);
+        }
+
+        $unsupportedFields = array_values(array_diff($requestedFields, $allowedFields));
+
+        if ($unsupportedFields !== []) {
+            throw ValidationException::withMessages([
+                'fields' => 'Unsupported '.$resourceLabel.' fields: '.implode(', ', $unsupportedFields).'. Supported fields: '.implode(', ', $allowedFields).'.',
+            ]);
+        }
+
+        return $requestedFields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<string>|null  $fields
+     * @return array<string, mixed>
+     */
+    private function sparsePayload(array $payload, ?array $fields): array
+    {
+        if ($fields === null) {
+            return $payload;
+        }
+
+        return collect($fields)
+            ->mapWithKeys(fn (string $field): array => array_key_exists($field, $payload) ? [$field => $payload[$field]] : [])
+            ->all();
+    }
+
+    /**
+     * @return array{lat: ?float, lng: ?float}
+     */
+    private function resolvedNearbyCoordinates(Request $request): array
+    {
+        $lat = $this->normalizedLatitude($request->query('lat'));
+        $lng = $this->normalizedLongitude($request->query('lng'));
+
+        if ($lat !== null && $lng !== null) {
+            return [
+                'lat' => $lat,
+                'lng' => $lng,
+            ];
+        }
+
+        $nearCoordinates = $this->normalizedNearCoordinates($request->query('near'));
+
+        return [
+            'lat' => $nearCoordinates['lat'] ?? null,
+            'lng' => $nearCoordinates['lng'] ?? null,
+        ];
+    }
+
+    /**
+     * @return array{lat: float, lng: float}|null
+     */
+    private function normalizedNearCoordinates(mixed $value): ?array
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $parts = preg_split('/\s*,\s*/', trim($value));
+
+        if (! is_array($parts) || count($parts) !== 2) {
+            return null;
+        }
+
+        $lat = $this->normalizedLatitude($parts[0]);
+        $lng = $this->normalizedLongitude($parts[1]);
+
+        if ($lat === null || $lng === null) {
+            return null;
+        }
+
+        return [
+            'lat' => $lat,
+            'lng' => $lng,
+        ];
     }
 
     private function normalizedString(mixed $value): ?string
@@ -1650,14 +1793,6 @@ class SearchController extends FrontendController
         }
 
         return $items;
-    }
-
-    /**
-     * @return array{street: ?string, locality: ?string, regional: ?string}
-     */
-    private function addressDisplayLines(?Address $address): array
-    {
-        return AddressHierarchyFormatter::displayLines($address);
     }
 
     private function addressLocation(?Address $address): ?string

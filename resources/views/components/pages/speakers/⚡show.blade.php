@@ -426,6 +426,7 @@ new class extends Component
         copyMessage: @json(__('Pautan disalin ke papan klip!')),
         copyPrompt: @json(__('Copy this link:')),
         trackEndpoint: @json(route('dawah-share.track')),
+        providerQueryParameter: @json(config('dawah-share.provider_query_parameter', 'channel')),
         attributedShareData: null,
         async resolveShareData() {
             if (this.attributedShareData) {
@@ -456,6 +457,25 @@ new class extends Component
 
             return this.attributedShareData;
         },
+        async sharePayloadForChannel(provider = null) {
+            const shareData = await this.resolveShareData();
+
+            if (! shareData || ! provider || ! shareData.tracking_token) {
+                return shareData;
+            }
+
+            try {
+                const shareUrl = new URL(shareData.url, window.location.origin);
+                shareUrl.searchParams.set(this.providerQueryParameter, provider);
+
+                return {
+                    ...shareData,
+                    url: shareUrl.toString(),
+                };
+            } catch (error) {
+                return shareData;
+            }
+        },
         async trackShare(provider) {
             const shareData = await this.resolveShareData();
 
@@ -483,7 +503,7 @@ new class extends Component
             });
         },
         async nativeShare() {
-            const shareData = await this.resolveShareData();
+            const shareData = await this.sharePayloadForChannel("native_share");
             if (navigator.share) {
                 try {
                     await navigator.share(shareData);
@@ -496,12 +516,12 @@ new class extends Component
 
             await this.copyLink();
         },
-        async copyLink(shouldTrack = true) {
-            const shareData = await this.resolveShareData();
+        async copyLink(shouldTrack = true, provider = "copy_link") {
+            const shareData = await this.sharePayloadForChannel(provider);
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(shareData.url).then(async () => {
                     if (shouldTrack) {
-                        await this.trackShare("copy_link");
+                        await this.trackShare(provider);
                     }
 
                     this.copied = true;
@@ -510,7 +530,7 @@ new class extends Component
                     window.prompt(this.copyPrompt, shareData.url);
 
                     if (shouldTrack) {
-                        await this.trackShare("copy_link");
+                        await this.trackShare(provider);
                     }
                 });
                 return;
@@ -519,7 +539,7 @@ new class extends Component
             window.prompt(this.copyPrompt, shareData.url);
 
             if (shouldTrack) {
-                await this.trackShare("copy_link");
+                await this.trackShare(provider);
             }
         },
         openShareModal() {
@@ -1508,10 +1528,10 @@ new class extends Component
                             <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener" title="X" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-slate-900 hover:bg-slate-900/10">
                                 <img src="{{ asset('storage/social-media-icons/x.svg') }}" alt="X" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink(false)" title="Instagram" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10">
+                            <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink(false, 'instagram')" title="Instagram" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10">
                                 <img src="{{ asset('storage/social-media-icons/instagram.svg') }}" alt="Instagram" class="h-6 w-6" loading="lazy">
                             </a>
-                            <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink(false)" title="TikTok" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-black hover:bg-black/10">
+                            <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink(false, 'tiktok')" title="TikTok" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-black hover:bg-black/10">
                                 <img src="{{ asset('storage/social-media-icons/tiktok.svg') }}" alt="TikTok" class="h-6 w-6" loading="lazy">
                             </a>
                             <a href="{{ $shareLinks['email'] }}" title="Email" class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-emerald-500 hover:bg-emerald-500/10">

@@ -8,7 +8,10 @@ use Dedoc\Scramble\Contracts\DocumentTransformer;
 use Dedoc\Scramble\OpenApiContext;
 use Dedoc\Scramble\Support\Generator\Components;
 use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\Operation;
+use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Reference;
+use Dedoc\Scramble\Support\Generator\Response;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType;
 use Dedoc\Scramble\Support\Generator\Types\BooleanType;
@@ -26,15 +29,23 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         $this->putSchema($components, 'AddressSelection', $this->addressSelectionSchema());
         $this->putSchema($components, 'Country', $this->countrySchema());
         $this->putSchema($components, 'EventSummary', $this->eventSummarySchema());
+        $this->putSchema($components, 'EventListItem', $this->eventSummarySchema(sparse: true));
         $this->putSchema($components, 'EventParticipation', $this->eventParticipationSchema($components));
         $this->putSchema($components, 'InstitutionListItem', $this->institutionListItemSchema($components));
+        $this->putSchema($components, 'InstitutionDirectoryItem', $this->institutionListItemSchema($components, sparse: true));
         $this->putSchema($components, 'SpeakerListItem', $this->speakerListItemSchema($components));
+        $this->putSchema($components, 'SpeakerDirectoryItem', $this->speakerListItemSchema($components, sparse: true));
         $this->putSchema($components, 'Institution', $this->institutionSchema($components));
         $this->putSchema($components, 'Speaker', $this->speakerSchema($components));
         $this->putSchema($components, 'InstitutionDirectoryResponse', $this->institutionDirectoryResponseSchema($components));
+        $this->putSchema($components, 'InstitutionDirectorySparseResponse', $this->institutionDirectoryResponseSchema($components, 'InstitutionDirectoryItem'));
         $this->putSchema($components, 'SpeakerDirectoryResponse', $this->speakerDirectoryResponseSchema($components));
+        $this->putSchema($components, 'SpeakerDirectorySparseResponse', $this->speakerDirectoryResponseSchema($components, 'SpeakerDirectoryItem'));
+        $this->putSchema($components, 'EventIndexResponse', $this->eventIndexResponseSchema($components));
         $this->putSchema($components, 'InstitutionDetailResponse', $this->institutionDetailResponseSchema($components));
         $this->putSchema($components, 'SpeakerDetailResponse', $this->speakerDetailResponseSchema($components));
+
+        $this->patchGeneratedOperations($document, $components);
     }
 
     private function putSchema(Components $components, string $name, Schema $schema): void
@@ -70,55 +81,61 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         );
     }
 
-    private function institutionListItemSchema(Components $components): Schema
+    private function institutionListItemSchema(Components $components, bool $sparse = false): Schema
     {
-        return Schema::fromType(
-            (new ObjectType)
-                ->addProperty('id', new StringType)
-                ->addProperty('slug', new StringType)
-                ->addProperty('name', new StringType)
-                ->addProperty('nickname', (new StringType)->nullable(true))
-                ->addProperty('display_name', new StringType)
-                ->addProperty('events_count', new IntegerType)
-                ->addProperty('public_image_url', new StringType)
-                ->addProperty('logo_url', new StringType)
-                ->addProperty('cover_url', (new StringType)->nullable(true))
-                ->addProperty('country', $this->nullableReference($components, 'Country'))
-                ->addProperty('location', (new StringType)->nullable(true))
-                ->addProperty('distance_km', (new NumberType)->nullable(true))
-                ->addProperty('is_following', new BooleanType)
-                ->setRequired([
-                    'id',
-                    'slug',
-                    'name',
-                    'nickname',
-                    'display_name',
-                    'events_count',
-                    'public_image_url',
-                    'logo_url',
-                    'cover_url',
-                    'country',
-                    'location',
-                    'distance_km',
-                    'is_following',
-                ]),
-        );
+        $type = (new ObjectType)
+            ->addProperty('id', new StringType)
+            ->addProperty('slug', new StringType)
+            ->addProperty('name', new StringType)
+            ->addProperty('nickname', (new StringType)->nullable(true))
+            ->addProperty('display_name', new StringType)
+            ->addProperty('events_count', new IntegerType)
+            ->addProperty('public_image_url', new StringType)
+            ->addProperty('logo_url', new StringType)
+            ->addProperty('cover_url', (new StringType)->nullable(true))
+            ->addProperty('country', $this->nullableReference($components, 'Country'))
+            ->addProperty('location', (new StringType)->nullable(true))
+            ->addProperty('distance_km', (new NumberType)->nullable(true))
+            ->addProperty('is_following', new BooleanType);
+
+        if (! $sparse) {
+            $type->setRequired([
+                'id',
+                'slug',
+                'name',
+                'nickname',
+                'display_name',
+                'events_count',
+                'public_image_url',
+                'logo_url',
+                'cover_url',
+                'country',
+                'location',
+                'distance_km',
+                'is_following',
+            ]);
+        }
+
+        return Schema::fromType($type);
     }
 
-    private function speakerListItemSchema(Components $components): Schema
+    private function speakerListItemSchema(Components $components, bool $sparse = false): Schema
     {
-        return Schema::fromType(
-            (new ObjectType)
-                ->addProperty('id', new StringType)
-                ->addProperty('slug', new StringType)
-                ->addProperty('name', new StringType)
-                ->addProperty('formatted_name', new StringType)
-                ->addProperty('events_count', new IntegerType)
-                ->addProperty('avatar_url', new StringType)
-                ->addProperty('country', $this->nullableReference($components, 'Country'))
-                ->addProperty('is_following', new BooleanType)
-                ->setRequired(['id', 'slug', 'name', 'formatted_name', 'events_count', 'avatar_url', 'country', 'is_following']),
-        );
+        $type = (new ObjectType)
+            ->addProperty('id', new StringType)
+            ->addProperty('slug', new StringType)
+            ->addProperty('name', new StringType)
+            ->addProperty('formatted_name', new StringType)
+            ->addProperty('events_count', new IntegerType)
+            ->addProperty('avatar_url', new StringType)
+            ->addProperty('country', $this->nullableReference($components, 'Country'))
+            ->addProperty('is_following', new BooleanType);
+
+        if (! $sparse) {
+            $type->setRequired(['id', 'slug', 'name', 'formatted_name', 'events_count', 'avatar_url', 'country', 'is_following']);
+        }
+
+        return Schema::fromType($type);
     }
 
     private function institutionSchema(Components $components): Schema
@@ -185,10 +202,6 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 ->addProperty('job_title', (new StringType)->nullable(true))
                 ->addProperty('is_freelance', new BooleanType)
                 ->addProperty('bio', (new StringType)->nullable(true))
-                ->addProperty('bio_html', (new StringType)->nullable(true))
-                ->addProperty('bio_text', (new StringType)->nullable(true))
-                ->addProperty('bio_excerpt', (new StringType)->nullable(true))
-                ->addProperty('should_collapse_bio', new BooleanType)
                 ->addProperty('qualifications', (new ArrayType)->setItems(new StringType))
                 ->addProperty('address', $this->nullableReference($components, 'AddressSelection'))
                 ->addProperty('country', $this->nullableReference($components, 'Country'))
@@ -209,10 +222,6 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                     'job_title',
                     'is_freelance',
                     'bio',
-                    'bio_html',
-                    'bio_text',
-                    'bio_excerpt',
-                    'should_collapse_bio',
                     'qualifications',
                     'address',
                     'country',
@@ -229,65 +238,68 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         );
     }
 
-    private function eventSummarySchema(): Schema
+    private function eventSummarySchema(bool $sparse = false): Schema
     {
-        return Schema::fromType(
-            (new ObjectType)
-                ->addProperty('id', new StringType)
-                ->addProperty('slug', new StringType)
-                ->addProperty('title', new StringType)
-                ->addProperty('starts_at', (new StringType)->nullable(true))
-                ->addProperty('ends_at', (new StringType)->nullable(true))
-                ->addProperty('timing_display', (new StringType)->nullable(true))
-                ->addProperty('prayer_display_text', (new StringType)->nullable(true))
-                ->addProperty('end_time_display', (new StringType)->nullable(true))
-                ->addProperty('visibility', new StringType)
-                ->addProperty('status', new StringType)
-                ->addProperty('status_label', new StringType)
-                ->addProperty('event_type', (new ArrayType)->setItems(new StringType))
-                ->addProperty('event_type_label', (new StringType)->nullable(true))
-                ->addProperty('event_format', new StringType)
-                ->addProperty('event_format_label', (new StringType)->nullable(true))
-                ->addProperty('reference_study_subtitle', (new StringType)->nullable(true))
-                ->addProperty('location', (new StringType)->nullable(true))
-                ->addProperty('is_remote', new BooleanType)
-                ->addProperty('is_pending', new BooleanType)
-                ->addProperty('is_cancelled', new BooleanType)
-                ->addProperty('has_poster', new BooleanType)
-                ->addProperty('poster_url', (new StringType)->nullable(true))
-                ->addProperty('card_image_url', (new StringType)->nullable(true))
-                ->addProperty('institution', $this->eventInstitutionType())
-                ->addProperty('venue', $this->eventVenueType())
-                ->addProperty('speakers', (new ArrayType)->setItems($this->eventSpeakerType()))
-                ->setRequired([
-                    'id',
-                    'slug',
-                    'title',
-                    'starts_at',
-                    'ends_at',
-                    'timing_display',
-                    'prayer_display_text',
-                    'end_time_display',
-                    'visibility',
-                    'status',
-                    'status_label',
-                    'event_type',
-                    'event_type_label',
-                    'event_format',
-                    'event_format_label',
-                    'reference_study_subtitle',
-                    'location',
-                    'is_remote',
-                    'is_pending',
-                    'is_cancelled',
-                    'has_poster',
-                    'poster_url',
-                    'card_image_url',
-                    'institution',
-                    'venue',
-                    'speakers',
-                ]),
-        );
+        $type = (new ObjectType)
+            ->addProperty('id', new StringType)
+            ->addProperty('slug', new StringType)
+            ->addProperty('title', new StringType)
+            ->addProperty('starts_at', (new StringType)->nullable(true))
+            ->addProperty('ends_at', (new StringType)->nullable(true))
+            ->addProperty('timing_display', (new StringType)->nullable(true))
+            ->addProperty('prayer_display_text', (new StringType)->nullable(true))
+            ->addProperty('end_time_display', (new StringType)->nullable(true))
+            ->addProperty('visibility', new StringType)
+            ->addProperty('status', new StringType)
+            ->addProperty('status_label', new StringType)
+            ->addProperty('event_type', (new ArrayType)->setItems(new StringType))
+            ->addProperty('event_type_label', (new StringType)->nullable(true))
+            ->addProperty('event_format', new StringType)
+            ->addProperty('event_format_label', (new StringType)->nullable(true))
+            ->addProperty('reference_study_subtitle', (new StringType)->nullable(true))
+            ->addProperty('location', (new StringType)->nullable(true))
+            ->addProperty('is_remote', new BooleanType)
+            ->addProperty('is_pending', new BooleanType)
+            ->addProperty('is_cancelled', new BooleanType)
+            ->addProperty('has_poster', new BooleanType)
+            ->addProperty('poster_url', (new StringType)->nullable(true))
+            ->addProperty('card_image_url', (new StringType)->nullable(true))
+            ->addProperty('institution', $this->eventInstitutionType())
+            ->addProperty('venue', $this->eventVenueType())
+            ->addProperty('speakers', (new ArrayType)->setItems($this->eventSpeakerType()));
+
+        if (! $sparse) {
+            $type->setRequired([
+                'id',
+                'slug',
+                'title',
+                'starts_at',
+                'ends_at',
+                'timing_display',
+                'prayer_display_text',
+                'end_time_display',
+                'visibility',
+                'status',
+                'status_label',
+                'event_type',
+                'event_type_label',
+                'event_format',
+                'event_format_label',
+                'reference_study_subtitle',
+                'location',
+                'is_remote',
+                'is_pending',
+                'is_cancelled',
+                'has_poster',
+                'poster_url',
+                'card_image_url',
+                'institution',
+                'venue',
+                'speakers',
+            ]);
+        }
+
+        return Schema::fromType($type);
     }
 
     private function eventParticipationSchema(Components $components): Schema
@@ -303,22 +315,44 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         );
     }
 
-    private function institutionDirectoryResponseSchema(Components $components): Schema
+    private function institutionDirectoryResponseSchema(Components $components, string $itemSchema = 'InstitutionListItem'): Schema
     {
         return Schema::fromType(
             (new ObjectType)
-                ->addProperty('data', (new ArrayType)->setItems($components->getSchemaReference('InstitutionListItem')))
+                ->addProperty('data', (new ArrayType)->setItems($components->getSchemaReference($itemSchema)))
                 ->addProperty('meta', $this->institutionDirectoryMetaType())
                 ->setRequired(['data', 'meta']),
         );
     }
 
-    private function speakerDirectoryResponseSchema(Components $components): Schema
+    private function speakerDirectoryResponseSchema(Components $components, string $itemSchema = 'SpeakerListItem'): Schema
     {
         return Schema::fromType(
             (new ObjectType)
-                ->addProperty('data', (new ArrayType)->setItems($components->getSchemaReference('SpeakerListItem')))
+                ->addProperty('data', (new ArrayType)->setItems($components->getSchemaReference($itemSchema)))
                 ->addProperty('meta', $this->directoryMetaType())
+                ->setRequired(['data', 'meta']),
+        );
+    }
+
+    private function eventIndexResponseSchema(Components $components): Schema
+    {
+        return Schema::fromType(
+            (new ObjectType)
+                ->addProperty('data', (new ArrayType)->setItems($components->getSchemaReference('EventListItem')))
+                ->addProperty(
+                    'meta',
+                    (new ObjectType)
+                        ->addProperty(
+                            'pagination',
+                            (new ObjectType)
+                                ->addProperty('page', new IntegerType)
+                                ->addProperty('per_page', new IntegerType)
+                                ->addProperty('total', new IntegerType)
+                                ->setRequired(['page', 'per_page', 'total']),
+                        )
+                        ->setRequired(['pagination']),
+                )
                 ->setRequired(['data', 'meta']),
         );
     }
@@ -578,6 +612,89 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             ->addProperty('slug', new StringType)
             ->addProperty('avatar_url', (new StringType)->nullable(true))
             ->setRequired(['id', 'name', 'formatted_name', 'slug', 'avatar_url']);
+    }
+
+    private function patchGeneratedOperations(OpenApi $document, Components $components): void
+    {
+        $this->replaceOperationResponseSchema($document, 'institutions', 'get', $components->getSchemaReference('InstitutionDirectorySparseResponse'));
+        $this->replaceOperationResponseSchema($document, 'institutions/near', 'get', $components->getSchemaReference('InstitutionDirectorySparseResponse'));
+        $this->replaceOperationResponseSchema($document, 'speakers', 'get', $components->getSchemaReference('SpeakerDirectorySparseResponse'));
+        $this->replaceOperationResponseSchema($document, 'events', 'get', $components->getSchemaReference('EventIndexResponse'));
+
+        $institutionsNearOperation = $this->findOperation($document, 'institutions/near', 'get');
+
+        if ($institutionsNearOperation instanceof Operation) {
+            $this->replaceNumericQueryParameter(
+                $institutionsNearOperation,
+                'lat',
+                'Current device latitude. Provide with `lng` if not using `near`.',
+                3.139,
+            );
+            $this->replaceNumericQueryParameter(
+                $institutionsNearOperation,
+                'lng',
+                'Current device longitude. Provide with `lat` if not using `near`.',
+                101.6869,
+            );
+        }
+
+    }
+
+    private function replaceOperationResponseSchema(OpenApi $document, string $path, string $method, Reference $schema): void
+    {
+        $operation = $this->findOperation($document, $path, $method);
+
+        if (! $operation instanceof Operation) {
+            return;
+        }
+
+        foreach ($operation->responses ?? [] as $response) {
+            if (! $response instanceof Response || $response->code !== 200) {
+                continue;
+            }
+
+            $response->setContent('application/json', $schema);
+        }
+    }
+
+    private function replaceNumericQueryParameter(Operation $operation, string $name, string $description, float $example): void
+    {
+        foreach ($operation->parameters as $parameter) {
+            if (! $parameter instanceof Parameter || $parameter->name !== $name) {
+                continue;
+            }
+
+            $parameter
+                ->setSchema(Schema::fromType(new NumberType))
+                ->description($description)
+                ->example($example);
+
+            return;
+        }
+
+        $operation->addParameters([
+            Parameter::make($name, 'query')
+                ->required(false)
+                ->setSchema(Schema::fromType(new NumberType))
+                ->description($description)
+                ->example($example),
+        ]);
+    }
+
+    private function findOperation(OpenApi $document, string $path, string $method): ?Operation
+    {
+        $normalizedPath = trim($path, '/');
+        $normalizedMethod = strtolower($method);
+
+        foreach ($document->paths as $documentPath) {
+            if (trim($documentPath->path, '/') !== $normalizedPath) {
+                continue;
+            }
+
+            return $documentPath->operations[$normalizedMethod] ?? null;
+        }
+
+        return null;
     }
 
     private function nullableReference(Components $components, string $name): Reference

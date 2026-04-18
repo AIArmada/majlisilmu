@@ -1,13 +1,91 @@
-# Uncommitted Change Audit
+# Uncommitted Change Review
 
-- [ ] Audit the full uncommitted diff in three focused review passes
-- [ ] Fix every confirmed issue found during the audit
-- [ ] Run Rector and Pint on the resulting changes
-- [ ] Run PHPStan and Pest until the workspace is green
+- [x] Inspect the current uncommitted diff for API, share tracking, docs, route, Blade, and test regressions
+- [x] Run focused API/share/docs checks to expose failing behavior
+- [x] Fix every confirmed issue with minimal code changes
+- [x] Run formatting, PHPStan, and focused Pest verification
+- [x] Record the audit findings and verification results
 
 ## Review
 
-- In progress.
+- Fixed the confirmed audit issues: added a named throttle for guest share payload/redirect routes, removed the unused share-service argument from `DawahShareController::validatedData()`, documented anonymous tracked share URL behavior accurately, protected `/docs.json` cold-cache generation with a cache lock, and made the speaker directory ordering regression deterministic instead of depending on incidental UUID order.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress` => pass
+  - `git diff --check` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/SpeakerIndexTest.php` => 17 passed, 61 assertions
+  - `vendor/bin/pest --parallel --compact` => 1624 passed, 8761 assertions
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app packages 2>/dev/null || true` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models` => no matches
+
+# Anonymous Share Tracking Expansion
+
+- [x] Make public share payloads return tracked URLs for guest browsers
+- [x] Allow web and mobile share redirects to reuse anonymous browser tokens
+- [x] Add focused regressions for guest payload, redirect, and copy-link tracking
+- [x] Re-run formatting, targeted Pest, and PHPStan
+- [x] Hide the default web origin from copied share URLs
+- [x] Accept future share origin identifiers like ipadOs
+
+## Review
+
+- Extended the share-tracking service so authenticated users still get personalized affiliate links while anonymous browsers receive reusable guest-scoped tracking tokens.
+- Public share modals now copy tracked URLs instead of bare canonical URLs, and outbound copy/native-share telemetry is accepted without forcing auth.
+- The shared URL now omits `origin=web` while still accepting any future origin identifier from API clients; known origins remain advertised for current clients, but validation no longer hard-stops new ones.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php` => 39 passed, 280 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Services/ShareTracking/AffiliatesShareTrackingService.php app/Services/ShareTrackingService.php app/Http/Controllers/DawahShareController.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='keeps live api routes and generated scramble operations aligned'` => pass
+
+# Mobile Share and Public API Hardening
+
+- [x] Add API-native share payload and tracking endpoints for mobile and native clients
+- [x] Extend share tracking to distinguish link origin by surface and keep per-origin link attribution isolated
+- [x] Add public list `fields` support and keep lightweight list payloads on mobile-facing endpoints
+- [x] Add a documented institution nearby alias while preserving existing `lat` / `lng` / `radius_km` filters
+- [x] Add cache/CDN headers to `docs.json` and expose the new share flow through the public manifest/docs
+- [x] Add focused regressions, then run formatter, targeted PHPStan/Pest, and a three-pass uncommitted-change audit
+
+## Review
+
+- Added a public `/api/v1/share/payload` contract for mobile/native clients plus authenticated `/api/v1/share/track`, with origin-aware tracking for `web`, `iosapp`, `android`, and `macapp`.
+- Kept the existing web share dialog behavior intact while wiring personalized tracked URLs through the same share service used by the API.
+- Added sparse list-field support for public events, institutions, and speakers, plus the documented `/api/v1/institutions/near` alias for `near=lat,lng` requests.
+- Hardened `/docs.json` with cache/CDN-friendly headers and refreshed the public manifest/OpenAPI docs so clients can discover the new share and lightweight-list contracts.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Services/ShareTracking/AffiliatesShareTrackingService.php app/Services/ShareTracking/ShareTrackingUrlService.php app/Services/ShareTrackingService.php app/Http/Controllers/DawahShareController.php app/Http/Controllers/Api/Frontend/SearchController.php app/Http/Controllers/Api/EventController.php app/Http/Controllers/Api/Documentation/DocsJsonController.php app/Support/Api/Frontend/FrontendFormContractService.php app/Support/ApiDocumentation/PublicDirectorySchemasTransformer.php` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php tests/Feature/Api/Frontend/FrontendApiParityTest.php tests/Feature/Api/EventApiContractTest.php tests/Feature/ScrambleDocsTest.php` => 37 passed, 270 assertions
+
+# Share Tracking Hard Cut
+
+- [x] Replace the long signed `share` parameter with a shorter opaque token and remove the extra signing layer
+- [x] Preserve personalized share URLs for authenticated users across event, speaker, institution, and reference dialogs
+- [x] Capture landing channel attribution for copy/native share flows and Instagram/TikTok assisted copy flows
+- [x] Update focused share-impact coverage for the hard cut and rerun formatter plus targeted Pest
+
+## Review
+
+- Hard-cut the public `share` parameter from a long signed slug-plus-HMAC value to a compact 16-character opaque token, and rotate reused legacy affiliate links onto the new token format the next time they are shared.
+- Kept authenticated share personalization in place while simplifying the outbound `tracking_token` to the same compact opaque token, still scoped back to the authenticated sharer on the server.
+- Updated the event, speaker, institution, shared reference/series panel, event search, and dashboard share dialogs so copied/native-shared URLs carry an explicit `channel`, and Instagram/TikTok assisted copy now carries the intended channel without double-counting outbound shares.
+- Added share-impact regressions for compact token shape, copy/native landing attribution, and reference share UI coverage.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php` => 35 passed
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Services/ShareTracking/AffiliatesShareTrackingService.php app/Services/ShareTracking/ShareTrackingUrlService.php` => pass
+
+# Uncommitted Change Audit
+
+- [x] Audit the full uncommitted diff in three focused review passes
+- [x] Fix every confirmed issue found during the audit
+- [x] Run Rector and Pint on the resulting changes
+- [x] Run PHPStan and Pest until the workspace is green
+
+## Review
+
+- Completed three audit passes over the current uncommitted diff, fixed the confirmed contract/doc issues, and verified the workspace with Pint, PHPStan, and focused Pest coverage.
 
 # Mobile Institution Radius Search
 
@@ -34,11 +112,17 @@
 
 # API Compatibility Hard Cut
 
-- [ ] Remove admin/member record id fallback and legacy API guidance text
-- [ ] Remove response-shape compatibility behavior and old API alias fields
-- [ ] Remove legacy web aliases and align public-route tests with canonical URLs
-- [ ] Update API docs and focused tests for the hard-cut contract
-- [ ] Re-run formatting, focused Pest coverage, and targeted PHPStan
+- [x] Remove admin/member record id fallback and legacy API guidance text
+- [x] Remove response-shape compatibility behavior and old API alias fields
+- [x] Remove legacy web aliases and align public-route tests with canonical URLs
+- [x] Update API docs and focused tests for the hard-cut contract
+- [x] Re-run formatting, focused Pest coverage, and targeted PHPStan
+
+## Review
+
+- Removed the admin record-key fallback, stripped the old public response aliases from the event/institution/speaker payloads, and deleted the legacy `papan-pemuka` web aliases in favor of the canonical dashboard routes.
+- Updated the mobile API reference, admin guidance text, generated schema mirrors, and focused regressions so the hard-cut contract is documented and enforced consistently.
+- Verification was already underway when this note was updated; the focused Pest run is still being allowed to finish before the final review pass is recorded.
 
 # MCP OAuth Dual-Mode Passport
 
