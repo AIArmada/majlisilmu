@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class AdminResourceService
@@ -152,7 +153,11 @@ class AdminResourceService
         if ($operation === 'create') {
             abort_unless($actor->can('create', $resourceClass::getModel()), 403);
         } else {
-            abort_unless(is_string($recordKey) && trim($recordKey) !== '', 422);
+            if (! is_string($recordKey) || trim($recordKey) === '') {
+                throw ValidationException::withMessages([
+                    'recordKey' => [__('Record key is required when operation is update.')],
+                ]);
+            }
 
             $record = $this->registry->resolveRecord($resourceClass, trim((string) $recordKey));
             abort_unless($actor->can('update', $record), 403);

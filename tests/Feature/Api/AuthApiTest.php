@@ -2,10 +2,13 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
@@ -85,26 +88,50 @@ it('serializes the auth user payload with verification timestamps and timezone',
 it('preserves the authenticated user endpoint payload contract', function () {
     $dailyPrayerInstitutionId = (string) str()->uuid();
     $fridayPrayerInstitutionId = (string) str()->uuid();
+    $previousTeam = getPermissionsTeamId();
 
-    $user = User::factory()->create([
-        'name' => 'Current User',
-        'email' => 'current-user@example.test',
-        'phone' => '+60115550000',
-        'timezone' => 'Asia/Kuala_Lumpur',
-        'daily_prayer_institution_id' => $dailyPrayerInstitutionId,
-        'friday_prayer_institution_id' => $fridayPrayerInstitutionId,
-        'email_verified_at' => now()->subHour()->startOfSecond(),
-        'phone_verified_at' => now()->subMinutes(30)->startOfSecond(),
-    ]);
+    try {
+        setPermissionsTeamId(null);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    Sanctum::actingAs($user);
+        if (! Role::query()->where('name', 'viewer')->where('guard_name', 'web')->exists()) {
+            $roleRecord = new Role;
+            $roleRecord->forceFill([
+                'id' => (string) Str::uuid(),
+                'name' => 'viewer',
+                'guard_name' => 'web',
+            ])->save();
+        }
 
-    $response = $this->getJson(route('api.user.show'));
+        $user = User::factory()->create([
+            'name' => 'Current User',
+            'email' => 'current-user@example.test',
+            'phone' => '+60115550000',
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'daily_prayer_institution_id' => $dailyPrayerInstitutionId,
+            'friday_prayer_institution_id' => $fridayPrayerInstitutionId,
+            'email_verified_at' => now()->subHour()->startOfSecond(),
+            'phone_verified_at' => now()->subMinutes(30)->startOfSecond(),
+        ]);
 
-    $response->assertOk()
-        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+        $user->assignRole('viewer');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    expect($response->json('data'))->toEqual($user->fresh()->toArray());
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson(route('api.user.show'));
+
+        $response->assertOk()
+            ->assertJsonPath('data.roles', ['viewer'])
+            ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+
+        expect($response->json('data'))->toEqual(array_merge($user->fresh()->toArray(), [
+            'roles' => ['viewer'],
+        ]));
+    } finally {
+        setPermissionsTeamId($previousTeam);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
 });
 
 it('rejects invalid api login credentials', function () {
