@@ -199,10 +199,17 @@ Accept: application/json
 | `POST` | `/auth/social/google` | Exchange a Google access token for a bearer token |
 | `POST` | `/auth/logout` | Revoke the current bearer token |
 | `GET` | `/user` | Return the authenticated user |
+| `DELETE` | `/user` | Delete the authenticated user account and revoke its tokens |
 
 Notes:
 
 - The `user` payload includes a `roles` array with the authenticated user's global role names.
+
+### `DELETE /user`
+
+Deletes the current authenticated account, including the bearer token(s) and the account data handled by the backend cleanup hooks.
+
+Use this endpoint from the mobile app's account/profile screen when the user chooses to permanently remove their account.
 
 ### `POST /auth/register`
 

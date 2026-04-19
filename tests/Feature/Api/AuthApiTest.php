@@ -134,6 +134,27 @@ it('preserves the authenticated user endpoint payload contract', function () {
     }
 });
 
+it('deletes the authenticated user account and revokes all tokens', function () {
+    $user = User::factory()->create([
+        'name' => 'Deleting User',
+        'email' => 'delete-me@example.test',
+    ]);
+
+    $plainTextToken = $user->createToken('iPhone 17')->plainTextToken;
+
+    $response = $this->withToken($plainTextToken)->deleteJson(route('api.user.destroy'));
+
+    $response->assertOk()
+        ->assertJsonPath('message', 'Account deleted successfully.')
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+
+    $this->assertDatabaseMissing('users', ['id' => $user->id]);
+    $this->assertDatabaseMissing('personal_access_tokens', [
+        'tokenable_type' => User::class,
+        'tokenable_id' => $user->id,
+    ]);
+});
+
 it('rejects invalid api login credentials', function () {
     User::factory()->create([
         'email' => 'mobile@example.test',

@@ -920,13 +920,15 @@ test('impact dashboard highlights event check-ins and submissions', function () 
 
     $eventLink = AffiliateLink::query()
         ->whereHas('affiliate', fn ($query) => $query
-            ->where('metadata->majlis_user_id', $this->sharer->getKey()))
+            ->where('owner_type', $this->sharer->getMorphClass())
+            ->where('owner_id', $this->sharer->getKey()))
         ->where('destination_url', route('events.show', $event))
         ->firstOrFail();
 
     $submissionLink = AffiliateLink::query()
         ->whereHas('affiliate', fn ($query) => $query
-            ->where('metadata->majlis_user_id', $this->sharer->getKey()))
+            ->where('owner_type', $this->sharer->getMorphClass())
+            ->where('owner_id', $this->sharer->getKey()))
         ->where('destination_url', route('submit-event.create'))
         ->firstOrFail();
 
@@ -1218,7 +1220,8 @@ test('impact dashboard exposes provider channel performance', function () {
     $attribution = AffiliateAttribution::query()->latest('created_at')->firstOrFail();
     $link = AffiliateLink::query()
         ->whereHas('affiliate', fn ($query) => $query
-            ->where('metadata->majlis_user_id', $this->sharer->getKey()))
+            ->where('owner_type', $this->sharer->getMorphClass())
+            ->where('owner_id', $this->sharer->getKey()))
         ->firstOrFail();
 
     expect(AffiliateTouchpoint::query()->where('metadata->provider', 'whatsapp')->exists())->toBeTrue();
