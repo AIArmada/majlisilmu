@@ -122,6 +122,38 @@ test('typesense filters include source, issue, and reference constraints when pr
         ->toContain('reference_ids:[ref-1]');
 });
 
+test('typesense filters include linked PIC profile ids and free-text PIC search forces database fallback', function () {
+    $service = new class extends EventSearchService
+    {
+        /**
+         * @param  array<string, mixed>  $filters
+         * @return array<int, string>
+         */
+        public function exposedBuildTypesenseFilterParts(array $filters): array
+        {
+            return $this->buildTypesenseFilterParts($filters);
+        }
+
+        /**
+         * @param  array<string, mixed>  $filters
+         */
+        public function exposedRequiresDatabaseFiltering(array $filters): bool
+        {
+            return $this->requiresDatabaseFiltering($filters);
+        }
+    };
+
+    $filters = $service->exposedBuildTypesenseFilterParts([
+        'person_in_charge_ids' => ['speaker-1'],
+    ]);
+
+    expect($filters)
+        ->toContain('person_in_charge_ids:[speaker-1]')
+        ->and($service->exposedRequiresDatabaseFiltering([
+            'person_in_charge_search' => 'Ahmad',
+        ]))->toBeTrue();
+});
+
 test('typesense starts_after filter uses held-period overlap semantics', function () {
     $service = new class extends EventSearchService
     {

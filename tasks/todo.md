@@ -1,3 +1,13 @@
+# API and MCP Media Upload Parity
+
+- [ ] Inventory frontend, admin UI, REST API, and MCP upload surfaces
+- [ ] Add the missing REST upload support for report evidence
+- [ ] Add MCP JSON file payload support for writable admin/member media fields
+- [ ] Update schemas, docs copy, and MCP descriptors so upload contracts are explicit
+- [ ] Add focused API and MCP regression coverage for every changed upload path
+- [ ] Run formatter, focused Pest tests, PHPStan, and media/database policy checks
+- [ ] Record review results
+
 # Local MCP Test Servers
 
 - [x] Register local MCP servers
@@ -10429,3 +10439,33 @@
   - `php -r 'foreach (["resources/lang/en.json", "resources/lang/ms.json", "resources/lang/ms_MY.json"] as $file) { json_decode(file_get_contents($file), true); if (json_last_error() !== JSON_ERROR_NONE) { fwrite(STDERR, $file.": ".json_last_error_msg().PHP_EOL); exit(1); } } echo "json ok\n";'` => **json ok**
   - `git diff --check` => **clean**
   - database rule checks => **no SoftDeletes matches** and **no package database dirs found for constraint/cascade scan**
+
+# PIC / Penyelaras Majlis Filter Todo
+
+- [x] Trace the existing `/majlis` role-specific filter pipeline
+- [x] Add a PIC / Penyelaras filter that supports linked speaker profiles and free-text names
+- [x] Keep saved-search/API/search-index contracts aligned with the new filter
+- [x] Add focused regressions for linked-profile and free-text PIC matching
+- [x] Run targeted Pest, PHPStan, Pint, and database-rule checks
+
+## Review
+- Root cause:
+  - `/majlis` only exposed PIC / Penyelaras through the generic `Peranan Lain` role selector, while Moderator, Imam, Khatib, and Bilal also had linked-profile selectors.
+  - PIC rows can be stored with either `speaker_id` or a free-text `name`, so adding profile-only parity would still miss valid PIC records.
+- Fix:
+  - added URL-backed `person_in_charge_ids` and `person_in_charge_search` filters to the `/majlis` advanced filter form and active-filter chips
+  - wired the new filters through `EventSearchService`, public event API filters, saved-search validation/storage/execution, and saved-search chip rendering
+  - indexed linked PIC profile IDs in the Scout/Typesense payload and kept free-text PIC matching on the database path for partial-name search
+  - added focused coverage for linked-profile PIC filtering, free-text PIC filtering, saved-search capture, API filters, Typesense filter construction, and event searchable payloads
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php --filter='filters events by PIC linked profile and free-text name'` => **1 passed, 10 assertions**
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTypesenseFilterTest.php --filter='typesense filters include linked PIC profile ids'` => **1 passed, 2 assertions**
+  - `vendor/bin/pest --parallel --compact tests/Unit/EventTest.php --filter='deduplicates key person roles'` => **1 passed, 5 assertions**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/EventApiContractTest.php --filter='filters events by key person roles and role-specific linked speakers'` => **1 passed, 13 assertions**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchApiTest.php --filter='creates a saved search'` => **1 passed, 8 assertions**
+  - `vendor/bin/pest --parallel --compact tests/Feature/SavedSearchPageTest.php --filter='renders key person role and linked profile chips'` => **1 passed, 5 assertions**
+  - `vendor/bin/phpstan analyse --ansi ...` on touched PHP and test files => **No errors** after rerunning outside the sandbox because PHPStan's local TCP worker was blocked
+  - `vendor/bin/pint --test ...` on touched files => **pass**
+  - locale JSON validation => **json ok**
+  - database rule checks => **no SoftDeletes matches** and **packages directory not present for package migration constraint scan**
+  - `git diff --check -- ...` on touched files => **clean**

@@ -202,11 +202,17 @@ it('publishes named speaker and institution schemas for the public directory end
         'InstitutionListItem',
         'InstitutionDirectoryItem',
     ])
+        ->and(data_get($schemas, 'Speaker.properties.gender'))->not->toBeNull()
         ->and(data_get($schemas, 'SpeakerListItem.properties.status.type'))->toBe('string')
         ->and(data_get($schemas, 'SpeakerListItem.properties.is_active.type'))->toBe('boolean')
+        ->and(data_get($schemas, 'SpeakerListItem.properties.gender'))->not->toBeNull()
         ->and(data_get($schemas, 'SpeakerDirectoryItem.properties.status.type'))->toBe('string')
         ->and(data_get($schemas, 'SpeakerDirectoryItem.properties.is_active.type'))->toBe('boolean')
+        ->and(data_get($schemas, 'SpeakerDirectoryItem.properties.gender'))->not->toBeNull()
+        ->and(data_get($schemas, 'Institution.properties.type'))->not->toBeNull()
         ->and(data_get($schemas, 'InstitutionListItem.properties.distance_km'))->not->toBeNull()
+        ->and(data_get($schemas, 'InstitutionListItem.properties.type'))->not->toBeNull()
+        ->and(data_get($schemas, 'InstitutionDirectoryItem.properties.type'))->not->toBeNull()
         ->and(collect(data_get($paths, '/institutions.get.parameters', []))->pluck('name')->all())->toContain('lat', 'lng', 'near', 'radius_km', 'fields')
         ->and(collect(data_get($paths, '/institutions/near.get.parameters', []))->pluck('name')->all())->toContain('near', 'radius_km', 'fields')
         ->and(data_get($institutionsNearParameters->get('lat'), 'schema.type'))->toBe('number')
@@ -216,7 +222,9 @@ it('publishes named speaker and institution schemas for the public directory end
         ->and(data_get($paths, '/speakers/{speakerKey}.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/institutions.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/institutions/near.get.responses.200.content.application/json.schema'))->not->toBeNull()
-        ->and(data_get($paths, '/institutions/{institutionKey}.get.responses.200.content.application/json.schema'))->not->toBeNull();
+        ->and(data_get($paths, '/institutions/{institutionKey}.get.responses.200.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($schemas, 'EventSummary.properties.institution.properties.type'))->not->toBeNull()
+        ->and(data_get($schemas, 'EventSummary.properties.speakers.items.properties.gender'))->not->toBeNull();
 });
 
 it('documents share payload and tracking endpoints for client integrations', function () {
@@ -303,6 +311,7 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain("\n\nTIMEZONE:\n")
         ->toContain('Resource manifests now expose explicit `mcp_tools` for collection, meta, schema, store, and update call surfaces; use those tool names and argument templates instead of guessing URLs.')
         ->toContain('Event discovery supports `filter[starts_on_local_date]=YYYY-MM-DD` and returns `starts_at_local` / `starts_on_local_date` in event payloads.')
+        ->toContain('Speaker collections expose explicit filters such as filter[status], filter[is_active], and filter[has_events], and date-aware admin resources also accept starts_after, starts_before, and starts_on_local_date.')
         ->toContain('use the admin record `route_key` returned by admin collection or detail payloads')
         ->toContain('If you only have a public UUID-backed payload and route_key is unavailable, use the UUID id directly as recordKey.')
         ->toContain('Collection endpoints clamp per_page to server-supported maxima')

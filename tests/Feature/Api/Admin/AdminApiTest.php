@@ -145,6 +145,10 @@ it('returns admin speaker resource metadata and records', function () {
         ->assertJsonPath('data.resource.write_support.schema', true)
         ->assertJsonPath('data.resource.api_routes.collection', '/api/v1/admin/speakers')
         ->assertJsonPath('data.resource.api_routes.schema', '/api/v1/admin/speakers/schema')
+        ->assertJsonPath('data.resource.filters.0.key', 'status')
+        ->assertJsonPath('data.resource.filters.0.options.verified', 'Verified')
+        ->assertJsonPath('data.resource.filters.1.key', 'is_active')
+        ->assertJsonPath('data.resource.filters.2.key', 'has_events')
         ->assertJsonPath('data.resource.mcp_tools.create.arguments.validate_only', false)
         ->assertJsonPath('data.resource.mcp_tools.update.arguments.validate_only', false);
 
@@ -160,6 +164,58 @@ it('returns admin speaker resource metadata and records', function () {
         ->assertJsonPath('data.record.route_key', $speakerRouteKey)
         ->assertJsonPath('data.record.attributes.name', 'Admin API Speaker')
         ->assertJsonPath('data.record.abilities.view', true);
+});
+
+it('filters admin speaker records by explicit query parameters', function () {
+    $admin = adminApiUser('super_admin');
+
+    $speakerWithEvents = Speaker::factory()->create([
+        'name' => 'Alpha Verified Speaker',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speakerWithoutEvents = Speaker::factory()->create([
+        'name' => 'Beta Verified Speaker',
+        'status' => 'verified',
+        'is_active' => false,
+    ]);
+
+    $pendingSpeaker = Speaker::factory()->create([
+        'name' => 'Gamma Pending Speaker',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Speaker Filter Event',
+    ])->speakers()->attach($speakerWithEvents->getKey());
+
+    Sanctum::actingAs($admin);
+
+    $verifiedResponse = $this->getJson('/api/v1/admin/speakers?filter[status]=verified')
+        ->assertOk();
+
+    $verifiedIds = collect($verifiedResponse->json('data'))->pluck('id')->all();
+
+    expect(in_array($speakerWithEvents->getKey(), $verifiedIds, true))->toBeTrue();
+    expect(in_array($speakerWithoutEvents->getKey(), $verifiedIds, true))->toBeTrue();
+    expect(in_array($pendingSpeaker->getKey(), $verifiedIds, true))->toBeFalse();
+
+    $inactiveResponse = $this->getJson('/api/v1/admin/speakers?is_active=0')
+        ->assertOk();
+
+    $inactiveIds = collect($inactiveResponse->json('data'))->pluck('id')->all();
+
+    expect(in_array($speakerWithoutEvents->getKey(), $inactiveIds, true))->toBeTrue();
+
+    $hasEventsResponse = $this->getJson('/api/v1/admin/speakers?filter[has_events]=true')
+        ->assertOk();
+
+    $hasEventsIds = collect($hasEventsResponse->json('data'))->pluck('id')->all();
+
+    expect(in_array($speakerWithEvents->getKey(), $hasEventsIds, true))->toBeTrue();
+    expect(in_array($speakerWithoutEvents->getKey(), $hasEventsIds, true))->toBeFalse();
 });
 
 it('previews admin speaker creation without persisting the record', function () {

@@ -10,7 +10,7 @@ use Illuminate\Contracts\Support\Arrayable;
 /**
  * @phpstan-import-type CountryArray from Country
  *
- * @phpstan-type InstitutionListItemArray array{id: string, slug: string, name: string, nickname: ?string, display_name: string, events_count: int, public_image_url: string, logo_url: string, cover_url: ?string, country: CountryArray|null, location: ?string, distance_km: ?float, is_following: bool}
+ * @phpstan-type InstitutionListItemArray array{id: string, slug: string, name: string, type: string|null, nickname: ?string, display_name: string, events_count: int, public_image_url: string, logo_url: string, cover_url: ?string, country: CountryArray|null, location: ?string, distance_km: ?float, is_following: bool}
  *
  * @implements Arrayable<string, mixed>
  */
@@ -21,6 +21,7 @@ final readonly class InstitutionListItem implements Arrayable
         public string $id,
         public string $slug,
         public string $name,
+        public ?string $type,
         public ?string $nickname,
         public string $display_name,
         public int $events_count,
@@ -40,6 +41,7 @@ final readonly class InstitutionListItem implements Arrayable
             'id' => $this->id,
             'slug' => $this->slug,
             'name' => $this->name,
+            'type' => $this->type,
             'nickname' => $this->nickname,
             'display_name' => $this->display_name,
             'events_count' => $this->events_count,

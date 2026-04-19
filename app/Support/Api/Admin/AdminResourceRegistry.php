@@ -2,6 +2,7 @@
 
 namespace App\Support\Api\Admin;
 
+use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\Event;
 use App\Models\Speaker;
 use App\Models\User;
@@ -27,6 +28,7 @@ use UnitEnum;
  *   pages: array<string, bool>,
  *   relations: list<string>,
  *   abilities: array<string, bool>,
+ *   filters: list<array{key: string, label: string, type: string, options?: array<string, string>}>,
  *   write_support: array<string, bool>,
  *   api_routes: array<string, string|null>,
  *   mcp_tools: array<string, mixed>,
@@ -48,6 +50,9 @@ class AdminResourceRegistry
 
     /** @var array<class-string<resource>, list<string>> */
     private array $searchableColumnsCache = [];
+
+    /** @var array<class-string<resource>, list<array{key: string, label: string, type: string, options?: array<string, string>}>> */
+    private array $filtersCache = [];
 
     public function __construct(
         private readonly AdminResourceMutationService $mutationService,
@@ -130,6 +135,14 @@ class AdminResourceRegistry
         $key = $this->keyFor($resourceClass);
         $pages = $resourceClass::getPages();
         $supportsMutation = $this->mutationService->supports($resourceClass);
+        $dateSemantics = is_a($resourceClass::getModel(), Event::class, true)
+            ? [
+                'storage_timezone' => 'UTC',
+                'viewer_timezone' => 'resolved at request time',
+                'local_fields' => ['starts_at_local', 'starts_on_local_date', 'ends_at_local'],
+                'local_date_filter' => 'starts_on_local_date',
+            ]
+            : null;
 
         return $this->metadataCache[$resourceClass] = [
             'key' => $key,
@@ -154,6 +167,7 @@ class AdminResourceRegistry
                 'restore_any' => $resourceClass::canRestoreAny(),
                 'reorder' => $resourceClass::canReorder(),
             ],
+            'filters' => $this->filterMetadata($resourceClass),
             'write_support' => [
                 'schema' => $supportsMutation,
                 'store' => $supportsMutation && array_key_exists('create', $pages),
@@ -174,22 +188,15 @@ class AdminResourceRegistry
                     ? route('api.admin.resources.update', ['resourceKey' => $key, 'recordKey' => 'record'], false)
                     : null,
             ],
-            'mcp_tools' => $this->mcpTools($key, $supportsMutation, $pages),
+            'mcp_tools' => $this->mcpTools($key, $supportsMutation, $pages, $dateSemantics),
             'panel_routes' => [
                 'index' => array_key_exists('index', $pages) ? $resourceClass::getUrl('index', panel: 'admin') : null,
                 'create' => array_key_exists('create', $pages) ? $resourceClass::getUrl('create', panel: 'admin') : null,
                 'view_template' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => 'record'], panel: 'admin') : null,
                 'edit_template' => array_key_exists('edit', $pages) ? $resourceClass::getUrl('edit', ['record' => 'record'], panel: 'admin') : null,
             ],
-            'timezone_sensitive' => is_a($resourceClass::getModel(), Event::class, true),
-            'date_semantics' => is_a($resourceClass::getModel(), Event::class, true)
-                ? [
-                    'storage_timezone' => 'UTC',
-                    'viewer_timezone' => 'resolved at request time',
-                    'local_fields' => ['starts_at_local', 'starts_on_local_date', 'ends_at_local'],
-                    'local_date_filter' => 'starts_on_local_date',
-                ]
-                : null,
+            'timezone_sensitive' => $dateSemantics !== null,
+            'date_semantics' => $dateSemantics,
         ];
     }
 
@@ -245,11 +252,72 @@ class AdminResourceRegistry
     }
 
     /**
+     * @return list<array{key: string, label: string, type: string, options?: array<string, string>}>
+     */
+    public function filters(string $resourceClass): array
+    {
+        if (array_key_exists($resourceClass, $this->filtersCache)) {
+            return $this->filtersCache[$resourceClass];
+        }
+
+        return $this->filtersCache[$resourceClass] = match ($resourceClass) {
+            SpeakerResource::class => [
+                [
+                    'key' => 'status',
+                    'label' => 'Status',
+                    'type' => 'select',
+                    'options' => [
+                        'pending' => 'Pending',
+                        'verified' => 'Verified',
+                        'rejected' => 'Rejected',
+                    ],
+                ],
+                [
+                    'key' => 'is_active',
+                    'label' => 'Active',
+                    'type' => 'boolean',
+                ],
+                [
+                    'key' => 'has_events',
+                    'label' => 'Has Events',
+                    'type' => 'boolean',
+                ],
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<array{key: string, label: string, type: string, options?: array<string, string>}>
+     */
+    public function filterMetadata(string $resourceClass): array
+    {
+        return array_map(
+            static fn (array $filter): array => Arr::only($filter, ['key', 'label', 'type', 'options']),
+            $this->filters($resourceClass),
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $pages
+     * @param  array<string, mixed>|null  $dateSemantics
      * @return array<string, mixed>
      */
-    private function mcpTools(string $key, bool $supportsMutation, array $pages): array
+    private function mcpTools(string $key, bool $supportsMutation, array $pages, ?array $dateSemantics): array
     {
+        $listRecordsArguments = [
+            'resource_key' => $key,
+            'search' => null,
+            'page' => 1,
+            'per_page' => 15,
+        ];
+
+        if ($dateSemantics !== null) {
+            $listRecordsArguments['starts_after'] = null;
+            $listRecordsArguments['starts_before'] = null;
+            $listRecordsArguments['starts_on_local_date'] = null;
+        }
+
         return [
             'list_resources' => [
                 'tool' => 'admin-list-resources',
@@ -266,12 +334,7 @@ class AdminResourceRegistry
             ],
             'list_records' => [
                 'tool' => 'admin-list-records',
-                'arguments' => [
-                    'resource_key' => $key,
-                    'search' => null,
-                    'page' => 1,
-                    'per_page' => 15,
-                ],
+                'arguments' => $listRecordsArguments,
             ],
             'list_related_records' => [
                 'tool' => 'admin-list-related-records',

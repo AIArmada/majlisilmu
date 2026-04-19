@@ -255,7 +255,7 @@ it('supports the nearby institution alias and sparse list fields', function () {
         'lng' => 101.8600,
     ]);
 
-    $response = $this->getJson('/api/v1/institutions/near?near=3.1390,101.6869&radius_km=12&fields=id,name,location,distance_km')
+    $response = $this->getJson('/api/v1/institutions/near?near=3.1390,101.6869&radius_km=12&fields=id,name,location,distance_km,type')
         ->assertOk()
         ->assertJsonPath('meta.location.active', true);
 
@@ -265,7 +265,7 @@ it('supports the nearby institution alias and sparse list fields', function () {
     expect($names)
         ->toContain('Masjid Near Alias')
         ->not->toContain('Masjid Far Alias')
-        ->and(array_keys($item))->toBe(['id', 'name', 'location', 'distance_km'])
+        ->and(array_keys($item))->toBe(['id', 'name', 'location', 'distance_km', 'type'])
         ->and(data_get($item, 'distance_km'))->toBeNumeric();
 });
 
@@ -286,10 +286,10 @@ it('supports sparse fields on the public speaker directory', function () {
         'name' => 'Sparse Speaker',
     ]);
 
-    $response = $this->getJson('/api/v1/speakers?fields=id,name,status,is_active,avatar_url')
+    $response = $this->getJson('/api/v1/speakers?fields=id,name,status,is_active,avatar_url,gender')
         ->assertOk();
 
-    expect(array_keys($response->json('data.0')))->toBe(['id', 'name', 'status', 'is_active', 'avatar_url']);
+    expect(array_keys($response->json('data.0')))->toBe(['id', 'name', 'status', 'is_active', 'avatar_url', 'gender']);
 });
 
 it('exposes authenticated contribution update contracts and permission-gated direct edit media support', function () {
@@ -413,6 +413,7 @@ it('normalizes event update context to public organizer values and exposes looku
     $startsAt = now()->addDays(3)->setTime(20, 15);
     $endsAt = now()->addDays(3)->setTime(21, 30);
     $institution = Institution::factory()->create([
+        'type' => 'masjid',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -471,6 +472,7 @@ it('exposes event direct edit media support for authorized public updaters', fun
     $owner = User::factory()->create();
     $visitor = User::factory()->create();
     $institution = Institution::factory()->create([
+        'type' => 'masjid',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -510,6 +512,7 @@ it('exposes event direct edit media support for authorized public updaters', fun
 it('accepts helper-shaped event timing updates on public contribution suggestions', function () {
     $owner = User::factory()->create();
     $institution = Institution::factory()->create([
+        'type' => 'masjid',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -678,7 +681,7 @@ it('returns only region address keys in the speaker suggest context state', func
     ]);
 });
 
-it('treats unchanged speaker region-only address round trips as no-op updates', function () {
+it('rejects unchanged speaker region-only address round trips as validation errors', function () {
     $owner = User::factory()->create();
     $countryId = ensureFrontendApiMalaysiaCountryExists();
 
@@ -721,15 +724,12 @@ it('treats unchanged speaker region-only address round trips as no-op updates', 
             'district_id' => (int) $district->id,
             'subdistrict_id' => null,
         ],
-    ])->assertOk();
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['data']);
 
     $speaker = $speaker->fresh('address');
-    $expectedGoogleMapsUrl = app(NormalizeGoogleMapsInputAction::class)->handle([
-        'google_maps_url' => 'https://maps.google.com/?q=3.1390,101.6869',
-    ])['google_maps_url'];
-
     expect($speaker?->addressModel?->line1)->toBe('Alamat Warisan')
-        ->and($speaker?->addressModel?->google_maps_url)->toBe($expectedGoogleMapsUrl);
+        ->and($speaker?->addressModel?->google_maps_url)->toBe('https://maps.google.com/?q=3.1390,101.6869');
 });
 
 it('preserves hidden speaker address details during region-only direct updates', function () {
@@ -913,6 +913,7 @@ it('rejects unsupported speaker media files on public contribution update sugges
 it('maps public event organizer values back to persistence classes during direct updates', function () {
     $owner = User::factory()->create();
     $institution = Institution::factory()->create([
+        'type' => 'masjid',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -1175,6 +1176,7 @@ it('returns card image metadata on public events index responses', function () {
     config()->set('media-library.disk_name', 'public');
 
     $institution = Institution::factory()->create([
+        'type' => 'masjid',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -1190,7 +1192,9 @@ it('returns card image metadata on public events index responses', function () {
     $posterEvent->addMedia(UploadedFile::fake()->image('home-poster.jpg', 1200, 1600))
         ->toMediaCollection('poster');
 
-    $speaker = Speaker::factory()->create();
+    $speaker = Speaker::factory()->create([
+        'gender' => 'male',
+    ]);
     $posterEvent->speakers()->attach($speaker);
 
     $placeholderEvent = Event::factory()->create([
@@ -1213,7 +1217,9 @@ it('returns card image metadata on public events index responses', function () {
         ->and($posterResponse->json('data.0.poster_url'))->toBeString()->not->toBe('')
         ->and(array_keys($posterItem))->not->toContain('media', 'references', 'key_people')
         ->and(data_get($posterItem, 'institution.media'))->toBeNull()
+        ->and(data_get($posterItem, 'institution.type'))->toBe('masjid')
         ->and(data_get($posterItem, 'speakers.0.id'))->toBe((string) $speaker->getKey())
+        ->and(data_get($posterItem, 'speakers.0.gender'))->toBe('male')
         ->and(data_get($posterItem, 'speakers.0.pivot'))->toBeNull()
         ->and($placeholderResponse->json('data.0.has_poster'))->toBeFalse()
         ->and($placeholderResponse->json('data.0.card_image_url'))->toContain('images/placeholders/event.png')
@@ -1228,6 +1234,7 @@ it('serializes institution directory payloads with card media aliases for mobile
 
     $institution = Institution::factory()->create([
         'name' => 'Masjid API Directory',
+        'type' => 'masjid',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -1270,6 +1277,7 @@ it('serializes institution directory payloads with card media aliases for mobile
     )();
 
     expect(data_get($item, 'display_name'))->toBe($institution->display_name)
+        ->and(data_get($item, 'type'))->toBe('masjid')
         ->and(data_get($item, 'events_count'))->toBe(1)
         ->and(data_get($item, 'public_image_url'))->toBeString()->not->toBe('')
         ->and(data_get($item, 'logo_url'))->toBeString()->not->toBe('')
@@ -1552,6 +1560,7 @@ it('exposes the institution public image url in the frontend institution detail 
 
     $institution = Institution::factory()->create([
         'name' => 'Masjid Detail API',
+        'type' => 'masjid',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -1564,7 +1573,8 @@ it('exposes the institution public image url in the frontend institution detail 
 
     expect($response->json('data.institution.media.public_image_url'))->toBe($institution->public_image_url)
         ->and($response->json('data.institution.media.cover_url'))->toBeNull()
-        ->and($response->json('data.institution.media.public_image_url'))->toBe($response->json('data.institution.media.logo_url'));
+        ->and($response->json('data.institution.media.public_image_url'))->toBe($response->json('data.institution.media.logo_url'))
+        ->and($response->json('data.institution.type'))->toBe('masjid');
 });
 
 it('returns institution follow state on the authenticated detail route response', function () {
@@ -1964,6 +1974,7 @@ it('returns profile-quality speaker avatar urls from the frontend search api', f
 
     $speaker = Speaker::factory()->create([
         'name' => 'Kazim Elias',
+        'gender' => 'male',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -1981,6 +1992,7 @@ it('exposes explicit country data and country filters on frontend institution an
 
     $institution = Institution::factory()->create([
         'name' => 'Country Filter Institution',
+        'type' => 'masjid',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -1990,6 +2002,7 @@ it('exposes explicit country data and country filters on frontend institution an
 
     $speaker = Speaker::factory()->create([
         'name' => 'Country Filter Speaker',
+        'gender' => 'male',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -2000,12 +2013,14 @@ it('exposes explicit country data and country filters on frontend institution an
     $this->getJson(route('api.client.institutions.index', ['country_id' => $countryId, 'search' => 'Country Filter Institution']))
         ->assertOk()
         ->assertJsonPath('data.0.country.iso2', 'MY')
-        ->assertJsonPath('data.0.country.key', 'malaysia');
+        ->assertJsonPath('data.0.country.key', 'malaysia')
+        ->assertJsonPath('data.0.type', 'masjid');
 
     $this->getJson(route('api.client.speakers.index', ['country_id' => $countryId, 'search' => 'Country Filter Speaker']))
         ->assertOk()
         ->assertJsonPath('data.0.country.iso2', 'MY')
-        ->assertJsonPath('data.0.country.key', 'malaysia');
+        ->assertJsonPath('data.0.country.key', 'malaysia')
+        ->assertJsonPath('data.0.gender', 'male');
 });
 
 it('returns authenticated follow state in the frontend speaker api', function () {
@@ -2086,6 +2101,7 @@ it('serializes speaker directory payloads with country and follow metadata for m
 
     $speaker = Speaker::factory()->create([
         'name' => 'Speaker Directory DTO',
+        'gender' => 'male',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -2107,6 +2123,7 @@ it('serializes speaker directory payloads with country and follow metadata for m
     )();
 
     expect(data_get($item, 'formatted_name'))->toBe($speaker->formatted_name)
+        ->and(data_get($item, 'gender'))->toBe('male')
         ->and(data_get($item, 'avatar_url'))->toBeString()->not->toBe('')
         ->and(data_get($item, 'status'))->toBe('verified')
         ->and(data_get($item, 'is_active'))->toBeTrue()
@@ -3107,6 +3124,7 @@ it('mirrors the public speaker page payload for app clients', function () {
         'is_active' => true,
         'job_title' => 'Penasihat Dakwah',
         'is_freelance' => true,
+        'gender' => 'male',
         'bio' => [
             'type' => 'doc',
             'content' => [[
@@ -3244,6 +3262,7 @@ it('mirrors the public speaker page payload for app clients', function () {
     $speakerInstitution = $response->json('data.speaker.institutions.0');
 
     expect($response->json('data.speaker.job_title'))->toBe('Penasihat Dakwah')
+        ->and($response->json('data.speaker.gender'))->toBe('male')
         ->and($response->json('data.speaker.is_freelance'))->toBeTrue()
         ->and($response->json('data.speaker.address.country_id'))->toBe($countryId)
         ->and($response->json('data.speaker.country.iso2'))->toBe('MY')

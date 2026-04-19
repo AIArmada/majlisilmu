@@ -236,6 +236,42 @@ class EventController extends Controller
                         ->whereIn('speaker_id', $speakerIds);
                 });
             }),
+            AllowedFilter::callback('person_in_charge_ids', function (Builder $query, mixed $value): void {
+                $speakerIds = $this->normalizeArrayFilter($value);
+
+                if ($speakerIds === []) {
+                    return;
+                }
+
+                $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($speakerIds): void {
+                    $keyPersonQuery
+                        ->where('role', EventKeyPersonRole::PersonInCharge->value)
+                        ->whereIn('speaker_id', $speakerIds);
+                });
+            }),
+            AllowedFilter::callback('person_in_charge_search', function (Builder $query, mixed $value): void {
+                $searchTerm = $this->normalizeTextFilter($value);
+
+                if ($searchTerm === null) {
+                    return;
+                }
+
+                $operator = $this->databaseLikeOperator();
+
+                $query->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($operator, $searchTerm): void {
+                    $keyPersonQuery
+                        ->where('role', EventKeyPersonRole::PersonInCharge->value)
+                        ->where(function (Builder $personInChargeQuery) use ($operator, $searchTerm): void {
+                            $personInChargeQuery
+                                ->where('name', $operator, "%{$searchTerm}%")
+                                ->orWhereHas('speaker', function (Builder $speakerQuery) use ($operator, $searchTerm): void {
+                                    $speakerQuery
+                                        ->where('speakers.name', $operator, "%{$searchTerm}%")
+                                        ->orWhere('speakers.searchable_name', $operator, "%{$searchTerm}%");
+                                });
+                        });
+                });
+            }),
             AllowedFilter::callback('imam_ids', function (Builder $query, mixed $value): void {
                 $speakerIds = $this->normalizeArrayFilter($value);
 
@@ -777,6 +813,17 @@ class EventController extends Controller
                 $this->normalizeArrayFilter($value)
             )
         ));
+    }
+
+    private function normalizeTextFilter(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return $normalized === '' ? null : $normalized;
     }
 
     private function databaseLikeOperator(): string

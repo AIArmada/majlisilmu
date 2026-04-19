@@ -274,6 +274,21 @@ class AdvancedFiltersPanel extends Component implements HasForms
                                     ->options(EventKeyPersonRole::nonSpeakerOptions())
                                     ->live(),
 
+                                Select::make('person_in_charge_ids')
+                                    ->label(__('PIC / Penyelaras'))
+                                    ->placeholder(__('Any PIC / Penyelaras'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
+                                    ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
+                                    ->live(),
+
+                                TextInput::make('person_in_charge_search')
+                                    ->label(__('Nama PIC / Penyelaras'))
+                                    ->placeholder(__('Cari nama PIC / Penyelaras'))
+                                    ->maxLength(255)
+                                    ->live(onBlur: true),
+
                                 Select::make('moderator_ids')
                                     ->label(__('Moderator'))
                                     ->placeholder(__('Any Moderator'))
@@ -619,6 +634,8 @@ class AdvancedFiltersPanel extends Component implements HasForms
             'venue_id' => null,
             'speaker_ids' => [],
             'key_person_roles' => [],
+            'person_in_charge_ids' => [],
+            'person_in_charge_search' => null,
             'moderator_ids' => [],
             'imam_ids' => [],
             'khatib_ids' => [],
@@ -701,6 +718,8 @@ class AdvancedFiltersPanel extends Component implements HasForms
             'venue_id' => filled($normalized['venue_id']) ? (string) $normalized['venue_id'] : null,
             'speaker_ids' => $this->normalizeStringArray($normalized['speaker_ids'] ?? []),
             'key_person_roles' => $this->normalizeStringArray($normalized['key_person_roles'] ?? []),
+            'person_in_charge_ids' => $this->normalizeStringArray($normalized['person_in_charge_ids'] ?? []),
+            'person_in_charge_search' => filled($normalized['person_in_charge_search'] ?? null) ? trim((string) $normalized['person_in_charge_search']) : null,
             'moderator_ids' => $this->normalizeStringArray($normalized['moderator_ids'] ?? []),
             'imam_ids' => $this->normalizeStringArray($normalized['imam_ids'] ?? []),
             'khatib_ids' => $this->normalizeStringArray($normalized['khatib_ids'] ?? []),

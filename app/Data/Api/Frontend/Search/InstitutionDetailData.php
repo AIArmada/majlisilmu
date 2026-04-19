@@ -2,6 +2,7 @@
 
 namespace App\Data\Api\Frontend\Search;
 
+use App\Enums\InstitutionType;
 use App\Models\Institution;
 use App\Models\User;
 use Filament\Support\Contracts\HasLabel;
@@ -25,6 +26,7 @@ class InstitutionDetailData extends Data
         public string $display_name,
         public ?string $description,
         public string $status,
+        public ?string $type,
         public ?string $type_label,
         public ?string $address_line,
         public ?array $address,
@@ -62,6 +64,11 @@ class InstitutionDetailData extends Data
         array $socialMedia,
         array $donationChannels,
     ): self {
+        $type = $institution->type;
+        $institutionType = $type instanceof InstitutionType
+            ? $type->value
+            : (is_string($type) ? $type : null);
+
         return new self(
             id: (string) $institution->id,
             slug: (string) $institution->slug,
@@ -70,6 +77,7 @@ class InstitutionDetailData extends Data
             display_name: (string) $institution->display_name,
             description: $institution->description,
             status: (string) $institution->status,
+            type: $institutionType,
             type_label: $institution->type instanceof HasLabel ? $institution->type->getLabel() : null,
             address_line: $addressLine,
             address: $address,

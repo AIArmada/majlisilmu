@@ -14,6 +14,7 @@ use App\Models\PassportUser;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Mcp\McpTokenManager;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Passport\Passport;
@@ -103,8 +104,47 @@ it('exposes timezone-aware metadata for member event resources', function () {
             ->where('data.resource.key', 'events')
             ->where('data.resource.timezone_sensitive', true)
             ->where('data.resource.date_semantics.local_date_filter', 'starts_on_local_date')
+            ->where('data.resource.mcp_tools.list_records.arguments.starts_after', null)
+            ->where('data.resource.mcp_tools.list_records.arguments.starts_before', null)
+            ->where('data.resource.mcp_tools.list_records.arguments.starts_on_local_date', null)
             ->where('data.resource.mcp_tools.list_records.tool', 'member-list-records')
             ->where('data.resource.mcp_tools.list_records.arguments.resource_key', 'events')
+            ->etc());
+});
+
+it('filters member event records by local date through the MCP server', function () {
+    [$member, $institution] = institutionMemberMcpContext();
+
+    $member->forceFill([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $matchingEvent = Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'title' => 'Member MCP Date Match',
+        'starts_at' => Carbon::parse('2026-05-01 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'title' => 'Member MCP Date Miss',
+        'starts_at' => Carbon::parse('2026-05-02 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberListRecordsTool::class, [
+            'resource_key' => 'events',
+            'starts_on_local_date' => '2026-05-01',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $matchingEvent->getKey())
+            ->where('data.0.title', 'Member MCP Date Match')
+            ->where('meta.resource.key', 'events')
+            ->where('meta.search', null)
             ->etc());
 });
 
@@ -152,6 +192,9 @@ it('returns member update schema and updates institutions through member MCP wri
     ensureMemberMcpMalaysiaCountryExists();
 
     [$member, $institution] = institutionMemberMcpContext(role: 'admin');
+    $originalAddress = $institution->fresh()?->addressModel;
+    $originalLat = $originalAddress?->lat;
+    $originalLng = $originalAddress?->lng;
 
     MemberServer::actingAs($member)
         ->tool(MemberGetWriteSchemaTool::class, [
@@ -185,6 +228,7 @@ it('returns member update schema and updates institutions through member MCP wri
                 'status' => 'pending',
                 'is_active' => true,
                 'allow_public_event_submission' => true,
+                'slug' => 'attempted-member-institution-injection',
                 'address' => [
                     'country_id' => 132,
                 ],
@@ -197,7 +241,10 @@ it('returns member update schema and updates institutions through member MCP wri
             ->etc());
 
     expect($institution->fresh()?->name)->toBe('Member MCP Institution Updated')
-        ->and($institution->fresh()?->nickname)->toBe('Member MCP Masjid');
+        ->and($institution->fresh()?->nickname)->toBe('Member MCP Masjid')
+        ->and($institution->fresh()?->slug)->not->toBe('attempted-member-institution-injection')
+        ->and(abs(((float) $institution->fresh()?->addressModel?->lat) - (float) $originalLat))->toBeLessThan(0.000001)
+        ->and(abs(((float) $institution->fresh()?->addressModel?->lng) - (float) $originalLng))->toBeLessThan(0.000001);
 });
 
 it('registers member write tools when the MCP actor is a normalized Passport user', function () {

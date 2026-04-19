@@ -26,6 +26,7 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
 use App\Support\Mcp\McpTokenManager;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Passport\Passport;
@@ -183,9 +184,45 @@ it('exposes timezone-aware metadata for admin event resources', function () {
             ->where('data.resource.timezone_sensitive', true)
             ->where('data.resource.date_semantics.storage_timezone', 'UTC')
             ->where('data.resource.date_semantics.local_date_filter', 'starts_on_local_date')
+            ->where('data.resource.mcp_tools.list_records.arguments.starts_after', null)
+            ->where('data.resource.mcp_tools.list_records.arguments.starts_before', null)
+            ->where('data.resource.mcp_tools.list_records.arguments.starts_on_local_date', null)
             ->where('data.resource.mcp_tools.get_record.tool', 'admin-get-record')
             ->where('data.resource.mcp_tools.get_record.arguments.resource_key', 'events')
             ->where('data.resource.mcp_tools.get_record.arguments.record_key', 'record')
+            ->etc());
+});
+
+it('filters admin event records by local date through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $admin->forceFill([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $matchingEvent = Event::factory()->create([
+        'title' => 'Admin MCP Date Match',
+        'starts_at' => Carbon::parse('2026-05-01 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Admin MCP Date Miss',
+        'starts_at' => Carbon::parse('2026-05-02 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'starts_on_local_date' => '2026-05-01',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $matchingEvent->getKey())
+            ->where('data.0.title', 'Admin MCP Date Match')
+            ->where('meta.resource.key', 'events')
+            ->where('meta.search', null)
             ->etc());
 });
 
@@ -295,6 +332,7 @@ it('previews admin speaker updates through the MCP write tool without persisting
     $admin = adminMcpUser('super_admin');
     $speaker = Speaker::factory()->create([
         'name' => 'Previewable Admin MCP Speaker',
+        'is_freelance' => false,
         'job_title' => null,
     ]);
 
@@ -432,6 +470,9 @@ it('creates and updates institutions through MCP write tools', function () {
 
     $institution = Institution::query()->where('name', 'Admin MCP Institution')->firstOrFail();
     $institutionId = (string) $institution->getKey();
+    $originalAddress = $institution->fresh()?->addressModel;
+    $originalLat = $originalAddress?->lat;
+    $originalLng = $originalAddress?->lng;
 
     expect($institution->display_name)->toBe('Admin MCP Institution (MCP Surau)')
         ->and($institution->status)->toBe('verified')
@@ -448,6 +489,7 @@ it('creates and updates institutions through MCP write tools', function () {
                 'status' => 'pending',
                 'is_active' => true,
                 'allow_public_event_submission' => true,
+                'slug' => 'attempted-admin-institution-injection',
                 'address' => [
                     'country_id' => 132,
                 ],
@@ -458,6 +500,10 @@ it('creates and updates institutions through MCP write tools', function () {
             ->where('data.record.attributes.name', 'Admin MCP Institution Updated')
             ->where('data.record.attributes.nickname', 'MCP Masjid')
             ->etc());
+
+    expect($institution->fresh()?->slug)->not->toBe('attempted-admin-institution-injection')
+        ->and(abs(((float) $institution->fresh()?->addressModel?->lat) - (float) $originalLat))->toBeLessThan(0.000001)
+        ->and(abs(((float) $institution->fresh()?->addressModel?->lng) - (float) $originalLng))->toBeLessThan(0.000001);
 });
 
 it('creates and updates events through MCP write tools', function () {

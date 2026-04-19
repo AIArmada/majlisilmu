@@ -7,6 +7,8 @@ namespace App\Support\Api\Member;
 use App\Models\User;
 use App\Support\Api\ApiPagination;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
+use App\Support\Timezone\UserDateTimeFormatter;
+use Carbon\CarbonInterface;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -79,8 +81,15 @@ class MemberResourceService
     /**
      * @return array{data: list<array<string, mixed>>, meta: array<string, mixed>}
      */
-    public function listRecords(string $resourceKey, string $search = '', int $page = 1, int $perPage = 15): array
-    {
+    public function listRecords(
+        string $resourceKey,
+        string $search = '',
+        int $page = 1,
+        int $perPage = 15,
+        ?string $startsAfter = null,
+        ?string $startsBefore = null,
+        ?string $startsOnLocalDate = null,
+    ): array {
         $resourceClass = $this->resolveAccessibleResource($resourceKey);
         $query = $this->registry->queryFor($resourceClass);
         $normalizedSearch = trim($search);
@@ -88,6 +97,14 @@ class MemberResourceService
         if ($normalizedSearch !== '') {
             $this->applySearch($query, $resourceClass, $normalizedSearch);
         }
+
+        $this->applyDateFilters(
+            $query,
+            $resourceClass,
+            $startsAfter,
+            $startsBefore,
+            $startsOnLocalDate,
+        );
 
         $this->applyDefaultOrdering($query, $resourceClass);
 
@@ -231,6 +248,52 @@ class MemberResourceService
                 $builder->{$method}($model->qualifyColumn($column), 'like', "%{$search}%");
             }
         });
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  class-string<resource>  $resourceClass
+     */
+    protected function applyDateFilters(
+        Builder $query,
+        string $resourceClass,
+        ?string $startsAfter,
+        ?string $startsBefore,
+        ?string $startsOnLocalDate,
+    ): void {
+        $resource = $this->registry->metadata($resourceClass);
+
+        if (! is_array($resource['date_semantics'] ?? null)) {
+            return;
+        }
+
+        $model = $query->getModel();
+        $startsAtColumn = $model->qualifyColumn('starts_at');
+
+        if (is_string($startsAfter) && trim($startsAfter) !== '') {
+            $parsedStartsAfter = UserDateTimeFormatter::parseUserDateToUtc($startsAfter, false);
+
+            if ($parsedStartsAfter instanceof CarbonInterface) {
+                $query->where($startsAtColumn, '>=', $parsedStartsAfter);
+            }
+        }
+
+        if (is_string($startsBefore) && trim($startsBefore) !== '') {
+            $parsedStartsBefore = UserDateTimeFormatter::parseUserDateToUtc($startsBefore, true);
+
+            if ($parsedStartsBefore instanceof CarbonInterface) {
+                $query->where($startsAtColumn, '<=', $parsedStartsBefore);
+            }
+        }
+
+        if (is_string($startsOnLocalDate) && trim($startsOnLocalDate) !== '') {
+            $startsOnLocalDateStart = UserDateTimeFormatter::parseUserDateToUtc($startsOnLocalDate, false);
+            $startsOnLocalDateEnd = UserDateTimeFormatter::parseUserDateToUtc($startsOnLocalDate, true);
+
+            if ($startsOnLocalDateStart instanceof CarbonInterface && $startsOnLocalDateEnd instanceof CarbonInterface) {
+                $query->whereBetween($startsAtColumn, [$startsOnLocalDateStart, $startsOnLocalDateEnd]);
+            }
+        }
     }
 
     /**

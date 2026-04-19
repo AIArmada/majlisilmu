@@ -27,7 +27,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
-use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
@@ -600,26 +599,38 @@ class SharedFormSchema
     public static function prepareAddressPersistenceData(array $data): array
     {
         $normalized = self::normalizeAddressFormState($data);
-        $normalized['country_id'] = self::normalizeCountrySelection($normalized);
+        $payload = [];
 
-        if (FederalTerritoryLocation::isFederalTerritoryStateId($normalized['state_id'] ?? null)) {
-            $normalized['district_id'] = null;
+        if (self::countrySelectionProvided($data)) {
+            $payload['country_id'] = self::normalizeCountrySelection($normalized);
         }
 
-        return Arr::only($normalized, [
-            'country_id',
+        foreach ([
             'state_id',
             'district_id',
             'subdistrict_id',
             'line1',
             'line2',
             'postcode',
-            'lat',
-            'lng',
-            'google_maps_url',
-            'google_place_id',
             'waze_url',
-        ]);
+        ] as $field) {
+            if (array_key_exists($field, $data)) {
+                $payload[$field] = $normalized[$field] ?? null;
+            }
+        }
+
+        if (self::hasGoogleMapsInput($data)) {
+            $payload['lat'] = $normalized['lat'] ?? null;
+            $payload['lng'] = $normalized['lng'] ?? null;
+            $payload['google_maps_url'] = $normalized['google_maps_url'] ?? null;
+            $payload['google_place_id'] = $normalized['google_place_id'] ?? null;
+        }
+
+        if (FederalTerritoryLocation::isFederalTerritoryStateId($payload['state_id'] ?? null)) {
+            $payload['district_id'] = null;
+        }
+
+        return $payload;
     }
 
     /**
@@ -653,6 +664,26 @@ class SharedFormSchema
             $data['country_key'] ?? null,
             $enabledOnly,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private static function hasGoogleMapsInput(array $data): bool
+    {
+        foreach ([
+            'google_maps_url',
+            'google_place_id',
+            'google_display_name',
+            'lat',
+            'lng',
+        ] as $field) {
+            if (array_key_exists($field, $data)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

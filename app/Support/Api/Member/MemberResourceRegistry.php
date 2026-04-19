@@ -119,6 +119,14 @@ class MemberResourceRegistry
 
         $key = $this->keyFor($resourceClass);
         $pages = $resourceClass::getPages();
+        $dateSemantics = is_a($resourceClass::getModel(), Event::class, true)
+            ? [
+                'storage_timezone' => 'UTC',
+                'viewer_timezone' => 'resolved at request time',
+                'local_fields' => ['starts_at_local', 'starts_on_local_date', 'ends_at_local'],
+                'local_date_filter' => 'starts_on_local_date',
+            ]
+            : null;
 
         return $this->metadataCache[$resourceClass] = [
             'key' => $key,
@@ -145,22 +153,15 @@ class MemberResourceRegistry
                 'store' => false,
                 'update' => $this->canWriteResource($resourceClass),
             ],
-            'mcp_tools' => $this->mcpTools($key, $this->canWriteResource($resourceClass)),
+            'mcp_tools' => $this->mcpTools($key, $this->canWriteResource($resourceClass), $dateSemantics),
             'panel_routes' => [
                 'index' => array_key_exists('index', $pages) ? $resourceClass::getUrl('index', panel: 'ahli') : null,
                 'create' => null,
                 'view_template' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => 'record'], panel: 'ahli') : null,
                 'edit_template' => array_key_exists('edit', $pages) ? $resourceClass::getUrl('edit', ['record' => 'record'], panel: 'ahli') : null,
             ],
-            'timezone_sensitive' => is_a($resourceClass::getModel(), Event::class, true),
-            'date_semantics' => is_a($resourceClass::getModel(), Event::class, true)
-                ? [
-                    'storage_timezone' => 'UTC',
-                    'viewer_timezone' => 'resolved at request time',
-                    'local_fields' => ['starts_at_local', 'starts_on_local_date', 'ends_at_local'],
-                    'local_date_filter' => 'starts_on_local_date',
-                ]
-                : null,
+            'timezone_sensitive' => $dateSemantics !== null,
+            'date_semantics' => $dateSemantics,
         ];
     }
 
@@ -225,10 +226,24 @@ class MemberResourceRegistry
     }
 
     /**
+     * @param  array<string, mixed>|null  $dateSemantics
      * @return array<string, mixed>
      */
-    private function mcpTools(string $key, bool $canWrite): array
+    private function mcpTools(string $key, bool $canWrite, ?array $dateSemantics): array
     {
+        $listRecordsArguments = [
+            'resource_key' => $key,
+            'search' => null,
+            'page' => 1,
+            'per_page' => 15,
+        ];
+
+        if ($dateSemantics !== null) {
+            $listRecordsArguments['starts_after'] = null;
+            $listRecordsArguments['starts_before'] = null;
+            $listRecordsArguments['starts_on_local_date'] = null;
+        }
+
         return [
             'list_resources' => [
                 'tool' => 'member-list-resources',
@@ -244,12 +259,7 @@ class MemberResourceRegistry
             ],
             'list_records' => [
                 'tool' => 'member-list-records',
-                'arguments' => [
-                    'resource_key' => $key,
-                    'search' => null,
-                    'page' => 1,
-                    'per_page' => 15,
-                ],
+                'arguments' => $listRecordsArguments,
             ],
             'get_record' => [
                 'tool' => 'member-get-record',

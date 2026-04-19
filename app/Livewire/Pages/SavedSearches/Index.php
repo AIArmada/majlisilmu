@@ -343,6 +343,7 @@ class Index extends Component
             'institution_id',
             'venue_id',
             'key_person_roles',
+            'person_in_charge_search',
             'moderator_ids',
             'imam_ids',
             'khatib_ids',
@@ -417,7 +418,7 @@ class Index extends Component
             $filters['key_person_roles'] = $keyPersonRoles;
         }
 
-        foreach (['moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids'] as $filterKey) {
+        foreach (['person_in_charge_ids', 'moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids'] as $filterKey) {
             $roleSpecificIds = array_values(array_filter((array) request()->input($filterKey, [])));
 
             if ($roleSpecificIds !== []) {
@@ -481,6 +482,8 @@ class Index extends Component
             'venue_id' => __('Venue'),
             'speaker_ids' => __('Speaker'),
             'key_person_roles' => __('Key Person Roles'),
+            'person_in_charge_ids' => __('PIC / Penyelaras'),
+            'person_in_charge_search' => __('Nama PIC / Penyelaras'),
             'moderator_ids' => __('Moderator'),
             'imam_ids' => __('Imam'),
             'khatib_ids' => __('Khatib'),
@@ -537,7 +540,7 @@ class Index extends Component
             'venue_id' => $this->venueName($value) ?? $value,
             'speaker_ids' => $this->speakerName($value) ?? $value,
             'key_person_roles' => EventKeyPersonRole::tryFrom($value)?->getLabel() ?? $value,
-            'moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids' => $this->speakerName($value) ?? $value,
+            'person_in_charge_ids', 'moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids' => $this->speakerName($value) ?? $value,
             'domain_tag_ids', 'topic_ids', 'source_tag_ids', 'issue_tag_ids' => $this->tagName($value) ?? $value,
             'reference_ids' => $this->referenceTitle($value) ?? $value,
             'language_codes' => $this->languageLabel($value) ?? $value,

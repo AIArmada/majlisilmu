@@ -37,6 +37,7 @@ describe('Saved Search API Endpoints', function () {
         describe('POST /api/v1/saved-searches', function () {
             it('creates a saved search', function () {
                 $imamSpeaker = Speaker::factory()->create();
+                $personInChargeSpeaker = Speaker::factory()->create();
 
                 $response = $this->postJson('/api/v1/saved-searches', [
                     'name' => 'Kuliah Maghrib',
@@ -44,6 +45,8 @@ describe('Saved Search API Endpoints', function () {
                     'filters' => [
                         'language_codes' => ['ms'],
                         'key_person_roles' => [EventKeyPersonRole::Imam->value],
+                        'person_in_charge_ids' => [$personInChargeSpeaker->id],
+                        'person_in_charge_search' => 'Penyelaras Saf',
                         'imam_ids' => [$imamSpeaker->id],
                         'starts_on_local_date' => '2026-04-12',
                     ],
@@ -53,6 +56,8 @@ describe('Saved Search API Endpoints', function () {
                 $response->assertCreated()
                     ->assertJsonPath('data.name', 'Kuliah Maghrib')
                     ->assertJsonPath('data.filters.key_person_roles.0', EventKeyPersonRole::Imam->value)
+                    ->assertJsonPath('data.filters.person_in_charge_ids.0', $personInChargeSpeaker->id)
+                    ->assertJsonPath('data.filters.person_in_charge_search', 'Penyelaras Saf')
                     ->assertJsonPath('data.filters.imam_ids.0', $imamSpeaker->id)
                     ->assertJsonPath('data.filters.starts_on_local_date', '2026-04-12');
 

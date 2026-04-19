@@ -106,6 +106,8 @@ final readonly class ExecuteSavedSearchAction
             'venue_id',
             'speaker_ids',
             'key_person_roles',
+            'person_in_charge_ids',
+            'person_in_charge_search',
             'moderator_ids',
             'imam_ids',
             'khatib_ids',

@@ -87,6 +87,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             ->addProperty('id', new StringType)
             ->addProperty('slug', new StringType)
             ->addProperty('name', new StringType)
+            ->addProperty('type', (new StringType)->nullable(true))
             ->addProperty('nickname', (new StringType)->nullable(true))
             ->addProperty('display_name', new StringType)
             ->addProperty('events_count', new IntegerType)
@@ -103,6 +104,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 'id',
                 'slug',
                 'name',
+                'type',
                 'nickname',
                 'display_name',
                 'events_count',
@@ -125,6 +127,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             ->addProperty('id', new StringType)
             ->addProperty('slug', new StringType)
             ->addProperty('name', new StringType)
+            ->addProperty('gender', (new StringType)->nullable(true))
             ->addProperty('formatted_name', new StringType)
             ->addProperty('status', new StringType)
             ->addProperty('is_active', new BooleanType)
@@ -134,7 +137,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             ->addProperty('is_following', new BooleanType);
 
         if (! $sparse) {
-            $type->setRequired(['id', 'slug', 'name', 'formatted_name', 'status', 'is_active', 'events_count', 'avatar_url', 'country', 'is_following']);
+            $type->setRequired(['id', 'slug', 'name', 'gender', 'formatted_name', 'status', 'is_active', 'events_count', 'avatar_url', 'country', 'is_following']);
         }
 
         return Schema::fromType($type);
@@ -151,6 +154,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 ->addProperty('display_name', new StringType)
                 ->addProperty('description', (new StringType)->nullable(true))
                 ->addProperty('status', new StringType)
+                ->addProperty('type', (new StringType)->nullable(true))
                 ->addProperty('type_label', (new StringType)->nullable(true))
                 ->addProperty('address_line', (new StringType)->nullable(true))
                 ->addProperty('address', $this->nullableReference($components, 'AddressSelection'))
@@ -174,6 +178,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                     'display_name',
                     'description',
                     'status',
+                    'type',
                     'type_label',
                     'address_line',
                     'address',
@@ -200,6 +205,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 ->addProperty('id', new StringType)
                 ->addProperty('slug', new StringType)
                 ->addProperty('name', new StringType)
+                ->addProperty('gender', (new StringType)->nullable(true))
                 ->addProperty('formatted_name', new StringType)
                 ->addProperty('job_title', (new StringType)->nullable(true))
                 ->addProperty('is_freelance', new BooleanType)
@@ -220,6 +226,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                     'id',
                     'slug',
                     'name',
+                    'gender',
                     'formatted_name',
                     'job_title',
                     'is_freelance',
@@ -596,10 +603,11 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             ->addProperty('id', new StringType)
             ->addProperty('name', new StringType)
             ->addProperty('slug', new StringType)
+            ->addProperty('type', (new StringType)->nullable(true))
             ->addProperty('display_name', (new StringType)->nullable(true))
             ->addProperty('public_image_url', (new StringType)->nullable(true))
             ->addProperty('logo_url', (new StringType)->nullable(true))
-            ->setRequired(['id', 'name', 'slug', 'display_name', 'public_image_url', 'logo_url'])
+            ->setRequired(['id', 'name', 'slug', 'type', 'display_name', 'public_image_url', 'logo_url'])
             ->nullable(true);
     }
 
@@ -618,10 +626,11 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         return (new ObjectType)
             ->addProperty('id', new StringType)
             ->addProperty('name', new StringType)
+            ->addProperty('gender', (new StringType)->nullable(true))
             ->addProperty('formatted_name', new StringType)
             ->addProperty('slug', new StringType)
             ->addProperty('avatar_url', (new StringType)->nullable(true))
-            ->setRequired(['id', 'name', 'formatted_name', 'slug', 'avatar_url']);
+            ->setRequired(['id', 'name', 'gender', 'formatted_name', 'slug', 'avatar_url']);
     }
 
     private function patchGeneratedOperations(OpenApi $document, Components $components): void

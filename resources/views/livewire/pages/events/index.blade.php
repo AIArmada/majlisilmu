@@ -93,6 +93,8 @@
     $selectedReferenceIds = array_values(array_filter((array) $this->reference_ids));
     $selectedSpeakerIds = array_values(array_filter((array) $this->speaker_ids));
     $selectedKeyPersonRoles = array_values(array_filter((array) $this->key_person_roles));
+    $selectedPersonInChargeIds = array_values(array_filter((array) $this->person_in_charge_ids));
+    $personInChargeSearch = filled($this->person_in_charge_search) ? trim((string) $this->person_in_charge_search) : null;
     $selectedModeratorIds = array_values(array_filter((array) $this->moderator_ids));
     $selectedImamIds = array_values(array_filter((array) $this->imam_ids));
     $selectedKhatibIds = array_values(array_filter((array) $this->khatib_ids));
@@ -105,6 +107,7 @@
         $selectedTopicIds,
     );
     $selectedSpeakerOptions = $this->speakerOptionLabels($selectedSpeakerIds);
+    $selectedPersonInChargeOptions = $this->speakerOptionLabels($selectedPersonInChargeIds);
     $selectedModeratorOptions = $this->speakerOptionLabels($selectedModeratorIds);
     $selectedImamOptions = $this->speakerOptionLabels($selectedImamIds);
     $selectedKhatibOptions = $this->speakerOptionLabels($selectedKhatibIds);
@@ -125,6 +128,10 @@
         ->values();
     $selectedKeyPersonRoleLabels = collect($selectedKeyPersonRoles)
         ->map(fn (string $role): ?string => \App\Enums\EventKeyPersonRole::tryFrom($role)?->getLabel())
+        ->filter()
+        ->values();
+    $selectedPersonInChargeLabels = collect($selectedPersonInChargeIds)
+        ->map(fn (string $speakerId): ?string => $selectedPersonInChargeOptions[$speakerId] ?? null)
         ->filter()
         ->values();
     $selectedModeratorLabels = collect($selectedModeratorIds)
@@ -193,6 +200,8 @@
         'venue_id' => $venueId,
         'speaker_ids' => $selectedSpeakerIds,
         'key_person_roles' => $selectedKeyPersonRoles,
+        'person_in_charge_ids' => $selectedPersonInChargeIds,
+        'person_in_charge_search' => $personInChargeSearch,
         'moderator_ids' => $selectedModeratorIds,
         'imam_ids' => $selectedImamIds,
         'khatib_ids' => $selectedKhatibIds,
@@ -247,6 +256,8 @@
         $isMuslimOnly !== null,
         count($selectedSpeakerIds) > 0,
         count($selectedKeyPersonRoles) > 0,
+        count($selectedPersonInChargeIds) > 0,
+        filled($personInChargeSearch),
         count($selectedModeratorIds) > 0,
         count($selectedImamIds) > 0,
         count($selectedKhatibIds) > 0,
@@ -827,6 +838,18 @@
                             {{ $roleLabel }}
                         </span>
                     @endforeach
+
+                    @foreach($selectedPersonInChargeLabels as $personInChargeLabel)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                            {{ __('PIC / Penyelaras') }}: {{ $personInChargeLabel }}
+                        </span>
+                    @endforeach
+
+                    @if($personInChargeSearch)
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                            {{ __('Nama PIC / Penyelaras') }}: {{ $personInChargeSearch }}
+                        </span>
+                    @endif
 
                     @foreach($selectedModeratorLabels as $moderatorLabel)
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
