@@ -1,3 +1,23 @@
+# Local MCP Test Servers
+
+- [x] Register local MCP servers
+- [x] Keep web routes unchanged
+- [x] Add registration tests
+- [x] Update MCP guide
+- [x] Verify local inspector flow
+
+## Review
+
+- Added local-only MCP handles for `AdminServer` and `MemberServer` in `routes/ai.php`, gated to the `local` and `testing` environments so the stdio transport is available for local verification without changing the web MCP routes.
+- Added `tests/Feature/Mcp/LocalServerRegistrationTest.php` to lock the local handles into the MCP registry and confirm the web registrations still exist.
+- Updated `docs/MAJLISILMU_MCP_GUIDE.md` with the local Inspector workflow and database expectations for local development and test runs.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/LocalServerRegistrationTest.php` => 1 passed, 6 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 30 passed, 300 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php` => 19 passed, 148 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress routes/ai.php tests/Feature/Mcp/LocalServerRegistrationTest.php` => pass
+  - `php artisan mcp:inspector majlisilmu-admin-local` => started the local MCP Inspector successfully and exposed the local inspector URL for the stdio server handle
 # Restorable API Self-Delete Audit
 
 - [x] Inspect API self-delete, deleted-model snapshot, token revocation, and Filament restore flows
