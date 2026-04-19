@@ -1,5 +1,7 @@
 # Lessons
 
+- When account deletion has a grace-period restore requirement, model it as two buckets: preserve shared domain records by detaching/nulling restorable links, and delete only user-private records into the snapshot; include roles/permissions because package delete hooks can detach them before the deleted-model snapshot is written.
+- When an existing database disagrees with edited create migrations, add a forward migration for that installed schema; tests on fresh migrations can pass while the real local API path still fails on old column types.
 - When a user provides both PDF and Markdown versions of a report and asks to use the md file, treat the Markdown copy as the source of truth and keep subsequent implementation notes aligned to it.
 - When a public catalog already uses `label` as the display field, do not add a duplicate `name` alias for backward compatibility; keep the API canonical and update docs/tests to match it.
 - Keep the origin query param free-form for API clients, but hide `origin=web` from the visible URL so the default web case stays clean while iOS/Android/macOS and future clients can still identify themselves explicitly.

@@ -30,6 +30,13 @@ class DeletedUsers extends Page implements HasTable
 
     protected string $view = 'filament.pages.deleted-users';
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->hasRole('super_admin');
+    }
+
     public function table(Table $table): Table
     {
         return $table

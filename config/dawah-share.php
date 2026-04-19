@@ -23,6 +23,10 @@ return [
 
     'visit_dedupe_minutes' => 5,
 
+    'runtime_data_purge' => [
+        'enabled' => env('DAWAH_SHARE_PURGE_AFFILIATE_RUNTIME_DATA', false),
+    ],
+
     'bot_user_agents' => [
         'bot',
         'crawler',

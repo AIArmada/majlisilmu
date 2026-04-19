@@ -39,7 +39,7 @@ class CurrentUserController extends Controller
 
     #[Endpoint(
         title: 'Delete current authenticated user',
-        description: 'Deletes the authenticated account, revokes all personal access tokens, and removes the account data that belongs to the current user.',
+        description: 'Deletes the authenticated account, revokes all personal access tokens, and retains a restorable account snapshot for the admin grace-period restore flow.',
     )]
     #[Response(status: 200, description: 'Successful account deletion response.', type: MessageResponseData::class)]
     public function destroy(Request $request): JsonResponse

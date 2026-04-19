@@ -6,6 +6,7 @@ namespace App\Services\Signals;
 
 use AIArmada\Affiliates\Models\AffiliateAttribution;
 use AIArmada\Affiliates\Models\AffiliateConversion;
+use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\Signals\Models\TrackedProperty;
 
 class AffiliateSignalsBridge
@@ -31,7 +32,7 @@ class AffiliateSignalsBridge
             ?? 'default';
         $landingUrl = $this->stringValue($attribution->landing_url);
 
-        $this->signalEventRecorder->ingest($trackedProperty, [
+        OwnerContext::withOwner(null, fn () => $this->signalEventRecorder->ingest($trackedProperty, [
             'event_name' => (string) config('signals.integrations.affiliates.attributed_event_name', 'affiliate.attributed'),
             'event_category' => (string) config('signals.integrations.affiliates.attributed_event_category', 'acquisition'),
             'external_id' => $this->stringValue($attribution->user_id),
@@ -58,7 +59,7 @@ class AffiliateSignalsBridge
                 'voucher_code' => $this->stringValue($attribution->voucher_code),
                 'landing_url' => $landingUrl,
             ], static fn (mixed $value): bool => $value !== null),
-        ]);
+        ]));
     }
 
     public function recordAffiliateConversionRecorded(AffiliateConversion $conversion): void
@@ -77,7 +78,7 @@ class AffiliateSignalsBridge
             ?? 'default';
         $destinationUrl = $this->stringValue(data_get($conversion->metadata, 'destination_url'));
 
-        $this->signalEventRecorder->ingest($trackedProperty, [
+        OwnerContext::withOwner(null, fn () => $this->signalEventRecorder->ingest($trackedProperty, [
             'event_name' => (string) config('signals.integrations.affiliates.conversion_event_name', 'affiliate.conversion.recorded'),
             'event_category' => (string) config('signals.integrations.affiliates.conversion_event_category', 'conversion'),
             'external_id' => $this->stringValue(data_get($conversion->metadata, 'user_id')),
@@ -105,7 +106,7 @@ class AffiliateSignalsBridge
                 'voucher_code' => $this->stringValue($conversion->voucher_code),
                 'status' => $this->stringValue((string) $conversion->status),
             ], static fn (mixed $value): bool => $value !== null),
-        ]);
+        ]));
     }
 
     private function affiliateSessionIdentifier(?string $identifier, string $instance): ?string

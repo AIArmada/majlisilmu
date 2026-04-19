@@ -2,11 +2,13 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
+use Spatie\DeletedModels\Models\DeletedModel;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -134,13 +136,66 @@ it('preserves the authenticated user endpoint payload contract', function () {
     }
 });
 
-it('deletes the authenticated user account and revokes all tokens', function () {
+it('deletes the authenticated user account, revokes tokens, and keeps a sanitized restore snapshot', function () {
     $user = User::factory()->create([
         'name' => 'Deleting User',
         'email' => 'delete-me@example.test',
+        'password' => 'password',
+        'remember_token' => 'remember-me-token',
     ]);
 
     $plainTextToken = $user->createToken('iPhone 17')->plainTextToken;
+    $passportAccessTokenId = Str::random(80);
+
+    DB::table('sessions')->insert([
+        'id' => 'delete-me-session',
+        'user_id' => $user->id,
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'Pest',
+        'payload' => 'serialized-session',
+        'last_activity' => now()->timestamp,
+    ]);
+    DB::table('password_reset_tokens')->insert([
+        'email' => $user->email,
+        'token' => 'password-reset-token',
+        'created_at' => now(),
+    ]);
+    DB::table('oauth_auth_codes')->insert([
+        'id' => Str::random(80),
+        'user_id' => $user->id,
+        'client_id' => (string) Str::uuid(),
+        'scopes' => '[]',
+        'revoked' => false,
+        'expires_at' => now()->addMinutes(10),
+    ]);
+    DB::table('oauth_access_tokens')->insert([
+        'id' => $passportAccessTokenId,
+        'user_id' => $user->id,
+        'client_id' => (string) Str::uuid(),
+        'name' => 'passport-token',
+        'scopes' => '[]',
+        'revoked' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+        'expires_at' => now()->addDay(),
+    ]);
+    DB::table('oauth_refresh_tokens')->insert([
+        'id' => Str::random(80),
+        'access_token_id' => $passportAccessTokenId,
+        'revoked' => false,
+        'expires_at' => now()->addMonth(),
+    ]);
+    DB::table('oauth_device_codes')->insert([
+        'id' => Str::random(80),
+        'user_id' => $user->id,
+        'client_id' => (string) Str::uuid(),
+        'user_code' => 'ABC12345',
+        'scopes' => '[]',
+        'revoked' => false,
+        'user_approved_at' => now(),
+        'last_polled_at' => null,
+        'expires_at' => now()->addMinutes(10),
+    ]);
 
     $response = $this->withToken($plainTextToken)->deleteJson(route('api.user.destroy'));
 
@@ -149,10 +204,33 @@ it('deletes the authenticated user account and revokes all tokens', function () 
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 
     $this->assertDatabaseMissing('users', ['id' => $user->id]);
+    $this->assertDatabaseHas('deleted_models', [
+        'key' => $user->id,
+        'model' => $user->getMorphClass(),
+    ]);
     $this->assertDatabaseMissing('personal_access_tokens', [
         'tokenable_type' => User::class,
         'tokenable_id' => $user->id,
     ]);
+    $this->assertDatabaseMissing('sessions', ['user_id' => $user->id]);
+    $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
+    $this->assertDatabaseMissing('oauth_auth_codes', ['user_id' => $user->id]);
+    $this->assertDatabaseMissing('oauth_access_tokens', ['user_id' => $user->id]);
+    $this->assertDatabaseMissing('oauth_refresh_tokens', ['access_token_id' => $passportAccessTokenId]);
+    $this->assertDatabaseMissing('oauth_device_codes', ['user_id' => $user->id]);
+
+    $deletedModel = DeletedModel::query()
+        ->where('key', $user->id)
+        ->where('model', $user->getMorphClass())
+        ->firstOrFail();
+
+    expect($deletedModel->values)
+        ->toMatchArray([
+            'name' => 'Deleting User',
+            'email' => 'delete-me@example.test',
+        ])
+        ->not->toHaveKey('password')
+        ->not->toHaveKey('remember_token');
 });
 
 it('rejects invalid api login credentials', function () {

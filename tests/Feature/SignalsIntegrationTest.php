@@ -87,6 +87,11 @@ it('records signals events when affiliate attribution and attributed outcomes oc
 
     expect(SignalEvent::query()->where('event_name', 'affiliate.attributed')->exists())->toBeTrue();
     expect(SignalEvent::query()->where('event_name', 'affiliate.conversion.recorded')->exists())->toBeTrue();
+    expect(SignalEvent::query()
+        ->withoutOwnerScope()
+        ->whereIn('event_name', ['affiliate.attributed', 'affiliate.conversion.recorded'])
+        ->whereNotNull('owner_id')
+        ->exists())->toBeFalse();
 });
 
 it('does not break affiliate-backed outcomes when signals ingestion fails', function () {
