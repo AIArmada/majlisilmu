@@ -1,3 +1,33 @@
+# Frontend Catalog and Admin Preview Audit
+
+- [x] Revert the public country selector and public-country registry display field back to canonical `label`
+- [x] Audit remaining admin API, MCP, speaker-list, documentation, and test changes for regressions
+- [x] Fix confirmed implementation, contract, documentation, or static-analysis issues
+- [x] Run focused Pest coverage for touched API/MCP/docs paths
+- [x] Run formatter, PHPStan, and repository policy checks
+- [x] Record the review findings and verification results
+
+## Review
+
+- Reverted the public countries catalog and public country registry display field back to canonical `label`; added regression coverage so countries and spaces stay label-based selector catalogs.
+- Fixed audit issues found in the remaining diff: updated the API documentation schema serialization fixture for new speaker `status`/`is_active` fields, removed a bad PHPStan import from `SpeakerListData`, and fixed an admin related-record fallback serializer that called a non-existent helper.
+- Kept the admin `validate_only` preview mode and MCP preview support, with destructive media clear flags hidden from MCP schemas and rejected by MCP write tools.
+- Full PHPStan exposed two existing static-analysis/runtime-safety issues outside the original diff; fixed them by importing the correct `OwnerScope`, narrowing the share outcome callback return type, and replacing direct pivot-property reads in user-delete snapshots with typed pivot helpers and snapshot normalizers.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php` => 27 passed, 366 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 30 passed, 300 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => 27 passed, 293 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => 87 passed, 578 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/ApiDocumentationSchemaSerializationTest.php` => 2 passed, 11 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/PublicCountryRegistryTest.php` => 4 passed, 6 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/UserRestoreTest.php` => 1 passed, 28 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php` => 39 passed, 289 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress` => pass
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `git diff --check` => pass
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app packages 2>/dev/null || true` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models 2>/dev/null || true` => no matches
+
 # Official MCP Documentation Audit
 
 - [x] Read OpenAI Apps SDK MCP server documentation end to end

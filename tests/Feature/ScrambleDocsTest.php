@@ -202,6 +202,10 @@ it('publishes named speaker and institution schemas for the public directory end
         'InstitutionListItem',
         'InstitutionDirectoryItem',
     ])
+        ->and(data_get($schemas, 'SpeakerListItem.properties.status.type'))->toBe('string')
+        ->and(data_get($schemas, 'SpeakerListItem.properties.is_active.type'))->toBe('boolean')
+        ->and(data_get($schemas, 'SpeakerDirectoryItem.properties.status.type'))->toBe('string')
+        ->and(data_get($schemas, 'SpeakerDirectoryItem.properties.is_active.type'))->toBe('boolean')
         ->and(data_get($schemas, 'InstitutionListItem.properties.distance_km'))->not->toBeNull()
         ->and(collect(data_get($paths, '/institutions.get.parameters', []))->pluck('name')->all())->toContain('lat', 'lng', 'near', 'radius_km', 'fields')
         ->and(collect(data_get($paths, '/institutions/near.get.parameters', []))->pluck('name')->all())->toContain('near', 'radius_km', 'fields')

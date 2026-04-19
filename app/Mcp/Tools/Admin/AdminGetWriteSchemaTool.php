@@ -68,16 +68,20 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
      */
     private function toolArguments(string $resourceKey, string $operation, ?string $recordKey): array
     {
-        $arguments = [
-            'resource_key' => $resourceKey,
-            'payload' => 'object',
-        ];
-
         if ($operation === 'update') {
-            $arguments['record_key'] = $recordKey ?? 'record';
+            return [
+                'resource_key' => $resourceKey,
+                'record_key' => $recordKey ?? 'record',
+                'payload' => 'object',
+                'validate_only' => false,
+            ];
         }
 
-        return $arguments;
+        return [
+            'resource_key' => $resourceKey,
+            'payload' => 'object',
+            'validate_only' => false,
+        ];
     }
 
     /**

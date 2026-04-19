@@ -65,6 +65,8 @@ it('serializes speaker detail and directory schemas to nested arrays', function 
                 slug: 'ustaz-adam',
                 name: 'Adam Yusuf',
                 formatted_name: 'Ustaz Adam Yusuf',
+                status: 'verified',
+                is_active: true,
                 events_count: 4,
                 avatar_url: 'https://example.test/speaker-avatar.jpg',
                 country: sampleCountrySchema(),

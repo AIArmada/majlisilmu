@@ -316,6 +316,7 @@ class AdminResourceRegistry
                     'arguments' => [
                         'resource_key' => $key,
                         'payload' => 'object',
+                        'validate_only' => false,
                     ],
                 ]
                 : null,
@@ -326,6 +327,7 @@ class AdminResourceRegistry
                         'resource_key' => $key,
                         'record_key' => 'record',
                         'payload' => 'object',
+                        'validate_only' => false,
                     ],
                 ]
                 : null,
@@ -526,6 +528,17 @@ class AdminResourceRegistry
     private function serializeAttributes(Model $record): array
     {
         $attributes = $record->toArray();
+
+        if ($record instanceof User) {
+            $attributes = Arr::except($attributes, [
+                'email',
+                'email_verified_at',
+                'phone',
+                'phone_verified_at',
+                'daily_prayer_institution_id',
+                'friday_prayer_institution_id',
+            ]);
+        }
 
         if ($record instanceof Speaker && is_array($attributes['address'] ?? null)) {
             $attributes['address'] = Arr::only($attributes['address'], [

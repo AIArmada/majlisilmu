@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -59,6 +60,7 @@ class AdminResourceService
                     'Use the admin record route_key returned by admin collection or detail payloads for record-specific paths.',
                     'Use the relation keys returned by admin resource metadata when traversing nested related records through the related-record route or MCP tool.',
                     'Fetch the exact schema before every create or update because required fields and catalogs are resource-specific.',
+                    'Send validate_only=true to preview and normalize a write request without persisting it; inspect the returned warning envelope before retrying without the flag.',
                     'Admin PUT requests are full schema-guided updates, not partial patches.',
                     'Use api_routes for HTTP API clients and mcp_tools for MCP clients; MCP tools take structured arguments instead of URL paths.',
                     'Use authenticated /admin/catalogs/* endpoints for dependent selectors referenced by schema catalog metadata.',
@@ -246,24 +248,19 @@ class AdminResourceService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{data: array{resource: array<string, mixed>, record: array<string, mixed>}}
+     * @return array<string, mixed>
      */
-    public function storeRecord(string $resourceKey, array $payload, ?User $actor = null): array
+    public function storeRecord(string $resourceKey, array $payload, ?User $actor = null, bool $validateOnly = false): array
     {
         $resourceClass = $this->resolveWritableResource($resourceKey);
 
         abort_unless($actor instanceof User && $actor->can('create', $resourceClass::getModel()), 403);
 
-        $validated = Validator::make(
-            $payload,
-            $this->mutationService->rules($resourceClass),
-        )->validate();
+        $validated = $this->validatedPayload($resourceClass, $payload);
 
-        if (is_array($payload['address'] ?? null) && ! array_key_exists('address', $validated)) {
-            $validated['address'] = $payload['address'];
+        if ($validateOnly) {
+            return $this->previewWriteRecord($resourceClass, $validated, 'create');
         }
-
-        $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated);
 
         $record = $this->mutationService->store($resourceClass, $validated, $actor);
 
@@ -277,9 +274,9 @@ class AdminResourceService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{data: array{resource: array<string, mixed>, record: array<string, mixed>}}
+     * @return array<string, mixed>
      */
-    public function updateRecord(string $resourceKey, string $recordKey, array $payload, ?User $actor = null): array
+    public function updateRecord(string $resourceKey, string $recordKey, array $payload, ?User $actor = null, bool $validateOnly = false): array
     {
         $resourceClass = $this->resolveWritableResource($resourceKey);
 
@@ -288,16 +285,11 @@ class AdminResourceService
         $record = $this->registry->resolveRecord($resourceClass, $recordKey);
         abort_unless($actor->can('update', $record), 403);
 
-        $validated = Validator::make(
-            $payload,
-            $this->mutationService->rules($resourceClass, updating: true),
-        )->validate();
+        $validated = $this->validatedPayload($resourceClass, $payload, updating: true, record: $record);
 
-        if (is_array($payload['address'] ?? null) && ! array_key_exists('address', $validated)) {
-            $validated['address'] = $payload['address'];
+        if ($validateOnly) {
+            return $this->previewWriteRecord($resourceClass, $validated, 'update', $record);
         }
-
-        $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated, $record);
 
         $record = $this->mutationService->update($resourceClass, $record, $validated, $actor);
 
@@ -329,6 +321,49 @@ class AdminResourceService
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function validatedPayload(string $resourceClass, array $payload, bool $updating = false, ?Model $record = null): array
+    {
+        $validated = Validator::make(
+            $payload,
+            $this->mutationService->rules($resourceClass, updating: $updating),
+        )->validate();
+
+        if (is_array($payload['address'] ?? null) && ! array_key_exists('address', $validated)) {
+            $validated['address'] = $payload['address'];
+        }
+
+        return $this->mutationService->normalizeValidatedPayload($resourceClass, $validated, $record);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array{data: array{resource: array<string, mixed>, preview: array<string, mixed>}}
+     */
+    private function previewWriteRecord(string $resourceClass, array $validated, string $operation, ?Model $record = null): array
+    {
+        $preview = $this->mutationService->previewNormalizedPayload($validated);
+
+        return [
+            'data' => [
+                'resource' => $this->registry->metadata($resourceClass),
+                'preview' => array_merge(
+                    [
+                        'validate_only' => true,
+                        'operation' => $operation,
+                        'current_record' => $record instanceof Model
+                            ? $this->registry->serializeRecordDetail($resourceClass, $record)
+                            : null,
+                    ],
+                    $preview,
+                ),
+            ],
+        ];
+    }
+
+    /**
      * @return array{
      *   id: string,
      *   route_key: string,
@@ -348,11 +383,11 @@ class AdminResourceService
             'id' => (string) $record->getKey(),
             'route_key' => (string) $record->getRouteKey(),
             'title' => $this->genericRecordTitle($record),
-            'attributes' => $this->serializeAttributes($record),
+            'attributes' => $this->serializeGenericAttributes($record),
         ];
     }
 
-    private function genericRecordTitle(Model $record): ?string
+    private function genericRecordTitle(Model $record): string
     {
         $table = $record->getTable();
         $candidates = [
@@ -381,6 +416,27 @@ class AdminResourceService
         }
 
         return (string) $record->getRouteKey();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeGenericAttributes(Model $record): array
+    {
+        $attributes = $record->toArray();
+
+        if ($record instanceof User) {
+            return Arr::except($attributes, [
+                'email',
+                'email_verified_at',
+                'phone',
+                'phone_verified_at',
+                'daily_prayer_institution_id',
+                'friday_prayer_institution_id',
+            ]);
+        }
+
+        return $attributes;
     }
 
     /**

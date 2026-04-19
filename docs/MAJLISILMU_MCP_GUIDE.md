@@ -116,6 +116,13 @@ Current supported admin resources include:
 - `references`
 - `subdistricts`
 
+Write-tool preview tip:
+
+- `admin-create-record` and `admin-update-record` accept `validate_only=true` to validate, normalize, and preview a write without persisting it.
+- Preview responses return the normalized payload plus warning metadata for supported write-side checks.
+- MCP write schemas do not advertise destructive media clear-flags, and the tools reject them if a client submits them anyway.
+- Update previews also include the current record snapshot so you can compare what would change before retrying without `validate_only`.
+
 ### Member MCP
 
 The member server currently exposes tools for:
