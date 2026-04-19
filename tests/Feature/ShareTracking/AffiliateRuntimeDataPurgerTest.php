@@ -9,6 +9,24 @@ use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
+it('skips the destructive purge unless explicitly enabled', function (): void {
+    $affiliateTable = config('affiliates.database.tables.affiliates', 'affiliates');
+
+    DB::table($affiliateTable)->insert([
+        'id' => (string) Str::uuid(),
+        'code' => 'KEEP-001',
+        'name' => 'Keep Affiliate',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    config(['dawah-share.runtime_data_purge.enabled' => false]);
+
+    app(AffiliateRuntimeDataPurger::class)->purge();
+
+    expect(DB::table($affiliateTable)->where('code', 'KEEP-001')->exists())->toBeTrue();
+});
+
 it('purges the full disposable affiliate package dataset before launch', function (): void {
     $now = now();
 
@@ -220,7 +238,7 @@ it('purges the full disposable affiliate package dataset before launch', functio
         DB::table($table)->insert($row);
     }
 
-    app(AffiliateRuntimeDataPurger::class)->purge();
+    app(AffiliateRuntimeDataPurger::class)->purge(force: true);
 
     foreach (array_keys($seededTables) as $table) {
         expect(DB::table($table)->count())->toBe(0);

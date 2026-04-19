@@ -45,8 +45,12 @@ class AffiliateRuntimeDataPurger
         ]));
     }
 
-    public function purge(): void
+    public function purge(bool $force = false): void
     {
+        if (! $force && ! $this->shouldPurge()) {
+            return;
+        }
+
         DB::transaction(function (): void {
             foreach ($this->purgeTables() as $table) {
                 if (! Schema::hasTable($table)) {
@@ -56,5 +60,10 @@ class AffiliateRuntimeDataPurger
                 DB::table($table)->delete();
             }
         });
+    }
+
+    private function shouldPurge(): bool
+    {
+        return (bool) config('dawah-share.runtime_data_purge.enabled', false);
     }
 }

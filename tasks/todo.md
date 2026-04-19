@@ -1,3 +1,72 @@
+# Restorable API Self-Delete Audit
+
+- [x] Inspect API self-delete, deleted-model snapshot, token revocation, and Filament restore flows
+- [x] Restore API self-delete to the restorable deletion path
+- [x] Add end-to-end regression tests for API self-delete snapshot retention and admin restore
+- [x] Run formatter, PHPStan, focused Pest tests, and repository policy checks
+- [x] Verify manually with curl-created API token and Chrome UI restore
+- [x] Record verification results
+
+## Review
+
+- API self-delete now uses the restorable `delete()` path again, keeps a sanitized `deleted_models` snapshot for grace-period admin restore, and still revokes transient credentials.
+- Expanded the user deletion snapshot around the product boundary:
+  - Shared/domain records are preserved and detached or nulled for restore: owned/submitted events, institution/speaker/reference/venue memberships, event memberships, contribution and moderation attribution, reports, verified donation channels, and verifier check-ins.
+  - User-private records are deleted into the snapshot and restored: saved events, going events, followings, registrations, check-ins, saved searches, social accounts, notification settings/rules/destinations/messages/deliveries, AI usage logs, affiliate runtime data, and role/permission pivots.
+  - Auth/session credentials are deleted and intentionally not restored: Sanctum tokens, sessions, password reset rows, Passport auth/access/refresh/device tokens.
+- Added a forward migration for already-migrated Passport tables whose `user_id` columns were still integer-backed locally; the create migrations and schema tests already expect UUID columns, but an existing database needed conversion.
+- Manual verification:
+  - Registered a disposable API user with curl, attached representative shared/private relationships and auth state, then deleted via `DELETE /api/v1/user`.
+  - Post-delete DB check: user row absent, sanitized deleted snapshot present, memberships/private rows captured, shared records nulled rather than deleted, all token/session/password reset/OAuth records gone.
+  - Restored through Chrome MCP on `https://admin.majlisilmu.test/deleted-users` as `superadmin@majlisilmu.my`.
+  - Post-restore DB check: user row restored, snapshot removed, one row restored for institution/speaker/reference/venue/event memberships, saved/going/following, owned/submitted events, registration/check-ins, saved search, social account, notification records, AI usage log, donation verification, and role pivot; credentials remained deleted.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/UserRestoreTest.php --filter='restores a deleted user together'` => 1 passed, 72 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/AuthApiTest.php --filter='deletes the authenticated user account'` => 1 passed, 18 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/UserRestoreTest.php --filter='restores an api self-deleted user'` => 1 passed, 43 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/UserRestoreTest.php` => 5 passed, 121 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/AuthApiTest.php` => 13 passed, 85 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/PassportSchemaTest.php` => 1 passed, 8 assertions
+  - `vendor/bin/pest --parallel --compact` => 1657 passed, 9263 assertions
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress` => pass
+  - `git diff --check` => pass
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app 2>/dev/null || true` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models 2>/dev/null || true` => no matches
+
+# Deleted User and Affiliate Audit Fixes
+
+- [x] Record fix checklist and inspect current code state
+- [x] Fix share-tracking owner-scope import/runtime issues
+- [x] Guard the affiliate runtime purge migration against accidental production data loss
+- [x] Align account deletion retention with the user-facing API contract
+- [x] Restrict deleted-user restore access to privileged admins
+- [x] Make user restore atomic and avoid overwriting records reassigned after deletion
+- [x] Preserve membership pivot metadata during delete/restore
+- [x] Add focused regression coverage for the fixes
+- [x] Run formatter, PHPStan, focused Pest tests, and repository policy checks
+- [x] Record verification results
+
+## Review
+
+- Account self-deletion uses the restorable deleted-model path so admins can restore during the grace period, while transient credentials are still revoked and not restored.
+- Sanitized deleted-user snapshots so `password` and `remember_token` are never kept, restored users atomically, preserved membership `joined_at` pivot metadata, and prevented restore from reclaiming records that were reassigned after deletion.
+- Guarded the affiliate runtime purge behind `dawah-share.runtime_data_purge.enabled` or an explicit `force: true` call, so the migration is no-op by default.
+- Restricted the deleted-users Filament page to `super_admin` users and added regression coverage for access.
+- Fixed affiliate signal ingestion so public affiliate telemetry is recorded against the global tracked property instead of inheriting the sharer's owner context.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/UserRestoreTest.php` => 4 passed, 36 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ShareTracking/AffiliateRuntimeDataPurgerTest.php` => 2 passed, 22 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/AuthApiTest.php` => 13 passed, 73 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/DawahShareImpactTest.php` => 39 passed, 289 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/SignalsIntegrationTest.php` => 5 passed, 20 assertions
+  - `vendor/bin/pest --parallel --compact` => 1656 passed, 9164 assertions
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress` => pass
+  - `git diff --check` => pass
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app packages 2>/dev/null || true` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models 2>/dev/null || true` => no matches
+
 # Frontend Catalog and Admin Preview Audit
 
 - [x] Revert the public country selector and public-country registry display field back to canonical `label`

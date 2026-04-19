@@ -88,18 +88,22 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         });
 
         static::deleting(function (User $user) {
-            $user->captureDeletedRelationsSnapshot();
+            if ($user->deletedRelationsSnapshot === []) {
+                $user->captureDeletedRelationsSnapshot();
+            }
 
             $user->socialAccounts()->each(fn ($account) => $account->delete());
-            $user->tokens()->delete();
+            $user->deleteAuthenticationState();
             $user->institutions()->detach();
             $user->speakers()->detach();
             $user->references()->detach();
+            DB::table('user_venue')->where('user_id', $user->id)->delete();
             $user->memberEvents()->detach();
             $user->savedEvents()->detach();
             $user->goingEvents()->detach();
 
             $user->ownedEvents()->update(['user_id' => null]);
+            $user->submittedEvents()->update(['submitter_id' => null]);
             $user->eventSubmissions()->update(['submitted_by' => null]);
             $user->contributionRequests()->update(['proposer_id' => null]);
             $user->reviewedContributionRequests()->update(['reviewer_id' => null]);
@@ -108,9 +112,12 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
             $user->moderationReviews()->update(['moderator_id' => null]);
             $user->reports()->update(['reporter_id' => null]);
             $user->handledReports()->update(['handled_by' => null]);
+            $user->verifiedDonationChannels()->update(['verified_by' => null]);
+            $user->verifiedEventCheckins()->update(['verified_by_user_id' => null]);
             $user->registrations()->each(fn ($reg) => $reg->delete());
             $user->eventCheckins()->each(fn ($checkin) => $checkin->delete());
             $user->savedSearches()->each(fn ($search) => $search->delete());
+            $user->aiUsageLogs()->each(fn ($log) => $log->delete());
             app(ShareTrackingService::class)->deleteUserTracking($user);
             $user->notificationSetting()->delete();
             $user->notificationRules()->each(fn ($rule) => $rule->delete());
@@ -124,11 +131,28 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     }
 
     /**
+     * Capture relationships before package-level deleting hooks detach permission rows.
+     */
+    #[\Override]
+    public function delete()
+    {
+        if ($this->exists && $this->deletedRelationsSnapshot === []) {
+            $this->captureDeletedRelationsSnapshot();
+        }
+
+        return parent::delete();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function attributesToKeep(): array
     {
-        return array_merge($this->deletedModelsAttributesToKeep(), [
+        $attributes = $this->deletedModelsAttributesToKeep();
+
+        unset($attributes['password'], $attributes['remember_token']);
+
+        return array_merge($attributes, [
             'deleted_relations_snapshot' => $this->deletedRelationsSnapshot,
             'deleted_affiliate_tracking_snapshot' => $this->deletedAffiliateTrackingSnapshot,
         ]);
@@ -137,10 +161,12 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     public static function restoreDeletedUser(mixed $key): self
     {
         /** @var self $restoredUser */
-        $restoredUser = self::restore($key, static function (Model $restoredModel, DeletedModel $deletedModel): void {
+        $restoredUser = DB::transaction(static fn (): Model => self::restore($key, static function (Model $restoredModel, DeletedModel $deletedModel): void {
+            unset($deletedModel);
+
             unset($restoredModel->deleted_relations_snapshot);
             unset($restoredModel->deleted_affiliate_tracking_snapshot);
-        });
+        }));
 
         return $restoredUser;
     }
@@ -170,6 +196,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
                 return [
                     'institution_id' => $institution->getKey(),
                     'user_id' => $this->getKey(),
+                    'joined_at' => $this->pivotTimestamp($institution, 'joined_at'),
                     'created_at' => $this->pivotTimestamp($institution, 'created_at'),
                     'updated_at' => $this->pivotTimestamp($institution, 'updated_at'),
                 ];
@@ -178,6 +205,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
                 return [
                     'speaker_id' => $speaker->getKey(),
                     'user_id' => $this->getKey(),
+                    'joined_at' => $this->pivotTimestamp($speaker, 'joined_at'),
                     'created_at' => $this->pivotTimestamp($speaker, 'created_at'),
                     'updated_at' => $this->pivotTimestamp($speaker, 'updated_at'),
                 ];
@@ -186,10 +214,16 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
                 return [
                     'reference_id' => $reference->getKey(),
                     'user_id' => $this->getKey(),
+                    'joined_at' => $this->pivotTimestamp($reference, 'joined_at'),
                     'created_at' => $this->pivotTimestamp($reference, 'created_at'),
                     'updated_at' => $this->pivotTimestamp($reference, 'updated_at'),
                 ];
             })->all(),
+            'user_venue' => DB::table('user_venue')
+                ->where('user_id', $this->id)
+                ->get()
+                ->map(fn (object $row): array => (array) $row)
+                ->all(),
             'event_saves' => $this->savedEvents()->get()->map(function (Event $event): array {
                 return [
                     'event_id' => $event->getKey(),
@@ -215,7 +249,10 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
                     'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
                 ];
             })->all(),
+            'model_has_roles' => $this->permissionRows('model_has_roles'),
+            'model_has_permissions' => $this->permissionRows('model_has_permissions'),
             'owned_event_ids' => $this->ownedEvents()->pluck('id')->all(),
+            'submitted_event_ids' => $this->submittedEvents()->pluck('id')->all(),
             'event_submission_ids' => $this->eventSubmissions()->pluck('id')->all(),
             'contribution_request_proposer_ids' => $this->contributionRequests()->pluck('id')->all(),
             'contribution_request_reviewer_ids' => $this->reviewedContributionRequests()->pluck('id')->all(),
@@ -224,10 +261,13 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
             'moderation_review_ids' => $this->moderationReviews()->pluck('id')->all(),
             'report_ids' => $this->reports()->pluck('id')->all(),
             'handled_report_ids' => $this->handledReports()->pluck('id')->all(),
+            'verified_donation_channel_ids' => $this->verifiedDonationChannels()->pluck('id')->all(),
+            'verified_event_checkin_ids' => $this->verifiedEventCheckins()->pluck('id')->all(),
             'social_accounts' => $this->socialAccounts()->get()->map->attributesToArray()->all(),
             'registrations' => $this->registrations()->get()->map->attributesToArray()->all(),
             'event_checkins' => $this->eventCheckins()->get()->map->attributesToArray()->all(),
             'saved_searches' => $this->savedSearches()->get()->map->attributesToArray()->all(),
+            'ai_usage_logs' => $this->aiUsageLogs()->get()->map->attributesToArray()->all(),
             'notification_setting' => $this->notificationSetting?->attributesToArray(),
             'notification_rules' => $this->notificationRules()->get()->map->attributesToArray()->all(),
             'notification_destinations' => $this->notificationDestinations()->get()->map->attributesToArray()->all(),
@@ -249,6 +289,29 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         ];
 
         $this->captureDeletedAffiliateTrackingSnapshot();
+    }
+
+    protected function deleteAuthenticationState(): void
+    {
+        $this->tokens()->delete();
+
+        DB::table('sessions')->where('user_id', $this->id)->delete();
+        DB::table('password_reset_tokens')->where('email', $this->email)->delete();
+        DB::table('oauth_auth_codes')->where('user_id', $this->id)->delete();
+        DB::table('oauth_device_codes')->where('user_id', $this->id)->delete();
+
+        $passportAccessTokenIds = DB::table('oauth_access_tokens')
+            ->where('user_id', $this->id)
+            ->pluck('id')
+            ->all();
+
+        if ($passportAccessTokenIds !== []) {
+            DB::table('oauth_refresh_tokens')
+                ->whereIn('access_token_id', $passportAccessTokenIds)
+                ->delete();
+        }
+
+        DB::table('oauth_access_tokens')->where('user_id', $this->id)->delete();
     }
 
     protected function captureDeletedAffiliateTrackingSnapshot(): void
@@ -294,14 +357,19 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         DB::table('institution_user')->insertOrIgnore($this->snapshotRows($snapshot, 'institution_user'));
         DB::table('speaker_user')->insertOrIgnore($this->snapshotRows($snapshot, 'speaker_user'));
         DB::table('reference_user')->insertOrIgnore($this->snapshotRows($snapshot, 'reference_user'));
+        DB::table('user_venue')->insertOrIgnore($this->snapshotRows($snapshot, 'user_venue'));
         DB::table('event_saves')->insertOrIgnore($this->snapshotRows($snapshot, 'event_saves'));
         DB::table('event_attendees')->insertOrIgnore($this->snapshotRows($snapshot, 'event_attendees'));
         DB::table('event_user')->insertOrIgnore($this->snapshotRows($snapshot, 'event_user'));
+        DB::table($this->permissionTable('model_has_roles'))->insertOrIgnore($this->snapshotRows($snapshot, 'model_has_roles'));
+        DB::table($this->permissionTable('model_has_permissions'))->insertOrIgnore($this->snapshotRows($snapshot, 'model_has_permissions'));
         DB::table('followings')->insertOrIgnore(collect($this->snapshotRows($snapshot, 'followings'))->map(function (array $row): array {
             return array_merge([
                 'user_id' => $this->id,
             ], $row);
         })->all());
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     /**
@@ -310,6 +378,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     protected function restoreReassignedRelations(array $snapshot): void
     {
         $this->restoreForeignKeyRelation('ownedEvents', 'user_id', $this->snapshotIds($snapshot, 'owned_event_ids'));
+        $this->restoreForeignKeyRelation('submittedEvents', 'submitter_id', $this->snapshotIds($snapshot, 'submitted_event_ids'));
         $this->restoreForeignKeyRelation('eventSubmissions', 'submitted_by', $this->snapshotIds($snapshot, 'event_submission_ids'));
         $this->restoreForeignKeyRelation('contributionRequests', 'proposer_id', $this->snapshotIds($snapshot, 'contribution_request_proposer_ids'));
         $this->restoreForeignKeyRelation('reviewedContributionRequests', 'reviewer_id', $this->snapshotIds($snapshot, 'contribution_request_reviewer_ids'));
@@ -318,6 +387,8 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         $this->restoreForeignKeyRelation('moderationReviews', 'moderator_id', $this->snapshotIds($snapshot, 'moderation_review_ids'));
         $this->restoreForeignKeyRelation('reports', 'reporter_id', $this->snapshotIds($snapshot, 'report_ids'));
         $this->restoreForeignKeyRelation('handledReports', 'handled_by', $this->snapshotIds($snapshot, 'handled_report_ids'));
+        $this->restoreForeignKeyRelation('verifiedDonationChannels', 'verified_by', $this->snapshotIds($snapshot, 'verified_donation_channel_ids'));
+        $this->restoreForeignKeyRelation('verifiedEventCheckins', 'verified_by_user_id', $this->snapshotIds($snapshot, 'verified_event_checkin_ids'));
     }
 
     protected function restoreDeletedAffiliateTrackingSnapshot(mixed $record): void
@@ -369,6 +440,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         $this->restoreChildModels('registrations', $this->snapshotRows($snapshot, 'registrations'));
         $this->restoreChildModels('eventCheckins', $this->snapshotRows($snapshot, 'event_checkins'));
         $this->restoreChildModels('savedSearches', $this->snapshotRows($snapshot, 'saved_searches'));
+        $this->restoreChildModels('aiUsageLogs', $this->snapshotRows($snapshot, 'ai_usage_logs'));
         $this->restoreSingleChildModel('notificationSetting', $snapshot['notification_setting'] ?? null);
         $this->restoreChildModels('notificationRules', $this->snapshotRows($snapshot, 'notification_rules'));
         $this->restoreChildModels('notificationDestinations', $this->snapshotRows($snapshot, 'notification_destinations'));
@@ -427,7 +499,10 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
 
         $modelClass = $this->{$relationName}()->getRelated()::class;
 
-        $modelClass::query()->whereKey($ids)->update([$foreignKey => $this->id]);
+        $modelClass::query()
+            ->whereKey($ids)
+            ->whereNull($foreignKey)
+            ->update([$foreignKey => $this->id]);
     }
 
     private function pivotTimestamp(Model $model, string $attribute): ?string
@@ -481,6 +556,33 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
             ->filter(fn (mixed $id): bool => is_int($id) || is_string($id))
             ->values()
             ->all();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function permissionRows(string $tableKey): array
+    {
+        return DB::table($this->permissionTable($tableKey))
+            ->where($this->permissionModelKeyName(), $this->getKey())
+            ->where('model_type', $this->getMorphClass())
+            ->get()
+            ->map(fn (object $row): array => (array) $row)
+            ->all();
+    }
+
+    private function permissionTable(string $tableKey): string
+    {
+        $table = config("permission.table_names.{$tableKey}");
+
+        return is_string($table) && $table !== '' ? $table : $tableKey;
+    }
+
+    private function permissionModelKeyName(): string
+    {
+        $key = config('permission.column_names.model_morph_key');
+
+        return is_string($key) && $key !== '' ? $key : 'model_id';
     }
 
     /**
@@ -599,6 +701,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     public function institutions(): BelongsToMany
     {
         return $this->belongsToMany(Institution::class, 'institution_user')
+            ->withPivot(['joined_at'])
             ->withTimestamps();
     }
 
@@ -608,6 +711,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'speaker_user')
+            ->withPivot(['joined_at'])
             ->withTimestamps();
     }
 
@@ -648,7 +752,26 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     public function references(): BelongsToMany
     {
         return $this->belongsToMany(Reference::class, 'reference_user')
+            ->withPivot(['joined_at'])
             ->withTimestamps();
+    }
+
+    /**
+     * @return BelongsToMany<Venue, $this>
+     */
+    public function venues(): BelongsToMany
+    {
+        return $this->belongsToMany(Venue::class, 'user_venue')
+            ->withPivot(['joined_at'])
+            ->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<Event, $this>
+     */
+    public function submittedEvents(): HasMany
+    {
+        return $this->hasMany(Event::class, 'submitter_id');
     }
 
     /**
@@ -732,6 +855,14 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     }
 
     /**
+     * @return HasMany<EventCheckin, $this>
+     */
+    public function verifiedEventCheckins(): HasMany
+    {
+        return $this->hasMany(EventCheckin::class, 'verified_by_user_id');
+    }
+
+    /**
      * @return HasMany<SocialAccount, $this>
      */
     public function socialAccounts(): HasMany
@@ -745,6 +876,14 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     public function savedSearches(): HasMany
     {
         return $this->hasMany(SavedSearch::class);
+    }
+
+    /**
+     * @return HasMany<AiUsageLog, $this>
+     */
+    public function aiUsageLogs(): HasMany
+    {
+        return $this->hasMany(AiUsageLog::class);
     }
 
     /**
@@ -834,6 +973,14 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     public function ownedEvents(): HasMany
     {
         return $this->hasMany(Event::class);
+    }
+
+    /**
+     * @return HasMany<DonationChannel, $this>
+     */
+    public function verifiedDonationChannels(): HasMany
+    {
+        return $this->hasMany(DonationChannel::class, 'verified_by');
     }
 
     /**
