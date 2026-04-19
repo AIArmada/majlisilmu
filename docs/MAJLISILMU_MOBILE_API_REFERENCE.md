@@ -23,6 +23,8 @@ If you are building an AI client, use this read order:
 6. Send raw timestamp fields in UTC. For date-only filters, send the user's local calendar date together with timezone context so the server can convert it to UTC boundaries.
 7. Treat `error.code` as the machine-readable failure classifier and `meta.request_id` as the trace identifier for retries and support.
 
+If you are evaluating the MCP connector rather than the raw HTTP admin API, switch to `docs/MAJLISILMU_MCP_GUIDE.md`. The MCP server is intentionally sanitized and does not expose the same write-schema surface as `/api/v1/admin`.
+
 ---
 
 ## Quick-reference: Routing Surfaces
@@ -523,6 +525,10 @@ Authorization note:
 
 ## 2B. Admin API Foundation
 
+> **Read this section as the raw HTTP admin contract, not the MCP contract.**
+> The Filament admin panel, the HTTP admin API, and the MCP admin server share the same domain model, but they are not identical surfaces.
+> In particular, the MCP guide documents the sanitized `/mcp/admin` behavior, while this document describes `/api/v1/admin`.
+
 For authenticated users who can access the Filament admin panel, an admin surface is available under `/api/v1/admin`. This follows Filament resource discovery and authorization at the resource/record level, and is intended for admin apps and agents that need to browse and, for selected resources, mutate what the admin panel can currently expose.
 
 Current scope:
@@ -535,10 +541,13 @@ Current scope:
 - Named relation traversal for related admin records
 - Shared create/update write support for `speakers`, `institutions`, `venues`, `references`, `events`, and `subdistricts`
 - Optional `validate_only=true` preview mode for admin create/update requests
+- `current_media` is metadata only; it is useful for pre-populating edit forms, but it does not expose signed or temporary file URLs
+- User record payloads intentionally redact sensitive fields such as `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`
 
 Current limitation:
 
 - This is not yet full create-edit-delete parity for every complex Filament workflow. Write support currently exists only where the Filament save path has been extracted into reusable actions.
+- Do not infer destructive behavior from HTTP method alone. The write endpoints are schema-guided and the underlying save actions merge optional omitted fields where that resource is designed to preserve them.
 
 ### Admin endpoints
 
