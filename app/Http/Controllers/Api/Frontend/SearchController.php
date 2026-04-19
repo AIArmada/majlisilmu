@@ -66,6 +66,7 @@ class SearchController extends FrontendController
         'id',
         'slug',
         'name',
+        'type',
         'nickname',
         'display_name',
         'events_count',
@@ -83,6 +84,7 @@ class SearchController extends FrontendController
         'id',
         'slug',
         'name',
+        'gender',
         'formatted_name',
         'status',
         'is_active',
@@ -170,7 +172,7 @@ class SearchController extends FrontendController
     #[QueryParameter('lat', 'Current device latitude. Provide with `lng` to filter institutions within `radius_km`.', required: false, type: 'number', infer: false, example: 3.139)]
     #[QueryParameter('lng', 'Current device longitude. Provide with `lat` to filter institutions within `radius_km`.', required: false, type: 'number', infer: false, example: 101.6869)]
     #[QueryParameter('radius_km', 'Nearby search radius in kilometers. Values are clamped from 1 to 100 and default to 15 when `lat` and `lng` are present.', required: false, type: 'integer', infer: false, default: 15, example: 15)]
-    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, name, nickname, display_name, events_count, public_image_url, logo_url, cover_url, country, location, distance_km, is_following.', required: false, type: 'string', infer: false, example: 'id,name,location')]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, name, type, nickname, display_name, events_count, public_image_url, logo_url, cover_url, country, location, distance_km, is_following.', required: false, type: 'string', infer: false, example: 'id,name,location')]
     #[QueryParameter('type', 'Optional institution type filter.', required: false, type: 'string', infer: false, example: 'masjid')]
     #[QueryParameter('country_id', 'Optional country filter.', required: false, type: 'integer', infer: false, example: 132)]
     #[QueryParameter('state_id', 'Optional state filter.', required: false, type: 'integer', infer: false, example: 14)]
@@ -289,7 +291,7 @@ class SearchController extends FrontendController
         title: 'List public speakers',
         description: 'Returns the public speaker directory with search, location, gender, and follow-state filters.',
     )]
-    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, name, formatted_name, status, is_active, events_count, avatar_url, country, is_following.', required: false, type: 'string', infer: false, example: 'id,name,avatar_url')]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, name, gender, formatted_name, status, is_active, events_count, avatar_url, country, is_following.', required: false, type: 'string', infer: false, example: 'id,name,avatar_url')]
     #[Response(
         status: 200,
         description: 'Speaker directory response.',

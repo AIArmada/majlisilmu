@@ -421,7 +421,7 @@ class EventSearchService
             }
         }
 
-        foreach (['moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids'] as $roleSpecificFilter) {
+        foreach (['person_in_charge_ids', 'moderator_ids', 'imam_ids', 'khatib_ids', 'bilal_ids'] as $roleSpecificFilter) {
             if (! empty($filters[$roleSpecificFilter])) {
                 $roleSpecificIds = $this->normalizeArrayFilter($filters[$roleSpecificFilter]);
 
@@ -608,6 +608,7 @@ class EventSearchService
         }
 
         foreach ([
+            'person_in_charge_ids' => EventKeyPersonRole::PersonInCharge,
             'moderator_ids' => EventKeyPersonRole::Moderator,
             'imam_ids' => EventKeyPersonRole::Imam,
             'khatib_ids' => EventKeyPersonRole::Khatib,
@@ -623,6 +624,26 @@ class EventSearchService
                 $keyPersonQuery
                     ->where('role', $role->value)
                     ->whereIn('speaker_id', $roleSpecificIds);
+            });
+        }
+
+        $personInChargeSearch = $this->normalizeTextFilter($filters['person_in_charge_search'] ?? null);
+
+        if ($personInChargeSearch !== null) {
+            $operator = $this->databaseLikeOperator();
+
+            $queryBuilder->whereHas('keyPeople', function (Builder $keyPersonQuery) use ($operator, $personInChargeSearch): void {
+                $keyPersonQuery
+                    ->where('role', EventKeyPersonRole::PersonInCharge->value)
+                    ->where(function (Builder $personInChargeQuery) use ($operator, $personInChargeSearch): void {
+                        $personInChargeQuery
+                            ->where('name', $operator, "%{$personInChargeSearch}%")
+                            ->orWhereHas('speaker', function (Builder $speakerQuery) use ($operator, $personInChargeSearch): void {
+                                $speakerQuery
+                                    ->where('speakers.name', $operator, "%{$personInChargeSearch}%")
+                                    ->orWhere('speakers.searchable_name', $operator, "%{$personInChargeSearch}%");
+                            });
+                    });
             });
         }
 
@@ -1121,6 +1142,17 @@ class EventSearchService
         return null;
     }
 
+    protected function normalizeTextFilter(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return $normalized === '' ? null : $normalized;
+    }
+
     protected function normalizePrayerTimeFilter(mixed $value): ?string
     {
         if (! is_string($value)) {
@@ -1222,6 +1254,7 @@ class EventSearchService
     {
         return $this->normalizePrayerTimeFilter($filters['prayer_time'] ?? null) !== null
             || $this->normalizeArrayFilter($filters['language_codes'] ?? null) !== []
+            || $this->normalizeTextFilter($filters['person_in_charge_search'] ?? null) !== null
             || $this->normalizeTimingModeFilter($filters['timing_mode'] ?? null) !== null
             || $this->normalizeTimeFilter($filters['starts_time_from'] ?? null) !== null
             || $this->normalizeTimeFilter($filters['starts_time_until'] ?? null) !== null

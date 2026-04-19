@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\EventFormat;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\PrayerReference;
@@ -1422,6 +1423,74 @@ describe('Event Search Filters', function () {
             ->assertSee('Tafsir Session')
             ->assertDontSee('Fiqh Session')
             ->assertSee('Tafsir');
+    });
+
+    it('filters events by PIC linked profile and free-text name', function () {
+        $linkedPic = Speaker::factory()->create([
+            'name' => 'Ustaz Linked PIC',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $linkedPicEvent = createVisibleEventForSearch([
+            'title' => 'Linked PIC Majlis',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+        ]);
+        $linkedPicEvent->keyPeople()->create([
+            'role' => EventKeyPersonRole::PersonInCharge,
+            'speaker_id' => $linkedPic->id,
+            'order_column' => 1,
+            'is_public' => true,
+        ]);
+
+        $freeTextPicEvent = createVisibleEventForSearch([
+            'title' => 'Free Text PIC Majlis',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(2),
+        ]);
+        $freeTextPicEvent->keyPeople()->create([
+            'role' => EventKeyPersonRole::PersonInCharge,
+            'name' => 'Encik Free Text Penyelaras',
+            'order_column' => 1,
+            'is_public' => true,
+        ]);
+
+        $otherEvent = createVisibleEventForSearch([
+            'title' => 'Other Majlis',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(3),
+        ]);
+        $otherEvent->keyPeople()->create([
+            'role' => EventKeyPersonRole::Moderator,
+            'name' => 'Encik Free Text Penyelaras',
+            'order_column' => 1,
+            'is_public' => true,
+        ]);
+
+        $linkedProfileQuery = http_build_query(['person_in_charge_ids' => [$linkedPic->id]]);
+
+        $this->get(eventsIndexUrl($linkedProfileQuery))
+            ->assertOk()
+            ->assertSee('Linked PIC Majlis')
+            ->assertSee('PIC / Coordinator: Ustaz Linked PIC')
+            ->assertDontSee('Free Text PIC Majlis')
+            ->assertDontSee('Other Majlis');
+
+        $freeTextQuery = http_build_query(['person_in_charge_search' => 'Free Text']);
+
+        $this->get(eventsIndexUrl($freeTextQuery))
+            ->assertOk()
+            ->assertSee('Free Text PIC Majlis')
+            ->assertSee('PIC / Coordinator Name: Free Text')
+            ->assertDontSee('Linked PIC Majlis')
+            ->assertDontSee('Other Majlis');
     });
 
     it('filters events by selected kategori (domain tags)', function () {

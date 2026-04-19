@@ -8,9 +8,9 @@ use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Contracts\Support\Arrayable;
 
 /**
- * @phpstan-type EventSummaryInstitutionArray array{id: string, name: string, slug: string, display_name: ?string, public_image_url: ?string, logo_url: ?string}
+ * @phpstan-type EventSummaryInstitutionArray array{id: string, name: string, slug: string, type: string|null, display_name: ?string, public_image_url: ?string, logo_url: ?string}
  * @phpstan-type EventSummaryVenueArray array{id: string, name: string, slug: string}
- * @phpstan-type EventSummarySpeakerArray array{id: string, name: string, formatted_name: string, slug: string, avatar_url: ?string}
+ * @phpstan-type EventSummarySpeakerArray array{id: string, name: string, gender: string|null, formatted_name: string, slug: string, avatar_url: ?string}
  * @phpstan-type EventSummaryArray array{id: string, slug: string, title: string, starts_at: ?string, starts_at_local: ?string, starts_on_local_date: ?string, ends_at: ?string, ends_at_local: ?string, timing_display: ?string, prayer_display_text: ?string, end_time_display: ?string, visibility: string, status: string, status_label: string, event_type: list<string>, event_type_label: ?string, event_format: string, event_format_label: ?string, reference_study_subtitle: ?string, location: ?string, is_remote: bool, is_pending: bool, is_cancelled: bool, has_poster: bool, poster_url: ?string, card_image_url: ?string, institution: EventSummaryInstitutionArray|null, venue: EventSummaryVenueArray|null, speakers: list<EventSummarySpeakerArray>}
  *
  * @implements Arrayable<string, mixed>
@@ -20,9 +20,9 @@ final readonly class EventSummary implements Arrayable
 {
     /**
      * @param  list<string>  $event_type
-     * @param  array{id: string, name: string, slug: string, display_name: ?string, public_image_url: ?string, logo_url: ?string}|null  $institution
+     * @param  array{id: string, name: string, slug: string, type: string|null, display_name: ?string, public_image_url: ?string, logo_url: ?string}|null  $institution
      * @param  array{id: string, name: string, slug: string}|null  $venue
-     * @param  list<array{id: string, name: string, formatted_name: string, slug: string, avatar_url: ?string}>  $speakers
+     * @param  list<array{id: string, name: string, gender: string|null, formatted_name: string, slug: string, avatar_url: ?string}>  $speakers
      */
     public function __construct(
         public string $id,

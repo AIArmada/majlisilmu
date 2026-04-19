@@ -2,6 +2,7 @@
 
 namespace App\Data\Api\Frontend\Search;
 
+use App\Enums\InstitutionType;
 use App\Models\Institution;
 use App\Models\User;
 use App\Support\Location\AddressHierarchyFormatter;
@@ -16,6 +17,7 @@ class InstitutionListData extends Data
         public string $id,
         public string $slug,
         public string $name,
+        public ?string $type,
         public ?string $nickname,
         public string $display_name,
         public int $events_count,
@@ -31,6 +33,10 @@ class InstitutionListData extends Data
     public static function fromModel(Institution $institution, ?User $user = null): self
     {
         $attributes = $institution->getAttributes();
+        $type = $institution->type;
+        $institutionType = $type instanceof InstitutionType
+            ? $type->value
+            : (is_string($type) ? $type : null);
         $isFollowing = array_key_exists('is_following', $attributes)
             ? (bool) $attributes['is_following']
             : ($user?->isFollowing($institution) ?? false);
@@ -49,6 +55,7 @@ class InstitutionListData extends Data
             id: (string) $institution->id,
             slug: (string) $institution->slug,
             name: (string) $institution->name,
+            type: $institutionType,
             nickname: $institution->nickname,
             display_name: (string) $institution->display_name,
             events_count: $eventsCount,

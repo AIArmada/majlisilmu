@@ -536,7 +536,7 @@ Current scope:
 - Resource manifest and capability discovery
 - Per-resource metadata
 - Resource-specific write schema discovery for supported resources
-- Generic record listing with search
+- Generic record listing with search and resource-specific filters
 - Generic record detail with per-record abilities
 - Named relation traversal for related admin records
 - Shared create/update write support for `speakers`, `institutions`, `venues`, `references`, `events`, and `subdistricts`
@@ -557,7 +557,7 @@ Current limitation:
 | `GET` | `/admin/{resourceKey}/meta` | Required Filament admin-panel access | Return metadata, pages, relations, abilities, and write-support flags for one admin resource |
 | `GET` | `/admin/{resourceKey}/schema?operation=create` | Required Filament admin-panel access | Return the create contract for supported write resources |
 | `GET` | `/admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` | Required Filament admin-panel access | Return the update contract plus current defaults/media for one supported record |
-| `GET` | `/admin/{resourceKey}` | Required Filament admin-panel access | Paginated record listing for the selected resource |
+| `GET` | `/admin/{resourceKey}` | Required Filament admin-panel access | Paginated record listing for the selected resource. Supports search, date filters, and resource-specific `filter[...]` query parameters when available |
 | `GET` | `/admin/{resourceKey}/{recordKey}/relations/{relation}` | Required Filament admin-panel access | Paginated listing for a named relation on one admin record |
 | `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources, or add `?validate_only=1` to preview the normalized payload and warnings without persisting |
 | `GET` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
@@ -575,6 +575,8 @@ Preview responses include:
 - `data.preview.current_record` for updates so you can compare the existing state against the previewed payload
 
 > **Record-key format:** `{recordKey}` in GET and PUT admin record routes should use the `route_key` field returned by the admin collection or detail endpoints.
+
+> **Record filtering:** speaker admin collections support `filter[status]`, `filter[is_active]`, and `filter[has_events]`. Date-aware admin collections also support `starts_after`, `starts_before`, and `starts_on_local_date`.
 
 Authorization note:
 

@@ -524,6 +524,11 @@ it('filters events by the dhuha group using morning events while excluding subuh
 it('filters events by key person roles and role-specific linked speakers', function () {
     $imamSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
     $moderatorSpeaker = Speaker::factory()->create(['status' => 'verified', 'is_active' => true]);
+    $personInChargeSpeaker = Speaker::factory()->create([
+        'name' => 'Ustaz API PIC',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
 
     $imamEvent = Event::factory()->create([
         'status' => 'approved',
@@ -551,6 +556,34 @@ it('filters events by key person roles and role-specific linked speakers', funct
         'is_public' => true,
     ]);
 
+    $personInChargeEvent = Event::factory()->create([
+        'title' => 'API Linked PIC Event',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $personInChargeEvent->keyPeople()->create([
+        'role' => EventKeyPersonRole::PersonInCharge,
+        'speaker_id' => $personInChargeSpeaker->id,
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
+    $freeTextPersonInChargeEvent = Event::factory()->create([
+        'title' => 'API Free Text PIC Event',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $freeTextPersonInChargeEvent->keyPeople()->create([
+        'role' => EventKeyPersonRole::PersonInCharge,
+        'name' => 'Encik API Free Text PIC',
+        'order_column' => 1,
+        'is_public' => true,
+    ]);
+
     $roleResponse = $this->getJson('/api/v1/events?filter[key_person_roles]=imam');
 
     $roleResponse->assertOk();
@@ -570,6 +603,27 @@ it('filters events by key person roles and role-specific linked speakers', funct
     expect($speakerEventIds)
         ->toContain($moderatedEvent->id)
         ->not()->toContain($imamEvent->id);
+
+    $personInChargeResponse = $this->getJson('/api/v1/events?filter[person_in_charge_ids]='.$personInChargeSpeaker->id);
+
+    $personInChargeResponse->assertOk();
+
+    $personInChargeEventIds = collect($personInChargeResponse->json('data'))->pluck('id')->all();
+
+    expect($personInChargeEventIds)
+        ->toContain($personInChargeEvent->id)
+        ->not()->toContain($freeTextPersonInChargeEvent->id);
+
+    $freeTextPersonInChargeResponse = $this->getJson('/api/v1/events?filter[person_in_charge_search]=Free%20Text%20PIC');
+
+    $freeTextPersonInChargeResponse->assertOk();
+
+    $freeTextPersonInChargeEventIds = collect($freeTextPersonInChargeResponse->json('data'))->pluck('id')->all();
+
+    expect($freeTextPersonInChargeEventIds)
+        ->toContain($freeTextPersonInChargeEvent->id)
+        ->not()->toContain($personInChargeEvent->id)
+        ->not()->toContain($moderatedEvent->id);
 });
 
 it('includes reference study subtitle in the generic paginated events payload', function () {

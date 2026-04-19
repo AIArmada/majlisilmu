@@ -38,7 +38,7 @@ return [
 
     Public routes (/api/v1/speakers, /api/v1/institutions, etc.) return only active and verified records (is_active=true AND status=verified).
 
-    Admin routes (/api/v1/admin/speakers, etc.) return all records regardless of active or status state.
+    Admin routes (/api/v1/admin/speakers, etc.) return all records by default. Speaker collections expose explicit filters such as filter[status], filter[is_active], and filter[has_events], and date-aware admin resources also accept starts_after, starts_before, and starts_on_local_date.
 
     The same search= parameter on both surfaces returns different result sets by design.
 

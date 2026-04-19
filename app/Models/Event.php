@@ -420,6 +420,29 @@ class Event extends Model implements AuditableContract, HasMedia
             ->values()
             ->all();
 
+        $personInChargeIds = $keyPeople
+            ->where('role', EventKeyPersonRole::PersonInCharge)
+            ->pluck('speaker_id')
+            ->filter(fn (mixed $speakerId): bool => is_string($speakerId) && $speakerId !== '')
+            ->values()
+            ->all();
+
+        $personInChargeNames = $keyPeople
+            ->where('role', EventKeyPersonRole::PersonInCharge)
+            ->map(function (EventKeyPerson $keyPerson): string {
+                if ($keyPerson->speaker instanceof Speaker) {
+                    $searchableName = trim((string) $keyPerson->speaker->searchable_name);
+
+                    return $searchableName !== '' ? $searchableName : (string) $keyPerson->speaker->name;
+                }
+
+                return (string) ($keyPerson->name ?? '');
+            })
+            ->filter(fn (string $name): bool => trim($name) !== '')
+            ->unique()
+            ->values()
+            ->implode(', ');
+
         $moderatorIds = $keyPeople
             ->where('role', EventKeyPersonRole::Moderator)
             ->pluck('speaker_id')
@@ -504,6 +527,8 @@ class Event extends Model implements AuditableContract, HasMedia
                 ->all(),
             'key_person_roles' => $keyPersonRoles,
             'key_person_speaker_ids' => $keyPersonSpeakerIds,
+            'person_in_charge_ids' => $personInChargeIds,
+            'person_in_charge_names' => $personInChargeNames,
             'moderator_ids' => $moderatorIds,
             'imam_ids' => $imamIds,
             'khatib_ids' => $khatibIds,

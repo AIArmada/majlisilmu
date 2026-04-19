@@ -35,6 +35,12 @@ class ResourceController extends Controller
 
     #[PathParameter('resourceKey', 'Admin resource key from `GET /admin/manifest`, for example `events`, `institutions`, or `speakers`.', example: 'events')]
     #[QueryParameter('search', 'Optional free-text search across the resource\'s searchable columns.', required: false, type: 'string', infer: false, example: 'maghrib')]
+    #[QueryParameter('filter[status]', 'Optional status filter for resources that expose a status filter. Speakers accept `pending`, `verified`, and `rejected`.', required: false, type: 'string', infer: false, example: 'verified')]
+    #[QueryParameter('filter[is_active]', 'Optional active-state filter for resources that expose it. Use `true` or `false`.', required: false, type: 'boolean', infer: false, example: true)]
+    #[QueryParameter('filter[has_events]', 'Optional event-history filter for speaker resources. Use `true` for speakers linked to at least one event and `false` for speakers with no linked events.', required: false, type: 'boolean', infer: false, example: true)]
+    #[QueryParameter('starts_after', 'Optional date filter for date-aware admin resources. Interpreted in the resolved request timezone and converted to UTC before querying.', required: false, type: 'string', infer: false, example: '2026-04-12')]
+    #[QueryParameter('starts_before', 'Optional date filter for date-aware admin resources. Interpreted in the resolved request timezone and converted to UTC before querying.', required: false, type: 'string', infer: false, example: '2026-04-12')]
+    #[QueryParameter('starts_on_local_date', 'Optional local-date filter for date-aware admin resources. Interpreted in the resolved request timezone and converted to UTC day boundaries before querying.', required: false, type: 'string', infer: false, example: '2026-04-12')]
     #[QueryParameter('page', 'Pagination page number.', required: false, type: 'integer', infer: false, default: 1, example: 1)]
     #[QueryParameter('per_page', 'Pagination page size. Values are clamped to the server\'s allowed range.', required: false, type: 'integer', infer: false, default: 15, example: 15)]
     #[Endpoint(
@@ -49,6 +55,10 @@ class ResourceController extends Controller
             search: (string) $request->query('search', ''),
             page: $request->integer('page', 1),
             perPage: $request->integer('per_page', 15),
+            filters: $this->queryFilters($request),
+            startsAfter: $this->queryString($request, 'starts_after'),
+            startsBefore: $this->queryString($request, 'starts_before'),
+            startsOnLocalDate: $this->queryString($request, 'starts_on_local_date'),
         ));
     }
 
@@ -148,6 +158,30 @@ class ResourceController extends Controller
     public function showRecord(string $resourceKey, string $recordKey): JsonResponse
     {
         return response()->json($this->resourceService->showRecord($resourceKey, $recordKey));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function queryFilters(Request $request): array
+    {
+        $filterBag = $request->query('filter');
+        $filters = is_array($filterBag) ? $filterBag : [];
+
+        $legacyFilters = array_filter([
+            'status' => $request->query('status'),
+            'is_active' => $request->query('is_active'),
+            'has_events' => $request->query('has_events'),
+        ], static fn (mixed $value): bool => $value !== null);
+
+        return array_merge($legacyFilters, $filters);
+    }
+
+    private function queryString(Request $request, string $key): ?string
+    {
+        $value = $request->query($key);
+
+        return is_string($value) ? $value : null;
     }
 
     private function currentUser(Request $request): ?User

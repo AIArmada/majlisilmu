@@ -71,6 +71,21 @@ it('creates an address when only a google maps url is provided', function () {
     expect(abs(((float) $address?->lng) - 101.686855))->toBeLessThan(0.000001);
 });
 
+it('preserves omitted address geo fields when preparing partial update payloads', function () {
+    $prepared = SharedFormSchema::prepareAddressPersistenceData([
+        'country_id' => 132,
+        'line1' => 'Jalan Duta',
+    ]);
+
+    expect($prepared)->toHaveKey('country_id')
+        ->and($prepared)->toHaveKey('line1')
+        ->and($prepared)->not->toHaveKey('lat')
+        ->and($prepared)->not->toHaveKey('lng')
+        ->and($prepared)->not->toHaveKey('google_maps_url')
+        ->and($prepared)->not->toHaveKey('google_place_id')
+        ->and($prepared)->not->toHaveKey('waze_url');
+});
+
 it('preserves explicit google place metadata when creating an address from form data', function () {
     $institution = Institution::factory()->create();
     $institution->address()->delete();

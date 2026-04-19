@@ -163,6 +163,10 @@ it('deduplicates key person roles in the searchable payload', function () {
 
     $moderator = Speaker::factory()->create();
     $imam = Speaker::factory()->create();
+    $personInCharge = Speaker::factory()->create([
+        'name' => 'Ustaz Searchable PIC',
+        'searchable_name' => 'ustaz searchable pic',
+    ]);
 
     $event->keyPeople()->create([
         'speaker_id' => $moderator->getKey(),
@@ -182,15 +186,32 @@ it('deduplicates key person roles in the searchable payload', function () {
         'name' => $imam->name,
     ]);
 
+    $event->keyPeople()->create([
+        'speaker_id' => $personInCharge->getKey(),
+        'role' => EventKeyPersonRole::PersonInCharge,
+        'name' => $personInCharge->name,
+    ]);
+
+    $event->keyPeople()->create([
+        'role' => EventKeyPersonRole::PersonInCharge,
+        'name' => 'Encik Free Text PIC',
+    ]);
+
     $payload = $event->fresh()->toSearchableArray();
 
     expect($payload['key_person_roles'])->toBe([
         EventKeyPersonRole::Moderator->value,
         EventKeyPersonRole::Imam->value,
+        EventKeyPersonRole::PersonInCharge->value,
     ])->and($payload['key_person_speaker_ids'])->toBe([
         (string) $moderator->getKey(),
         (string) $imam->getKey(),
-    ]);
+        (string) $personInCharge->getKey(),
+    ])->and($payload['person_in_charge_ids'])->toBe([
+        (string) $personInCharge->getKey(),
+    ])->and($payload['person_in_charge_names'])
+        ->toContain('ustaz searchable pic')
+        ->toContain('Encik Free Text PIC');
 });
 
 it('supports parent program and child event hierarchy helpers', function () {

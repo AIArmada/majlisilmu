@@ -97,7 +97,7 @@ final readonly class SaveVenueAction
     }
 
     /**
-     * @return array<string, true>
+     * @return array<string, bool>
      */
     private function normalizeFacilities(mixed $value): array
     {
@@ -116,11 +116,13 @@ final readonly class SaveVenueAction
                 continue;
             }
 
-            if (trim($key) === '' || ! (bool) $entry) {
+            $facilityKey = trim($key);
+
+            if ($facilityKey === '' || $entry === null || $entry === '') {
                 continue;
             }
 
-            $normalized[trim($key)] = true;
+            $normalized[$facilityKey] = is_bool($entry) ? $entry : true;
         }
 
         return $normalized;

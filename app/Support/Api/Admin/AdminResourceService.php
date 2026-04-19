@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Support\Api\Admin;
 
+use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\User;
 use App\Support\Api\ApiPagination;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
+use App\Support\Timezone\UserDateTimeFormatter;
+use Carbon\CarbonInterface;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -96,8 +99,16 @@ class AdminResourceService
     /**
      * @return array{data: list<array<string, mixed>>, meta: array<string, mixed>}
      */
-    public function listRecords(string $resourceKey, string $search = '', int $page = 1, int $perPage = 15): array
-    {
+    public function listRecords(
+        string $resourceKey,
+        string $search = '',
+        int $page = 1,
+        int $perPage = 15,
+        array $filters = [],
+        ?string $startsAfter = null,
+        ?string $startsBefore = null,
+        ?string $startsOnLocalDate = null,
+    ): array {
         $resourceClass = $this->resolveAccessibleResource($resourceKey);
 
         abort_unless($resourceClass::canViewAny(), 403);
@@ -108,6 +119,16 @@ class AdminResourceService
         if ($normalizedSearch !== '') {
             $this->applySearch($query, $resourceClass, $normalizedSearch);
         }
+
+        $this->applyFilters($query, $resourceClass, $filters);
+
+        $this->applyDateFilters(
+            $query,
+            $resourceClass,
+            $startsAfter,
+            $startsBefore,
+            $startsOnLocalDate,
+        );
 
         $this->applyDefaultOrdering($query, $resourceClass);
 
@@ -544,6 +565,136 @@ class AdminResourceService
     }
 
     /**
+     * @param  array<string, mixed>  $filters
+     */
+    protected function applyFilters(Builder $query, string $resourceClass, array $filters): void
+    {
+        if ($filters === [] || $resourceClass !== SpeakerResource::class) {
+            return;
+        }
+
+        $model = $query->getModel();
+
+        if (array_key_exists('status', $filters)) {
+            $rawStatus = $filters['status'];
+
+            if ($rawStatus !== null && $rawStatus !== '') {
+                $status = $this->normalizeStatusFilter($rawStatus);
+
+                if ($status === null || ! in_array($status, ['pending', 'verified', 'rejected'], true)) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $query->where($model->qualifyColumn('status'), $status);
+            }
+        }
+
+        if (array_key_exists('is_active', $filters)) {
+            $rawIsActive = $filters['is_active'];
+
+            if ($rawIsActive !== null && $rawIsActive !== '') {
+                $isActive = $this->normalizeBooleanFilter($rawIsActive);
+
+                if ($isActive === null) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $query->where($model->qualifyColumn('is_active'), $isActive);
+            }
+        }
+
+        if (array_key_exists('has_events', $filters)) {
+            $rawHasEvents = $filters['has_events'];
+
+            if ($rawHasEvents !== null && $rawHasEvents !== '') {
+                $hasEvents = $this->normalizeBooleanFilter($rawHasEvents);
+
+                if ($hasEvents === null) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                if ($hasEvents) {
+                    $query->whereHas('events');
+
+                    return;
+                }
+
+                $query->whereDoesntHave('events');
+            }
+        }
+    }
+
+    private function normalizeStatusFilter(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = trim($value);
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function normalizeBooleanFilter(mixed $value): ?bool
+    {
+        $normalized = filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+        return is_bool($normalized) ? $normalized : null;
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  class-string<resource>  $resourceClass
+     */
+    protected function applyDateFilters(
+        Builder $query,
+        string $resourceClass,
+        ?string $startsAfter,
+        ?string $startsBefore,
+        ?string $startsOnLocalDate,
+    ): void {
+        $resource = $this->registry->metadata($resourceClass);
+
+        if (! is_array($resource['date_semantics'] ?? null)) {
+            return;
+        }
+
+        $model = $query->getModel();
+        $startsAtColumn = $model->qualifyColumn('starts_at');
+
+        if (is_string($startsAfter) && trim($startsAfter) !== '') {
+            $parsedStartsAfter = UserDateTimeFormatter::parseUserDateToUtc($startsAfter, false);
+
+            if ($parsedStartsAfter instanceof CarbonInterface) {
+                $query->where($startsAtColumn, '>=', $parsedStartsAfter);
+            }
+        }
+
+        if (is_string($startsBefore) && trim($startsBefore) !== '') {
+            $parsedStartsBefore = UserDateTimeFormatter::parseUserDateToUtc($startsBefore, true);
+
+            if ($parsedStartsBefore instanceof CarbonInterface) {
+                $query->where($startsAtColumn, '<=', $parsedStartsBefore);
+            }
+        }
+
+        if (is_string($startsOnLocalDate) && trim($startsOnLocalDate) !== '') {
+            $startsOnLocalDateStart = UserDateTimeFormatter::parseUserDateToUtc($startsOnLocalDate, false);
+            $startsOnLocalDateEnd = UserDateTimeFormatter::parseUserDateToUtc($startsOnLocalDate, true);
+
+            if ($startsOnLocalDateStart instanceof CarbonInterface && $startsOnLocalDateEnd instanceof CarbonInterface) {
+                $query->whereBetween($startsAtColumn, [$startsOnLocalDateStart, $startsOnLocalDateEnd]);
+            }
+        }
+    }
+
+    /**
      * @param  class-string<\Filament\Resources\Resource>  $resourceClass
      * @param  LengthAwarePaginator<int, Model>  $records
      * @return array<string, mixed>
@@ -570,6 +721,7 @@ class AdminResourceService
             'navigation_group' => $resource['navigation_group'],
             'pages' => $resource['pages'],
             'abilities' => $resource['abilities'],
+            'filters' => $resource['filters'],
             'write_support' => $resource['write_support'],
             'api_routes' => [
                 'collection' => $resource['api_routes']['collection'],
