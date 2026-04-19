@@ -286,10 +286,10 @@ it('supports sparse fields on the public speaker directory', function () {
         'name' => 'Sparse Speaker',
     ]);
 
-    $response = $this->getJson('/api/v1/speakers?fields=id,name,avatar_url')
+    $response = $this->getJson('/api/v1/speakers?fields=id,name,status,is_active,avatar_url')
         ->assertOk();
 
-    expect(array_keys($response->json('data.0')))->toBe(['id', 'name', 'avatar_url']);
+    expect(array_keys($response->json('data.0')))->toBe(['id', 'name', 'status', 'is_active', 'avatar_url']);
 });
 
 it('exposes authenticated contribution update contracts and permission-gated direct edit media support', function () {
@@ -2108,6 +2108,8 @@ it('serializes speaker directory payloads with country and follow metadata for m
 
     expect(data_get($item, 'formatted_name'))->toBe($speaker->formatted_name)
         ->and(data_get($item, 'avatar_url'))->toBeString()->not->toBe('')
+        ->and(data_get($item, 'status'))->toBe('verified')
+        ->and(data_get($item, 'is_active'))->toBeTrue()
         ->and(data_get($item, 'country.id'))->toBe($countryId)
         ->and(data_get($item, 'country.key'))->toBe('malaysia')
         ->and(data_get($item, 'is_following'))->toBeTrue();
@@ -2591,6 +2593,33 @@ it('scopes the spaces catalog to global spaces unless an institution is selected
         ->toContain((string) $globalSpace->getKey())
         ->toContain((string) $institutionSpace->getKey())
         ->not->toContain((string) $otherInstitutionSpace->getKey());
+});
+
+it('keeps public catalog selectors label-based', function () {
+    ensureFrontendApiMalaysiaCountryExists();
+
+    $space = Space::factory()->create([
+        'name' => 'Label Contract Space',
+        'is_active' => true,
+    ]);
+
+    $countries = $this->getJson(route('api.client.catalogs.countries'))
+        ->assertOk()
+        ->json('data');
+
+    $spaces = $this->getJson(route('api.client.catalogs.spaces'))
+        ->assertOk()
+        ->json('data');
+
+    $malaysia = collect($countries)->firstWhere('key', 'malaysia');
+    $spacePayload = collect($spaces)->firstWhere('id', (string) $space->getKey());
+
+    expect($malaysia)->not->toBeNull()
+        ->and(array_keys($malaysia))->toBe(['id', 'label', 'iso2', 'key'])
+        ->and($malaysia['label'])->toBe('Malaysia')
+        ->and($spacePayload)->not->toBeNull()
+        ->and(array_keys($spacePayload))->toBe(['id', 'label'])
+        ->and($spacePayload['label'])->toBe('Label Contract Space');
 });
 
 it('returns all matching spaces without truncating the catalog payload', function () {

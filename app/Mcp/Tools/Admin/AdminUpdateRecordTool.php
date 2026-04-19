@@ -23,7 +23,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
 {
     protected string $name = 'admin-update-record';
 
-    protected string $description = 'Update a supported writable admin resource record.';
+    protected string $description = 'Update or preview a supported writable admin resource record.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -38,6 +38,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
                 'resource_key' => ['required', 'string'],
                 'record_key' => ['required', 'string'],
                 'payload' => ['required', 'array'],
+                'validate_only' => ['sometimes', 'boolean'],
             ]);
 
             /** @var array<string, mixed> $payload */
@@ -52,6 +53,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
                 recordKey: (string) $validated['record_key'],
                 payload: $payload,
                 actor: $actor,
+                validateOnly: (bool) ($validated['validate_only'] ?? false),
             );
         });
     }
@@ -66,6 +68,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
             'resource_key' => $schema->string()->required()->min(1),
             'record_key' => $schema->string()->required()->min(1),
             'payload' => $schema->object()->required(),
+            'validate_only' => $schema->boolean()->default(false),
         ];
     }
 }

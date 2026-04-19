@@ -1,6 +1,7 @@
 # Lessons
 
 - When a user provides both PDF and Markdown versions of a report and asks to use the md file, treat the Markdown copy as the source of truth and keep subsequent implementation notes aligned to it.
+- When a public catalog already uses `label` as the display field, do not add a duplicate `name` alias for backward compatibility; keep the API canonical and update docs/tests to match it.
 - Keep the origin query param free-form for API clients, but hide `origin=web` from the visible URL so the default web case stays clean while iOS/Android/macOS and future clients can still identify themselves explicitly.
 - When the user needs to see where a share came from, put the resolved origin directly into the generated tracked URL (`origin=web`, `origin=iosapp`, etc.); storing origin only in backend metadata is not enough for the UI copy-link surface.
 - When a share modal still copies a bare canonical URL, audit the payload source and caller identity together; the client can be wired correctly while the backend still returns an anonymous fallback, so copy-link, social, and native-share paths all need the same tracked payload contract.
@@ -238,6 +239,7 @@
 - Never try to invoke `task_complete` or any other internal agent-only tool from the terminal; those tools exist only in the chat/tooling runtime and must be called directly through the agent, not shell commands.
 - In `filament-authz`, role scope selectors must use the actual `authz_scopes.id` values, not domain `scopeable_id` constants. When package config accepts database-backed scope option closures, keep them lazy until the resource resolves them instead of evaluating them during plugin boot.
 - When reviewing or changing `commerce` packages that are consumed by Majlis Ilmu, validate assumptions against Majlis Ilmu’s real package configuration before treating a package-level behavior as a bug or dead code.
+- When untracked files look like scaffolding, confirm they are not another agent's in-progress work before deleting or replacing them; restore immediately if the user flags them as WIP.
 - When moving existing workflow rules into Laravel Actions, diff the old controller/component eligibility checks exactly before tightening anything; product behavior like unlisted-event registration is easy to regress during “cleanup”.
 - In this app’s no-FK model, never pass nullable relation-backed users straight into stricter typed actions without preserving the caller’s null guard; deleted proposers and other missing relations are legitimate runtime states, not edge-case corruption.
 - When squashing or consolidating migrations in this repo, do two explicit audits before calling it done: scan every local migration for lingering `json(...)` columns that should be `jsonb(...)`, and verify exact runtime references for each legacy workflow column before dropping it so only truly dead compatibility fields are removed.

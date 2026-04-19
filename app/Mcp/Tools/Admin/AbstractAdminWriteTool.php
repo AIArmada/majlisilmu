@@ -20,12 +20,12 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
     {
         $errors = [];
 
-        foreach (['logo', 'cover', 'avatar', 'poster', 'front_cover', 'back_cover', 'gallery'] as $field) {
+        foreach (['logo', 'cover', 'avatar', 'poster', 'front_cover', 'back_cover', 'gallery', 'clear_logo', 'clear_cover', 'clear_avatar', 'clear_poster', 'clear_front_cover', 'clear_back_cover', 'clear_gallery'] as $field) {
             if (! array_key_exists($field, $payload) || ! $this->hasMeaningfulMediaValue($payload[$field])) {
                 continue;
             }
 
-            $errors[$field] = ['Media uploads are not supported through MCP v1.'];
+            $errors[$field] = ['Media uploads and destructive media clear flags are not supported through MCP v1.'];
         }
 
         if ($errors !== []) {

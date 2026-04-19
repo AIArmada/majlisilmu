@@ -126,13 +126,15 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             ->addProperty('slug', new StringType)
             ->addProperty('name', new StringType)
             ->addProperty('formatted_name', new StringType)
+            ->addProperty('status', new StringType)
+            ->addProperty('is_active', new BooleanType)
             ->addProperty('events_count', new IntegerType)
             ->addProperty('avatar_url', new StringType)
             ->addProperty('country', $this->nullableReference($components, 'Country'))
             ->addProperty('is_following', new BooleanType);
 
         if (! $sparse) {
-            $type->setRequired(['id', 'slug', 'name', 'formatted_name', 'events_count', 'avatar_url', 'country', 'is_following']);
+            $type->setRequired(['id', 'slug', 'name', 'formatted_name', 'status', 'is_active', 'events_count', 'avatar_url', 'country', 'is_following']);
         }
 
         return Schema::fromType($type);

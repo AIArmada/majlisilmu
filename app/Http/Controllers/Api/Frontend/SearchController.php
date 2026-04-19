@@ -84,6 +84,8 @@ class SearchController extends FrontendController
         'slug',
         'name',
         'formatted_name',
+        'status',
+        'is_active',
         'events_count',
         'avatar_url',
         'country',
@@ -287,7 +289,7 @@ class SearchController extends FrontendController
         title: 'List public speakers',
         description: 'Returns the public speaker directory with search, location, gender, and follow-state filters.',
     )]
-    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, name, formatted_name, events_count, avatar_url, country, is_following.', required: false, type: 'string', infer: false, example: 'id,name,avatar_url')]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, name, formatted_name, status, is_active, events_count, avatar_url, country, is_following.', required: false, type: 'string', infer: false, example: 'id,name,avatar_url')]
     #[Response(
         status: 200,
         description: 'Speaker directory response.',

@@ -13,6 +13,7 @@ use AIArmada\Affiliates\Models\AffiliateTouchpoint;
 use AIArmada\Affiliates\States\Active;
 use AIArmada\Affiliates\States\ApprovedConversion;
 use AIArmada\CommerceSupport\Support\OwnerContext;
+use AIArmada\CommerceSupport\Support\OwnerScope;
 use App\Data\ShareTracking\ShareTrackingAttributionData;
 use App\Data\ShareTracking\ShareTrackingLinkData;
 use App\Data\ShareTracking\ShareTrackingOutcomeData;
@@ -296,7 +297,7 @@ final readonly class AffiliatesShareTrackingService
             return null;
         }
 
-        return OwnerContext::withOwner($this->ownerForAffiliateAttribution($attribution), function () use ($attribution, $type, $outcomeKey, $subject, $actor, $metadata): ?ShareTrackingOutcomeData {
+        return OwnerContext::withOwner($this->ownerForAffiliateAttribution($attribution), function () use ($attribution, $type, $outcomeKey, $subject, $actor, $metadata): ShareTrackingOutcomeData {
             $existing = AffiliateConversion::query()
                 ->where('external_reference', $outcomeKey)
                 ->first();

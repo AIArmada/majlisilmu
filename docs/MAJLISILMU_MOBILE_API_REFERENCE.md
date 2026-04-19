@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-17
+**Last Updated:** 2026-04-19
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -339,7 +339,7 @@ Examples:
 ```http
 GET /api/v1/institutions?fields=id,name,location
 GET /api/v1/events?fields=id,title,starts_at,card_image_url
-GET /api/v1/speakers?fields=id,name,avatar_url
+GET /api/v1/speakers?fields=id,name,status,is_active,avatar_url
 ```
 
 Validation failures use the same `error` envelope with a field-level bag preserved for direct form binding:
@@ -401,7 +401,7 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 | `GET` | `/institutions` | Public institution listing filters |
 | `GET` | `/institutions/near` | Nearby institution alias using `near=lat,lng` |
 | `GET` | `/institutions/{institutionKey}` | Public institution detail by slug or UUID |
-| `GET` | `/speakers` | Public speaker listing filters |
+| `GET` | `/speakers` | Public speaker listing filters; speaker directory items include `status` and `is_active` in the default payload |
 | `GET` | `/speakers/{speakerKey}` | Public speaker detail by slug or UUID |
 | `GET` | `/inspirations/random` | Random active inspiration payload with category and media metadata |
 | `GET` | `/venues/{venueKey}` | Public venue detail by slug or UUID |
@@ -411,6 +411,7 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 Notes:
 
 - **Visibility rule:** `/speakers` and `/institutions` return **only** records where `is_active = true` AND `status = 'verified'`. Inactive or unverified records are invisible on the public surface. To access all records including drafts, use the admin surface.
+- Public speaker directory list items expose `status` and `is_active` alongside the existing summary fields. Keep client logic aligned with those canonical fields instead of inferring alternate aliases.
 - These detail payloads now mirror the web client media collections and public-contact visibility rules.
 - Institution payloads expose `public_image_url` as the canonical cover -> logo -> placeholder image. Use that for cards and previews. Use `logo_url` or `cover_url` only when you need those explicit assets.
 - Institution directory requests can filter by the device's current location: `GET /api/v1/institutions?lat=3.1390&lng=101.6869&radius_km=15` or `GET /api/v1/institutions/near?near=3.1390,101.6869&radius_km=15`. `radius_km` defaults to 15, is clamped between 1 and 100, and is always expressed in kilometers. Nearby results are sorted nearest-first and include `distance_km`; non-nearby requests return `distance_km: null`.
@@ -533,6 +534,7 @@ Current scope:
 - Generic record detail with per-record abilities
 - Named relation traversal for related admin records
 - Shared create/update write support for `speakers`, `institutions`, `venues`, `references`, `events`, and `subdistricts`
+- Optional `validate_only=true` preview mode for admin create/update requests
 
 Current limitation:
 
@@ -548,9 +550,20 @@ Current limitation:
 | `GET` | `/admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` | Required Filament admin-panel access | Return the update contract plus current defaults/media for one supported record |
 | `GET` | `/admin/{resourceKey}` | Required Filament admin-panel access | Paginated record listing for the selected resource |
 | `GET` | `/admin/{resourceKey}/{recordKey}/relations/{relation}` | Required Filament admin-panel access | Paginated listing for a named relation on one admin record |
-| `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources |
+| `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources, or add `?validate_only=1` to preview the normalized payload and warnings without persisting |
 | `GET` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
-| `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources |
+| `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources, or add `?validate_only=1` to preview the current record snapshot, normalized payload, and warnings without persisting |
+
+### Write preview mode
+
+The admin create and update endpoints accept `validate_only=true` as a query parameter. When present, the API validates and normalizes the request, then returns a preview envelope instead of mutating the database.
+
+Preview responses include:
+
+- `data.preview.validate_only = true`
+- `data.preview.normalized_payload`
+- `data.preview.warnings` for destructive clear-flags such as `clear_cover`
+- `data.preview.current_record` for updates so you can compare the existing state against the previewed payload
 
 > **Record-key format:** `{recordKey}` in GET and PUT admin record routes should use the `route_key` field returned by the admin collection or detail endpoints.
 
@@ -575,7 +588,7 @@ Rules:
 
 - `recordKey` should use the record `route_key` returned by the admin collection or record-detail payload.
 - The schema response embeds an `endpoint` field with the exact URL you should POST or PUT to — use that directly.
-- The schema response also embeds `defaults` with current field values, and `current_media` with existing media URLs, enabling pre-population of edit forms.
+- The schema response also embeds `defaults` with current field values, and `current_media` with existing media metadata, enabling pre-population of edit forms without exposing signed media URLs.
 - The `method` field tells you whether to use `POST` or `PUT`.
 - `conditional_rules` describe fields that become required based on other field values (e.g., `job_title` is required when `is_freelance = true` for speakers).
 

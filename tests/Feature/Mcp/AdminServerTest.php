@@ -97,6 +97,8 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->where('data.resource.api_routes.schema', '/api/v1/admin/speakers/schema')
             ->where('data.resource.mcp_tools.list_records.tool', 'admin-list-records')
             ->where('data.resource.mcp_tools.list_records.arguments.resource_key', 'speakers')
+            ->where('data.resource.mcp_tools.create.arguments.validate_only', false)
+            ->where('data.resource.mcp_tools.update.arguments.validate_only', false)
             ->etc());
 
     AdminServer::actingAs($admin)
@@ -203,10 +205,15 @@ it('returns write schema for supported resources and rejects unknown resources',
             ->where('data.schema.tool', 'admin-create-record')
             ->where('data.schema.tool_arguments.resource_key', 'speakers')
             ->where('data.schema.tool_arguments.payload', 'object')
+            ->where('data.schema.tool_arguments.validate_only', false)
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
             ->where('data.schema.media_uploads_supported', false)
             ->where('data.schema.unsupported_fields', fn ($fields): bool => collect($fields)->contains('avatar') && collect($fields)->contains('gallery'))
+            ->where('data.schema.fields', fn ($fields): bool => collect($fields)
+                ->pluck('name')
+                ->filter(fn (mixed $name): bool => is_string($name) && str_starts_with($name, 'clear_'))
+                ->isEmpty())
             ->etc());
 
     AdminServer::actingAs($admin)
@@ -248,6 +255,98 @@ it('returns write schema for supported resources and rejects unknown resources',
             'operation' => 'create',
         ])
         ->assertHasErrors(['Resource not found.']);
+});
+
+it('previews admin speaker creation through the MCP write tool without persisting the record', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Previewed Admin MCP Speaker',
+                'gender' => 'male',
+                'status' => 'verified',
+                'is_freelance' => false,
+                'is_active' => true,
+                'address' => [
+                    'country_id' => 132,
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'speakers')
+            ->where('data.preview.validate_only', true)
+            ->where('data.preview.operation', 'create')
+            ->where('data.preview.normalized_payload.address.country_id', 132)
+            ->where('data.preview.current_record', null)
+            ->etc());
+
+    expect(Speaker::query()->where('name', 'Previewed Admin MCP Speaker')->exists())->toBeFalse();
+});
+
+it('previews admin speaker updates through the MCP write tool without persisting the record', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $speaker = Speaker::factory()->create([
+        'name' => 'Previewable Admin MCP Speaker',
+        'job_title' => null,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => $speaker->getKey(),
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Previewed Admin MCP Speaker Updated',
+                'gender' => 'male',
+                'status' => 'verified',
+                'is_freelance' => true,
+                'job_title' => 'Imam',
+                'is_active' => true,
+                'allow_public_event_submission' => true,
+                'address' => [
+                    'country_id' => 132,
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'speakers')
+            ->where('data.preview.validate_only', true)
+            ->where('data.preview.operation', 'update')
+            ->where('data.preview.current_record.route_key', $speaker->getRouteKey())
+            ->where('data.preview.normalized_payload.job_title', 'Imam')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => $speaker->getKey(),
+            'payload' => [
+                'name' => 'Previewed Admin MCP Speaker Updated',
+                'gender' => 'male',
+                'status' => 'verified',
+                'is_freelance' => true,
+                'job_title' => 'Imam',
+                'is_active' => true,
+                'allow_public_event_submission' => true,
+                'address' => [
+                    'country_id' => 132,
+                ],
+                'clear_cover' => true,
+            ],
+        ])
+        ->assertHasErrors(['Media uploads and destructive media clear flags are not supported through MCP v1.']);
+
+    expect(Speaker::query()->findOrFail($speaker->getKey())->name)->toBe('Previewable Admin MCP Speaker')
+        ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
 });
 
 it('registers admin write tools when the MCP actor is a normalized Passport user', function () {
@@ -508,7 +607,7 @@ it('rejects media fields through MCP write tools', function () {
                 ],
             ],
         ])
-        ->assertHasErrors(['Media uploads are not supported through MCP v1.']);
+        ->assertHasErrors(['Media uploads and destructive media clear flags are not supported through MCP v1.']);
 
     AdminServer::actingAs($admin)
         ->tool(AdminCreateRecordTool::class, [
@@ -520,7 +619,7 @@ it('rejects media fields through MCP write tools', function () {
                 'front_cover' => 'base64-data',
             ],
         ])
-        ->assertHasErrors(['Media uploads are not supported through MCP v1.']);
+        ->assertHasErrors(['Media uploads and destructive media clear flags are not supported through MCP v1.']);
 });
 
 it('returns structured MCP error payloads for validation failures', function () {

@@ -295,6 +295,28 @@ class AdminResourceMutationService
     }
 
     /**
+     * @param  array<string, mixed>  $normalizedPayload
+     * @return array{normalized_payload: array<string, mixed>, warnings: list<array<string, string>>, destructive_media_fields: list<string>}
+     */
+    public function previewNormalizedPayload(array $normalizedPayload): array
+    {
+        $destructiveMediaFields = $this->destructiveMediaFields($normalizedPayload);
+
+        return [
+            'normalized_payload' => $normalizedPayload,
+            'warnings' => array_values(array_map(
+                fn (string $field): array => [
+                    'code' => 'destructive_media_clear',
+                    'field' => $field,
+                    'message' => $this->destructiveMediaWarning($field),
+                ],
+                $destructiveMediaFields,
+            )),
+            'destructive_media_fields' => $destructiveMediaFields,
+        ];
+    }
+
+    /**
      * @param  class-string  $resourceClass
      * @return array<string, mixed>
      */
@@ -388,6 +410,11 @@ class AdminResourceMutationService
                 );
             }
 
+            unset(
+                $defaults['institution_id'],
+                $defaults['institution_position'],
+            );
+
             $defaults['status'] = $record->status;
             $defaults['is_active'] = (bool) $record->is_active;
             $defaults['allow_public_event_submission'] = (bool) $record->allow_public_event_submission;
@@ -431,6 +458,35 @@ class AdminResourceMutationService
     private function recordKey(Model $record): string
     {
         return (string) $record->getRouteKey();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<string>
+     */
+    private function destructiveMediaFields(array $payload): array
+    {
+        $fields = [];
+
+        foreach ($payload as $field => $value) {
+            if (! is_string($field) || ! str_starts_with($field, 'clear_') || $value !== true) {
+                continue;
+            }
+
+            $fields[] = $field;
+        }
+
+        return array_values(array_unique($fields));
+    }
+
+    private function destructiveMediaWarning(string $field): string
+    {
+        $label = ucwords(str_replace('_', ' ', substr($field, 6)));
+
+        return __('The :field flag will clear the existing :label media collection before saving.', [
+            'field' => $field,
+            'label' => $label,
+        ]);
     }
 
     /**
@@ -928,7 +984,6 @@ class AdminResourceMutationService
                     'id' => (int) $item->getKey(),
                     'name' => $item->name,
                     'file_name' => $item->file_name,
-                    'url' => $item->getUrl(),
                 ])
                 ->values()
                 ->all();

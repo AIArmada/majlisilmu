@@ -23,7 +23,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
 {
     protected string $name = 'admin-create-record';
 
-    protected string $description = 'Create a supported writable admin resource record.';
+    protected string $description = 'Create or preview a supported writable admin resource record.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -37,6 +37,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
             $validated = $this->validateArguments($request, [
                 'resource_key' => ['required', 'string'],
                 'payload' => ['required', 'array'],
+                'validate_only' => ['sometimes', 'boolean'],
             ]);
 
             /** @var array<string, mixed> $payload */
@@ -50,6 +51,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
                 resourceKey: $resourceKey,
                 payload: $payload,
                 actor: $actor,
+                validateOnly: (bool) ($validated['validate_only'] ?? false),
             );
         });
     }
@@ -63,6 +65,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
         return [
             'resource_key' => $schema->string()->required()->min(1),
             'payload' => $schema->object()->required(),
+            'validate_only' => $schema->boolean()->default(false),
         ];
     }
 }

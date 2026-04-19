@@ -20,6 +20,19 @@ final class McpWriteSchemaFormatter
     ];
 
     /**
+     * @var list<string>
+     */
+    private const array DESTRUCTIVE_MEDIA_CLEAR_FIELDS = [
+        'clear_logo',
+        'clear_cover',
+        'clear_avatar',
+        'clear_poster',
+        'clear_front_cover',
+        'clear_back_cover',
+        'clear_gallery',
+    ];
+
+    /**
      * @param  array<string, mixed>  $schema
      * @param  array<string, mixed>  $toolArguments
      * @return array<string, mixed>
@@ -86,6 +99,10 @@ final class McpWriteSchemaFormatter
             if ($name !== null && in_array($name, $unsupportedFields, true)) {
                 $field['supported'] = false;
                 $field['unsupported_reason'] = 'Media uploads are not supported through MCP v1.';
+            }
+
+            if ($name !== null && in_array($name, self::DESTRUCTIVE_MEDIA_CLEAR_FIELDS, true)) {
+                continue;
             }
 
             $annotated[] = $field;

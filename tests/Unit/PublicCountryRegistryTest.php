@@ -63,3 +63,13 @@ it('returns null for supported multi-timezone public countries', function () {
 
     expect(app(PublicCountryRegistry::class)->singleTimezoneForCountryId($countryId))->toBeNull();
 });
+
+it('exposes country labels as the registry display field', function () {
+    app()->forgetInstance(PublicCountryRegistry::class);
+
+    $country = app(PublicCountryRegistry::class)->country('malaysia');
+
+    expect($country['label'])->toBe('Malaysia')
+        ->and($country['flag'])->toBe('🇲🇾')
+        ->and($country['iso2'])->toBe('MY');
+});

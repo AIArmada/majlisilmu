@@ -144,7 +144,9 @@ it('returns admin speaker resource metadata and records', function () {
         ->assertJsonPath('data.resource.abilities.view_any', true)
         ->assertJsonPath('data.resource.write_support.schema', true)
         ->assertJsonPath('data.resource.api_routes.collection', '/api/v1/admin/speakers')
-        ->assertJsonPath('data.resource.api_routes.schema', '/api/v1/admin/speakers/schema');
+        ->assertJsonPath('data.resource.api_routes.schema', '/api/v1/admin/speakers/schema')
+        ->assertJsonPath('data.resource.mcp_tools.create.arguments.validate_only', false)
+        ->assertJsonPath('data.resource.mcp_tools.update.arguments.validate_only', false);
 
     $this->getJson('/api/v1/admin/speakers?search=Admin%20API%20Speaker')
         ->assertOk()
@@ -158,6 +160,73 @@ it('returns admin speaker resource metadata and records', function () {
         ->assertJsonPath('data.record.route_key', $speakerRouteKey)
         ->assertJsonPath('data.record.attributes.name', 'Admin API Speaker')
         ->assertJsonPath('data.record.abilities.view', true);
+});
+
+it('previews admin speaker creation without persisting the record', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->postJson('/api/v1/admin/speakers?validate_only=1', [
+        'name' => 'Previewed Admin API Speaker',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => false,
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+    ])->assertOk();
+
+    $response
+        ->assertJsonPath('data.resource.key', 'speakers')
+        ->assertJsonPath('data.preview.validate_only', true)
+        ->assertJsonPath('data.preview.operation', 'create')
+        ->assertJsonPath('data.preview.normalized_payload.address.country_id', 132)
+        ->assertJsonPath('data.preview.current_record', null);
+
+    expect(Speaker::query()->where('name', 'Previewed Admin API Speaker')->exists())->toBeFalse();
+});
+
+it('previews admin speaker updates without persisting the record', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    $speaker = Speaker::factory()->create([
+        'name' => 'Previewable Admin API Speaker',
+        'job_title' => null,
+    ]);
+    $speakerRouteKey = (string) $speaker->getRouteKey();
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->putJson('/api/v1/admin/speakers/'.$speakerRouteKey.'?validate_only=1', [
+        'name' => 'Previewed Admin API Speaker Updated',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => true,
+        'job_title' => 'Imam',
+        'is_active' => true,
+        'allow_public_event_submission' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+        'clear_cover' => true,
+    ])->assertOk();
+
+    $response
+        ->assertJsonPath('data.resource.key', 'speakers')
+        ->assertJsonPath('data.preview.validate_only', true)
+        ->assertJsonPath('data.preview.operation', 'update')
+        ->assertJsonPath('data.preview.current_record.route_key', $speakerRouteKey)
+        ->assertJsonPath('data.preview.normalized_payload.job_title', 'Imam')
+        ->assertJsonPath('data.preview.destructive_media_fields.0', 'clear_cover')
+        ->assertJsonPath('data.preview.warnings.0.field', 'clear_cover');
+
+    expect(Speaker::query()->findOrFail($speaker->getKey())->name)->toBe('Previewable Admin API Speaker')
+        ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
 });
 
 it('lists related records for admin resource relations', function () {

@@ -25,6 +25,7 @@ use App\Notifications\Auth\VerifyEmailNotification;
 use App\Notifications\NotificationCenterMessage;
 use App\Services\ShareTrackingService;
 use App\Support\Submission\PublicSubmissionLockService;
+use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -41,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Notifications\Notification;
@@ -121,6 +123,9 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         });
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function attributesToKeep(): array
     {
         return array_merge($this->deletedModelsAttributesToKeep(), [
@@ -165,49 +170,49 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
                 return [
                     'institution_id' => $institution->getKey(),
                     'user_id' => $this->getKey(),
-                    'created_at' => $institution->pivot?->created_at?->toDateTimeString(),
-                    'updated_at' => $institution->pivot?->updated_at?->toDateTimeString(),
+                    'created_at' => $this->pivotTimestamp($institution, 'created_at'),
+                    'updated_at' => $this->pivotTimestamp($institution, 'updated_at'),
                 ];
             })->all(),
             'speaker_user' => $this->speakers()->get()->map(function (Speaker $speaker): array {
                 return [
                     'speaker_id' => $speaker->getKey(),
                     'user_id' => $this->getKey(),
-                    'created_at' => $speaker->pivot?->created_at?->toDateTimeString(),
-                    'updated_at' => $speaker->pivot?->updated_at?->toDateTimeString(),
+                    'created_at' => $this->pivotTimestamp($speaker, 'created_at'),
+                    'updated_at' => $this->pivotTimestamp($speaker, 'updated_at'),
                 ];
             })->all(),
             'reference_user' => $this->references()->get()->map(function (Reference $reference): array {
                 return [
                     'reference_id' => $reference->getKey(),
                     'user_id' => $this->getKey(),
-                    'created_at' => $reference->pivot?->created_at?->toDateTimeString(),
-                    'updated_at' => $reference->pivot?->updated_at?->toDateTimeString(),
+                    'created_at' => $this->pivotTimestamp($reference, 'created_at'),
+                    'updated_at' => $this->pivotTimestamp($reference, 'updated_at'),
                 ];
             })->all(),
             'event_saves' => $this->savedEvents()->get()->map(function (Event $event): array {
                 return [
                     'event_id' => $event->getKey(),
                     'user_id' => $this->getKey(),
-                    'created_at' => $event->pivot?->created_at?->toDateTimeString(),
-                    'updated_at' => $event->pivot?->updated_at?->toDateTimeString(),
+                    'created_at' => $this->pivotTimestamp($event, 'created_at'),
+                    'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
                 ];
             })->all(),
             'event_attendees' => $this->goingEvents()->get()->map(function (Event $event): array {
                 return [
                     'event_id' => $event->getKey(),
                     'user_id' => $this->getKey(),
-                    'created_at' => $event->pivot?->created_at?->toDateTimeString(),
-                    'updated_at' => $event->pivot?->updated_at?->toDateTimeString(),
+                    'created_at' => $this->pivotTimestamp($event, 'created_at'),
+                    'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
                 ];
             })->all(),
             'event_user' => $this->memberEvents()->get()->map(function (Event $event): array {
                 return [
                     'event_id' => $event->getKey(),
                     'user_id' => $this->getKey(),
-                    'joined_at' => $event->pivot?->joined_at?->toDateTimeString(),
-                    'created_at' => $event->pivot?->created_at?->toDateTimeString(),
-                    'updated_at' => $event->pivot?->updated_at?->toDateTimeString(),
+                    'joined_at' => $this->pivotTimestamp($event, 'joined_at'),
+                    'created_at' => $this->pivotTimestamp($event, 'created_at'),
+                    'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
                 ];
             })->all(),
             'owned_event_ids' => $this->ownedEvents()->pluck('id')->all(),
@@ -281,32 +286,38 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
     protected function restoreManyToManyRelations(array $snapshot): void
     {
-        DB::table('institution_user')->insertOrIgnore($snapshot['institution_user'] ?? []);
-        DB::table('speaker_user')->insertOrIgnore($snapshot['speaker_user'] ?? []);
-        DB::table('reference_user')->insertOrIgnore($snapshot['reference_user'] ?? []);
-        DB::table('event_saves')->insertOrIgnore($snapshot['event_saves'] ?? []);
-        DB::table('event_attendees')->insertOrIgnore($snapshot['event_attendees'] ?? []);
-        DB::table('event_user')->insertOrIgnore($snapshot['event_user'] ?? []);
-        DB::table('followings')->insertOrIgnore(collect($snapshot['followings'] ?? [])->map(function (array $row): array {
+        DB::table('institution_user')->insertOrIgnore($this->snapshotRows($snapshot, 'institution_user'));
+        DB::table('speaker_user')->insertOrIgnore($this->snapshotRows($snapshot, 'speaker_user'));
+        DB::table('reference_user')->insertOrIgnore($this->snapshotRows($snapshot, 'reference_user'));
+        DB::table('event_saves')->insertOrIgnore($this->snapshotRows($snapshot, 'event_saves'));
+        DB::table('event_attendees')->insertOrIgnore($this->snapshotRows($snapshot, 'event_attendees'));
+        DB::table('event_user')->insertOrIgnore($this->snapshotRows($snapshot, 'event_user'));
+        DB::table('followings')->insertOrIgnore(collect($this->snapshotRows($snapshot, 'followings'))->map(function (array $row): array {
             return array_merge([
                 'user_id' => $this->id,
             ], $row);
         })->all());
     }
 
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
     protected function restoreReassignedRelations(array $snapshot): void
     {
-        $this->restoreForeignKeyRelation('ownedEvents', 'user_id', $snapshot['owned_event_ids'] ?? []);
-        $this->restoreForeignKeyRelation('eventSubmissions', 'submitted_by', $snapshot['event_submission_ids'] ?? []);
-        $this->restoreForeignKeyRelation('contributionRequests', 'proposer_id', $snapshot['contribution_request_proposer_ids'] ?? []);
-        $this->restoreForeignKeyRelation('reviewedContributionRequests', 'reviewer_id', $snapshot['contribution_request_reviewer_ids'] ?? []);
-        $this->restoreForeignKeyRelation('membershipClaims', 'claimant_id', $snapshot['membership_claim_ids'] ?? []);
-        $this->restoreForeignKeyRelation('reviewedMembershipClaims', 'reviewer_id', $snapshot['membership_claim_reviewer_ids'] ?? []);
-        $this->restoreForeignKeyRelation('moderationReviews', 'moderator_id', $snapshot['moderation_review_ids'] ?? []);
-        $this->restoreForeignKeyRelation('reports', 'reporter_id', $snapshot['report_ids'] ?? []);
-        $this->restoreForeignKeyRelation('handledReports', 'handled_by', $snapshot['handled_report_ids'] ?? []);
+        $this->restoreForeignKeyRelation('ownedEvents', 'user_id', $this->snapshotIds($snapshot, 'owned_event_ids'));
+        $this->restoreForeignKeyRelation('eventSubmissions', 'submitted_by', $this->snapshotIds($snapshot, 'event_submission_ids'));
+        $this->restoreForeignKeyRelation('contributionRequests', 'proposer_id', $this->snapshotIds($snapshot, 'contribution_request_proposer_ids'));
+        $this->restoreForeignKeyRelation('reviewedContributionRequests', 'reviewer_id', $this->snapshotIds($snapshot, 'contribution_request_reviewer_ids'));
+        $this->restoreForeignKeyRelation('membershipClaims', 'claimant_id', $this->snapshotIds($snapshot, 'membership_claim_ids'));
+        $this->restoreForeignKeyRelation('reviewedMembershipClaims', 'reviewer_id', $this->snapshotIds($snapshot, 'membership_claim_reviewer_ids'));
+        $this->restoreForeignKeyRelation('moderationReviews', 'moderator_id', $this->snapshotIds($snapshot, 'moderation_review_ids'));
+        $this->restoreForeignKeyRelation('reports', 'reporter_id', $this->snapshotIds($snapshot, 'report_ids'));
+        $this->restoreForeignKeyRelation('handledReports', 'handled_by', $this->snapshotIds($snapshot, 'handled_report_ids'));
     }
 
     protected function restoreDeletedAffiliateTrackingSnapshot(mixed $record): void
@@ -323,6 +334,10 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
             }
 
             $affiliate = $this->restoreRawModel(Affiliate::class, $affiliateAttributes);
+
+            if (! $affiliate instanceof Affiliate) {
+                return;
+            }
 
             if (! $affiliate->belongsToOwner($this)) {
                 $affiliate->assignOwner($this)->saveQuietly();
@@ -345,20 +360,26 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
     protected function restoreDeletedChildModels(array $snapshot): void
     {
-        $this->restoreChildModels('socialAccounts', $snapshot['social_accounts'] ?? []);
-        $this->restoreChildModels('registrations', $snapshot['registrations'] ?? []);
-        $this->restoreChildModels('eventCheckins', $snapshot['event_checkins'] ?? []);
-        $this->restoreChildModels('savedSearches', $snapshot['saved_searches'] ?? []);
+        $this->restoreChildModels('socialAccounts', $this->snapshotRows($snapshot, 'social_accounts'));
+        $this->restoreChildModels('registrations', $this->snapshotRows($snapshot, 'registrations'));
+        $this->restoreChildModels('eventCheckins', $this->snapshotRows($snapshot, 'event_checkins'));
+        $this->restoreChildModels('savedSearches', $this->snapshotRows($snapshot, 'saved_searches'));
         $this->restoreSingleChildModel('notificationSetting', $snapshot['notification_setting'] ?? null);
-        $this->restoreChildModels('notificationRules', $snapshot['notification_rules'] ?? []);
-        $this->restoreChildModels('notificationDestinations', $snapshot['notification_destinations'] ?? []);
-        $this->restoreChildModels('pendingNotifications', $snapshot['pending_notifications'] ?? []);
-        $this->restoreChildModels('notificationMessages', $snapshot['notification_messages'] ?? []);
-        $this->restoreChildModels('notificationDeliveries', $snapshot['notification_deliveries'] ?? []);
+        $this->restoreChildModels('notificationRules', $this->snapshotRows($snapshot, 'notification_rules'));
+        $this->restoreChildModels('notificationDestinations', $this->snapshotRows($snapshot, 'notification_destinations'));
+        $this->restoreChildModels('pendingNotifications', $this->snapshotRows($snapshot, 'pending_notifications'));
+        $this->restoreChildModels('notificationMessages', $this->snapshotRows($snapshot, 'notification_messages'));
+        $this->restoreChildModels('notificationDeliveries', $this->snapshotRows($snapshot, 'notification_deliveries'));
     }
 
+    /**
+     * @param  list<array<string, mixed>>  $records
+     */
     protected function restoreChildModels(string $relationName, array $records): void
     {
         if ($records === []) {
@@ -395,6 +416,9 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         $model->saveQuietly();
     }
 
+    /**
+     * @param  list<int|string>  $ids
+     */
     protected function restoreForeignKeyRelation(string $relationName, string $foreignKey, array $ids): void
     {
         if ($ids === []) {
@@ -404,6 +428,59 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         $modelClass = $this->{$relationName}()->getRelated()::class;
 
         $modelClass::query()->whereKey($ids)->update([$foreignKey => $this->id]);
+    }
+
+    private function pivotTimestamp(Model $model, string $attribute): ?string
+    {
+        $pivot = $model->getRelationValue('pivot');
+
+        if (! $pivot instanceof Pivot) {
+            return null;
+        }
+
+        $value = $pivot->getAttribute($attribute);
+
+        if ($value instanceof CarbonInterface) {
+            return $value->toDateTimeString();
+        }
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return list<array<string, mixed>>
+     */
+    private function snapshotRows(array $snapshot, string $key): array
+    {
+        $rows = $snapshot[$key] ?? [];
+
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        return collect($rows)
+            ->filter(fn (mixed $row): bool => is_array($row))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return list<int|string>
+     */
+    private function snapshotIds(array $snapshot, string $key): array
+    {
+        $ids = $snapshot[$key] ?? [];
+
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        return collect($ids)
+            ->filter(fn (mixed $id): bool => is_int($id) || is_string($id))
+            ->values()
+            ->all();
     }
 
     /**

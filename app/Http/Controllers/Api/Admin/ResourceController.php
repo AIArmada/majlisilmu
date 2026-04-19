@@ -95,37 +95,47 @@ class ResourceController extends Controller
     }
 
     #[PathParameter('resourceKey', 'Writable admin resource key from `GET /admin/manifest`.', example: 'speakers')]
+    #[QueryParameter('validate_only', 'When true, validates and normalizes the payload without persisting changes. The response includes a preview envelope with destructive media clear-flag warnings.', required: false, type: 'boolean', infer: false, default: false, example: false)]
     #[Endpoint(
         title: 'Create an admin resource record',
         description: 'Creates a record for a writable admin resource. '
+            .'Set `validate_only=true` to preview the normalized payload and warning envelope without persisting the write. '
             .'The request body is dynamic and depends on `resourceKey`, so fetch `GET /admin/{resourceKey}/schema?operation=create` first to obtain the canonical required and optional fields.',
     )]
     public function storeRecord(Request $request, string $resourceKey): JsonResponse
     {
+        $validateOnly = $request->boolean('validate_only');
+
         return response()->json(
             $this->resourceService->storeRecord(
                 resourceKey: $resourceKey,
                 payload: $request->all(),
                 actor: $this->currentUser($request),
+                validateOnly: $validateOnly,
             ),
-            201,
+            $validateOnly ? 200 : 201,
         );
     }
 
     #[PathParameter('resourceKey', 'Writable admin resource key from `GET /admin/manifest`.', example: 'speakers')]
     #[PathParameter('recordKey', 'Existing admin record route key returned by the collection or record endpoints.', example: '0195b86a-3c15-73fa-a2d8-5a45f6a7f701')]
+    #[QueryParameter('validate_only', 'When true, validates and normalizes the payload without persisting changes. The response includes the current record snapshot and destructive media clear-flag warnings.', required: false, type: 'boolean', infer: false, default: false, example: false)]
     #[Endpoint(
         title: 'Update an admin resource record',
         description: 'Updates a record for a writable admin resource. '
+            .'Set `validate_only=true` to preview the normalized payload, current record snapshot, and warning envelope without persisting the write. '
             .'The request body is dynamic and depends on both `resourceKey` and the existing record, so fetch `GET /admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` first.',
     )]
     public function updateRecord(Request $request, string $resourceKey, string $recordKey): JsonResponse
     {
+        $validateOnly = $request->boolean('validate_only');
+
         return response()->json($this->resourceService->updateRecord(
             resourceKey: $resourceKey,
             recordKey: $recordKey,
             payload: $request->all(),
             actor: $this->currentUser($request),
+            validateOnly: $validateOnly,
         ));
     }
 
