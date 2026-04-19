@@ -9,6 +9,7 @@ use AIArmada\Affiliates\Models\AffiliateAttribution;
 use AIArmada\Affiliates\Models\AffiliateConversion;
 use AIArmada\Affiliates\Models\AffiliateLink;
 use AIArmada\Affiliates\Models\AffiliateTouchpoint;
+use AIArmada\CommerceSupport\Support\OwnerScope;
 use App\Models\User;
 use App\Services\ShareTrackingService;
 use Carbon\CarbonInterface;
@@ -101,21 +102,25 @@ final readonly class AdminShareAnalyticsService
         int $recentVisitsLimit = 10,
         int $recentOutcomesLimit = 10,
     ): array {
-        $affiliates = Affiliate::query()->get();
-        $links = AffiliateLink::query()->latest('updated_at')->get();
+        $affiliates = Affiliate::query()->withoutGlobalScope(OwnerScope::class)->get();
+        $links = AffiliateLink::query()->withoutGlobalScope(OwnerScope::class)->latest('updated_at')->get();
         $landingAttributions = AffiliateAttribution::query()
+            ->withoutGlobalScope(OwnerScope::class)
             ->where('metadata->tracking_mode', 'landing')
             ->latest('last_seen_at')
             ->get();
         $outboundShares = AffiliateTouchpoint::query()
+            ->withoutGlobalScope(OwnerScope::class)
             ->where('metadata->event_type', 'outbound_share')
             ->latest('touched_at')
             ->get();
         $visits = AffiliateTouchpoint::query()
+            ->withoutGlobalScope(OwnerScope::class)
             ->where('metadata->event_type', 'visit')
             ->latest('touched_at')
             ->get();
         $conversions = AffiliateConversion::query()
+            ->withoutGlobalScope(OwnerScope::class)
             ->latest('occurred_at')
             ->get();
 
@@ -436,9 +441,9 @@ final readonly class AdminShareAnalyticsService
 
     private function userIdForAffiliate(Affiliate $affiliate): ?string
     {
-        $userId = data_get($affiliate->metadata, 'majlis_user_id');
+        $owner = $affiliate->owner;
 
-        return is_string($userId) && $userId !== '' ? $userId : null;
+        return $owner instanceof User ? (string) $owner->getAuthIdentifier() : null;
     }
 
     private function providerLabel(string $provider): string

@@ -2,6 +2,18 @@
 
 namespace App\Models;
 
+use AIArmada\Affiliates\Models\Affiliate;
+use AIArmada\Affiliates\Models\AffiliateAttribution;
+use AIArmada\Affiliates\Models\AffiliateBalance;
+use AIArmada\Affiliates\Models\AffiliateConversion;
+use AIArmada\Affiliates\Models\AffiliateDailyStat;
+use AIArmada\Affiliates\Models\AffiliateFraudSignal;
+use AIArmada\Affiliates\Models\AffiliateLink;
+use AIArmada\Affiliates\Models\AffiliatePayout;
+use AIArmada\Affiliates\Models\AffiliatePayoutHold;
+use AIArmada\Affiliates\Models\AffiliatePayoutMethod;
+use AIArmada\Affiliates\Models\AffiliateTouchpoint;
+use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\FilamentAuthz\Facades\Authz;
 use AIArmada\FilamentAuthz\Models\Permission;
 use AIArmada\FilamentAuthz\Models\Role;
@@ -36,17 +48,31 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
+use Spatie\DeletedModels\Models\DeletedModel;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements AuditableContract, FilamentUser, HasLocalePreference, MustVerifyEmailContract
 {
     /** @use HasFactory<UserFactory> */
-    use AuditsModelChanges, HasApiTokens, HasFactory, HasRoles, HasUuids, MustVerifyEmail, Notifiable;
+    use AuditsModelChanges, HasApiTokens, HasFactory, HasRoles, HasUuids, KeepsDeletedModels, MustVerifyEmail, Notifiable {
+        KeepsDeletedModels::attributesToKeep as protected deletedModelsAttributesToKeep;
+    }
 
     public $incrementing = false;
 
     protected $keyType = 'string';
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected array $deletedRelationsSnapshot = [];
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected array $deletedAffiliateTrackingSnapshot = [];
 
     #[\Override]
     protected static function booted(): void
@@ -60,7 +86,10 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         });
 
         static::deleting(function (User $user) {
+            $user->captureDeletedRelationsSnapshot();
+
             $user->socialAccounts()->each(fn ($account) => $account->delete());
+            $user->tokens()->delete();
             $user->institutions()->detach();
             $user->speakers()->detach();
             $user->references()->detach();
@@ -90,6 +119,321 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
 
             DB::table('followings')->where('user_id', $user->id)->delete();
         });
+    }
+
+    public function attributesToKeep(): array
+    {
+        return array_merge($this->deletedModelsAttributesToKeep(), [
+            'deleted_relations_snapshot' => $this->deletedRelationsSnapshot,
+            'deleted_affiliate_tracking_snapshot' => $this->deletedAffiliateTrackingSnapshot,
+        ]);
+    }
+
+    public static function restoreDeletedUser(mixed $key): self
+    {
+        /** @var self $restoredUser */
+        $restoredUser = self::restore($key, static function (Model $restoredModel, DeletedModel $deletedModel): void {
+            unset($restoredModel->deleted_relations_snapshot);
+            unset($restoredModel->deleted_affiliate_tracking_snapshot);
+        });
+
+        return $restoredUser;
+    }
+
+    public static function afterRestoringModel(Model $restoredModel, DeletedModel $deletedModel): void
+    {
+        if (! $restoredModel instanceof self) {
+            return;
+        }
+
+        $snapshot = $deletedModel->value('deleted_relations_snapshot');
+
+        if (! is_array($snapshot)) {
+            return;
+        }
+
+        $restoredModel->restoreManyToManyRelations($snapshot);
+        $restoredModel->restoreReassignedRelations($snapshot);
+        $restoredModel->restoreDeletedAffiliateTrackingSnapshot($deletedModel->value('deleted_affiliate_tracking_snapshot'));
+        $restoredModel->restoreDeletedChildModels($snapshot);
+    }
+
+    protected function captureDeletedRelationsSnapshot(): void
+    {
+        $this->deletedRelationsSnapshot = [
+            'institution_user' => $this->institutions()->get()->map(function (Institution $institution): array {
+                return [
+                    'institution_id' => $institution->getKey(),
+                    'user_id' => $this->getKey(),
+                    'created_at' => $institution->pivot?->created_at?->toDateTimeString(),
+                    'updated_at' => $institution->pivot?->updated_at?->toDateTimeString(),
+                ];
+            })->all(),
+            'speaker_user' => $this->speakers()->get()->map(function (Speaker $speaker): array {
+                return [
+                    'speaker_id' => $speaker->getKey(),
+                    'user_id' => $this->getKey(),
+                    'created_at' => $speaker->pivot?->created_at?->toDateTimeString(),
+                    'updated_at' => $speaker->pivot?->updated_at?->toDateTimeString(),
+                ];
+            })->all(),
+            'reference_user' => $this->references()->get()->map(function (Reference $reference): array {
+                return [
+                    'reference_id' => $reference->getKey(),
+                    'user_id' => $this->getKey(),
+                    'created_at' => $reference->pivot?->created_at?->toDateTimeString(),
+                    'updated_at' => $reference->pivot?->updated_at?->toDateTimeString(),
+                ];
+            })->all(),
+            'event_saves' => $this->savedEvents()->get()->map(function (Event $event): array {
+                return [
+                    'event_id' => $event->getKey(),
+                    'user_id' => $this->getKey(),
+                    'created_at' => $event->pivot?->created_at?->toDateTimeString(),
+                    'updated_at' => $event->pivot?->updated_at?->toDateTimeString(),
+                ];
+            })->all(),
+            'event_attendees' => $this->goingEvents()->get()->map(function (Event $event): array {
+                return [
+                    'event_id' => $event->getKey(),
+                    'user_id' => $this->getKey(),
+                    'created_at' => $event->pivot?->created_at?->toDateTimeString(),
+                    'updated_at' => $event->pivot?->updated_at?->toDateTimeString(),
+                ];
+            })->all(),
+            'event_user' => $this->memberEvents()->get()->map(function (Event $event): array {
+                return [
+                    'event_id' => $event->getKey(),
+                    'user_id' => $this->getKey(),
+                    'joined_at' => $event->pivot?->joined_at?->toDateTimeString(),
+                    'created_at' => $event->pivot?->created_at?->toDateTimeString(),
+                    'updated_at' => $event->pivot?->updated_at?->toDateTimeString(),
+                ];
+            })->all(),
+            'owned_event_ids' => $this->ownedEvents()->pluck('id')->all(),
+            'event_submission_ids' => $this->eventSubmissions()->pluck('id')->all(),
+            'contribution_request_proposer_ids' => $this->contributionRequests()->pluck('id')->all(),
+            'contribution_request_reviewer_ids' => $this->reviewedContributionRequests()->pluck('id')->all(),
+            'membership_claim_ids' => $this->membershipClaims()->pluck('id')->all(),
+            'membership_claim_reviewer_ids' => $this->reviewedMembershipClaims()->pluck('id')->all(),
+            'moderation_review_ids' => $this->moderationReviews()->pluck('id')->all(),
+            'report_ids' => $this->reports()->pluck('id')->all(),
+            'handled_report_ids' => $this->handledReports()->pluck('id')->all(),
+            'social_accounts' => $this->socialAccounts()->get()->map->attributesToArray()->all(),
+            'registrations' => $this->registrations()->get()->map->attributesToArray()->all(),
+            'event_checkins' => $this->eventCheckins()->get()->map->attributesToArray()->all(),
+            'saved_searches' => $this->savedSearches()->get()->map->attributesToArray()->all(),
+            'notification_setting' => $this->notificationSetting?->attributesToArray(),
+            'notification_rules' => $this->notificationRules()->get()->map->attributesToArray()->all(),
+            'notification_destinations' => $this->notificationDestinations()->get()->map->attributesToArray()->all(),
+            'pending_notifications' => $this->pendingNotifications()->get()->map->attributesToArray()->all(),
+            'notification_messages' => $this->notificationMessages()->get()->map->attributesToArray()->all(),
+            'notification_deliveries' => $this->notificationDeliveries()->get()->map->attributesToArray()->all(),
+            'followings' => DB::table('followings')
+                ->where('user_id', $this->id)
+                ->get()
+                ->map(function (object $row): array {
+                    return [
+                        'followable_id' => $row->followable_id,
+                        'followable_type' => $row->followable_type,
+                        'created_at' => $row->created_at,
+                        'updated_at' => $row->updated_at,
+                    ];
+                })
+                ->all(),
+        ];
+
+        $this->captureDeletedAffiliateTrackingSnapshot();
+    }
+
+    protected function captureDeletedAffiliateTrackingSnapshot(): void
+    {
+        OwnerContext::withOwner($this, function (): void {
+            /** @var Affiliate|null $affiliate */
+            $affiliate = Affiliate::query()
+                ->where('owner_type', $this->getMorphClass())
+                ->where('owner_id', $this->getKey())
+                ->first();
+
+            if (! $affiliate instanceof Affiliate) {
+                $this->deletedAffiliateTrackingSnapshot = [];
+
+                return;
+            }
+
+            $this->deletedAffiliateTrackingSnapshot = [
+                'affiliate' => $affiliate->getAttributes(),
+                'links' => $affiliate->links()->get()->map(fn (AffiliateLink $link): array => $link->getAttributes())->all(),
+                'attributions' => $affiliate->attributions()->get()->map(fn (AffiliateAttribution $attribution): array => $attribution->getAttributes())->all(),
+                'touchpoints' => AffiliateTouchpoint::query()
+                    ->where('affiliate_id', $affiliate->id)
+                    ->get()
+                    ->map(fn (AffiliateTouchpoint $touchpoint): array => $touchpoint->getAttributes())
+                    ->all(),
+                'conversions' => $affiliate->conversions()->get()->map(fn (AffiliateConversion $conversion): array => $conversion->getAttributes())->all(),
+                'payouts' => $affiliate->payouts()->get()->map(fn (AffiliatePayout $payout): array => $payout->getAttributes())->all(),
+                'fraud_signals' => $affiliate->fraudSignals()->get()->map(fn (AffiliateFraudSignal $fraudSignal): array => $fraudSignal->getAttributes())->all(),
+                'daily_stats' => $affiliate->dailyStats()->get()->map(fn (AffiliateDailyStat $dailyStat): array => $dailyStat->getAttributes())->all(),
+                'balance' => $affiliate->balance?->getAttributes(),
+                'payout_methods' => $affiliate->payoutMethods()->get()->map(fn (AffiliatePayoutMethod $payoutMethod): array => $payoutMethod->getAttributes())->all(),
+                'payout_holds' => $affiliate->payoutHolds()->get()->map(fn (AffiliatePayoutHold $payoutHold): array => $payoutHold->getAttributes())->all(),
+            ];
+        });
+    }
+
+    protected function restoreManyToManyRelations(array $snapshot): void
+    {
+        DB::table('institution_user')->insertOrIgnore($snapshot['institution_user'] ?? []);
+        DB::table('speaker_user')->insertOrIgnore($snapshot['speaker_user'] ?? []);
+        DB::table('reference_user')->insertOrIgnore($snapshot['reference_user'] ?? []);
+        DB::table('event_saves')->insertOrIgnore($snapshot['event_saves'] ?? []);
+        DB::table('event_attendees')->insertOrIgnore($snapshot['event_attendees'] ?? []);
+        DB::table('event_user')->insertOrIgnore($snapshot['event_user'] ?? []);
+        DB::table('followings')->insertOrIgnore(collect($snapshot['followings'] ?? [])->map(function (array $row): array {
+            return array_merge([
+                'user_id' => $this->id,
+            ], $row);
+        })->all());
+    }
+
+    protected function restoreReassignedRelations(array $snapshot): void
+    {
+        $this->restoreForeignKeyRelation('ownedEvents', 'user_id', $snapshot['owned_event_ids'] ?? []);
+        $this->restoreForeignKeyRelation('eventSubmissions', 'submitted_by', $snapshot['event_submission_ids'] ?? []);
+        $this->restoreForeignKeyRelation('contributionRequests', 'proposer_id', $snapshot['contribution_request_proposer_ids'] ?? []);
+        $this->restoreForeignKeyRelation('reviewedContributionRequests', 'reviewer_id', $snapshot['contribution_request_reviewer_ids'] ?? []);
+        $this->restoreForeignKeyRelation('membershipClaims', 'claimant_id', $snapshot['membership_claim_ids'] ?? []);
+        $this->restoreForeignKeyRelation('reviewedMembershipClaims', 'reviewer_id', $snapshot['membership_claim_reviewer_ids'] ?? []);
+        $this->restoreForeignKeyRelation('moderationReviews', 'moderator_id', $snapshot['moderation_review_ids'] ?? []);
+        $this->restoreForeignKeyRelation('reports', 'reporter_id', $snapshot['report_ids'] ?? []);
+        $this->restoreForeignKeyRelation('handledReports', 'handled_by', $snapshot['handled_report_ids'] ?? []);
+    }
+
+    protected function restoreDeletedAffiliateTrackingSnapshot(mixed $record): void
+    {
+        if (! is_array($record)) {
+            return;
+        }
+
+        OwnerContext::withOwner($this, function () use ($record): void {
+            $affiliateAttributes = $record['affiliate'] ?? null;
+
+            if (! is_array($affiliateAttributes)) {
+                return;
+            }
+
+            $affiliate = $this->restoreRawModel(Affiliate::class, $affiliateAttributes);
+
+            if (! $affiliate->belongsToOwner($this)) {
+                $affiliate->assignOwner($this)->saveQuietly();
+            }
+
+            $this->restoreRawModels(AffiliateLink::class, $record['links'] ?? []);
+            $this->restoreRawModels(AffiliateAttribution::class, $record['attributions'] ?? []);
+            $this->restoreRawModels(AffiliateTouchpoint::class, $record['touchpoints'] ?? []);
+            $this->restoreRawModels(AffiliateConversion::class, $record['conversions'] ?? []);
+            $this->restoreRawModels(AffiliatePayout::class, $record['payouts'] ?? []);
+            $this->restoreRawModels(AffiliateFraudSignal::class, $record['fraud_signals'] ?? []);
+            $this->restoreRawModels(AffiliateDailyStat::class, $record['daily_stats'] ?? []);
+
+            if (is_array($record['balance'] ?? null)) {
+                $this->restoreRawModel(AffiliateBalance::class, $record['balance']);
+            }
+
+            $this->restoreRawModels(AffiliatePayoutMethod::class, $record['payout_methods'] ?? []);
+            $this->restoreRawModels(AffiliatePayoutHold::class, $record['payout_holds'] ?? []);
+        });
+    }
+
+    protected function restoreDeletedChildModels(array $snapshot): void
+    {
+        $this->restoreChildModels('socialAccounts', $snapshot['social_accounts'] ?? []);
+        $this->restoreChildModels('registrations', $snapshot['registrations'] ?? []);
+        $this->restoreChildModels('eventCheckins', $snapshot['event_checkins'] ?? []);
+        $this->restoreChildModels('savedSearches', $snapshot['saved_searches'] ?? []);
+        $this->restoreSingleChildModel('notificationSetting', $snapshot['notification_setting'] ?? null);
+        $this->restoreChildModels('notificationRules', $snapshot['notification_rules'] ?? []);
+        $this->restoreChildModels('notificationDestinations', $snapshot['notification_destinations'] ?? []);
+        $this->restoreChildModels('pendingNotifications', $snapshot['pending_notifications'] ?? []);
+        $this->restoreChildModels('notificationMessages', $snapshot['notification_messages'] ?? []);
+        $this->restoreChildModels('notificationDeliveries', $snapshot['notification_deliveries'] ?? []);
+    }
+
+    protected function restoreChildModels(string $relationName, array $records): void
+    {
+        if ($records === []) {
+            return;
+        }
+
+        $modelClass = $this->{$relationName}()->getRelated()::class;
+
+        foreach ($records as $attributes) {
+            if (! is_array($attributes)) {
+                continue;
+            }
+
+            /** @var Model $model */
+            $model = new $modelClass;
+            $model->timestamps = false;
+            $model->forceFill($attributes);
+            $model->saveQuietly();
+        }
+    }
+
+    protected function restoreSingleChildModel(string $relationName, mixed $record): void
+    {
+        if (! is_array($record)) {
+            return;
+        }
+
+        $modelClass = $this->{$relationName}()->getRelated()::class;
+
+        /** @var Model $model */
+        $model = new $modelClass;
+        $model->timestamps = false;
+        $model->forceFill($record);
+        $model->saveQuietly();
+    }
+
+    protected function restoreForeignKeyRelation(string $relationName, string $foreignKey, array $ids): void
+    {
+        if ($ids === []) {
+            return;
+        }
+
+        $modelClass = $this->{$relationName}()->getRelated()::class;
+
+        $modelClass::query()->whereKey($ids)->update([$foreignKey => $this->id]);
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @param  array<string, mixed>  $attributes
+     */
+    protected function restoreRawModel(string $modelClass, array $attributes): Model
+    {
+        $primaryKey = (new $modelClass)->getKeyName();
+        $model = $modelClass::query()->find($attributes[$primaryKey] ?? null) ?? new $modelClass;
+        $model->timestamps = false;
+        $model->setRawAttributes($attributes, true);
+        $model->saveQuietly();
+
+        return $model;
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @param  array<int, array<string, mixed>>  $records
+     */
+    protected function restoreRawModels(string $modelClass, array $records): void
+    {
+        foreach ($records as $attributes) {
+            if (! is_array($attributes)) {
+                continue;
+            }
+
+            $this->restoreRawModel($modelClass, $attributes);
+        }
     }
 
     /**

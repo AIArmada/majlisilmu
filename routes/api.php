@@ -200,6 +200,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
     // User
     Route::get('/user', CurrentUserController::class)->name('api.user.show');
+    Route::delete('/user', [CurrentUserController::class, 'destroy'])->name('api.user.destroy');
     Route::get('/user/registrations', [UserRegistrationController::class, 'index'])
         ->name('api.user.registrations.index');
     Route::get('/me/events/going', [EventGoingController::class, 'index'])
