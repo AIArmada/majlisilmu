@@ -29,6 +29,11 @@ Mcp::web('/mcp/member', MemberServer::class)
         EnsureMemberMcpAccess::class,
     ]);
 
+if (app()->environment(['local', 'testing'])) {
+    Mcp::local('majlisilmu-admin-local', AdminServer::class);
+    Mcp::local('majlisilmu-member-local', MemberServer::class);
+}
+
 Route::middleware([
     NormalizeMcpAcceptHeader::class,
     AddWwwAuthenticateHeader::class,
