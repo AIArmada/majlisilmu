@@ -1,3 +1,68 @@
+# Public Catalog Report Verification
+
+- [x] Verify the public catalog report against the running API and current code
+- [x] Fix confirmed public catalog regressions with minimal scoped changes
+- [x] Add focused regression coverage for public catalog defaults and venue visibility
+- [x] Audit related catalog controllers/contracts and rerun formatter plus focused verification
+
+## Review
+
+- Verified the report against the running local API before changing code:
+  - `/api/v1/catalogs/states` and `/api/v1/catalogs/districts` returned empty arrays without query params even though the public app defaults to a preferred country scope.
+  - `/api/v1/catalogs/venues` was not broken locally; it returned 50 active verified/pending venues, so that report item did not reproduce.
+  - `/api/v1/catalogs/subdistricts` also returns `[]` without filters, but that remains expected because the contract still requires `district_id` or the federal-territory `state_id` fallback.
+- Fixed the real regression by making the public catalog controller resolve the preferred public country from the request when `country_id` / `state_id` are omitted, then passing that resolved country into the shared catalog service for `states` and country-scoped `districts`.
+- Audited the sibling admin catalog controller and tightened missing-query handling there too so omitted filters are treated as `null` instead of Laravel's `integer()` zero default.
+- Added focused API regressions in `tests/Feature/Api/Frontend/CatalogApiTest.php` covering:
+  - default public-country fallback for `states`
+  - default public-country fallback for `districts`
+  - request-scoped public-country resolution via `X-Timezone` when an additional public country is enabled in test config
+  - venue catalog visibility rules (`verified` + `pending` active venues included, rejected/inactive excluded)
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/CatalogApiTest.php` => 4 passed, 22 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php --filter='lists admin geography catalogs and exposes catalog metadata through admin write schemas'` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='adds summaries and descriptions to catalog and authenticated workflow endpoints'` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Http/Controllers/Api/Frontend/CatalogController.php app/Http/Controllers/Api/Admin/CatalogController.php app/Support/Api/Frontend/FrontendCatalogService.php` => pass
+  - `git diff --check -- app/Http/Controllers/Api/Frontend/CatalogController.php app/Http/Controllers/Api/Admin/CatalogController.php app/Support/Api/Frontend/FrontendCatalogService.php tests/Feature/Api/Frontend/CatalogApiTest.php tasks/todo.md` => pass
+  - Live curl smoke checks after the fix:
+    - `/api/v1/catalogs/states` => 18 rows, first `Johor`
+    - `/api/v1/catalogs/districts` => 162 rows, first `Alor Gajah`
+    - `/api/v1/catalogs/venues` remained populated throughout verification
+  - Note: a live `X-Timezone: Asia/Jakarta` curl still falls back to Malaysia in the local runtime because Indonesia is disabled in `config/public-countries.php`; the request-scoped non-Malaysia fallback is covered by the focused test where Indonesia is explicitly enabled.
+
+# MCP Documentation Exposure Upgrade
+
+- [x] Reproduce and diagnose why the verified MCP docs resources were not surfacing reliably in production clients
+- [x] Read the official Laravel MCP and OpenAI MCP / Apps SDK guidance for exposure, metadata, auth, and testing
+- [x] Keep the raw markdown resources on both admin and member servers
+- [x] Expose the same verified docs through model-friendly `search` / `fetch` MCP tools on both servers
+- [x] Upgrade MCP tool metadata and auth hints to better match ChatGPT / OpenAI expectations
+- [x] Update the MCP guide to explain the resource-versus-tool discoverability split
+- [x] Add focused regression coverage and rerun formatter, tests, PHPStan, and diff checks
+
+## Review
+
+- Root cause: the raw documentation pages were correctly registered as MCP resources, but production ChatGPT / OpenAI MCP flows are tool-centric. Connector creation and remote MCP import rely on `tools/list`, so the docs were not reliably discoverable just because `resources/list` exposed them.
+- Added `App\Support\Mcp\VerifiedDocumentationCatalog` as the shared source of truth for the two verified documentation pages.
+- Added read-only, idempotent `search` and `fetch` documentation tools to both servers:
+  - `App\Mcp\Tools\Admin\AdminDocumentationSearchTool`
+  - `App\Mcp\Tools\Admin\AdminDocumentationFetchTool`
+  - `App\Mcp\Tools\Member\MemberDocumentationSearchTool`
+  - `App\Mcp\Tools\Member\MemberDocumentationFetchTool`
+- These tools use OpenAI-compatible `search` / `fetch` names and exact single-argument shapes (`query` and `id`) so tool-centric clients can discover and retrieve the verified docs without depending on raw resource browsing.
+- Kept the original raw resources in place on both servers and upgraded them with standard MCP `Audience` / `Priority` annotations for resource-aware clients.
+- Upgraded all admin/member MCP tools to advertise top-level `securitySchemes` plus the `_meta.securitySchemes` compatibility mirror, aligned to the documented `oauth2` + `mcp:use` flow.
+- Added OpenAI-compatible short invocation status text on the new docs tools and updated the server instructions plus `docs/MAJLISILMU_MCP_GUIDE.md` to explain why both resources and tools now exist.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideDocsTest.php` => 2 passed, 14 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/CrudComparisonDocsTest.php` => 2 passed, 17 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 34 passed, 378 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php` => 22 passed, 211 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Mcp app/Support/Mcp tests/Unit/McpGuideDocsTest.php tests/Feature/Mcp/AdminServerTest.php tests/Feature/Mcp/MemberServerTest.php` => pass
+  - `git diff --check` => pass
+
 # MCP Documentation Resources
 
 - [x] Audit `docs/MAJLISILMU_MCP_GUIDE.md` and `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md` against the live admin/member MCP CRUD surface

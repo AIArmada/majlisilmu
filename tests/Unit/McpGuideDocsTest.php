@@ -32,7 +32,16 @@ it('keeps the MCP guide aligned with the verified admin and member write-capable
         ->and(documentedMcpGuideBulletList($markdown, 'Current member-write-capable resources include:'))
         ->toEqual($memberWriteKeys)
         ->and($markdown)->toContain('file://docs/MAJLISILMU_MCP_GUIDE.md')
-        ->toContain('file://docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md');
+        ->toContain('Tool-centric clients like ChatGPT and the OpenAI Responses MCP integration import tools from `tools/list`, not raw resources from `resources/list`.')
+        ->toContain('| `search` | Search the verified MCP/docs pages exposed by this server | `query` |')
+        ->toContain('| `fetch` | Fetch the full text of one verified docs page | `id` |')
+        ->toContain('| `documentation-tool-routing` | Short guidance for deciding when to use `search` vs `fetch` for the verified docs pages | `topic?` |')
+        ->toContain('fetch `docs-mcp-guide` directly when the question is clearly about MajlisIlmu MCP docs')
+        ->toContain('optionally accept a `topic` hint such as `crud`, `auth`, `media uploads`, `runtime records`, `search`, or `fetch` for more targeted guidance')
+        ->toContain('The broader internal cross-surface parity docs (`MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.*`) are intentionally not exposed through MCP.')
+        ->toContain('### MCP capability matrix')
+        ->toContain('| Related-record traversal | `admin-list-related-records` | No generic related-record tool |')
+        ->toContain('| `venues` | list/get/meta + schema + create + update + preview | Not exposed |');
 });
 
 it('keeps the member update tool appendix aligned with the live member MCP schema', function () {
@@ -43,7 +52,9 @@ it('keeps the member update tool appendix aligned with the live member MCP schem
     expect($matches[1] ?? null)
         ->toBeString()
         ->toContain('payload')
-        ->not->toContain('validate_only');
+        ->not->toContain('validate_only')
+        ->and($markdown)->toContain('Member update tools do not support `validate_only`; there is no preview-only member write path today.')
+        ->toContain('When a write tool supports `validate_only=true` (currently admin create/update only), previews normalize descriptors into file summaries without persisting media.');
 });
 
 /**

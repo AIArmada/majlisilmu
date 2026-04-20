@@ -56,7 +56,7 @@ class FrontendCatalogService
      */
     public function states(?int $countryId): array
     {
-        if ($countryId === null) {
+        if (! is_int($countryId)) {
             return [];
         }
 
@@ -74,14 +74,19 @@ class FrontendCatalogService
     /**
      * @return list<array{id: int, label: string}>
      */
-    public function districts(?int $stateId): array
+    public function districts(?int $stateId, ?int $countryId = null): array
     {
-        if ($stateId === null) {
+        $query = District::query();
+
+        if (is_int($stateId)) {
+            $query->where('state_id', $stateId);
+        } elseif (is_int($countryId)) {
+            $query->where('country_id', $countryId);
+        } else {
             return [];
         }
 
-        return District::query()
-            ->where('state_id', $stateId)
+        return $query
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (District $district): array => [

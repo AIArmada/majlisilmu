@@ -41,7 +41,7 @@ class CatalogController extends Controller
     public function states(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => $this->catalogs->states($request->integer('country_id')),
+            'data' => $this->catalogs->states($request->filled('country_id') ? $request->integer('country_id') : null),
         ]);
     }
 
@@ -54,7 +54,7 @@ class CatalogController extends Controller
     public function districts(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => $this->catalogs->districts($request->integer('state_id')),
+            'data' => $this->catalogs->districts($request->filled('state_id') ? $request->integer('state_id') : null),
         ]);
     }
 
@@ -69,8 +69,8 @@ class CatalogController extends Controller
     {
         return response()->json([
             'data' => $this->catalogs->subdistricts(
-                $request->integer('state_id'),
-                $request->integer('district_id'),
+                $request->filled('state_id') ? $request->integer('state_id') : null,
+                $request->filled('district_id') ? $request->integer('district_id') : null,
             ),
         ]);
     }
