@@ -438,7 +438,7 @@ it('previews admin speaker updates through the MCP write tool without persisting
         ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
 });
 
-it('returns remediation details for validate only admin create validation failures', function () {
+it('returns remediation details for validate-only admin create validation failures', function () {
     ensureMcpMalaysiaCountryExists();
 
     $admin = adminMcpUser('super_admin');
@@ -472,7 +472,7 @@ it('returns remediation details for validate only admin create validation failur
             ->etc());
 });
 
-it('returns retryable remediation details for validate only admin update validation failures', function () {
+it('returns retryable remediation details for validate-only admin update validation failures', function () {
     ensureMcpMalaysiaCountryExists();
 
     $admin = adminMcpUser('super_admin');
