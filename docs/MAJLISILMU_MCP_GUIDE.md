@@ -1,6 +1,6 @@
 # MajlisIlmu MCP Guide
 
-Updated: April 19, 2026
+Updated: April 20, 2026
 Audience: developers and AI-client integrators.
 
 ## What MCP Means in MajlisIlmu
@@ -25,7 +25,7 @@ When you are comparing a report, a Filament page, an HTTP admin endpoint, and an
 Key rules:
 
 - `GET /api/v1/admin/{resourceKey}/schema` documents the raw HTTP admin contract.
-- `GET /mcp/admin` uses a separate MCP write-schema formatter; destructive `clear_*` media flags are removed there and media uploads are marked unsupported.
+- `GET /mcp/admin` uses a separate MCP write-schema formatter; destructive `clear_*` media flags are removed there, while supported media/file fields are advertised with JSON base64 descriptor metadata.
 - `current_media` contains metadata only; it does not expose signed or temporary URLs.
 - Generic user record payloads intentionally redact `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`.
 - Record lookups use `route_key` for record-specific paths, and missing records return 404 rather than a generic server error.
@@ -170,6 +170,7 @@ Admin tool behavior notes:
 
 - `validate_only=true` is supported for create/update preview flows.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
+- Media/file upload fields accept JSON base64 descriptors only when the matching write schema advertises them.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
 - Read-only tools should be annotated as such so ChatGPT can safely choose them.
 - Write tools should be described as schema-guided and idempotent where the server logic supports that behavior.
@@ -191,7 +192,31 @@ Member tool behavior notes:
 
 - Member tools are constrained to the Ahli workspace boundary and live membership relationships.
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
+- Media/file upload fields accept JSON base64 descriptors only when the matching member write schema advertises them.
 - As with admin tools, ChatGPT only understands what the tool descriptor exposes; if a capability is not registered as a tool, the model will not assume it exists.
+
+### MCP media/file upload contract
+
+MCP write tools are JSON tools, not multipart HTTP endpoints. When a schema advertises a media/file field, send a descriptor object instead of a browser file upload:
+
+```json
+{
+  "filename": "poster.png",
+  "mime_type": "image/png",
+  "content_base64": "iVBORw0KGgo..."
+}
+```
+
+Accepted aliases are `file_name` or `name` for `filename`, `mime` for `mime_type`, and `base64` or `data` for `content_base64`. Data URLs are accepted for `content_base64`. Filename extensions are recommended; when they are omitted, the server derives the staged extension from `mime_type`.
+
+Schema fields describe the exact upload rules:
+
+- `mcp_upload.shape` is `file_descriptor` for a single file and `array<file_descriptor>` for multiple files.
+- `accepted_mime_types`, `max_file_size_kb`, and `max_files` are authoritative for that field.
+- `mcp_upload.replacement_semantics` describes whether the submitted descriptor or descriptor array replaces the target media collection.
+- `validate_only=true` previews normalize descriptors into file summaries without persisting media.
+- `current_media` stays metadata-only and does not expose signed or temporary URLs.
+- `clear_*` media flags remain unsupported through MCP and are rejected even when clients submit them manually.
 
 ### Admin MCP resource scope
 
@@ -209,7 +234,7 @@ Write-tool preview tip:
 
 - `admin-create-record` and `admin-update-record` accept `validate_only=true` to validate, normalize, and preview a write without persisting it.
 - Preview responses return the normalized payload plus warning metadata for supported write-side checks.
-- MCP write schemas do not advertise destructive media clear-flags, and the tools reject them if a client submits them anyway.
+- MCP write schemas advertise supported media/file fields with JSON descriptor metadata, do not advertise destructive media clear-flags, and reject clear-flags if a client submits them anyway.
 - Update previews also include the current record snapshot so you can compare what would change before retrying without `validate_only`.
 
 ### Member MCP resource scope
@@ -245,6 +270,8 @@ Useful environment variables:
 - `routes/ai.php` — MCP server registration and OAuth routes.
 - `app/Mcp/Servers/AdminServer.php` — admin MCP server definition.
 - `app/Mcp/Servers/MemberServer.php` — member MCP server definition.
+- `app/Support/Mcp/McpWriteSchemaFormatter.php` — sanitized MCP write-schema formatter.
+- `app/Support/Mcp/McpFilePayloadNormalizer.php` — JSON file descriptor staging and validation for MCP writes.
 - `routes/ai.php` — web and local MCP registration.
 - `app/Console/Commands/IssueMcpToken.php` — command for issuing scoped tokens.
 - `app/Support/Mcp/McpTokenManager.php` — token issuance, listing, and revocation logic.

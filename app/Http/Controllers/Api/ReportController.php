@@ -10,6 +10,7 @@ use App\Data\Api\Report\ReportSubmissionData;
 use App\Http\Controllers\Controller;
 use App\Models\Report;
 use App\Models\User;
+use App\Support\Api\Frontend\FrontendMediaSyncService;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -34,10 +35,12 @@ class ReportController extends Controller
         ResolveReportEntityMetadataAction $resolveReportEntityMetadataAction,
         SubmitReportAction $submitReportAction,
         ResolveReporterFingerprintAction $resolveReporterFingerprintAction,
+        FrontendMediaSyncService $frontendMediaSyncService,
     ): JsonResponse {
         $this->authorize('create', Report::class);
 
         $reporterFingerprint = $resolveReporterFingerprintAction->handle($request);
+        $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
 
         $validated = $request->validate([
             'entity_type' => ['required', Rule::in($resolveReportEntityMetadataAction->validKeys())],
@@ -47,6 +50,8 @@ class ReportController extends Controller
                 Rule::in($resolveReportCategoryOptionsAction->validKeys()),
             ],
             'description' => ['required_if:category,other', 'nullable', 'string', 'max:2000'],
+            'evidence' => ['nullable', 'array', 'max:8'],
+            'evidence.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf', "max:{$maxUploadSizeKb}"],
         ]);
 
         // Verify entity exists
@@ -75,6 +80,12 @@ class ReportController extends Controller
                 $validated['description'] ?? null,
                 $request,
             );
+
+            $frontendMediaSyncService->syncMultiple(
+                $report,
+                is_array($request->file('evidence')) ? $request->file('evidence') : null,
+                'evidence',
+            );
         } catch (\RuntimeException $exception) {
             if ($exception->getMessage() !== 'duplicate_report') {
                 throw $exception;
@@ -90,7 +101,7 @@ class ReportController extends Controller
 
         return response()->json([
             'message' => 'Report submitted successfully. Our team will review it.',
-            'data' => ReportSubmissionData::fromModel($report)->toArray(),
+            'data' => ReportSubmissionData::fromModel($report->fresh('media') ?? $report)->toArray(),
             'meta' => [
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
             ],

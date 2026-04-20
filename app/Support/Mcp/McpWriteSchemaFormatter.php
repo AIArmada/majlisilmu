@@ -17,6 +17,9 @@ final class McpWriteSchemaFormatter
         'front_cover',
         'back_cover',
         'gallery',
+        'main',
+        'qr',
+        'evidence',
     ];
 
     /**
@@ -30,6 +33,9 @@ final class McpWriteSchemaFormatter
         'clear_front_cover',
         'clear_back_cover',
         'clear_gallery',
+        'clear_main',
+        'clear_qr',
+        'clear_evidence',
     ];
 
     /**
@@ -40,16 +46,23 @@ final class McpWriteSchemaFormatter
     public function formatSchema(array $schema, string $tool, array $toolArguments): array
     {
         $fields = is_array($schema['fields'] ?? null) ? $schema['fields'] : [];
-        $unsupportedFields = $this->unsupportedMediaFields($fields);
+        $mediaFields = $this->mediaFields($fields);
 
         $schema['transport'] = 'mcp';
         $schema['tool'] = $tool;
         $schema['tool_arguments'] = $toolArguments;
         $schema['endpoint'] = null;
         $schema['content_type'] = 'application/json';
-        $schema['media_uploads_supported'] = false;
-        $schema['unsupported_fields'] = $unsupportedFields;
-        $schema['fields'] = $this->annotateFields($fields, $unsupportedFields);
+        $schema['media_uploads_supported'] = $mediaFields !== [];
+        $schema['media_upload_transport'] = $mediaFields === [] ? null : 'json_base64_descriptor';
+        $schema['file_descriptor_shape'] = $mediaFields === [] ? null : [
+            'filename' => 'Original client filename. Include an extension when available; otherwise mime_type is used for the staged extension.',
+            'mime_type' => 'IANA media type, for example image/jpeg or application/pdf.',
+            'content_base64' => 'Raw base64 file bytes. Data URLs are also accepted.',
+        ];
+        $schema['unsupported_fields'] = [];
+        $schema['destructive_media_clear_fields_supported'] = false;
+        $schema['fields'] = $this->annotateFields($fields);
 
         return $schema;
     }
@@ -58,9 +71,9 @@ final class McpWriteSchemaFormatter
      * @param  array<int, mixed>  $fields
      * @return list<string>
      */
-    private function unsupportedMediaFields(array $fields): array
+    private function mediaFields(array $fields): array
     {
-        $unsupported = [];
+        $mediaFields = [];
 
         foreach ($fields as $field) {
             if (! is_array($field)) {
@@ -73,18 +86,17 @@ final class McpWriteSchemaFormatter
                 continue;
             }
 
-            $unsupported[] = $name;
+            $mediaFields[] = $name;
         }
 
-        return array_values(array_unique($unsupported));
+        return array_values(array_unique($mediaFields));
     }
 
     /**
      * @param  array<int, mixed>  $fields
-     * @param  list<string>  $unsupportedFields
      * @return list<array<string, mixed>>
      */
-    private function annotateFields(array $fields, array $unsupportedFields): array
+    private function annotateFields(array $fields): array
     {
         $annotated = [];
 
@@ -96,13 +108,13 @@ final class McpWriteSchemaFormatter
             /** @var array<string, mixed> $field */
             $name = $this->fieldName($field);
 
-            if ($name !== null && in_array($name, $unsupportedFields, true)) {
-                $field['supported'] = false;
-                $field['unsupported_reason'] = 'Media uploads are not supported through MCP v1.';
-            }
-
             if ($name !== null && in_array($name, self::DESTRUCTIVE_MEDIA_CLEAR_FIELDS, true)) {
                 continue;
+            }
+
+            if ($name !== null && $this->isMediaField($field, $name)) {
+                $field['supported'] = true;
+                $field['mcp_upload'] = $this->mediaUploadDescriptor($field);
             }
 
             $annotated[] = $field;
@@ -130,5 +142,24 @@ final class McpWriteSchemaFormatter
 
         return in_array($name, self::MEDIA_FIELDS, true)
             || (is_string($type) && str_contains($type, 'file'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return array<string, mixed>
+     */
+    private function mediaUploadDescriptor(array $field): array
+    {
+        $type = $field['type'] ?? null;
+        $isMultiple = is_string($type) && str_contains($type, 'array');
+
+        return array_filter([
+            'transport' => 'json_base64_descriptor',
+            'shape' => $isMultiple ? 'array<file_descriptor>' : 'file_descriptor',
+            'replacement_semantics' => $isMultiple ? 'submitted_array_replaces_collection' : 'submitted_file_replaces_collection',
+            'accepted_mime_types' => $field['accepted_mime_types'] ?? null,
+            'max_file_size_kb' => $field['max_file_size_kb'] ?? null,
+            'max_files' => $field['max_files'] ?? null,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 }

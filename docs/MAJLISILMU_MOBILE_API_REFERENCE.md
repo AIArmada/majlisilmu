@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-19
+**Last Updated:** 2026-04-20
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -21,9 +21,10 @@ If you are building an AI client, use this read order:
 4. Before any write, fetch the exact contract first: `GET /forms/*` for public flows, or `GET /admin/{resourceKey}/schema` for admin writes.
 5. Use the admin record `route_key` returned by admin collection or detail payloads for record-specific schema and mutation paths.
 6. Send raw timestamp fields in UTC. For date-only filters, send the user's local calendar date together with timezone context so the server can convert it to UTC boundaries.
-7. Treat `error.code` as the machine-readable failure classifier and `meta.request_id` as the trace identifier for retries and support.
+7. For any file field, read `accepted_mime_types`, `max_file_size_kb`, and `max_files` from the form/schema response before uploading.
+8. Treat `error.code` as the machine-readable failure classifier and `meta.request_id` as the trace identifier for retries and support.
 
-If you are evaluating the MCP connector rather than the raw HTTP admin API, switch to `docs/MAJLISILMU_MCP_GUIDE.md`. The MCP server is intentionally sanitized and does not expose the same write-schema surface as `/api/v1/admin`.
+If you are evaluating the MCP connector rather than the raw HTTP admin API, switch to `docs/MAJLISILMU_MCP_GUIDE.md`. The MCP server is intentionally sanitized and uses its own write-schema surface; when it advertises media/file fields, clients send JSON base64 file descriptors instead of multipart files.
 
 ---
 
@@ -387,7 +388,7 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 | `GET` | `/forms/submit-event` | Optional | Submit-event schema, defaults, and validation metadata |
 | `GET` | `/forms/contributions/institutions` | Optional | Institution contribution contract |
 | `GET` | `/forms/contributions/speakers` | Optional | Speaker contribution contract |
-| `GET` | `/forms/report` | Required | Report form contract |
+| `GET` | `/forms/report` | Required | Report form contract, including optional evidence upload metadata |
 | `GET` | `/forms/account-settings` | Required | Account-settings contract |
 | `GET` | `/forms/advanced-events` | Required | Advanced parent-program builder contract |
 | `GET` | `/forms/institution-workspace` | Required | Institution workspace contract |
@@ -440,6 +441,7 @@ Notes:
 | `GET` | `/membership-claims` | List the current user’s membership claims |
 | `POST` | `/membership-claims/{subjectType}/{subject}` | Submit a membership claim with evidence uploads |
 | `DELETE` | `/membership-claims/{claimId}` | Cancel the current user’s pending membership claim |
+| `POST` | `/reports` | Submit a report with optional evidence uploads |
 | `POST` | `/advanced-events` | Create an advanced parent program submission |
 | `GET` | `/follows/{type}/{subject}` | Return follow state for the current user |
 | `POST` | `/follows/{type}/{subject}` | Follow a public institution, speaker, reference, or series |
@@ -463,6 +465,7 @@ Authorization note:
 - Use this as the authoritative create contract for public institution submissions.
 - Institution create requires an explicit address country.
 - Send `address.country_id`.
+- Public institution create accepts media fields `cover` and `gallery`.
 - If the same normalized institution name plus the same `state_id`, `district_id`, and `subdistrict_id` already exists, create will fail with HTTP `422` on `name`.
 
 #### `GET /forms/contributions/speakers`
@@ -492,9 +495,19 @@ Authorization note:
 - `can_direct_edit = false` means the same endpoint will create a review request instead.
 - `direct_edit_media_fields` is the only allowed file-upload contract for direct edits.
 - Current direct-edit media sets are:
-  - Institutions: `['cover']`
-  - Speakers: `['avatar', 'cover']`
-  - Everyone else or non-maintainers: `[]`
+  - Events: `['poster', 'gallery']`
+  - Institutions: `['cover', 'gallery']`
+  - Speakers: `['avatar', 'cover', 'gallery']`
+  - References and non-maintainers: `[]`
+
+Public upload metadata:
+
+- Public event submissions accept `poster` and `gallery`.
+- Membership claims accept `evidence` files.
+- Reports accept `evidence` files.
+- Image upload fields accept `image/jpeg`, `image/png`, and `image/webp`.
+- Evidence fields accept `image/jpeg`, `image/png`, `image/webp`, and `application/pdf`.
+- `max_file_size_kb` comes from `config('media-library.max_file_size')` and defaults to 10 MB.
 
 #### `POST /contributions/{subjectType}/{subject}/suggest`
 
@@ -542,6 +555,7 @@ Current scope:
 - Shared create/update write support for `speakers`, `institutions`, `venues`, `references`, `events`, and `subdistricts`
 - Optional `validate_only=true` preview mode for admin create/update requests
 - `current_media` is metadata only; it is useful for pre-populating edit forms, but it does not expose signed or temporary file URLs
+- File fields in schema responses include `accepted_mime_types`, `max_file_size_kb`, and `max_files` where applicable
 - User record payloads intentionally redact sensitive fields such as `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`
 
 Current limitation:
@@ -600,6 +614,7 @@ Rules:
 - `recordKey` should use the record `route_key` returned by the admin collection or record-detail payload.
 - The schema response embeds an `endpoint` field with the exact URL you should POST or PUT to — use that directly.
 - The schema response also embeds `defaults` with current field values, and `current_media` with existing media metadata, enabling pre-population of edit forms without exposing signed media URLs.
+- File fields include `accepted_mime_types`, `max_file_size_kb`, and `max_files` where applicable. Use `multipart/form-data` for raw HTTP API writes that include files.
 - The `method` field tells you whether to use `POST` or `PUT`.
 - `conditional_rules` describe fields that become required based on other field values (e.g., `job_title` is required when `is_freelance = true` for speakers).
 
@@ -931,19 +946,21 @@ Auth:
 - Authentication is required.
 - Rate limiting uses `throttle:reports`.
 
-Request body:
+Request body (`multipart/form-data` when evidence is included):
 
-```json
-{
-  "entity_type": "event",
-  "entity_id": "uuid",
-  "category": "wrong_info",
-  "description": "Optional text when category is other."
-}
+```http
+entity_type=event
+entity_id=uuid
+category=wrong_info
+description=Optional text when category is other.
+evidence[]=<image-or-pdf-file>
 ```
 
 Notes:
 
+- `evidence[]` is optional, accepts up to 8 files, and each file may be `image/jpeg`, `image/png`, `image/webp`, or `application/pdf`.
+- Evidence file size follows `config('media-library.max_file_size')`, 10 MB by default.
+- The response includes report evidence metadata with media id, display name, stored filename, MIME type, byte size, and URL.
 - Duplicate reports from the same reporter fingerprint within 24 hours return `409`.
 - High-risk event reports can trigger re-moderation.
 

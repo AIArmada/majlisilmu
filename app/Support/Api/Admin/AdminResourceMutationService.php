@@ -45,6 +45,7 @@ use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Location\PreferredCountryResolver;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\HasMedia;
@@ -303,7 +304,7 @@ class AdminResourceMutationService
         $destructiveMediaFields = $this->destructiveMediaFields($normalizedPayload);
 
         return [
-            'normalized_payload' => $normalizedPayload,
+            'normalized_payload' => $this->previewPayload($normalizedPayload),
             'warnings' => array_values(array_map(
                 fn (string $field): array => [
                     'code' => 'destructive_media_clear',
@@ -490,6 +491,59 @@ class AdminResourceMutationService
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function previewPayload(array $payload): array
+    {
+        $preview = [];
+
+        foreach ($payload as $key => $value) {
+            $preview[$key] = $this->previewValue($value);
+        }
+
+        return $preview;
+    }
+
+    private function previewValue(mixed $value): mixed
+    {
+        if ($value instanceof UploadedFile) {
+            return [
+                'file_name' => $value->getClientOriginalName(),
+                'mime_type' => $value->getClientMimeType(),
+                'size' => $value->getSize(),
+            ];
+        }
+
+        if (is_array($value)) {
+            return array_map(fn (mixed $item): mixed => $this->previewValue($item), $value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function imageMimeTypes(): array
+    {
+        return ['image/jpeg', 'image/png', 'image/webp'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function logoMimeTypes(): array
+    {
+        return ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+    }
+
+    private function maxUploadSizeKb(): int
+    {
+        return (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function institutionFields(bool $updating): array
@@ -505,9 +559,9 @@ class AdminResourceMutationService
             $this->field('address.country_id', 'integer', required: ! $updating, default: SharedFormSchema::preferredPublicCountryId()),
             $this->field('contacts', 'array<object>', required: false),
             $this->field('social_media', 'array<object>', required: false),
-            $this->field('logo', 'file', required: false),
-            $this->field('cover', 'file', required: false),
-            $this->field('gallery', 'array<file>', required: false),
+            $this->field('logo', 'file', required: false, acceptedMimeTypes: $this->logoMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('clear_logo', 'boolean', required: false, default: false),
             $this->field('clear_cover', 'boolean', required: false, default: false),
             $this->field('clear_gallery', 'boolean', required: false, default: false),
@@ -542,9 +596,9 @@ class AdminResourceMutationService
             $this->field('address.country_id', 'integer', required: ! $updating, default: SharedFormSchema::preferredPublicCountryId()),
             $this->field('contacts', 'array<object>', required: false),
             $this->field('social_media', 'array<object>', required: false),
-            $this->field('avatar', 'file', required: false),
-            $this->field('cover', 'file', required: false),
-            $this->field('gallery', 'array<file>', required: false),
+            $this->field('avatar', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('clear_avatar', 'boolean', required: false, default: false),
             $this->field('clear_cover', 'boolean', required: false, default: false),
             $this->field('clear_gallery', 'boolean', required: false, default: false),
@@ -573,9 +627,9 @@ class AdminResourceMutationService
             $this->field('status', 'string', required: true, default: 'verified', allowedValues: ['pending', 'verified']),
             $this->field('is_active', 'boolean', required: false, default: true),
             $this->field('social_media', 'array<object>', required: false),
-            $this->field('front_cover', 'file', required: false),
-            $this->field('back_cover', 'file', required: false),
-            $this->field('gallery', 'array<file>', required: false),
+            $this->field('front_cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('back_cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 10),
             $this->field('clear_front_cover', 'boolean', required: false, default: false),
             $this->field('clear_back_cover', 'boolean', required: false, default: false),
             $this->field('clear_gallery', 'boolean', required: false, default: false),
@@ -596,8 +650,8 @@ class AdminResourceMutationService
             $this->field('address', 'object', required: true),
             $this->field('contacts', 'array<object>', required: false),
             $this->field('social_media', 'array<object>', required: false),
-            $this->field('cover', 'file', required: false),
-            $this->field('gallery', 'array<file>', required: false),
+            $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('clear_cover', 'boolean', required: false, default: false),
             $this->field('clear_gallery', 'boolean', required: false, default: false),
         ];
@@ -653,8 +707,8 @@ class AdminResourceMutationService
             $this->field('space_id', 'string', required: false),
             $this->field('speakers', 'array<string>', required: false),
             $this->field('other_key_people', 'array<object>', required: false),
-            $this->field('poster', 'file', required: false),
-            $this->field('gallery', 'array<file>', required: false),
+            $this->field('poster', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 10),
             $this->field('clear_poster', 'boolean', required: false, default: false),
             $this->field('clear_gallery', 'boolean', required: false, default: false),
             $this->field('is_priority', 'boolean', required: false, default: false),
@@ -668,6 +722,7 @@ class AdminResourceMutationService
 
     /**
      * @param  list<string|int>|null  $allowedValues
+     * @param  list<string>|null  $acceptedMimeTypes
      * @return array<string, mixed>
      */
     private function field(
@@ -677,6 +732,9 @@ class AdminResourceMutationService
         mixed $default = null,
         ?int $maxLength = null,
         ?array $allowedValues = null,
+        ?array $acceptedMimeTypes = null,
+        ?int $maxFileSizeKb = null,
+        ?int $maxFiles = null,
     ): array {
         return array_filter([
             'name' => $name,
@@ -685,6 +743,9 @@ class AdminResourceMutationService
             'default' => $default,
             'max_length' => $maxLength,
             'allowed_values' => $allowedValues,
+            'accepted_mime_types' => $acceptedMimeTypes,
+            'max_file_size_kb' => $maxFileSizeKb,
+            'max_files' => $maxFiles,
         ], static fn (mixed $value): bool => $value !== null);
     }
 
@@ -706,6 +767,7 @@ class AdminResourceMutationService
     private function institutionRules(bool $updating): array
     {
         $addressRule = $updating ? ['sometimes', 'array'] : ['required', 'array'];
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -737,10 +799,10 @@ class AdminResourceMutationService
             'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::enum(SocialMediaPlatform::class)],
             'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
             'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
-            'logo' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp,image/svg+xml'],
-            'cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'logo' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp,image/svg+xml', $maxUploadSize],
+            'cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
             'gallery' => ['nullable', 'array'],
-            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
             'clear_logo' => ['sometimes', 'boolean'],
             'clear_cover' => ['sometimes', 'boolean'],
             'clear_gallery' => ['sometimes', 'boolean'],
@@ -753,6 +815,7 @@ class AdminResourceMutationService
     private function eventRules(bool $updating): array
     {
         $required = $updating ? 'sometimes' : 'required';
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
 
         return [
             'title' => [$required, 'string', 'max:255'],
@@ -801,9 +864,9 @@ class AdminResourceMutationService
             'other_key_people.*.name' => ['nullable', 'string', 'max:255', 'required_without:other_key_people.*.speaker_id'],
             'other_key_people.*.is_public' => ['sometimes', 'boolean'],
             'other_key_people.*.notes' => ['nullable', 'string', 'max:500'],
-            'poster' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
-            'gallery' => ['nullable', 'array'],
-            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'poster' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
+            'gallery' => ['nullable', 'array', 'max:10'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
             'clear_poster' => ['sometimes', 'boolean'],
             'clear_gallery' => ['sometimes', 'boolean'],
             'is_priority' => ['sometimes', 'boolean'],
@@ -821,6 +884,7 @@ class AdminResourceMutationService
     private function referenceRules(bool $updating): array
     {
         $required = $updating ? 'required' : 'required';
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
 
         return [
             'title' => [$required, 'string', 'max:255'],
@@ -836,10 +900,10 @@ class AdminResourceMutationService
             'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::enum(SocialMediaPlatform::class)],
             'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
             'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
-            'front_cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
-            'back_cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
-            'gallery' => ['nullable', 'array'],
-            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'front_cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
+            'back_cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
+            'gallery' => ['nullable', 'array', 'max:10'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
             'clear_front_cover' => ['sometimes', 'boolean'],
             'clear_back_cover' => ['sometimes', 'boolean'],
             'clear_gallery' => ['sometimes', 'boolean'],
@@ -852,6 +916,7 @@ class AdminResourceMutationService
     private function speakerRules(bool $updating): array
     {
         $addressRule = $updating ? ['sometimes', 'array'] : ['present', 'array'];
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -897,10 +962,10 @@ class AdminResourceMutationService
             'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::enum(SocialMediaPlatform::class)],
             'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
             'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
-            'avatar' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
-            'cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'avatar' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
+            'cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
             'gallery' => ['nullable', 'array'],
-            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
             'clear_avatar' => ['sometimes', 'boolean'],
             'clear_cover' => ['sometimes', 'boolean'],
             'clear_gallery' => ['sometimes', 'boolean'],
@@ -929,6 +994,7 @@ class AdminResourceMutationService
     {
         $addressRule = $updating ? ['sometimes', 'array'] : ['required', 'array'];
         $required = $updating ? 'sometimes' : 'required';
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
 
         return [
             'name' => [$required, 'string', 'max:255'],
@@ -959,9 +1025,9 @@ class AdminResourceMutationService
             'social_media.*.platform' => ['required_with:social_media.*.username,social_media.*.url', Rule::enum(SocialMediaPlatform::class)],
             'social_media.*.username' => ['nullable', 'string', 'max:255', 'required_without:social_media.*.url'],
             'social_media.*.url' => ['nullable', 'url', 'max:255', 'required_without:social_media.*.username'],
-            'cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
             'gallery' => ['nullable', 'array'],
-            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
             'clear_cover' => ['sometimes', 'boolean'],
             'clear_gallery' => ['sometimes', 'boolean'],
         ];

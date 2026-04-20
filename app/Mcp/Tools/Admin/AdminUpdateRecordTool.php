@@ -44,17 +44,30 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
             /** @var array<string, mixed> $payload */
             $payload = $validated['payload'];
             $resourceKey = (string) $validated['resource_key'];
+            $recordKey = (string) $validated['record_key'];
 
-            $this->ensureMediaUploadsAreUnsupported($payload);
-            $payload = $this->normalizePayloadForWriteTool($resourceKey, $payload);
-
-            return $this->resourceService->updateRecord(
+            $this->ensureDestructiveMediaClearFlagsAreUnsupported($payload);
+            $schemaResponse = $this->resourceService->writeSchema(
                 resourceKey: $resourceKey,
-                recordKey: (string) $validated['record_key'],
-                payload: $payload,
+                operation: 'update',
+                recordKey: $recordKey,
                 actor: $actor,
-                validateOnly: (bool) ($validated['validate_only'] ?? false),
             );
+            $normalizedMediaPayload = $this->normalizeMcpMediaPayload($payload, $schemaResponse);
+
+            try {
+                $payload = $this->normalizePayloadForWriteTool($resourceKey, $normalizedMediaPayload['payload']);
+
+                return $this->resourceService->updateRecord(
+                    resourceKey: $resourceKey,
+                    recordKey: $recordKey,
+                    payload: $payload,
+                    actor: $actor,
+                    validateOnly: (bool) ($validated['validate_only'] ?? false),
+                );
+            } finally {
+                $this->cleanupMcpMediaPayload($normalizedMediaPayload);
+            }
         });
     }
 

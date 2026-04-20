@@ -92,6 +92,7 @@ class ContributionController extends FrontendController
     ): JsonResponse {
         $user = $this->requireUser($request);
         $this->ensureDirectoryFeedbackAllowed($user);
+        $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
 
         $validated = $request->validate([
             'type' => ['required', Rule::in(array_column(InstitutionType::cases(), 'value'))],
@@ -120,9 +121,9 @@ class ContributionController extends FrontendController
             'social_media.*.platform' => ['required_with:social_media', 'string', 'max:255'],
             'social_media.*.username' => ['nullable', 'string', 'max:255'],
             'social_media.*.url' => ['nullable', 'url', 'max:255'],
-            'cover' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'],
+            'cover' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
             'gallery' => ['nullable', 'array'],
-            'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp'],
+            'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
         ]);
         $validated = $this->normalizeContributionAddressPayload($validated);
 
@@ -171,6 +172,7 @@ class ContributionController extends FrontendController
     ): JsonResponse {
         $user = $this->requireUser($request);
         $this->ensureDirectoryFeedbackAllowed($user);
+        $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -215,10 +217,10 @@ class ContributionController extends FrontendController
             'social_media.*.platform' => ['required_with:social_media', 'string', 'max:255'],
             'social_media.*.username' => ['nullable', 'string', 'max:255'],
             'social_media.*.url' => ['nullable', 'url', 'max:255'],
-            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'],
-            'cover' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'],
+            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
+            'cover' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
             'gallery' => ['nullable', 'array'],
-            'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp'],
+            'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
         ]);
         $validated = $this->normalizeContributionAddressPayload($validated);
 
@@ -630,22 +632,23 @@ class ContributionController extends FrontendController
     private function directEditMediaValidationRules(array $directEditMediaFields): array
     {
         $rules = [];
+        $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
 
         if (in_array('avatar', $directEditMediaFields, true)) {
-            $rules['avatar'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'];
+            $rules['avatar'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"];
         }
 
         if (in_array('cover', $directEditMediaFields, true)) {
-            $rules['cover'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'];
+            $rules['cover'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"];
         }
 
         if (in_array('poster', $directEditMediaFields, true)) {
-            $rules['poster'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'];
+            $rules['poster'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"];
         }
 
         if (in_array('gallery', $directEditMediaFields, true)) {
             $rules['gallery'] = ['nullable', 'array'];
-            $rules['gallery.*'] = ['image', 'mimes:jpg,jpeg,png,webp'];
+            $rules['gallery.*'] = ['image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"];
         }
 
         return $rules;

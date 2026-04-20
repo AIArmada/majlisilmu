@@ -213,8 +213,11 @@ it('returns member update schema and updates institutions through member MCP wri
             ->where('data.schema.tool_arguments.payload', 'object')
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
-            ->where('data.schema.media_uploads_supported', false)
-            ->where('data.schema.unsupported_fields', fn ($fields): bool => collect($fields)->contains('logo') && collect($fields)->contains('gallery'))
+            ->where('data.schema.media_uploads_supported', true)
+            ->where('data.schema.media_upload_transport', 'json_base64_descriptor')
+            ->where('data.schema.unsupported_fields', [])
+            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'logo'), 'mcp_upload.shape') === 'file_descriptor'
+                && data_get(collect($fields)->firstWhere('name', 'gallery'), 'mcp_upload.shape') === 'array<file_descriptor>')
             ->etc());
 
     MemberServer::actingAs($member)
@@ -229,6 +232,10 @@ it('returns member update schema and updates institutions through member MCP wri
                 'is_active' => true,
                 'allow_public_event_submission' => true,
                 'slug' => 'attempted-member-institution-injection',
+                'cover' => memberMcpImageDescriptor('member-mcp-cover.png'),
+                'gallery' => [
+                    memberMcpImageDescriptor('member-mcp-gallery.png'),
+                ],
                 'address' => [
                     'country_id' => 132,
                 ],
@@ -243,8 +250,20 @@ it('returns member update schema and updates institutions through member MCP wri
     expect($institution->fresh()?->name)->toBe('Member MCP Institution Updated')
         ->and($institution->fresh()?->nickname)->toBe('Member MCP Masjid')
         ->and($institution->fresh()?->slug)->not->toBe('attempted-member-institution-injection')
+        ->and($institution->fresh()?->getMedia('cover'))->toHaveCount(1)
+        ->and($institution->fresh()?->getMedia('gallery'))->toHaveCount(1)
         ->and(abs(((float) $institution->fresh()?->addressModel?->lat) - (float) $originalLat))->toBeLessThan(0.000001)
         ->and(abs(((float) $institution->fresh()?->addressModel?->lng) - (float) $originalLng))->toBeLessThan(0.000001);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberUpdateRecordTool::class, [
+            'resource_key' => 'institutions',
+            'record_key' => $institution->getKey(),
+            'payload' => [
+                'clear_gallery' => true,
+            ],
+        ])
+        ->assertHasErrors(['Destructive media clear flags are not supported through MCP. Upload a replacement file or array when the schema advertises that media field.']);
 });
 
 it('registers member write tools when the MCP actor is a normalized Passport user', function () {
@@ -509,6 +528,25 @@ function globalRoleMcpUser(string $role): User
     $user->assignRole($role);
 
     return $user;
+}
+
+/**
+ * @return array{filename: string, mime_type: string, content_base64: string}
+ */
+function memberMcpImageDescriptor(string $name): array
+{
+    $upload = fakeGeneratedImageUpload($name, 640, 480);
+    $contents = file_get_contents((string) $upload->getRealPath());
+
+    if (! is_string($contents) || $contents === '') {
+        throw new RuntimeException('Unable to create MCP image descriptor.');
+    }
+
+    return [
+        'filename' => $name,
+        'mime_type' => 'image/png',
+        'content_base64' => base64_encode($contents),
+    ];
 }
 
 function ensureMemberMcpMalaysiaCountryExists(): int

@@ -13,6 +13,38 @@
   - `vendor/bin/pint --dirty --format agent` => pass
   - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => 28 passed, 84 assertions
   - Chrome MCP browser review of `https://majlisilmu.test/majlis/majlis-ilmu-remaja-identiti-jrqpuql` => no console warning or leaked Alpine text after the fix
+
+# API and MCP Media Upload Docs/Audit Follow-up
+
+- [x] Update MCP, API, and comparison docs for JSON file descriptor upload support
+- [x] Update generated API overview copy where media/file write guidance is embedded
+- [x] Review uncommitted code changes for upload contract, validation, naming, and docs drift issues
+- [x] Fix confirmed issues from the audit
+- [x] Rerun focused docs/MCP/API verification and policy checks
+- [x] Record review results
+
+## Review
+
+- Updated the MCP guide, MCP tool examples, API/mobile reference, CRUD comparison matrix, JSON companion, and generated OpenAPI overview text so report evidence, file-field metadata, and MCP JSON base64 descriptors are documented consistently.
+- Audit fixes:
+  - MCP staged uploads now sanitize descriptor filenames and derive missing extensions from `mime_type`.
+  - Shared media persistence now uses detected file extensions for storage names instead of trusting the client-provided extension.
+  - MCP schema/guard media lists now include the canonical `main`, `qr`, and `evidence` collections plus their destructive clear flags.
+  - Removed an unrelated untracked placeholder unit test that only asserted `true`.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 32 passed, 343 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php` => 20 passed, 176 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/ReportApiModerationTest.php` => 8 passed, 25 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='exposes corrected frontend contract metadata'` => 1 passed, 62 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='publishes high-value request body examples for agentic write endpoints|publishes follow-up request examples for authenticated workflow mutations|adds summaries and descriptions to catalog and authenticated workflow endpoints|documents public and admin mutation capability boundaries in the api overview'` => 4 passed, 69 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress` => pass
+  - `git diff --check` => pass
+  - JSON validation for `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.json` => pass
+  - Stale MCP media wording scan => no matches
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models` => no matches
+
 # API / MCP / Filament CRUD Comparison Matrix
 
 - [x] Inventory API, MCP, and Filament source contracts
@@ -29,13 +61,30 @@
 
 # API and MCP Media Upload Parity
 
-- [ ] Inventory frontend, admin UI, REST API, and MCP upload surfaces
-- [ ] Add the missing REST upload support for report evidence
-- [ ] Add MCP JSON file payload support for writable admin/member media fields
-- [ ] Update schemas, docs copy, and MCP descriptors so upload contracts are explicit
-- [ ] Add focused API and MCP regression coverage for every changed upload path
-- [ ] Run formatter, focused Pest tests, PHPStan, and media/database policy checks
-- [ ] Record review results
+- [x] Inventory frontend, admin UI, REST API, and MCP upload surfaces
+- [x] Add the missing REST upload support for report evidence
+- [x] Add MCP JSON file payload support for writable admin/member media fields
+- [x] Update schemas, docs copy, and MCP descriptors so upload contracts are explicit
+- [x] Add focused API and MCP regression coverage for every changed upload path
+- [x] Run formatter, focused Pest tests, PHPStan, and media/database policy checks
+- [x] Record review results
+
+## Review
+
+- Added report evidence uploads to `POST /api/v1/reports`, including `jpg/jpeg/png/webp/pdf`, max 8 files, and the shared media-library max file size.
+- Centralized API/MCP media persistence through the existing media naming/display/custom-properties convention used by Filament uploads.
+- Added MCP JSON base64 file descriptors for advertised admin/member media fields while keeping destructive `clear_*` flags hidden and rejected.
+- Updated public/admin/MCP schema metadata and OpenAPI request examples so file MIME, size, count, and descriptor contracts are explicit.
+- Verification:
+  - `vendor/bin/pint ...` on touched files => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/ReportApiModerationTest.php` => 8 passed, 25 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 32 passed, 342 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php` => 20 passed, 176 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='exposes corrected frontend contract metadata'` => 1 passed, 62 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='publishes high-value request body examples for agentic write endpoints|publishes follow-up request examples for authenticated workflow mutations|adds summaries and descriptions to catalog and authenticated workflow endpoints'` => 3 passed, 41 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database app` => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models` => no matches
 
 # Local MCP Test Servers
 
@@ -167,7 +216,7 @@
 
 ## Review
 
-- OpenAI Apps SDK audit: tool descriptors should expose accurate names, schemas, structured results, and behavior annotations; file inputs require explicit `openai/fileParams`, which this server intentionally does not advertise because MCP v1 writes reject media uploads. Company knowledge compatibility still remains a future product gap because these servers do not expose exact `search` / `fetch` connector tools.
+- OpenAI Apps SDK audit: tool descriptors should expose accurate names, schemas, structured results, and behavior annotations; MCP media writes use schema-advertised JSON base64 descriptors rather than `openai/fileParams`. Company knowledge compatibility still remains a future product gap because these servers do not expose exact `search` / `fetch` connector tools.
 - Laravel MCP audit: route registration, OAuth metadata, Passport authorization view, schema methods, `Response::structured(...)` responses, and middleware-based authentication are aligned with the Laravel 13 MCP lifecycle.
 - Fixed descriptor issues: write-schema tools now advertise `readOnlyHint=true` and `idempotentHint=true`; create/update tools now advertise explicit non-read-only, non-idempotent, non-destructive, closed-world annotations so ChatGPT does not infer an empty behavior contract.
 - Fixed Passport actor normalization issues: MCP tool authorization now sets the normalized application `User` on the active guard before calling Filament-backed services, and conditional write-tool registration resolves Passport users through `McpAuthenticatedUserResolver`. Write-access discovery now checks known resource classes directly instead of re-entering UI visibility checks that may depend on a Passport guard model.
@@ -196,10 +245,10 @@
 ## Review
 
 - API capability summary: the HTTP API covers public/mobile discovery and detail contracts, authenticated account settings, saved searches, follows/going/saved interactions, submissions, reports/contributions, notifications, institution workspace flows, MCP token self-service, and admin/member resource operations.
-- MCP capability summary: admin MCP covers resource discovery, list/get, schema inspection, and create/update for admin resources through generic tools; member MCP covers Ahli-scoped resource discovery, list/get, schema inspection, and non-media updates through generic tools.
-- Fixed confirmed parity/documentation bugs: resource metadata no longer advertises HTTP or Filament URLs as `mcp_paths`; it now exposes actual MCP tool names and argument templates through `mcp_tools`. MCP write schemas are now clearly JSON tool contracts, mark media uploads as unsupported, and annotate unsupported media/file fields instead of implying multipart upload support. Admin/member MCP instructions now describe schema-guided non-media writes accurately.
+- MCP capability summary: admin MCP covers resource discovery, list/get, schema inspection, and create/update for admin resources through generic tools; member MCP covers Ahli-scoped resource discovery, list/get, schema inspection, and schema-advertised updates through generic tools.
+- Fixed confirmed parity/documentation bugs: resource metadata no longer advertises HTTP or Filament URLs as `mcp_paths`; it now exposes actual MCP tool names and argument templates through `mcp_tools`. MCP write schemas are now clearly JSON tool contracts, hide destructive media clear-flags, and advertise supported media/file fields with descriptor metadata instead of implying multipart upload support. Admin/member MCP instructions now describe schema-guided writes accurately.
 - Fixed audit issues in the uncommitted diff: added `McpWriteSchemaFormatter`, wired it into admin/member write-schema flows, updated MCP/Scramble regressions, tightened the paginator type to the Laravel pagination contract for PHPStan, cleaned the MCP OAuth authorization view styling, and updated the API documentation schema serialization fixture for the new local-time event fields.
-- Remaining capability gaps and recommendation: binary media uploads are available through HTTP API/form flows but intentionally unsupported in MCP v1; add a dedicated MCP media upload/attach flow only if AI clients must manage posters, galleries, logos, QR files, or evidence files. Public/mobile workflows such as saved searches, follows/going/saved, account settings/MCP token self-service, contribution/report/member-claim submission, notifications, and institution member management do not yet have dedicated MCP tools; add thin MCP tools over the existing services if full mobile-user parity is required. Member MCP also has generic Ahli resource update capability that is broader than any one HTTP endpoint, which is acceptable but should stay documented as MCP-specific.
+- Remaining capability gaps and recommendation: MCP media uploads use JSON base64 descriptors and are available only where the write schema advertises media/file fields; add dedicated workflow tools only if AI clients must manage public/mobile workflows such as saved searches, follows/going/saved, account settings/MCP token self-service, contribution/report/member-claim submission, notifications, or institution member management. Member MCP also has generic Ahli resource update capability that is broader than any one HTTP endpoint, which is acceptable but should stay documented as MCP-specific.
 - Verification:
   - `vendor/bin/pint --dirty --format agent` => pass
   - `vendor/bin/phpstan analyse --ansi --no-progress` => pass

@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Support\Api\Admin\AdminResourceService;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Mcp\McpAuthenticatedUserResolver;
+use App\Support\Mcp\McpFilePayloadNormalizer;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 
@@ -16,16 +18,16 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
     /**
      * @param  array<string, mixed>  $payload
      */
-    protected function ensureMediaUploadsAreUnsupported(array $payload): void
+    protected function ensureDestructiveMediaClearFlagsAreUnsupported(array $payload): void
     {
         $errors = [];
 
-        foreach (['logo', 'cover', 'avatar', 'poster', 'front_cover', 'back_cover', 'gallery', 'clear_logo', 'clear_cover', 'clear_avatar', 'clear_poster', 'clear_front_cover', 'clear_back_cover', 'clear_gallery'] as $field) {
+        foreach (['clear_logo', 'clear_cover', 'clear_avatar', 'clear_poster', 'clear_front_cover', 'clear_back_cover', 'clear_gallery', 'clear_main', 'clear_qr', 'clear_evidence'] as $field) {
             if (! array_key_exists($field, $payload) || ! $this->hasMeaningfulMediaValue($payload[$field])) {
                 continue;
             }
 
-            $errors[$field] = ['Media uploads and destructive media clear flags are not supported through MCP v1.'];
+            $errors[$field] = ['Destructive media clear flags are not supported through MCP. Upload a replacement file or array when the schema advertises that media field.'];
         }
 
         if ($errors !== []) {
@@ -48,6 +50,60 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
         ];
 
         return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     * @return array{payload: array<string, mixed>, temporary_paths: list<string>}
+     */
+    protected function normalizeMcpMediaPayload(array $payload, array $schemaResponse): array
+    {
+        return app(McpFilePayloadNormalizer::class)->normalize(
+            $payload,
+            $this->mediaFieldContractsFromSchemaResponse($schemaResponse),
+        );
+    }
+
+    /**
+     * @param  array{temporary_paths?: list<string>}  $normalizedMediaPayload
+     */
+    protected function cleanupMcpMediaPayload(array $normalizedMediaPayload): void
+    {
+        app(McpFilePayloadNormalizer::class)->cleanup($normalizedMediaPayload['temporary_paths'] ?? []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $schemaResponse
+     * @return array<string, array<string, mixed>>
+     */
+    private function mediaFieldContractsFromSchemaResponse(array $schemaResponse): array
+    {
+        $fields = Arr::get($schemaResponse, 'data.schema.fields', []);
+
+        if (! is_array($fields)) {
+            return [];
+        }
+
+        $contracts = [];
+
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            /** @var array<string, mixed> $field */
+            $name = $field['name'] ?? null;
+            $type = $field['type'] ?? null;
+
+            if (! is_string($name) || ! is_string($type) || ! str_contains($type, 'file')) {
+                continue;
+            }
+
+            $contracts[$name] = $field;
+        }
+
+        return $contracts;
     }
 
     public function shouldRegister(Request $request, AdminResourceService $resourceService): bool

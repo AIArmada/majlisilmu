@@ -751,7 +751,8 @@ it('publishes high-value request body examples for agentic write endpoints', fun
         ->and(data_get($paths, '/events/{event}/registrations.post.requestBody.content.application/json.example.email'))->toBe('guest@example.com')
         ->and(data_get($paths, '/saved-searches.post.requestBody.content.application/json.example.notify'))->toBe('daily')
         ->and(data_get($paths, '/saved-searches/{savedSearch}.put.requestBody.content.application/json.example.notify'))->toBe('instant')
-        ->and(data_get($paths, '/reports.post.requestBody.content.application/json.example.category'))->toBe('wrong_info');
+        ->and(data_get($paths, '/reports.post.requestBody.content.multipart/form-data.example.category'))->toBe('wrong_info')
+        ->and(data_get($paths, '/reports.post.requestBody.content.multipart/form-data.example.evidence.0'))->toBe('poster-screenshot.jpg');
 });
 
 it('publishes follow-up request examples for authenticated workflow mutations', function () {

@@ -165,6 +165,19 @@ it('exposes corrected frontend contract metadata', function () {
     $institutionFields = collect($institutionContract['fields'] ?? [])->pluck('name')->all();
 
     expect($institutionFields)->not->toContain('logo');
+
+    Sanctum::actingAs(User::factory()->create());
+
+    $reportContract = $this->getJson(route('api.client.forms.report'))
+        ->assertOk()
+        ->json('data');
+    $reportEvidenceField = collect($reportContract['fields'] ?? [])->firstWhere('name', 'evidence');
+
+    expect(collect($reportContract['fields'] ?? [])->pluck('name')->all())->toContain('evidence')
+        ->and($reportEvidenceField['type'] ?? null)->toBe('array<file>')
+        ->and($reportEvidenceField['required'] ?? null)->toBeFalse()
+        ->and($reportEvidenceField['accepted_mime_types'] ?? [])->toContain('application/pdf')
+        ->and($reportEvidenceField['max_files'] ?? null)->toBe(8);
 });
 
 it('clamps public institution directory per_page values to the supported maximum', function () {

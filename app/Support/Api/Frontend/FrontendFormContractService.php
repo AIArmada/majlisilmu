@@ -359,8 +359,8 @@ class FrontendFormContractService
                 $this->field('submitter_phone', 'string', required: false),
                 $this->field('notes', 'string', required: false, maxLength: 1000),
                 $this->field('captcha_token', 'string', required: false),
-                $this->field('poster', 'file', required: false),
-                $this->field('gallery', 'array<file>', required: false),
+                $this->field('poster', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+                $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 10),
             ],
             'conditional_rules' => [
                 ['field' => 'organizer_institution_id', 'required_when' => ['organizer_type' => ['institution']]],
@@ -411,8 +411,8 @@ class FrontendFormContractService
                 $this->field('address.country_id', 'integer', required: true, default: $preferredCountryId, catalog: route('api.client.catalogs.countries')),
                 $this->field('contacts', 'array<object>', required: false),
                 $this->field('social_media', 'array<object>', required: false),
-                $this->field('cover', 'file', required: false),
-                $this->field('gallery', 'array<file>', required: false),
+                $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+                $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             ],
             'conditional_rules' => [
                 ['field' => 'address.google_maps_url', 'required' => true],
@@ -460,9 +460,9 @@ class FrontendFormContractService
                 $this->field('language_ids', 'array<int>', required: false, catalog: route('api.client.catalogs.languages')),
                 $this->field('contacts', 'array<object>', required: false),
                 $this->field('social_media', 'array<object>', required: false),
-                $this->field('avatar', 'file', required: false),
-                $this->field('cover', 'file', required: false),
-                $this->field('gallery', 'array<file>', required: false),
+                $this->field('avatar', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+                $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+                $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             ],
             'conditional_rules' => [
                 ['field' => 'job_title', 'required_when' => ['is_freelance' => [true]]],
@@ -485,7 +485,7 @@ class FrontendFormContractService
             'auth_required' => true,
             'fields' => [
                 $this->field('justification', 'string', required: true, maxLength: 2000),
-                $this->field('evidence', 'array<file>', required: true),
+                $this->field('evidence', 'array<file>', required: true, acceptedMimeTypes: $this->evidenceMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 8),
             ],
         ];
     }
@@ -505,6 +505,7 @@ class FrontendFormContractService
                 $this->field('entity_id', 'uuid', required: true),
                 $this->field('category', 'string', required: true),
                 $this->field('description', 'string', required: false, maxLength: 2000),
+                $this->field('evidence', 'array<file>', required: false, acceptedMimeTypes: $this->evidenceMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 8),
             ],
             'conditional_rules' => [
                 ['field' => 'description', 'required_when' => ['category' => ['other']]],
@@ -625,6 +626,7 @@ class FrontendFormContractService
 
     /**
      * @param  list<string|int>|null  $allowedValues
+     * @param  list<string>|null  $acceptedMimeTypes
      * @return array<string, mixed>
      */
     private function field(
@@ -635,6 +637,9 @@ class FrontendFormContractService
         ?int $maxLength = null,
         ?array $allowedValues = null,
         ?string $catalog = null,
+        ?array $acceptedMimeTypes = null,
+        ?int $maxFileSizeKb = null,
+        ?int $maxFiles = null,
     ): array {
         return array_filter([
             'name' => $name,
@@ -644,6 +649,30 @@ class FrontendFormContractService
             'max_length' => $maxLength,
             'allowed_values' => $allowedValues,
             'catalog' => $catalog,
+            'accepted_mime_types' => $acceptedMimeTypes,
+            'max_file_size_kb' => $maxFileSizeKb,
+            'max_files' => $maxFiles,
         ], static fn (mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function imageMimeTypes(): array
+    {
+        return ['image/jpeg', 'image/png', 'image/webp'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function evidenceMimeTypes(): array
+    {
+        return ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    }
+
+    private function maxUploadSizeKb(): int
+    {
+        return (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
     }
 }

@@ -286,12 +286,16 @@ it('returns write schema for supported resources and rejects unknown resources',
             ->where('data.schema.tool_arguments.validate_only', false)
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
-            ->where('data.schema.media_uploads_supported', false)
-            ->where('data.schema.unsupported_fields', fn ($fields): bool => collect($fields)->contains('avatar') && collect($fields)->contains('gallery'))
+            ->where('data.schema.media_uploads_supported', true)
+            ->where('data.schema.media_upload_transport', 'json_base64_descriptor')
+            ->where('data.schema.unsupported_fields', [])
             ->where('data.schema.fields', fn ($fields): bool => collect($fields)
                 ->pluck('name')
                 ->filter(fn (mixed $name): bool => is_string($name) && str_starts_with($name, 'clear_'))
                 ->isEmpty())
+            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'avatar'), 'mcp_upload.shape') === 'file_descriptor'
+                && data_get(collect($fields)->firstWhere('name', 'gallery'), 'mcp_upload.shape') === 'array<file_descriptor>'
+                && data_get(collect($fields)->firstWhere('name', 'gallery'), 'mcp_upload.accepted_mime_types.0') === 'image/jpeg')
             ->etc());
 
     AdminServer::actingAs($admin)
@@ -422,7 +426,7 @@ it('previews admin speaker updates through the MCP write tool without persisting
                 'clear_cover' => true,
             ],
         ])
-        ->assertHasErrors(['Media uploads and destructive media clear flags are not supported through MCP v1.']);
+        ->assertHasErrors(['Destructive media clear flags are not supported through MCP. Upload a replacement file or array when the schema advertises that media field.']);
 
     expect(Speaker::query()->findOrFail($speaker->getKey())->name)->toBe('Previewable Admin MCP Speaker')
         ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
@@ -454,6 +458,7 @@ it('creates and updates speakers through MCP write tools', function () {
                 'status' => 'verified',
                 'is_freelance' => false,
                 'is_active' => true,
+                'avatar' => adminMcpImageDescriptor('admin-mcp-avatar'),
                 'address' => [],
             ],
         ])
@@ -464,7 +469,9 @@ it('creates and updates speakers through MCP write tools', function () {
 
     expect($speaker->name)->toBe('Admin MCP Created Speaker')
         ->and($speaker->status)->toBe('verified')
-        ->and($speaker->allow_public_event_submission)->toBeTrue();
+        ->and($speaker->allow_public_event_submission)->toBeTrue()
+        ->and($speaker->getMedia('avatar'))->toHaveCount(1)
+        ->and($speaker->getFirstMedia('avatar')?->file_name)->toEndWith('.png');
 
     AdminServer::actingAs($admin)
         ->tool(AdminUpdateRecordTool::class, [
@@ -478,6 +485,9 @@ it('creates and updates speakers through MCP write tools', function () {
                 'job_title' => 'Imam',
                 'is_active' => true,
                 'allow_public_event_submission' => true,
+                'gallery' => [
+                    adminMcpImageDescriptor('admin-mcp-gallery'),
+                ],
                 'address' => [],
             ],
         ])
@@ -486,6 +496,8 @@ it('creates and updates speakers through MCP write tools', function () {
             ->where('data.record.attributes.name', 'Admin MCP Updated Speaker')
             ->where('data.record.attributes.job_title', 'Imam')
             ->etc());
+
+    expect($speaker->fresh()?->getMedia('gallery'))->toHaveCount(1);
 });
 
 it('creates and updates institutions through MCP write tools', function () {
@@ -674,7 +686,7 @@ it('surfaces admin event validation failures through MCP write tools', function 
         ->assertHasErrors(['Sekurang-kurangnya seorang penceramah diperlukan untuk jenis majlis ini.']);
 });
 
-it('rejects media fields through MCP write tools', function () {
+it('rejects malformed MCP media descriptors through write tools', function () {
     ensureMcpMalaysiaCountryExists();
 
     $admin = adminMcpUser('super_admin');
@@ -694,7 +706,7 @@ it('rejects media fields through MCP write tools', function () {
                 ],
             ],
         ])
-        ->assertHasErrors(['Media uploads and destructive media clear flags are not supported through MCP v1.']);
+        ->assertHasErrors(['This MCP media field must be a file descriptor object.']);
 
     AdminServer::actingAs($admin)
         ->tool(AdminCreateRecordTool::class, [
@@ -706,7 +718,7 @@ it('rejects media fields through MCP write tools', function () {
                 'front_cover' => 'base64-data',
             ],
         ])
-        ->assertHasErrors(['Media uploads and destructive media clear flags are not supported through MCP v1.']);
+        ->assertHasErrors(['This MCP media field must be a file descriptor object.']);
 });
 
 it('returns structured MCP error payloads for validation failures', function () {
@@ -1061,6 +1073,25 @@ function adminMcpUser(string $role): User
     $user->assignRole($role);
 
     return $user;
+}
+
+/**
+ * @return array{filename: string, mime_type: string, content_base64: string}
+ */
+function adminMcpImageDescriptor(string $name): array
+{
+    $upload = fakeGeneratedImageUpload($name, 640, 480);
+    $contents = file_get_contents((string) $upload->getRealPath());
+
+    if (! is_string($contents) || $contents === '') {
+        throw new RuntimeException('Unable to create MCP image descriptor.');
+    }
+
+    return [
+        'filename' => $name,
+        'mime_type' => 'image/png',
+        'content_base64' => base64_encode($contents),
+    ];
 }
 
 /**
