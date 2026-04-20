@@ -201,7 +201,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
 
                 $remainingBlockers[] = [
                     'field' => $field,
-                    'type' => $this->isMissingRemediationValue($currentValue) ? 'required_choice' : 'invalid_choice',
+                    'type' => $this->determineBlockerType($currentValue, true),
                     'options' => $allowedValues,
                     'messages' => array_values(array_map('strval', $messages)),
                 ];
@@ -211,7 +211,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
 
             $remainingBlockers[] = [
                 'field' => $field,
-                'type' => $this->isMissingRemediationValue($currentValue) ? 'missing_value' : 'validation_error',
+                'type' => $this->determineBlockerType($currentValue, false),
                 'messages' => array_values(array_map('strval', $messages)),
             ];
         }
@@ -293,7 +293,9 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
 
     /**
      * @param  array<string, mixed>|null  $fieldDefinition
-     * @return list<string|int>
+     *
+     * @return list<string|int> Only scalar enum/catalog values are surfaced because MCP write schema option
+     *                          lists are currently exposed as string or integer identifiers.
      */
     private function allowedValuesForField(?array $fieldDefinition): array
     {
@@ -325,5 +327,14 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             is_array($value) => $value === [],
             default => $value === null,
         };
+    }
+
+    private function determineBlockerType(mixed $currentValue, bool $hasAllowedValues): string
+    {
+        if ($this->isMissingRemediationValue($currentValue)) {
+            return $hasAllowedValues ? 'required_choice' : 'missing_value';
+        }
+
+        return $hasAllowedValues ? 'invalid_choice' : 'validation_error';
     }
 }
