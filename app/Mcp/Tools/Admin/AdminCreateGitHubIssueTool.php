@@ -28,7 +28,7 @@ class AdminCreateGitHubIssueTool extends AbstractAdminTool
 {
     protected string $name = 'admin-create-github-issue';
 
-    protected string $description = 'Create a GitHub issue in the configured MajlisIlmu repository and assign Copilot automatically when the authenticated actor is an admin.';
+    protected string $description = 'Create a GitHub issue in the configured MajlisIlmu repository. Admin Copilot assignment is controlled by server config and can be disabled.';
 
     public function __construct(
         private readonly SubmitGitHubIssueReportAction $submitGitHubIssueReportAction,
@@ -67,7 +67,11 @@ class AdminCreateGitHubIssueTool extends AbstractAdminTool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'category' => $schema->string()->required()->min(1),
+            'category' => $schema->string()
+                ->required()
+                ->enum(GitHubIssueReportContract::categories())
+                ->default(GitHubIssueReportContract::DEFAULT_CATEGORY)
+                ->description(GitHubIssueReportContract::categoryDescription()),
             'title' => $schema->string()->required()->min(3),
             'summary' => $schema->string()->required()->min(10),
             'description' => $schema->string()->nullable(),

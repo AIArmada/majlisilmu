@@ -72,6 +72,7 @@ return [
             'custom_instructions' => env('GITHUB_ISSUE_REPORTING_CUSTOM_INSTRUCTIONS'),
             'admin_model' => env('GITHUB_ISSUE_REPORTING_ADMIN_MODEL', 'GPT-5.4'),
             'admin_model_fallbacks' => $githubIssueModelFallbacks,
+            'admin_copilot_assignment_enabled' => (bool) env('GITHUB_ISSUE_REPORTING_ADMIN_COPILOT_ASSIGNMENT_ENABLED', true),
             'copilot_assignee' => env('GITHUB_ISSUE_REPORTING_COPILOT_ASSIGNEE', 'copilot-swe-agent[bot]'),
         ],
     ],
