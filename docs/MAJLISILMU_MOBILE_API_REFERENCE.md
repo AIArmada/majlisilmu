@@ -261,7 +261,7 @@ Accept: application/json
 | `POST` | `/auth/social/google` | Exchange a Google access token for a bearer token |
 | `POST` | `/auth/logout` | Revoke the current bearer token |
 | `GET` | `/user` | Return the authenticated user |
-| `DELETE` | `/user` | Delete the authenticated user account and revoke its tokens |
+| `DELETE` | `/user` | Delete the authenticated user account, revoke its tokens, and retain an admin-restorable snapshot during the grace period |
 
 Notes:
 
@@ -271,7 +271,9 @@ Notes:
 
 Deletes the current authenticated account, including the bearer token(s) and the account data handled by the backend cleanup hooks.
 
-Use this endpoint from the mobile app's account/profile screen when the user chooses to permanently remove their account.
+The API revokes the user's transient credentials immediately, but the backend also keeps a sanitized deleted-account snapshot so an admin can restore the account during the grace-period restore flow.
+
+Use this endpoint from the mobile app's account/profile screen when the user chooses to remove their account. Client copy should not promise irreversible self-service deletion because recovery is now an admin-led grace-period operation.
 
 ### `POST /auth/register`
 
@@ -384,6 +386,23 @@ Paginated list endpoints generally return:
 ```
 
 `meta.pagination` is the canonical pagination bag for list endpoints.
+
+Authenticated engagement lists `GET /me/events/saved` and `GET /me/events/going` intentionally use a simpler pagination bag optimized for infinite mobile lists:
+
+```json
+{
+  "meta": {
+    "pagination": {
+      "page": 1,
+      "per_page": 20,
+      "has_more": true,
+      "next_page": 2
+    }
+  }
+}
+```
+
+Those two endpoints do **not** return `meta.pagination.total`.
 
 List endpoints clamp `per_page` to server-supported maxima. Public `/events`, `/institutions`, and `/speakers` currently cap at 50. Most authenticated collections and admin resource listings currently cap at 100.
 
@@ -910,6 +929,7 @@ Mobile recommendation:
 Notes:
 
 - Use `GET /events/{event}/me` for the current saved flag and count.
+- `GET /me/events/saved` uses simple pagination metadata: `page`, `per_page`, `has_more`, and `next_page`.
 - `PUT /events/{event}/saved` is restricted to active public events in engageable statuses.
 - `PUT /events/{event}/saved` returns `201` on first save and `200` when the event was already saved.
 - `DELETE /events/{event}/saved` always returns the final saved state payload.
@@ -925,6 +945,7 @@ Notes:
 Notes:
 
 - Use `GET /events/{event}/me` for the current going flag and count.
+- `GET /me/events/going` uses simple pagination metadata: `page`, `per_page`, `has_more`, and `next_page`.
 - `PUT /events/{event}/going` is restricted to active public, engageable, future events.
 - `PUT /events/{event}/going` returns `201` on first write and `200` when the state was already set.
 

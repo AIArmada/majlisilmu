@@ -51,6 +51,10 @@ use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Dedoc\Scramble\Attributes\Response;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -130,12 +134,22 @@ class SearchController extends FrontendController
                 sort: $search !== null ? 'relevance' : 'time',
             );
 
-        $speakerQuery = $search !== null ? $this->speakerSearchQuery($search) : Speaker::query()->whereRaw('1 = 0');
-        $institutionQuery = $search !== null ? $this->institutionSearchQuery($search) : Institution::query()->whereRaw('1 = 0');
+        $speakerIds = $search !== null ? $this->speakerSearchService->publicSearchIds($search) : [];
+        $speakerQuery = $search !== null
+            ? $this->baseSpeakerQuery($user)->whereIn('speakers.id', $speakerIds)
+            : Speaker::query()->whereRaw('1 = 0');
+        $institutionIds = $search !== null ? $this->institutionSearchService->publicSearchIds($search) : [];
+        $institutionQuery = $search !== null
+            ? $this->aggregateInstitutionSearchItemsQuery($institutionIds)
+            : Institution::query()->whereRaw('1 = 0');
 
         if ($hasLocation) {
             $this->applyInstitutionNearbyScope($institutionQuery, $lat, $lng, $radius);
         }
+
+        $institutionTotal = $search === null
+            ? 0
+            : ($hasLocation ? (clone $institutionQuery)->count() : count($institutionIds));
 
         return response()->json([
             'data' => [
@@ -145,11 +159,11 @@ class SearchController extends FrontendController
                 ],
                 'speakers' => [
                     'items' => $speakerQuery->orderBy('name')->limit(4)->get()->map(fn (Speaker $speaker): array => $this->speakerListData($speaker, $user))->all(),
-                    'total' => (clone $speakerQuery)->count(),
+                    'total' => count($speakerIds),
                 ],
                 'institutions' => [
                     'items' => $institutionQuery->orderBy('name')->limit(4)->get()->map(fn (Institution $institution): array => $this->institutionListData($institution))->all(),
-                    'total' => (clone $institutionQuery)->count(),
+                    'total' => $institutionTotal,
                 ],
             ],
             'meta' => [
@@ -203,6 +217,7 @@ class SearchController extends FrontendController
         $hasNearbyLocation = $lat !== null && $lng !== null;
         $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
         $followingOnly = $request->boolean('following');
+        $followingTotal = 0;
 
         $baseQuery = $this->baseInstitutionQuery(
             type: $institutionType,
@@ -217,14 +232,14 @@ class SearchController extends FrontendController
             $this->applyInstitutionNearbyScope($baseQuery, $lat, $lng, $radius);
         }
 
-        $followedInstitutionQuery = clone $baseQuery;
-
-        $this->applyInstitutionFollowingScope($followedInstitutionQuery, $user);
-
-        $followingTotal = $this->institutionDirectoryTotalWithBase($request, $search, $followedInstitutionQuery);
-
         if ($followingOnly) {
             $this->applyInstitutionFollowingScope($baseQuery, $user);
+        } elseif ($user instanceof User) {
+            $followedInstitutionQuery = clone $baseQuery;
+
+            $this->applyInstitutionFollowingScope($followedInstitutionQuery, $user);
+
+            $followingTotal = $this->institutionDirectoryTotalWithBase($request, $search, $followedInstitutionQuery);
         }
 
         $institutions = $search === null
@@ -232,6 +247,10 @@ class SearchController extends FrontendController
                 ->when(! $hasNearbyLocation, fn (Builder $query) => $query->publicDirectoryOrder())
                 ->paginate($perPage)
             : $this->institutionDirectorySearchPaginator($request, $search, $perPage, $baseQuery);
+
+        if ($followingOnly) {
+            $followingTotal = $institutions->total();
+        }
 
         return response()->json([
             'data' => collect($institutions->items())
@@ -313,6 +332,7 @@ class SearchController extends FrontendController
             : null;
         $sort = $request->query('sort') === 'upcoming' ? 'upcoming' : null;
         $followingOnly = $request->boolean('following');
+        $followingTotal = 0;
 
         $baseQuery = $this->baseSpeakerQuery($user);
 
@@ -326,19 +346,24 @@ class SearchController extends FrontendController
             $baseQuery->orderBy('events_count', 'desc');
         }
 
-        $followedSpeakerQuery = clone $baseQuery;
-
-        $this->applySpeakerFollowingScope($followedSpeakerQuery, $user);
-
-        $followingTotal = $this->speakerDirectoryTotalWithBase($request, $search, $followedSpeakerQuery, $sort);
-
         if ($followingOnly) {
             $this->applySpeakerFollowingScope($baseQuery, $user);
+        } elseif ($user instanceof User) {
+            $followedSpeakerQuery = clone $baseQuery;
+
+            $this->applySpeakerFollowingScope($followedSpeakerQuery, $user);
+
+            $followingTotal = $this->speakerDirectoryTotalWithBase($request, $search, $followedSpeakerQuery, $sort);
         }
 
         $speakers = $search === null
             ? $baseQuery->when($sort === null, fn ($q) => $q->publicDirectoryOrder($directorySeed))->paginate($perPage)
             : $this->speakerDirectorySearchPaginatorWithBase($request, $search, $perPage, $baseQuery, $sort);
+
+        if ($followingOnly) {
+            $followingTotal = $speakers->total();
+        }
+
         $speakerDirectoryCache = $this->speakerDirectoryCacheData();
 
         return response()->json([
@@ -395,6 +420,7 @@ class SearchController extends FrontendController
     public function showInstitution(Request $request, string $institutionKey): JsonResponse
     {
         $user = $this->currentUser($request);
+        $now = now();
         $record = Institution::query()
             ->with([
                 'media',
@@ -422,29 +448,33 @@ class SearchController extends FrontendController
 
         abort_unless($user instanceof User ? $user->can('view', $record) : $record->status === 'verified', 404);
 
+        $upcomingPerPage = max(1, min($request->integer('upcoming_per_page', 6), 50));
+        $upcomingEvents = $this->limitedEventPayloadWithTotal(
+            $record->events()
+                ->active()
+                ->where('starts_at', '>=', $now)
+                ->with(['institution.media', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'speakers.media', 'keyPeople.speaker', 'media', 'references'])
+                ->orderBy('starts_at'),
+            $upcomingPerPage,
+        );
+
+        $pastPerPage = max(1, min($request->integer('past_per_page', 6), 50));
+        $pastEvents = $this->limitedEventPayloadWithTotal(
+            $record->events()
+                ->active()
+                ->where('starts_at', '<', $now)
+                ->with(['institution.media', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'speakers.media', 'keyPeople.speaker', 'media', 'references'])
+                ->orderByDesc('starts_at'),
+            $pastPerPage,
+        );
+
         return response()->json([
             'data' => [
                 'institution' => $this->institutionDetailData($record, $user),
-                'upcoming_events' => $record->events()
-                    ->active()
-                    ->where('starts_at', '>=', now())
-                    ->with(['institution.media', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'speakers.media', 'keyPeople.speaker', 'media', 'references'])
-                    ->orderBy('starts_at')
-                    ->take(max(1, min($request->integer('upcoming_per_page', 6), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'upcoming_total' => $record->events()->active()->where('starts_at', '>=', now())->count(),
-                'past_events' => $record->events()
-                    ->active()
-                    ->where('starts_at', '<', now())
-                    ->with(['institution.media', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'speakers.media', 'keyPeople.speaker', 'media', 'references'])
-                    ->orderByDesc('starts_at')
-                    ->take(max(1, min($request->integer('past_per_page', 6), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'past_total' => $record->events()->active()->where('starts_at', '<', now())->count(),
+                'upcoming_events' => $upcomingEvents['items'],
+                'upcoming_total' => $upcomingEvents['total'],
+                'past_events' => $pastEvents['items'],
+                'past_total' => $pastEvents['total'],
             ],
         ]);
     }
@@ -462,6 +492,7 @@ class SearchController extends FrontendController
     public function showSpeaker(Request $request, string $speakerKey): JsonResponse
     {
         $user = $this->currentUser($request);
+        $now = now();
         $record = Speaker::query()
             ->with([
                 'media',
@@ -486,14 +517,15 @@ class SearchController extends FrontendController
 
         abort_unless($user instanceof User ? $user->can('view', $record) : ($record->is_active && $record->status === 'verified'), 404);
 
-        $otherRoleUpcomingParticipations = $record->nonSpeakerEventKeyPeople()
-            ->whereHas('event', function (Builder $query): void {
+        $otherRoleUpcomingPerPage = max(1, min($request->integer('other_role_upcoming_per_page', 6), 50));
+        $otherRoleUpcomingMatches = $record->nonSpeakerEventKeyPeople()
+            ->whereHas('event', function (Builder $query) use ($now): void {
                 $query
                     ->where('events.is_active', true)
                     ->whereIn('events.status', Event::PUBLIC_STATUSES)
                     ->where('events.visibility', EventVisibility::Public)
                     ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                    ->where('starts_at', '>=', now());
+                    ->where('starts_at', '>=', $now);
             })
             ->with([
                 'event.institution',
@@ -513,17 +545,20 @@ class SearchController extends FrontendController
 
                 return $startsAt instanceof \DateTimeInterface ? $startsAt->getTimestamp() : PHP_INT_MAX;
             })
-            ->take(max(1, min($request->integer('other_role_upcoming_per_page', 6), 50)))
+            ->values();
+        $otherRoleUpcomingParticipations = $otherRoleUpcomingMatches
+            ->take($otherRoleUpcomingPerPage)
             ->values();
 
-        $otherRolePastParticipations = $record->nonSpeakerEventKeyPeople()
-            ->whereHas('event', function (Builder $query): void {
+        $otherRolePastPerPage = max(1, min($request->integer('other_role_past_per_page', 6), 50));
+        $otherRolePastMatches = $record->nonSpeakerEventKeyPeople()
+            ->whereHas('event', function (Builder $query) use ($now): void {
                 $query
                     ->where('events.is_active', true)
                     ->whereIn('events.status', Event::PUBLIC_STATUSES)
                     ->where('events.visibility', EventVisibility::Public)
                     ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                    ->where('starts_at', '<', now());
+                    ->where('starts_at', '<', $now);
             })
             ->with([
                 'event.institution',
@@ -543,58 +578,46 @@ class SearchController extends FrontendController
 
                 return $startsAt instanceof \DateTimeInterface ? $startsAt->getTimestamp() : 0;
             })
-            ->take(max(1, min($request->integer('other_role_past_per_page', 6), 50)))
             ->values();
+        $otherRolePastParticipations = $otherRolePastMatches
+            ->take($otherRolePastPerPage)
+            ->values();
+
+        $upcomingPerPage = max(1, min($request->integer('upcoming_per_page', 10), 50));
+        $upcomingEvents = $this->limitedEventPayloadWithTotal(
+            $record->speakerEvents()
+                ->active()
+                ->where('starts_at', '>=', $now)
+                ->with(['institution', 'institution.media', 'institution.address.state', 'institution.address.district', 'institution.address.subdistrict', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'media', 'references'])
+                ->orderBy('starts_at'),
+            $upcomingPerPage,
+        );
+
+        $pastPerPage = max(1, min($request->integer('past_per_page', 10), 50));
+        $pastEvents = $this->limitedEventPayloadWithTotal(
+            $record->speakerEvents()
+                ->active()
+                ->where('starts_at', '<', $now)
+                ->with(['institution', 'institution.media', 'institution.address.state', 'institution.address.district', 'institution.address.subdistrict', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'media', 'references'])
+                ->orderByDesc('starts_at'),
+            $pastPerPage,
+        );
 
         return response()->json([
             'data' => [
                 'speaker' => $this->speakerDetailData($record, $user),
-                'upcoming_events' => $record->speakerEvents()
-                    ->active()
-                    ->where('starts_at', '>=', now())
-                    ->with(['institution', 'institution.media', 'institution.address.state', 'institution.address.district', 'institution.address.subdistrict', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'media', 'references'])
-                    ->orderBy('starts_at')
-                    ->take(max(1, min($request->integer('upcoming_per_page', 10), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'upcoming_total' => $record->speakerEvents()->active()->where('starts_at', '>=', now())->count(),
-                'past_events' => $record->speakerEvents()
-                    ->active()
-                    ->where('starts_at', '<', now())
-                    ->with(['institution', 'institution.media', 'institution.address.state', 'institution.address.district', 'institution.address.subdistrict', 'venue.address.state', 'venue.address.district', 'venue.address.subdistrict', 'media', 'references'])
-                    ->orderByDesc('starts_at')
-                    ->take(max(1, min($request->integer('past_per_page', 10), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'past_total' => $record->speakerEvents()->active()->where('starts_at', '<', now())->count(),
+                'upcoming_events' => $upcomingEvents['items'],
+                'upcoming_total' => $upcomingEvents['total'],
+                'past_events' => $pastEvents['items'],
+                'past_total' => $pastEvents['total'],
                 'other_role_upcoming_participations' => $otherRoleUpcomingParticipations
                     ->map(fn (EventKeyPerson $keyPerson): array => $this->eventParticipationData($keyPerson))
                     ->all(),
-                'other_role_upcoming_total' => $record->nonSpeakerEventKeyPeople()
-                    ->whereHas('event', function (Builder $query): void {
-                        $query
-                            ->where('events.is_active', true)
-                            ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                            ->where('events.visibility', EventVisibility::Public)
-                            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                            ->where('starts_at', '>=', now());
-                    })
-                    ->count(),
+                'other_role_upcoming_total' => $otherRoleUpcomingMatches->count(),
                 'other_role_past_participations' => $otherRolePastParticipations
                     ->map(fn (EventKeyPerson $keyPerson): array => $this->eventParticipationData($keyPerson))
                     ->all(),
-                'other_role_past_total' => $record->nonSpeakerEventKeyPeople()
-                    ->whereHas('event', function (Builder $query): void {
-                        $query
-                            ->where('events.is_active', true)
-                            ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                            ->where('events.visibility', EventVisibility::Public)
-                            ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                            ->where('starts_at', '<', now());
-                    })
-                    ->count(),
+                'other_role_past_total' => $otherRolePastMatches->count(),
             ],
         ]);
     }
@@ -607,6 +630,7 @@ class SearchController extends FrontendController
     public function showVenue(Request $request, string $venueKey): JsonResponse
     {
         $user = $this->currentUser($request);
+        $now = now();
         $canBypassVisibility = $user?->hasAnyRole(['super_admin', 'moderator']) ?? false;
 
         $record = Venue::query()
@@ -633,47 +657,51 @@ class SearchController extends FrontendController
             abort(404);
         }
 
+        $upcomingPerPage = max(1, min($request->integer('upcoming_per_page', 8), 50));
+        $upcomingEvents = $this->limitedEventPayloadWithTotal(
+            $record->events()
+                ->active()
+                ->where('starts_at', '>=', $now)
+                ->with([
+                    'institution.media',
+                    'institution.address.state',
+                    'institution.address.district',
+                    'institution.address.subdistrict',
+                    'speakers.media',
+                    'keyPeople.speaker.media',
+                    'media',
+                    'references',
+                ])
+                ->orderBy('starts_at'),
+            $upcomingPerPage,
+        );
+
+        $pastPerPage = max(1, min($request->integer('past_per_page', 8), 50));
+        $pastEvents = $this->limitedEventPayloadWithTotal(
+            $record->events()
+                ->active()
+                ->where('starts_at', '<', $now)
+                ->with([
+                    'institution.media',
+                    'institution.address.state',
+                    'institution.address.district',
+                    'institution.address.subdistrict',
+                    'speakers.media',
+                    'keyPeople.speaker.media',
+                    'media',
+                    'references',
+                ])
+                ->orderByDesc('starts_at'),
+            $pastPerPage,
+        );
+
         return response()->json([
             'data' => [
                 'venue' => $this->venueDetailData($record),
-                'upcoming_events' => $record->events()
-                    ->active()
-                    ->where('starts_at', '>=', now())
-                    ->with([
-                        'institution.media',
-                        'institution.address.state',
-                        'institution.address.district',
-                        'institution.address.subdistrict',
-                        'speakers.media',
-                        'keyPeople.speaker.media',
-                        'media',
-                        'references',
-                    ])
-                    ->orderBy('starts_at')
-                    ->take(max(1, min($request->integer('upcoming_per_page', 8), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'upcoming_total' => $record->events()->active()->where('starts_at', '>=', now())->count(),
-                'past_events' => $record->events()
-                    ->active()
-                    ->where('starts_at', '<', now())
-                    ->with([
-                        'institution.media',
-                        'institution.address.state',
-                        'institution.address.district',
-                        'institution.address.subdistrict',
-                        'speakers.media',
-                        'keyPeople.speaker.media',
-                        'media',
-                        'references',
-                    ])
-                    ->orderByDesc('starts_at')
-                    ->take(max(1, min($request->integer('past_per_page', 8), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'past_total' => $record->events()->active()->where('starts_at', '<', now())->count(),
+                'upcoming_events' => $upcomingEvents['items'],
+                'upcoming_total' => $upcomingEvents['total'],
+                'past_events' => $pastEvents['items'],
+                'past_total' => $pastEvents['total'],
             ],
         ]);
     }
@@ -686,6 +714,7 @@ class SearchController extends FrontendController
     public function showReference(Request $request, string $referenceKey): JsonResponse
     {
         $user = $this->currentUser($request);
+        $now = now();
 
         $record = Reference::query()
             ->with(['media', 'socialMedia'])
@@ -700,47 +729,51 @@ class SearchController extends FrontendController
 
         abort_unless($record->is_active, 404);
 
+        $upcomingPerPage = max(1, min($request->integer('upcoming_per_page', 10), 50));
+        $upcomingEvents = $this->limitedEventPayloadWithTotal(
+            $record->events()
+                ->active()
+                ->where('starts_at', '>=', $now)
+                ->with([
+                    'institution',
+                    'institution.address.state',
+                    'institution.address.district',
+                    'institution.address.subdistrict',
+                    'venue.address.state',
+                    'venue.address.district',
+                    'venue.address.subdistrict',
+                    'media',
+                ])
+                ->orderBy('starts_at', 'asc'),
+            $upcomingPerPage,
+        );
+
+        $pastPerPage = max(1, min($request->integer('past_per_page', 10), 50));
+        $pastEvents = $this->limitedEventPayloadWithTotal(
+            $record->events()
+                ->active()
+                ->where('starts_at', '<', $now)
+                ->with([
+                    'institution',
+                    'institution.address.state',
+                    'institution.address.district',
+                    'institution.address.subdistrict',
+                    'venue.address.state',
+                    'venue.address.district',
+                    'venue.address.subdistrict',
+                    'media',
+                ])
+                ->orderByDesc('starts_at'),
+            $pastPerPage,
+        );
+
         return response()->json([
             'data' => [
                 'reference' => $this->referenceDetailData($record, $user),
-                'upcoming_events' => $record->events()
-                    ->active()
-                    ->where('starts_at', '>=', now())
-                    ->with([
-                        'institution',
-                        'institution.address.state',
-                        'institution.address.district',
-                        'institution.address.subdistrict',
-                        'venue.address.state',
-                        'venue.address.district',
-                        'venue.address.subdistrict',
-                        'media',
-                    ])
-                    ->orderBy('starts_at', 'asc')
-                    ->take(max(1, min($request->integer('upcoming_per_page', 10), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'upcoming_total' => $record->events()->active()->where('starts_at', '>=', now())->count(),
-                'past_events' => $record->events()
-                    ->active()
-                    ->where('starts_at', '<', now())
-                    ->with([
-                        'institution',
-                        'institution.address.state',
-                        'institution.address.district',
-                        'institution.address.subdistrict',
-                        'venue.address.state',
-                        'venue.address.district',
-                        'venue.address.subdistrict',
-                        'media',
-                    ])
-                    ->orderByDesc('starts_at')
-                    ->take(max(1, min($request->integer('past_per_page', 10), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'past_total' => $record->events()->active()->where('starts_at', '<', now())->count(),
+                'upcoming_events' => $upcomingEvents['items'],
+                'upcoming_total' => $upcomingEvents['total'],
+                'past_events' => $pastEvents['items'],
+                'past_total' => $pastEvents['total'],
             ],
         ]);
     }
@@ -753,6 +786,7 @@ class SearchController extends FrontendController
     public function showSeries(Request $request, string $series): JsonResponse
     {
         $user = $this->currentUser($request);
+        $now = now();
         $canBypassVisibility = $user?->hasAnyRole(['super_admin', 'moderator']) ?? false;
 
         $record = Series::query()
@@ -770,79 +804,115 @@ class SearchController extends FrontendController
             abort(404);
         }
 
+        $upcomingPerPage = max(1, min($request->integer('upcoming_per_page', 10), 50));
+        $upcomingEvents = $this->limitedEventPayloadWithTotal(
+            $record->events()
+                ->active()
+                ->where('starts_at', '>=', $now)
+                ->with([
+                    'institution',
+                    'institution.address.state',
+                    'institution.address.district',
+                    'institution.address.subdistrict',
+                    'venue.address.state',
+                    'venue.address.district',
+                    'venue.address.subdistrict',
+                    'media',
+                ])
+                ->orderBy('starts_at', 'asc'),
+            $upcomingPerPage,
+        );
+
+        $pastPerPage = max(1, min($request->integer('past_per_page', 10), 50));
+        $pastEvents = $this->limitedEventPayloadWithTotal(
+            $record->events()
+                ->active()
+                ->where('starts_at', '<', $now)
+                ->with([
+                    'institution',
+                    'institution.address.state',
+                    'institution.address.district',
+                    'institution.address.subdistrict',
+                    'venue.address.state',
+                    'venue.address.district',
+                    'venue.address.subdistrict',
+                    'media',
+                ])
+                ->orderByDesc('starts_at'),
+            $pastPerPage,
+        );
+
         return response()->json([
             'data' => [
                 'series' => $this->seriesDetailData($record, $user),
-                'upcoming_events' => $record->events()
-                    ->active()
-                    ->where('starts_at', '>=', now())
-                    ->with([
-                        'institution',
-                        'institution.address.state',
-                        'institution.address.district',
-                        'institution.address.subdistrict',
-                        'venue.address.state',
-                        'venue.address.district',
-                        'venue.address.subdistrict',
-                        'media',
-                    ])
-                    ->orderBy('starts_at', 'asc')
-                    ->take(max(1, min($request->integer('upcoming_per_page', 10), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'upcoming_total' => $record->events()->active()->where('starts_at', '>=', now())->count(),
-                'past_events' => $record->events()
-                    ->active()
-                    ->where('starts_at', '<', now())
-                    ->with([
-                        'institution',
-                        'institution.address.state',
-                        'institution.address.district',
-                        'institution.address.subdistrict',
-                        'venue.address.state',
-                        'venue.address.district',
-                        'venue.address.subdistrict',
-                        'media',
-                    ])
-                    ->orderByDesc('starts_at')
-                    ->take(max(1, min($request->integer('past_per_page', 10), 50)))
-                    ->get()
-                    ->map(fn (Event $event): array => $this->eventListData($event))
-                    ->all(),
-                'past_total' => $record->events()->active()->where('starts_at', '<', now())->count(),
+                'upcoming_events' => $upcomingEvents['items'],
+                'upcoming_total' => $upcomingEvents['total'],
+                'past_events' => $pastEvents['items'],
+                'past_total' => $pastEvents['total'],
             ],
         ]);
     }
 
     /**
-     * @return Builder<Speaker>
+     * @template TDeclaringModel of \Illuminate\Database\Eloquent\Model
+     * @template TPivot of Pivot
+     *
+     * @param  Builder<Event>|HasMany<Event, TDeclaringModel>|BelongsToMany<Event, TDeclaringModel, TPivot, 'pivot'>  $query
+     * @return array{items: list<array<string, mixed>>, total: int}
      */
-    private function speakerSearchQuery(string $search): Builder
+    private function limitedEventPayloadWithTotal(Builder|HasMany|BelongsToMany $query, int $perPage): array
     {
-        return $this->speakerSearchService->applyIndexedSearch($this->baseSpeakerQuery(), $search);
+        /** @var Collection<int, Event> $limitedEvents */
+        $limitedEvents = (clone $query)
+            ->take($perPage + 1)
+            ->get();
+
+        /** @var Collection<int, Event> $visibleEvents */
+        $visibleEvents = $limitedEvents
+            ->take($perPage)
+            ->values();
+
+        $items = $visibleEvents
+            ->map(fn (Event $event): array => $this->eventListData($event))
+            ->all();
+
+        if ($limitedEvents->count() <= $perPage) {
+            return [
+                'items' => $items,
+                'total' => $visibleEvents->count(),
+            ];
+        }
+
+        return [
+            'items' => $items,
+            'total' => (clone $query)->count(),
+        ];
     }
 
     /**
+     * @param  list<string>  $institutionIds
      * @return Builder<Institution>
      */
-    private function institutionSearchQuery(string $search): Builder
+    private function aggregateInstitutionSearchItemsQuery(array $institutionIds = []): Builder
     {
-        return $this->institutionSearchService->applySearch(
-            Institution::query()
-                ->active()
-                ->where('status', 'verified')
-                ->withCount(['events' => function (Builder $query): void {
-                    $query
-                        ->where('events.is_active', true)
-                        ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                        ->where('events.visibility', EventVisibility::Public)
-                        ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
-                        ->where('events.starts_at', '>=', now());
-                }])
-                ->with(['address.country', 'address.state', 'address.district', 'address.subdistrict', 'media']),
-            $search,
-        );
+        $query = Institution::query()
+            ->active()
+            ->where('status', 'verified')
+            ->withCount(['events' => function (Builder $query): void {
+                $query
+                    ->where('events.is_active', true)
+                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                    ->where('events.visibility', EventVisibility::Public)
+                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                    ->where('events.starts_at', '>=', now());
+            }])
+            ->with(['address.country', 'address.state', 'address.district', 'address.subdistrict', 'media']);
+
+        if ($institutionIds !== []) {
+            $query->whereIn('institutions.id', $institutionIds);
+        }
+
+        return $query;
     }
 
     /**

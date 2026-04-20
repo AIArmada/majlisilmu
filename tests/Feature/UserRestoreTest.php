@@ -73,6 +73,10 @@ it('restores a deleted user together with key relationships and child records', 
         'submitter_id' => $user->id,
     ]);
     $sharedEvent = Event::factory()->create();
+    $sharedEvent->update([
+        'saves_count' => 99,
+        'going_count' => 88,
+    ]);
     $otherUser = User::factory()->create();
 
     Authz::withScope(null, function () use ($user): void {
@@ -475,6 +479,12 @@ it('restores a deleted user together with key relationships and child records', 
     assertDatabaseHas('event_attendees', [
         'event_id' => $sharedEvent->id,
         'user_id' => $user->id,
+    ]);
+
+    assertDatabaseHas('events', [
+        'id' => $sharedEvent->id,
+        'saves_count' => 1,
+        'going_count' => 1,
     ]);
 
     assertDatabaseHas('event_user', [

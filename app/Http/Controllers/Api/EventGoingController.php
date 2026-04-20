@@ -31,7 +31,7 @@ class EventGoingController extends Controller
             ->with(['institution:id,name,slug', 'venue:id,name', 'speakers:id,name,slug'])
             ->active()
             ->orderBy('starts_at')
-            ->paginate(ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 100));
+            ->simplePaginate(ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 100));
 
         return response()->json([
             'data' => collect($goingEvents->items())
@@ -40,9 +40,7 @@ class EventGoingController extends Controller
             'meta' => [
                 'request_id' => $request->header('X-Request-ID', (string) Str::uuid()),
                 'pagination' => [
-                    'page' => $goingEvents->currentPage(),
-                    'per_page' => $goingEvents->perPage(),
-                    'total' => $goingEvents->total(),
+                    ...ApiPagination::simplePaginationMeta($goingEvents),
                 ],
             ],
         ]);

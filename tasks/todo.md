@@ -1,3 +1,61 @@
+# Documentation Alignment for Account Delete and Engagement Pagination
+
+- [x] Audit mobile-facing docs against the current authenticated account and event-engagement behavior
+- [x] Update the mobile API reference for the admin-restorable self-delete flow and the simple pagination exception on saved/going lists
+- [x] Remove stale API-surface wording from the technical documentation and rerun diff checks
+
+## Review
+
+- Updated `docs/MAJLISILMU_MOBILE_API_REFERENCE.md` so `DELETE /user` now documents the admin-led grace-period restore flow instead of promising irreversible client-side deletion.
+- Documented the authenticated engagement pagination exception: `GET /me/events/saved` and `GET /me/events/going` now advertise the simple pagination bag (`page`, `per_page`, `has_more`, `next_page`) and explicitly note that `total` is omitted.
+- Updated `docs/MAJLISILMU_TECHNICAL_DOCUMENTATION.md` to include `DELETE /user`, remove the stale `Event interests endpoints` mention, and note the saved/going pagination change.
+- Verification:
+  - `git diff --check -- docs/MAJLISILMU_MOBILE_API_REFERENCE.md docs/MAJLISILMU_TECHNICAL_DOCUMENTATION.md` => pass
+
+# Public Detail Total Audit
+
+- [x] Audit public detail endpoints for redundant total-count queries without changing payload shape
+- [x] Refactor the safe under-limit paths to avoid extra count queries while preserving exact totals when needed
+- [x] Add focused regression coverage and rerun formatter, focused Pest, PHPStan, and diff checks
+
+## Review
+
+- Audited the public detail endpoints in `SearchController` and kept the response contract unchanged for institutions, speakers, venues, references, and series.
+- Added a shared `limitedEventPayloadWithTotal()` helper that loads `per_page + 1` events first:
+  - if the result count stays within the requested page size, the endpoint now reuses that in-memory count as the exact total,
+  - otherwise it falls back to the explicit count query so `upcoming_total` / `past_total` remain exact.
+- This removes redundant count queries in the common under-limit case without changing any public fields.
+- Tightened the speaker detail path further by reusing the already-materialized `otherRoleUpcomingMatches` and `otherRolePastMatches` collections for `other_role_*_total` instead of issuing separate count queries.
+- Extended the existing public speaker parity regression to assert the under-limit totals path explicitly for:
+  - `upcoming_total`
+  - `past_total`
+  - `other_role_upcoming_total`
+  - `other_role_past_total`
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='exposes 7-item institution detail lists with canonical address lines and qr urls|serializes series detail payloads with follow and media metadata for mobile clients|mirrors the public speaker page payload for app clients'` => 3 passed, 61 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Http/Controllers/Api/Frontend/SearchController.php` => pass
+  - `git diff --check -- app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => pass
+
+# Unified Search Aggregate Count Audit
+
+- [x] Audit `/api/v1/search` preview totals and current client usage before changing query behavior
+- [x] Remove duplicate speaker and institution search/count work without changing the aggregate search response contract
+- [x] Add focused regression coverage and rerun formatter, focused Pest, PHPStan, and diff checks
+
+## Review
+
+- Confirmed the current mobile app does **not** call `/api/v1/search`, but the endpoint still exposes public `data.speakers.total` and `data.institutions.total`, so the audit kept that contract intact.
+- Reworked `SearchController::search()` to reuse the cached `publicSearchIds()` lists from `SpeakerSearchService` and `InstitutionSearchService` for aggregate preview totals instead of re-running separate count queries over the same match set.
+- Speaker aggregate previews now also reuse the auth-aware base query, so authenticated requests avoid per-item `isFollowing()` checks while keeping the same payload fields.
+- Institution aggregate previews now reuse the same matched-id set for preview items and totals; only nearby searches still need a filtered count after the location scope is applied.
+- Added a focused regression in `tests/Feature/Api/Frontend/FrontendApiParityTest.php` proving the unified search response still returns the full speaker/institution totals while limiting each preview list to 4 items.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='unified search|falls back to local speaker and institution search on the frontend unified search api'` => 2 passed, 8 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => pass
+  - `git diff --check -- app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/Frontend/FrontendApiParityTest.php` => pass
+
 # Public Catalog Report Verification
 
 - [x] Verify the public catalog report against the running API and current code
@@ -684,6 +742,28 @@
   - `vendor/bin/pest --parallel tests/Feature/Api/EventCheckInApiTest.php` => 4 passed
   - `vendor/bin/pest --parallel tests/Feature/DawahShareImpactTest.php` => 32 passed
   - `vendor/bin/pest --parallel tests/Feature/ScrambleDocsTest.php` => 24 passed
+
+  # Discover/Search Audit Continuation
+
+  - [x] Re-audit the live discover/search and event-engagement paths across backend and app
+  - [x] Fix delete-side event engagement counter drift for user account removal
+  - [x] Trim redundant followed-only totals work in the public speaker and institution directories
+  - [x] Re-run focused formatter, regression tests, and static analysis on the touched backend slices
+
+  ## Review
+
+  - Confirmed the current public/mobile contract still needs exact totals on the discover/search surfaces we checked:
+    - the mobile home feed uses the event directory total for its results badge
+    - institution and speaker discovery use both `meta.pagination.total` and `meta.following.total`
+    - institution event tabs also surface totals in the app
+  - Found and fixed a second event-engagement correctness hole in `User::booted()`: deleting a user detached `event_saves` and `event_attendees` rows directly but did not recompute `events.saves_count` / `events.going_count`. The delete path now resyncs both cached counters, closing the mirror image of the earlier restore-side bug.
+  - Tightened the public directory endpoints in `SearchController`: when a request is already scoped to `following=1`, the institution and speaker directories now reuse the paginator total for `meta.following.total` instead of running an extra count query. Guest requests also skip the needless zero-count follow query.
+  - Verification:
+    - `vendor/bin/pint --dirty --format agent` => pass
+    - `vendor/bin/pest --parallel --compact tests/Feature/Api/AuthApiTest.php --filter='deletes the authenticated user account'` => **1 passed**, 21 assertions
+    - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='returns the total followed institution count|supports server-side filtering to only followed institutions|returns the total followed speaker count|supports server-side filtering to only followed speakers'` => **4 passed**, 18 assertions
+    - `vendor/bin/phpstan analyse --ansi --no-progress app/Models/User.php app/Http/Controllers/Api/Frontend/SearchController.php` => pass
+    - `git diff --check -- app/Models/User.php app/Http/Controllers/Api/Frontend/SearchController.php tests/Feature/Api/AuthApiTest.php` => pass
 
 # Homepage Date Filter Alignment
 

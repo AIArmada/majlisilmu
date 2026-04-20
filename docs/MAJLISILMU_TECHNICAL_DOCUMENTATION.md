@@ -251,6 +251,7 @@ Public:
 Authenticated (`auth:sanctum`):
 - `POST /auth/logout`
 - `GET /user`
+- `DELETE /user`
 - `GET /user/registrations`
 - `GET /me/events/going`
 - `GET /me/events/saved`
@@ -259,11 +260,14 @@ Authenticated (`auth:sanctum`):
 - `PUT/DELETE /events/{event}/going`
 - `PUT/DELETE /events/{event}/saved`
 - Saved-search CRUD + execute
-- Event interests endpoints
 - `POST /reports` (reports throttle applied)
 - Notifications inbox/settings endpoints
 - Push destination registration endpoints
 - Event registration export
+
+Notes:
+- `DELETE /user` now keeps a sanitized deleted-account snapshot for the admin grace-period restore flow while still revoking transient credentials immediately.
+- `GET /me/events/going` and `GET /me/events/saved` now use simple pagination metadata (`page`, `per_page`, `has_more`, `next_page`) and do not expose `total`.
 
 Controllers:
 - `app/Http/Controllers/Api/*`

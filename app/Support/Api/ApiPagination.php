@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Api;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\Paginator as PaginatorContract;
 
 final class ApiPagination
 {
@@ -32,6 +33,22 @@ final class ApiPagination
             'page' => $records->currentPage(),
             'per_page' => $records->perPage(),
             'total' => $records->total(),
+            'has_more' => $hasMorePages,
+            'next_page' => $hasMorePages ? $records->currentPage() + 1 : null,
+        ];
+    }
+
+    /**
+     * @param  PaginatorContract<int, mixed>  $records
+     * @return array{page: int, per_page: int, has_more: bool, next_page: int|null}
+     */
+    public static function simplePaginationMeta(PaginatorContract $records): array
+    {
+        $hasMorePages = $records->hasMorePages();
+
+        return [
+            'page' => $records->currentPage(),
+            'per_page' => $records->perPage(),
             'has_more' => $hasMorePages,
             'next_page' => $hasMorePages ? $records->currentPage() + 1 : null,
         ];
