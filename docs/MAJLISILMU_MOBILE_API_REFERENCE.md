@@ -576,7 +576,7 @@ Preview responses include:
 
 > **Record-key format:** `{recordKey}` in GET and PUT admin record routes should use the `route_key` field returned by the admin collection or detail endpoints.
 
-> **Record filtering:** speaker admin collections support `filter[status]`, `filter[is_active]`, and `filter[has_events]`. Date-aware admin collections also support `starts_after`, `starts_before`, and `starts_on_local_date`.
+> **Record filtering:** event admin collections support `filter[status]`, `filter[visibility]`, `filter[event_format]`, `filter[event_type]`, `filter[timing_mode]`, and `filter[prayer_reference]`. Speaker admin collections support `filter[status]`, `filter[is_active]`, and `filter[has_events]`. Date-aware admin collections also support `starts_after`, `starts_before`, and `starts_on_local_date`.
 
 Authorization note:
 

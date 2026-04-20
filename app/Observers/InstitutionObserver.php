@@ -31,6 +31,7 @@ class InstitutionObserver
             $this->generateInstitutionSlugAction->syncInstitutionSlugsForName($previousName);
         }
 
+        $this->publicListingsCache->bustHomepageStats();
         $this->publicListingsCache->bustMajlisListing();
         $this->publicDirectoryCacheVersion->bumpInstitution();
         $this->institutionSearchService->bustPublicSearchCache();
@@ -40,6 +41,7 @@ class InstitutionObserver
     {
         $this->syncSlugRedirectAction->purgeForModel($institution);
         $this->generateInstitutionSlugAction->syncInstitutionSlugsForName($institution->name);
+        $this->publicListingsCache->bustHomepageStats();
         $this->publicListingsCache->bustMajlisListing();
         $this->publicDirectoryCacheVersion->bumpInstitution();
         $this->institutionSearchService->bustPublicSearchCache();

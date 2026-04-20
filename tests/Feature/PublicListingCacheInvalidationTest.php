@@ -3,12 +3,14 @@
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\EventKeyPerson;
 use App\Models\Institution;
 use App\Models\Speaker;
 use App\Models\State;
@@ -60,9 +62,38 @@ function primeMajlisListingCache(): array
 }
 
 /**
+ * @return list<string>
+ */
+function primeHomepageStatsCache(): array
+{
+    $keys = [
+        'home.stats.events.upcoming',
+        'home.stats.speakers.upcoming',
+        'home.stats.institutions.upcoming',
+    ];
+
+    foreach ($keys as $key) {
+        Cache::put($key, 'primed', now()->addMinutes(10));
+    }
+
+    return $keys;
+}
+
+/**
  * @param  list<string>  $keys
  */
 function assertMajlisCacheWasCleared(array $keys): void
+{
+    foreach ($keys as $key) {
+        expect(Cache::has($key))
+            ->toBeFalse("Expected cache key [{$key}] to be cleared.");
+    }
+}
+
+/**
+ * @param  list<string>  $keys
+ */
+function assertHomepageStatsCacheWasCleared(array $keys): void
 {
     foreach ($keys as $key) {
         expect(Cache::has($key))
@@ -77,6 +108,7 @@ it('clears majlis listing cache when event is submitted from public submit form'
     $speaker = Speaker::factory()->create(['status' => 'verified']);
 
     $keys = primeMajlisListingCache();
+    $homepageKeys = primeHomepageStatsCache();
 
     setSubmitEventFormState(
         Livewire::test('pages.submit-event.create'),
@@ -105,28 +137,37 @@ it('clears majlis listing cache when event is submitted from public submit form'
         ->assertRedirect(route('submit-event.success'));
 
     assertMajlisCacheWasCleared($keys);
+    assertHomepageStatsCacheWasCleared($homepageKeys);
 });
 
 it('clears majlis listing cache when events are edited or deleted', function () {
     $event = Event::factory()->create();
 
     $keysAfterPrimeForUpdate = primeMajlisListingCache();
+    $homepageKeysAfterPrimeForUpdate = primeHomepageStatsCache();
     $event->update(['title' => 'Updated '.Str::random(8)]);
     assertMajlisCacheWasCleared($keysAfterPrimeForUpdate);
+    assertHomepageStatsCacheWasCleared($homepageKeysAfterPrimeForUpdate);
 
     $keysAfterPrimeForDelete = primeMajlisListingCache();
+    $homepageKeysAfterPrimeForDelete = primeHomepageStatsCache();
     $event->delete();
     assertMajlisCacheWasCleared($keysAfterPrimeForDelete);
+    assertHomepageStatsCacheWasCleared($homepageKeysAfterPrimeForDelete);
 });
 
 it('clears majlis listing cache when admin-managed related records are created', function () {
     $keysAfterInstitutionPrime = primeMajlisListingCache();
+    $homepageKeysAfterInstitutionPrime = primeHomepageStatsCache();
     Institution::factory()->create(['status' => 'verified']);
     assertMajlisCacheWasCleared($keysAfterInstitutionPrime);
+    assertHomepageStatsCacheWasCleared($homepageKeysAfterInstitutionPrime);
 
     $keysAfterSpeakerPrime = primeMajlisListingCache();
+    $homepageKeysAfterSpeakerPrime = primeHomepageStatsCache();
     Speaker::factory()->create(['status' => 'verified']);
     assertMajlisCacheWasCleared($keysAfterSpeakerPrime);
+    assertHomepageStatsCacheWasCleared($homepageKeysAfterSpeakerPrime);
 
     $keysAfterTagPrime = primeMajlisListingCache();
     Tag::factory()->issue()->create();
@@ -135,6 +176,29 @@ it('clears majlis listing cache when admin-managed related records are created',
     $keysAfterVenuePrime = primeMajlisListingCache();
     Venue::factory()->create(['status' => 'verified']);
     assertMajlisCacheWasCleared($keysAfterVenuePrime);
+});
+
+it('clears homepage stats cache when event key people are created or deleted', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'starts_at' => now()->addDays(7),
+    ]);
+    $speaker = Speaker::factory()->create(['status' => 'verified']);
+
+    $homepageKeysAfterCreate = primeHomepageStatsCache();
+    $eventKeyPerson = EventKeyPerson::factory()->create([
+        'event_id' => $event->getKey(),
+        'speaker_id' => $speaker->getKey(),
+        'role' => EventKeyPersonRole::Speaker,
+        'is_public' => true,
+    ]);
+
+    assertHomepageStatsCacheWasCleared($homepageKeysAfterCreate);
+
+    $homepageKeysAfterDelete = primeHomepageStatsCache();
+    $eventKeyPerson->delete();
+
+    assertHomepageStatsCacheWasCleared($homepageKeysAfterDelete);
 });
 
 it('clears majlis listing cache when geography records are created updated or deleted', function () {

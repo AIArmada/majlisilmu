@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Support\Api\Admin;
 
+use App\Enums\EventFormat;
+use App\Enums\EventStructure;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
+use App\Enums\PrayerReference;
+use App\Enums\TimingMode;
+use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\User;
 use App\Support\Api\ApiPagination;
@@ -97,6 +104,7 @@ class AdminResourceService
     }
 
     /**
+     * @param  array<string, mixed>  $filters
      * @return array{data: list<array<string, mixed>>, meta: array<string, mixed>}
      */
     public function listRecords(
@@ -566,13 +574,31 @@ class AdminResourceService
 
     /**
      * @param  array<string, mixed>  $filters
+     * @param  Builder<Model>  $query
      */
     protected function applyFilters(Builder $query, string $resourceClass, array $filters): void
     {
-        if ($filters === [] || $resourceClass !== SpeakerResource::class) {
+        if ($filters === []) {
             return;
         }
 
+        if ($resourceClass === SpeakerResource::class) {
+            $this->applySpeakerFilters($query, $filters);
+
+            return;
+        }
+
+        if ($resourceClass === EventResource::class) {
+            $this->applyEventFilters($query, $filters);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @param  Builder<Model>  $query
+     */
+    private function applySpeakerFilters(Builder $query, array $filters): void
+    {
         $model = $query->getModel();
 
         if (array_key_exists('status', $filters)) {
@@ -628,6 +654,153 @@ class AdminResourceService
                 $query->whereDoesntHave('events');
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @param  Builder<Model>  $query
+     */
+    private function applyEventFilters(Builder $query, array $filters): void
+    {
+        $model = $query->getModel();
+
+        if (array_key_exists('status', $filters)) {
+            $statuses = $this->normalizeArrayFilter($filters['status']);
+
+            if ($statuses === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->whereIn($model->qualifyColumn('status'), $statuses);
+        }
+
+        if (array_key_exists('visibility', $filters)) {
+            $visibleValues = array_values(array_filter(
+                array_map(static fn (string $value): ?string => EventVisibility::tryFrom($value)?->value, $this->normalizeArrayFilter($filters['visibility'])),
+            ));
+
+            if ($visibleValues === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->whereIn($model->qualifyColumn('visibility'), $visibleValues);
+        }
+
+        if (array_key_exists('event_structure', $filters)) {
+            $structures = array_values(array_filter(
+                array_map(static fn (string $value): ?string => EventStructure::tryFrom($value)?->value, $this->normalizeArrayFilter($filters['event_structure'])),
+            ));
+
+            if ($structures === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->whereIn($model->qualifyColumn('event_structure'), $structures);
+        }
+
+        if (array_key_exists('event_format', $filters)) {
+            $formats = array_values(array_filter(
+                array_map(static fn (string $value): ?string => EventFormat::tryFrom($value)?->value, $this->normalizeArrayFilter($filters['event_format'])),
+            ));
+
+            if ($formats === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->whereIn($model->qualifyColumn('event_format'), $formats);
+        }
+
+        if (array_key_exists('event_type', $filters)) {
+            $eventTypes = array_values(array_filter(
+                array_map(static fn (string $value): ?string => EventType::tryFrom($value)?->value, $this->normalizeArrayFilter($filters['event_type'])),
+            ));
+
+            if ($eventTypes === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->where(function (Builder $eventTypeQuery) use ($eventTypes, $model): void {
+                foreach ($eventTypes as $index => $eventType) {
+                    $method = $index === 0 ? 'whereJsonContains' : 'orWhereJsonContains';
+                    $eventTypeQuery->{$method}($model->qualifyColumn('event_type'), $eventType);
+                }
+            });
+        }
+
+        if (array_key_exists('timing_mode', $filters)) {
+            $timingModes = array_values(array_filter(
+                array_map(static fn (string $value): ?string => TimingMode::tryFrom($value)?->value, $this->normalizeArrayFilter($filters['timing_mode'])),
+            ));
+
+            if ($timingModes === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->whereIn($model->qualifyColumn('timing_mode'), $timingModes);
+        }
+
+        if (array_key_exists('prayer_reference', $filters)) {
+            $prayerReferences = array_values(array_filter(
+                array_map(static fn (string $value): ?string => PrayerReference::tryFrom($value)?->value, $this->normalizeArrayFilter($filters['prayer_reference'])),
+            ));
+
+            if ($prayerReferences === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->whereIn($model->qualifyColumn('prayer_reference'), $prayerReferences);
+        }
+
+        if (array_key_exists('is_active', $filters)) {
+            $rawIsActive = $filters['is_active'];
+
+            if ($rawIsActive !== null && $rawIsActive !== '') {
+                $isActive = $this->normalizeBooleanFilter($rawIsActive);
+
+                if ($isActive === null) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $query->where($model->qualifyColumn('is_active'), $isActive);
+            }
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeArrayFilter(mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        if (is_string($value) && str_contains($value, ',')) {
+            $value = array_map(trim(...), explode(',', $value));
+        }
+
+        $values = is_array($value) ? $value : [$value];
+
+        return array_values(array_filter(
+            array_map(static fn (mixed $item): string => (string) $item, $values),
+            static fn (string $item): bool => $item !== ''
+        ));
     }
 
     private function normalizeStatusFilter(mixed $value): ?string

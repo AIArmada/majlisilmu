@@ -34,8 +34,16 @@ trait AuditsModelChanges
     {
         $tags = [];
 
-        if (app()->bound('request') && request()->is('api/*')) {
-            $tags[] = 'api';
+        if (app()->bound('request')) {
+            $request = request();
+
+            if ($request->is('api/*')) {
+                $tags[] = 'api';
+            }
+
+            if ($request->is('mcp/*')) {
+                $tags[] = 'mcp';
+            }
         }
 
         $panelId = Filament::getCurrentPanel()?->getId();

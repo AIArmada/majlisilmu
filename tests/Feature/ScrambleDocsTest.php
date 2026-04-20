@@ -311,7 +311,7 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain("\n\nTIMEZONE:\n")
         ->toContain('Resource manifests now expose explicit `mcp_tools` for collection, meta, schema, store, and update call surfaces; use those tool names and argument templates instead of guessing URLs.')
         ->toContain('Event discovery supports `filter[starts_on_local_date]=YYYY-MM-DD` and returns `starts_at_local` / `starts_on_local_date` in event payloads.')
-        ->toContain('Speaker collections expose explicit filters such as filter[status], filter[is_active], and filter[has_events], and date-aware admin resources also accept starts_after, starts_before, and starts_on_local_date.')
+        ->toContain('Event collections expose explicit filters such as filter[status], filter[visibility], filter[event_format], filter[event_type], filter[timing_mode], and filter[prayer_reference]. Speaker collections expose filter[status], filter[is_active], and filter[has_events]. Date-aware admin resources also accept starts_after, starts_before, and starts_on_local_date.')
         ->toContain('use the admin record `route_key` returned by admin collection or detail payloads')
         ->toContain('If you only have a public UUID-backed payload and route_key is unavailable, use the UUID id directly as recordKey.')
         ->toContain('Collection endpoints clamp per_page to server-supported maxima')
@@ -544,12 +544,14 @@ it('documents admin schema-driven writes and dynamic payload discovery', functio
     ])->assertOk();
 
     $paths = $response->json('paths');
+    $adminListParameters = collect(data_get($paths, '/admin/{resourceKey}.get.parameters', []))->pluck('name')->all();
 
     expect($paths['/admin/manifest']['get']['summary'] ?? null)->toBe('List admin resources and write support')
         ->and($paths['/admin/{resourceKey}/schema']['get']['summary'] ?? null)->toBe('Get admin write schema')
         ->and($paths['/admin/{resourceKey}/schema']['get']['description'] ?? null)->toContain('mutation payloads are resource-specific')
         ->and($paths['/admin/{resourceKey}']['post']['summary'] ?? null)->toBe('Create an admin resource record')
         ->and($paths['/admin/{resourceKey}']['post']['description'] ?? null)->toContain('fetch `GET /admin/{resourceKey}/schema?operation=create` first')
+        ->and($adminListParameters)->toContain('filter[visibility]', 'filter[event_structure]', 'filter[event_format]', 'filter[event_type]', 'filter[timing_mode]', 'filter[prayer_reference]')
         ->and($paths['/admin/{resourceKey}/{recordKey}/relations/{relation}']['get']['summary'] ?? null)->toBe('List admin related records')
         ->and($paths['/admin/{resourceKey}/{recordKey}/relations/{relation}']['get']['description'] ?? null)->toContain('Use the relation keys from `GET /admin/{resourceKey}/meta`')
         ->and($paths['/admin/{resourceKey}/{recordKey}']['put']['summary'] ?? null)->toBe('Update an admin resource record')

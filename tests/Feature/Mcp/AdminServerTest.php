@@ -98,6 +98,7 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->where('data.resource.api_routes.schema', '/api/v1/admin/speakers/schema')
             ->where('data.resource.mcp_tools.list_records.tool', 'admin-list-records')
             ->where('data.resource.mcp_tools.list_records.arguments.resource_key', 'speakers')
+            ->where('data.resource.mcp_tools.list_records.arguments.filters', 'object')
             ->where('data.resource.mcp_tools.create.arguments.validate_only', false)
             ->where('data.resource.mcp_tools.update.arguments.validate_only', false)
             ->etc());
@@ -184,12 +185,52 @@ it('exposes timezone-aware metadata for admin event resources', function () {
             ->where('data.resource.timezone_sensitive', true)
             ->where('data.resource.date_semantics.storage_timezone', 'UTC')
             ->where('data.resource.date_semantics.local_date_filter', 'starts_on_local_date')
+            ->where('data.resource.mcp_tools.list_records.arguments.filters', 'object')
             ->where('data.resource.mcp_tools.list_records.arguments.starts_after', null)
             ->where('data.resource.mcp_tools.list_records.arguments.starts_before', null)
             ->where('data.resource.mcp_tools.list_records.arguments.starts_on_local_date', null)
             ->where('data.resource.mcp_tools.get_record.tool', 'admin-get-record')
             ->where('data.resource.mcp_tools.get_record.arguments.resource_key', 'events')
             ->where('data.resource.mcp_tools.get_record.arguments.record_key', 'record')
+            ->etc());
+});
+
+it('filters admin event records by structured filters through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $draftOnlineEvent = Event::factory()->create([
+        'title' => 'Admin MCP Filtered Draft Online Event',
+        'status' => 'draft',
+        'event_format' => EventFormat::Online,
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'event_type' => [EventType::KuliahCeramah->value],
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Admin MCP Approved Physical Event',
+        'status' => 'approved',
+        'event_format' => EventFormat::Physical,
+        'visibility' => EventVisibility::Private,
+        'is_active' => false,
+        'event_type' => [EventType::Forum->value],
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'filters' => [
+                'status' => 'draft',
+                'event_format' => 'online',
+                'event_type' => 'kuliah_ceramah',
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $draftOnlineEvent->getKey())
+            ->where('data.0.title', 'Admin MCP Filtered Draft Online Event')
+            ->where('meta.resource.key', 'events')
             ->etc());
 });
 
@@ -896,6 +937,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'readOnlyHint' => true,
         'idempotentHint' => true,
     ]);
+
+    expect(collect((array) data_get($tools->get('admin-list-records'), 'inputSchema.properties.filters.type'))->contains('object'))->toBeTrue();
 
     expect($tools->get('admin-get-write-schema')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,

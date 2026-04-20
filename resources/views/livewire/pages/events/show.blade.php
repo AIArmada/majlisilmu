@@ -333,7 +333,7 @@
             });
         },
         async nativeShare() {
-            const shareData = await this.sharePayloadForChannel('native_share');
+            const shareData = await this.sharePayloadForChannel("native_share");
             if (navigator.share) {
                 try {
                     await navigator.share(shareData);
@@ -346,7 +346,7 @@
 
             await this.copyLink();
         },
-        async copyLink(shouldTrack = true, provider = 'copy_link') {
+        async copyLink(shouldTrack = true, provider = "copy_link") {
             const shareData = await this.sharePayloadForChannel(provider);
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(shareData.url).then(async () => {

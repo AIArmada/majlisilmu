@@ -1,3 +1,32 @@
+# Event Detail Share Console Fix
+
+- [x] Reproduce the console error in the browser
+- [x] Fix Alpine x-data quoting on the event detail page
+- [x] Add a regression for leaked Alpine state in rendered body text
+- [x] Re-run formatter, targeted tests, and browser verification
+
+## Review
+
+- Fixed `resources/views/livewire/pages/events/show.blade.php` by switching the shared `x-data` string literals to double quotes so the single-quoted attribute no longer breaks the browser DOM.
+- Added a regression in `tests/Feature/EventShowPageTest.php` that parses the rendered body text and asserts the Alpine share-state snippet is not leaked into visible DOM text.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventShowPageTest.php` => 28 passed, 84 assertions
+  - Chrome MCP browser review of `https://majlisilmu.test/majlis/majlis-ilmu-remaja-identiti-jrqpuql` => no console warning or leaked Alpine text after the fix
+# API / MCP / Filament CRUD Comparison Matrix
+
+- [x] Inventory API, MCP, and Filament source contracts
+- [x] Draft the comparison matrix document
+- [x] Review the matrix for consistency and close any remaining drift notes
+- [x] Add machine-readable matrix companion
+
+## Review
+
+- Added `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md` as the living comparison matrix for API, MCP, and Filament CRUD parity.
+- Added `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.json` as the machine-readable companion for easier diffing and automated consumption.
+- Captured the shared write-capable resource intersection, panel-only/read-only resource groups, and Ahli/member mapping in one place.
+- Verification: `python -m json.tool docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.json >/dev/null` => pass; `git diff --check` => pass.
+
 # API and MCP Media Upload Parity
 
 - [ ] Inventory frontend, admin UI, REST API, and MCP upload surfaces

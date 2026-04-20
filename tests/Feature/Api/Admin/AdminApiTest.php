@@ -202,7 +202,7 @@ it('filters admin speaker records by explicit query parameters', function () {
     expect(in_array($speakerWithoutEvents->getKey(), $verifiedIds, true))->toBeTrue();
     expect(in_array($pendingSpeaker->getKey(), $verifiedIds, true))->toBeFalse();
 
-    $inactiveResponse = $this->getJson('/api/v1/admin/speakers?is_active=0')
+    $inactiveResponse = $this->getJson('/api/v1/admin/speakers?filter[is_active]=0')
         ->assertOk();
 
     $inactiveIds = collect($inactiveResponse->json('data'))->pluck('id')->all();
@@ -216,6 +216,85 @@ it('filters admin speaker records by explicit query parameters', function () {
 
     expect(in_array($speakerWithEvents->getKey(), $hasEventsIds, true))->toBeTrue();
     expect(in_array($speakerWithoutEvents->getKey(), $hasEventsIds, true))->toBeFalse();
+});
+
+it('filters admin event records by explicit query parameters', function () {
+    $admin = adminApiUser('super_admin');
+
+    $draftOnlineEvent = Event::factory()->create([
+        'title' => 'Admin API Draft Online Event',
+        'status' => 'draft',
+        'event_format' => EventFormat::Online,
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'event_type' => [EventType::KuliahCeramah->value],
+    ]);
+
+    $approvedPhysicalEvent = Event::factory()->create([
+        'title' => 'Admin API Approved Physical Event',
+        'status' => 'approved',
+        'event_format' => EventFormat::Physical,
+        'visibility' => EventVisibility::Private,
+        'is_active' => false,
+        'event_type' => [EventType::Forum->value],
+    ]);
+
+    $cancelledHybridEvent = Event::factory()->create([
+        'title' => 'Admin API Cancelled Hybrid Event',
+        'status' => 'cancelled',
+        'event_format' => EventFormat::Hybrid,
+        'visibility' => EventVisibility::Unlisted,
+        'is_active' => true,
+        'event_type' => [EventType::Kenduri->value],
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $metaResponse = $this->getJson('/api/v1/admin/events/meta')
+        ->assertOk();
+
+    expect(collect($metaResponse->json('data.resource.filters'))->pluck('key')->all())
+        ->toContain('status', 'visibility', 'event_structure', 'event_format', 'event_type', 'timing_mode', 'prayer_reference', 'is_active');
+
+    $draftResponse = $this->getJson('/api/v1/admin/events?filter[status]=draft')
+        ->assertOk();
+
+    expect($draftResponse->json('meta.pagination.total'))->toBe(1)
+        ->and(collect($draftResponse->json('data'))->pluck('route_key')->all())->toContain($draftOnlineEvent->getRouteKey())
+        ->and(collect($draftResponse->json('data'))->pluck('route_key')->all())->not->toContain($approvedPhysicalEvent->getRouteKey())
+        ->and(collect($draftResponse->json('data'))->pluck('route_key')->all())->not->toContain($cancelledHybridEvent->getRouteKey());
+
+    $onlineResponse = $this->getJson('/api/v1/admin/events?filter[event_format]=online')
+        ->assertOk();
+
+    expect($onlineResponse->json('meta.pagination.total'))->toBe(1)
+        ->and(collect($onlineResponse->json('data'))->pluck('route_key')->all())->toContain($draftOnlineEvent->getRouteKey())
+        ->and(collect($onlineResponse->json('data'))->pluck('route_key')->all())->not->toContain($approvedPhysicalEvent->getRouteKey())
+        ->and(collect($onlineResponse->json('data'))->pluck('route_key')->all())->not->toContain($cancelledHybridEvent->getRouteKey());
+
+    $privateResponse = $this->getJson('/api/v1/admin/events?filter[visibility]=private')
+        ->assertOk();
+
+    expect($privateResponse->json('meta.pagination.total'))->toBe(1)
+        ->and(collect($privateResponse->json('data'))->pluck('route_key')->all())->toContain($approvedPhysicalEvent->getRouteKey())
+        ->and(collect($privateResponse->json('data'))->pluck('route_key')->all())->not->toContain($draftOnlineEvent->getRouteKey())
+        ->and(collect($privateResponse->json('data'))->pluck('route_key')->all())->not->toContain($cancelledHybridEvent->getRouteKey());
+
+    $inactiveResponse = $this->getJson('/api/v1/admin/events?filter[is_active]=false')
+        ->assertOk();
+
+    expect($inactiveResponse->json('meta.pagination.total'))->toBe(1)
+        ->and(collect($inactiveResponse->json('data'))->pluck('route_key')->all())->toContain($approvedPhysicalEvent->getRouteKey())
+        ->and(collect($inactiveResponse->json('data'))->pluck('route_key')->all())->not->toContain($draftOnlineEvent->getRouteKey())
+        ->and(collect($inactiveResponse->json('data'))->pluck('route_key')->all())->not->toContain($cancelledHybridEvent->getRouteKey());
+
+    $eventTypeResponse = $this->getJson('/api/v1/admin/events?filter[event_type]=kuliah_ceramah')
+        ->assertOk();
+
+    expect($eventTypeResponse->json('meta.pagination.total'))->toBe(1)
+        ->and(collect($eventTypeResponse->json('data'))->pluck('route_key')->all())->toContain($draftOnlineEvent->getRouteKey())
+        ->and(collect($eventTypeResponse->json('data'))->pluck('route_key')->all())->not->toContain($approvedPhysicalEvent->getRouteKey())
+        ->and(collect($eventTypeResponse->json('data'))->pluck('route_key')->all())->not->toContain($cancelledHybridEvent->getRouteKey());
 });
 
 it('previews admin speaker creation without persisting the record', function () {
