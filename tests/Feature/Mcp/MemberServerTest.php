@@ -4,6 +4,7 @@ use App\Actions\Membership\AddMemberToSubject;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\MemberServer;
+use App\Mcp\Tools\Member\MemberCreateGitHubIssueTool;
 use App\Mcp\Tools\Member\MemberDocumentationFetchTool;
 use App\Mcp\Tools\Member\MemberDocumentationSearchTool;
 use App\Mcp\Tools\Member\MemberGetRecordTool;
@@ -20,6 +21,7 @@ use App\Models\User;
 use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Laravel\Passport\Passport;
 use Spatie\Permission\Models\Role;
@@ -282,6 +284,64 @@ it('registers member write tools when the MCP actor is a normalized Passport use
         ->assertHasNoErrors();
 });
 
+it('creates plain github issues through the member MCP tool', function () {
+    configureGithubIssueReportingForMemberMcp();
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://api.github.com/repos/AIArmada/majlisilmu/issues' => Http::response([
+            'number' => 654,
+            'title' => '[Bug] Member MCP GitHub issue',
+            'url' => 'https://api.github.com/repos/AIArmada/majlisilmu/issues/654',
+            'html_url' => 'https://github.com/AIArmada/majlisilmu/issues/654',
+        ], 201),
+    ]);
+
+    [$member] = institutionMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberCreateGitHubIssueTool::class, [
+            'category' => 'bug',
+            'title' => 'Member MCP GitHub issue',
+            'summary' => 'The member MCP GitHub issue tool should create a plain issue without Copilot assignment.',
+            'platform' => 'chatgpt',
+            'client_name' => 'ChatGPT',
+            'client_version' => 'GPT-5.4',
+            'tool_name' => 'member-create-github-issue',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.issue.assigned_to_copilot', false)
+            ->where('data.issue.copilot_model', null)
+            ->where('data.issue.attempted_models', [])
+            ->etc());
+
+    Http::assertSentCount(1);
+    Http::assertSent(function ($request): bool {
+        $payload = $request->data();
+
+        return $request->method() === 'POST'
+            && (string) $request->url() === 'https://api.github.com/repos/AIArmada/majlisilmu/issues'
+            && data_get($payload, 'assignees') === null
+            && data_get($payload, 'agent_assignment') === null;
+    });
+});
+
+it('hides the member github issue tool when github issue reporting is disabled', function () {
+    configureGithubIssueReportingForMemberMcp(['enabled' => false]);
+
+    [$member] = institutionMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberCreateGitHubIssueTool::class, [
+            'category' => 'bug',
+            'title' => 'Hidden tool',
+            'summary' => 'This should not be callable when disabled.',
+            'platform' => 'chatgpt',
+        ])
+        ->assertHasErrors(['Tool [member-create-github-issue] not found.']);
+});
+
 it('keeps admin and member MCP boundaries separate', function () {
     $admin = globalRoleMcpUser('super_admin');
 
@@ -325,6 +385,8 @@ it('serves the member MCP stream for Passport-authenticated eligible users', fun
 });
 
 it('initializes and lists member MCP tools over the HTTP endpoint for Passport-authenticated members', function () {
+    configureGithubIssueReportingForMemberMcp();
+
     [$member] = institutionMemberMcpContext(role: 'admin');
 
     Passport::actingAs(memberPassportUser($member), ['mcp:use']);
@@ -370,6 +432,7 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'member-list-records',
         'member-get-record',
         'member-get-write-schema',
+        'member-create-github-issue',
         'member-update-record',
     );
 
@@ -398,6 +461,13 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'idempotentHint' => false,
         'destructiveHint' => false,
         'openWorldHint' => false,
+    ]);
+
+    expect($tools->get('member-create-github-issue')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => false,
+        'idempotentHint' => false,
+        'destructiveHint' => false,
+        'openWorldHint' => true,
     ]);
 });
 
@@ -449,6 +519,8 @@ it('rejects legacy wildcard MCP tokens on the member MCP stream endpoint', funct
 });
 
 it('initializes and lists member MCP tools over the HTTP endpoint', function () {
+    configureGithubIssueReportingForMemberMcp();
+
     [$member] = speakerMemberMcpContext(role: 'admin');
     $token = $member->createToken('mcp-member-http-test', [McpTokenManager::MEMBER_ABILITY])->plainTextToken;
 
@@ -489,6 +561,7 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'member-list-records',
         'member-get-record',
         'member-get-write-schema',
+        'member-create-github-issue',
         'member-update-record',
     );
 });
@@ -758,4 +831,25 @@ function ensureMemberMcpMalaysiaCountryExists(): int
         'region' => 'Asia',
         'subregion' => 'South-Eastern Asia',
     ]);
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ */
+function configureGithubIssueReportingForMemberMcp(array $overrides = []): void
+{
+    config()->set('services.github.issues', array_replace([
+        'enabled' => true,
+        'token' => 'github-token',
+        'api_base' => 'https://api.github.com',
+        'api_version' => '2026-03-10',
+        'repository_owner' => 'AIArmada',
+        'repository_name' => 'majlisilmu',
+        'base_branch' => 'main',
+        'custom_agent' => null,
+        'custom_instructions' => 'Use repository tests and conventions when following up.',
+        'admin_model' => 'GPT-5.4',
+        'admin_model_fallbacks' => ['GPT-5.2-Codex', 'Auto'],
+        'copilot_assignee' => 'copilot-swe-agent[bot]',
+    ], $overrides));
 }

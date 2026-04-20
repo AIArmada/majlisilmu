@@ -705,6 +705,11 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         return ! $this->isDirectoryFeedbackBlocked();
     }
 
+    public function canSubmitIntegrationFeedback(): bool
+    {
+        return $this->canSubmitDirectoryFeedback();
+    }
+
     public function isDirectoryFeedbackBlocked(): bool
     {
         return Authz::withScope(null, function (): bool {
@@ -720,6 +725,11 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     public function directoryFeedbackBanMessage(): string
     {
         return __('Akaun anda tidak dibenarkan menghantar cadangan kemaskini, tuntutan keahlian, atau laporan buat masa ini.');
+    }
+
+    public function integrationFeedbackBanMessage(): string
+    {
+        return $this->directoryFeedbackBanMessage();
     }
 
     /**

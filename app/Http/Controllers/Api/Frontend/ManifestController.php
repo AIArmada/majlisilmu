@@ -99,6 +99,19 @@ class ManifestController extends FrontendController
     }
 
     #[Endpoint(
+        title: 'Get GitHub issue-report field contract',
+        description: 'Returns the authenticated field contract for reporting MCP or API issues directly to the MajlisIlmu GitHub repository before calling `POST /github-issues`.',
+    )]
+    public function githubIssueReport(): JsonResponse
+    {
+        abort_unless($this->contracts->supportsGitHubIssueReporting(), 404);
+
+        return response()->json([
+            'data' => $this->contracts->githubIssueReport(),
+        ]);
+    }
+
+    #[Endpoint(
         title: 'Get account-settings field contract',
         description: 'Returns the authenticated account-settings contract, including the update endpoint and supporting catalog endpoints.',
     )]

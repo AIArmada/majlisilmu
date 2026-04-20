@@ -657,6 +657,8 @@ it('publishes sanctum bearer security metadata for authenticated api operations'
         ->and($paths['/auth/logout']['post']['security'][0]['sanctumBearer'] ?? null)->toBe([])
         ->and($paths['/user']['get']['security'][0]['sanctumBearer'] ?? null)->toBe([])
         ->and($paths['/forms/account-settings']['get']['security'][0]['sanctumBearer'] ?? null)->toBe([])
+        ->and($paths['/forms/github-issue-report']['get']['security'][0]['sanctumBearer'] ?? null)->toBe([])
+        ->and($paths['/github-issues']['post']['security'][0]['sanctumBearer'] ?? null)->toBe([])
         ->and($paths['/events/{event}']['get']['security'] ?? null)->toBeNull()
         ->and($paths['/events/{event}/registrations']['post']['security'] ?? null)->toBeNull()
         ->and($paths['/events/{event}/me']['get']['security'][0]['sanctumBearer'] ?? null)->toBe([])
@@ -687,6 +689,7 @@ it('publishes explicit schemas for search manifest and public form contracts', f
         'InstitutionContributionFormResponse',
         'SpeakerContributionFormResponse',
         'ReportFormResponse',
+        'GitHubIssueReportFormResponse',
         'AccountSettingsFormResponse',
         'AdvancedEventFormResponse',
         'InstitutionWorkspaceFormResponse',
@@ -699,6 +702,7 @@ it('publishes explicit schemas for search manifest and public form contracts', f
         ->and(data_get($paths, '/forms/contributions/institutions.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/InstitutionContributionFormResponse')
         ->and(data_get($paths, '/forms/contributions/speakers.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/SpeakerContributionFormResponse')
         ->and(data_get($paths, '/forms/report.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/ReportFormResponse')
+        ->and(data_get($paths, '/forms/github-issue-report.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/GitHubIssueReportFormResponse')
         ->and(data_get($paths, '/forms/account-settings.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/AccountSettingsFormResponse')
         ->and(data_get($paths, '/forms/advanced-events.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/AdvancedEventFormResponse')
         ->and(data_get($paths, '/forms/institution-workspace.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/InstitutionWorkspaceFormResponse')
@@ -727,6 +731,9 @@ it('adds summaries and descriptions to catalog and authenticated workflow endpoi
         ->and($paths['/events/{event}/me']['get']['summary'] ?? null)->toBe('Get current user event state')
         ->and($paths['/events/{event}/check-ins']['post']['summary'] ?? null)->toBe('Record an event check-in')
         ->and($paths['/account-settings']['get']['summary'] ?? null)->toBe('Get account settings')
+        ->and($paths['/forms/github-issue-report']['get']['summary'] ?? null)->toBe('Get GitHub issue-report field contract')
+        ->and($paths['/github-issues']['post']['summary'] ?? null)->toBe('Create a GitHub issue report')
+        ->and($paths['/github-issues']['post']['description'] ?? null)->toContain('Non-admin users create a plain issue')
         ->and($paths['/institution-workspace']['get']['summary'] ?? null)->toBe('Get institution workspace')
         ->and($paths['/institution-workspace']['get']['description'] ?? null)->toContain('first accessible institution is selected automatically')
         ->and($paths['/membership-claims/{subjectType}/{subject}']['post']['summary'] ?? null)->toBe('Submit a membership claim')
@@ -758,7 +765,9 @@ it('publishes high-value request body examples for agentic write endpoints', fun
         ->and(data_get($paths, '/saved-searches.post.requestBody.content.application/json.example.notify'))->toBe('daily')
         ->and(data_get($paths, '/saved-searches/{savedSearch}.put.requestBody.content.application/json.example.notify'))->toBe('instant')
         ->and(data_get($paths, '/reports.post.requestBody.content.multipart/form-data.example.category'))->toBe('wrong_info')
-        ->and(data_get($paths, '/reports.post.requestBody.content.multipart/form-data.example.evidence.0'))->toBe('poster-screenshot.jpg');
+        ->and(data_get($paths, '/reports.post.requestBody.content.multipart/form-data.example.evidence.0'))->toBe('poster-screenshot.jpg')
+        ->and(data_get($paths, '/github-issues.post.requestBody.content.application/json.example.category'))->toBe('docs_mismatch')
+        ->and(data_get($paths, '/github-issues.post.requestBody.content.application/json.example.client_version'))->toBe('GPT-5.4');
 });
 
 it('publishes follow-up request examples for authenticated workflow mutations', function () {

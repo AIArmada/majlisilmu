@@ -55,7 +55,7 @@
       "key": "authenticated_api",
       "auth_boundary": "auth:sanctum",
       "contract_style": "workflow / self-service contracts",
-      "purpose": "contributions, reports, follows, saved searches, notifications, account settings, institution workspace, event state"
+      "purpose": "contributions, GitHub issue reporting, reports, follows, saved searches, notifications, account settings, institution workspace, event state"
     },
     {
       "key": "admin_api",
@@ -114,6 +114,7 @@
     ],
     "authenticated_workflow_families": [
       "account settings and MCP token self-service",
+      "GitHub issue reporting for API and MCP/API integration feedback",
       "authenticated contribution create/suggest/review actions",
       "membership claims",
       "advanced event submission",

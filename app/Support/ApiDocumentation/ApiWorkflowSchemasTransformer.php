@@ -55,6 +55,7 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
         $this->putSchema($components, 'InstitutionContributionFormResponse', $this->institutionContributionFormResponseSchema($components));
         $this->putSchema($components, 'SpeakerContributionFormResponse', $this->speakerContributionFormResponseSchema($components));
         $this->putSchema($components, 'ReportFormResponse', $this->reportFormResponseSchema($components));
+        $this->putSchema($components, 'GitHubIssueReportFormResponse', $this->gitHubIssueReportFormResponseSchema($components));
         $this->putSchema($components, 'AccountSettingsFormResponse', $this->accountSettingsFormResponseSchema($components));
         $this->putSchema($components, 'AdvancedEventFormResponse', $this->advancedEventFormResponseSchema($components));
         $this->putSchema($components, 'InstitutionWorkspaceFormResponse', $this->institutionWorkspaceFormResponseSchema($components));
@@ -70,6 +71,7 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
         $this->replaceJsonResponseSchema($document, 'forms/contributions/institutions', 'get', 200, $components, 'InstitutionContributionFormResponse', 'Institution contribution field contract response.');
         $this->replaceJsonResponseSchema($document, 'forms/contributions/speakers', 'get', 200, $components, 'SpeakerContributionFormResponse', 'Speaker contribution field contract response.');
         $this->replaceJsonResponseSchema($document, 'forms/report', 'get', 200, $components, 'ReportFormResponse', 'Report field contract response.');
+        $this->replaceJsonResponseSchema($document, 'forms/github-issue-report', 'get', 200, $components, 'GitHubIssueReportFormResponse', 'GitHub issue-report field contract response.');
         $this->replaceJsonResponseSchema($document, 'forms/account-settings', 'get', 200, $components, 'AccountSettingsFormResponse', 'Account-settings field contract response.');
         $this->replaceJsonResponseSchema($document, 'forms/advanced-events', 'get', 200, $components, 'AdvancedEventFormResponse', 'Advanced-event field contract response.');
         $this->replaceJsonResponseSchema($document, 'forms/institution-workspace', 'get', 200, $components, 'InstitutionWorkspaceFormResponse', 'Institution-workspace field contract response.');
@@ -98,6 +100,7 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
             'Catalog' => 'Public lookup catalogs for geography, tags, languages, references, venues, and write-flow selectors.',
             'Search' => 'Public aggregate search endpoints across events, speakers, and institutions.',
             'AccountSettings' => 'Authenticated account-settings read and update endpoints for client applications.',
+            'GitHub Issue Reporting' => 'Authenticated feedback endpoints that create GitHub issues in the MajlisIlmu repository for maintainers to triage.',
             'InstitutionWorkspace' => 'Authenticated institution workspace endpoints for member management and institution-scoped event listings.',
             'MembershipClaim' => 'Authenticated membership-claim endpoints for listing, creating, and cancelling subject membership claims.',
             'EventGoing' => 'Authenticated event-going endpoints for listing, reading, creating, and deleting the current user\'s going state.',
@@ -271,6 +274,16 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
                 ->addProperty('data', $this->standardFormContractType($components, [
                     'defaults' => null,
                 ], includeDefaults: false))
+                ->addProperty('meta', $this->requestMetaType())
+                ->setRequired(['data', 'meta']),
+        );
+    }
+
+    private function gitHubIssueReportFormResponseSchema(Components $components): Schema
+    {
+        return Schema::fromType(
+            (new ObjectType)
+                ->addProperty('data', $this->standardFormContractType($components))
                 ->addProperty('meta', $this->requestMetaType())
                 ->setRequired(['data', 'meta']),
         );

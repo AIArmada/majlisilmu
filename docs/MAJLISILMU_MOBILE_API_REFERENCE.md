@@ -467,6 +467,7 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 | `GET` | `/forms/contributions/institutions` | Optional | Institution contribution contract |
 | `GET` | `/forms/contributions/speakers` | Optional | Speaker contribution contract |
 | `GET` | `/forms/report` | Required | Report form contract, including optional evidence upload metadata |
+| `GET` | `/forms/github-issue-report` | Required | GitHub issue-report contract for MCP/API bugs, docs mismatches, and proposals |
 | `GET` | `/forms/account-settings` | Required | Account-settings contract |
 | `GET` | `/forms/advanced-events` | Required | Advanced parent-program builder contract |
 | `GET` | `/forms/institution-workspace` | Required | Institution workspace contract |
@@ -522,6 +523,7 @@ Notes:
 | `POST` | `/membership-claims/{subjectType}/{subject}` | Submit a membership claim with evidence uploads |
 | `DELETE` | `/membership-claims/{claimId}` | Cancel the current user’s pending membership claim |
 | `POST` | `/reports` | Submit a report with optional evidence uploads |
+| `POST` | `/github-issues` | Create a GitHub issue in the MajlisIlmu repository for integration, MCP, or API feedback |
 | `POST` | `/advanced-events` | Create an advanced parent program submission |
 | `GET` | `/follows/{type}/{subject}` | Return follow state for the current user |
 | `POST` | `/follows/{type}/{subject}` | Follow a public institution, speaker, reference, or series |
@@ -537,6 +539,34 @@ Authorization note:
 - `can_direct_edit`, `direct_edit_media_fields`, institution workspace access, and approval abilities all come from live policy and role evaluation for the authenticated user, not from bearer-token abilities.
 - Institution workspace permissions currently follow the existing app model where scoped member roles are assigned per subject type, not per individual institution. The API matches that behavior exactly.
 - `GET /institution-workspace` auto-selects the first accessible institution when `institution_id` is omitted and always returns a non-null `selected_institution` block together with `events_pagination` and `members_pagination` metadata.
+- `POST /github-issues` uses the same authenticated user identity as the rest of the client API. Non-admin users create a plain issue. Application admins create the issue and auto-assign Copilot, with the Copilot model resolved from server config and fallbacks.
+
+### GitHub issue reporting workflow
+
+Use this workflow when the client needs to report:
+
+- a MajlisIlmu MCP bug or confusing tool behavior
+- an API contract mismatch
+- a documentation mismatch or missing example
+- a proposal, feature request, or parameter-change request
+
+Recommended flow:
+
+1. Fetch `GET /api/v1/forms/github-issue-report` first.
+2. Read the returned `fields`, `defaults`, and allowed `category` values.
+3. Submit `POST /api/v1/github-issues` with the current client/platform context.
+
+Payload guidance:
+
+- `category`, `title`, `summary`, and `platform` are the minimum required inputs.
+- `client_name`, `client_version`, `current_endpoint`, `tool_name`, `steps_to_reproduce`, `expected_behavior`, `actual_behavior`, `proposal`, and `additional_context` are optional but strongly recommended for useful triage.
+- The server adds authenticated reporter context automatically so maintainers can trace the issue back to the MajlisIlmu user account without exposing raw credentials.
+
+Assignment behavior:
+
+- Non-admin callers create a plain GitHub issue.
+- Admin callers create the issue and automatically assign Copilot.
+- Copilot model selection is config-driven on the server and may fall back across multiple configured values before using `Auto`.
 
 ### Public contribution rules you must follow
 

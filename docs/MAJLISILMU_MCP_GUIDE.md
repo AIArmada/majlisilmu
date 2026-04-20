@@ -205,6 +205,7 @@ Use this section as the quick MCP-only capability summary.
 | Record read | `admin-get-record` | `member-get-record` |
 | Related-record traversal | `admin-list-related-records` | No generic related-record tool |
 | Write schema discovery | `admin-get-write-schema` | `member-get-write-schema` |
+| GitHub issue reporting | `admin-create-github-issue` | `member-create-github-issue` |
 | Create | `admin-create-record` | Not exposed |
 | Update | `admin-update-record` | `member-update-record` |
 | Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` | No |
@@ -284,6 +285,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
 | `admin-get-write-schema` | Discover the create/update contract for a writable admin record | `GET /api/v1/admin/{resourceKey}/schema` |
+| `admin-create-github-issue` | Create a GitHub issue in the configured repository and auto-assign Copilot | `POST /api/v1/github-issues` (admin caller path) |
 | `admin-create-record` | Create or preview a writable admin record | `POST /api/v1/admin/{resourceKey}` |
 | `admin-update-record` | Update or preview a writable admin record | `PUT /api/v1/admin/{resourceKey}/{recordKey}` |
 
@@ -293,6 +295,7 @@ Admin tool behavior notes:
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - Media/file upload fields accept JSON base64 descriptors only when the matching write schema advertises them.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
+- `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain.
 - Read-only tools should be annotated as such so ChatGPT can safely choose them.
 - Write tools should be described as schema-guided and idempotent where the server logic supports that behavior.
 
@@ -309,6 +312,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-records` | List records for one member resource with optional search and pagination |
 | `member-get-record` | Read one member record by resource key and record key |
 | `member-get-write-schema` | Discover the writable update schema for one member record |
+| `member-create-github-issue` | Create a GitHub issue in the configured repository |
 | `member-update-record` | Update a writable member record using the schema-guided payload contract |
 
 Member tool behavior notes:
@@ -316,6 +320,7 @@ Member tool behavior notes:
 - Member tools are constrained to the Ahli workspace boundary and live membership relationships.
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
 - Member update tools do not support `validate_only`; there is no preview-only member write path today.
+- `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
 - Media/file upload fields accept JSON base64 descriptors only when the matching member write schema advertises them.
 - As with admin tools, ChatGPT only understands what the tool descriptor exposes; if a capability is not registered as a tool, the model will not assume it exists.
 

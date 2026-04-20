@@ -17,8 +17,10 @@ use App\Enums\PreNominal;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Models\User;
+use App\Services\GitHub\GitHubIssueReporter;
 use App\Services\ShareTrackingService;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
+use App\Support\GitHub\GitHubIssueReportContract;
 use App\Support\Location\GooglePlacesConfiguration;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Location\PublicCountryRegistry;
@@ -30,6 +32,7 @@ class FrontendFormContractService
         private readonly FrontendCatalogService $catalogService,
         private readonly ApiDocumentationUrlResolver $urlResolver,
         private readonly McpTokenManager $mcpTokenManager,
+        private readonly GitHubIssueReporter $gitHubIssueReporter,
         private readonly ShareTrackingService $shareTrackingService,
     ) {}
 
@@ -281,6 +284,14 @@ class FrontendFormContractService
                     'unfollow_endpoint_template' => route('api.client.follows.destroy', ['type' => 'type', 'subject' => 'subject'], false),
                     'auth_required' => true,
                 ],
+                ...($this->supportsGitHubIssueReporting() ? [
+                    'github_issue_report' => [
+                        'method' => 'POST',
+                        'endpoint' => route('api.client.github-issues.store'),
+                        'schema_endpoint' => route('api.client.forms.github-issue-report'),
+                        'auth_required' => true,
+                    ],
+                ] : []),
             ],
             'auth_context' => [
                 'authenticated' => $user instanceof User,
@@ -523,6 +534,27 @@ class FrontendFormContractService
             'conditional_rules' => [
                 ['field' => 'description', 'required_when' => ['category' => ['other']]],
             ],
+        ];
+    }
+
+    public function supportsGitHubIssueReporting(): bool
+    {
+        return $this->gitHubIssueReporter->isConfigured();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function githubIssueReport(): array
+    {
+        return [
+            'flow' => 'github_issue_report',
+            'method' => 'POST',
+            'endpoint' => route('api.client.github-issues.store'),
+            'auth_required' => true,
+            'defaults' => GitHubIssueReportContract::defaults(),
+            'fields' => GitHubIssueReportContract::fields(),
+            'conditional_rules' => [],
         ];
     }
 
