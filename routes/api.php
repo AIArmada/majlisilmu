@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\Frontend\InstitutionWorkspaceController;
 use App\Http\Controllers\Api\Frontend\ManifestController;
 use App\Http\Controllers\Api\Frontend\MembershipClaimController;
 use App\Http\Controllers\Api\Frontend\SearchController;
+use App\Http\Controllers\Api\Frontend\ShareAnalyticsController;
 use App\Http\Controllers\Api\NotificationDestinationController;
 use App\Http\Controllers\Api\NotificationMessageController;
 use App\Http\Controllers\Api\NotificationSettingsController;
@@ -85,6 +86,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/share/payload', [DawahShareController::class, 'payload'])
             ->middleware('throttle:share-tracking')
             ->name('share.payload');
+        Route::post('/share/track', [DawahShareController::class, 'track'])
+            ->middleware('throttle:30,1')
+            ->name('share.track');
         Route::get('/institutions', [SearchController::class, 'institutions'])->name('institutions.index');
         Route::get('/institutions/near', [SearchController::class, 'institutionsNear'])->name('institutions.near');
         Route::get('/institutions/{institutionKey}', [SearchController::class, 'showInstitution'])->name('institutions.show');
@@ -132,9 +136,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         ->name('api.auth.verification-notification');
 
     Route::name('api.client.')->group(function () {
-        Route::post('/share/track', [DawahShareController::class, 'track'])
-            ->middleware('throttle:30,1')
-            ->name('share.track');
+        Route::prefix('share')->name('share.')->group(function (): void {
+            Route::get('/analytics', [ShareAnalyticsController::class, 'index'])->name('analytics');
+            Route::get('/analytics/links/{link}', [ShareAnalyticsController::class, 'show'])->name('analytics.links.show');
+        });
 
         Route::prefix('forms')->name('forms.')->group(function () {
             Route::get('/report', [ManifestController::class, 'report'])->name('report');

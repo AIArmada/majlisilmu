@@ -15,7 +15,7 @@ use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
-#[Group('Share', 'Public share payload discovery and authenticated share tracking endpoints for web, mobile, and native clients.')]
+#[Group('Share', 'Public share payload discovery and guest-or-authenticated share tracking endpoints for web, mobile, and native clients.')]
 class DawahShareController extends Controller
 {
     #[Endpoint(

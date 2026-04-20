@@ -236,8 +236,14 @@ it('documents share payload and tracking endpoints for client integrations', fun
 
     expect($paths['/share/payload']['get']['tags'] ?? null)->toContain('Share')
         ->and($paths['/share/track']['post']['tags'] ?? null)->toContain('Share')
+        ->and($paths['/share/analytics']['get']['tags'] ?? null)->toContain('Share')
+        ->and($paths['/share/analytics/links/{link}']['get']['tags'] ?? null)->toContain('Share')
         ->and(collect(data_get($paths, '/share/payload.get.parameters', []))->pluck('name')->all())->toContain('url', 'text', 'title', 'origin')
-        ->and(data_get($paths, '/share/track.post.requestBody.content.application/json.schema'))->not->toBeNull();
+        ->and(collect(data_get($paths, '/share/analytics.get.parameters', []))->pluck('name')->all())->toContain('type', 'sort', 'status', 'outcome', 'page', 'per_page')
+        ->and(collect(data_get($paths, '/share/analytics/links/{link}.get.parameters', []))->pluck('name')->all())->toContain('link')
+        ->and(data_get($paths, '/share/track.post.requestBody.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/share/analytics.get.responses.200.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/share/analytics/links/{link}.get.responses.200.content.application/json.schema'))->not->toBeNull();
 });
 
 it('documents sparse event list fields for public event index clients', function () {

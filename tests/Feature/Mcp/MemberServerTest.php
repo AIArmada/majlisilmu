@@ -1,6 +1,8 @@
 <?php
 
 use App\Actions\Membership\AddMemberToSubject;
+use App\Mcp\Resources\Docs\CrudComparisonResource;
+use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\MemberServer;
 use App\Mcp\Tools\Member\MemberGetRecordTool;
 use App\Mcp\Tools\Member\MemberGetResourceMetaTool;
@@ -469,6 +471,74 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'member-get-write-schema',
         'member-update-record',
     );
+});
+
+it('lists and reads verified documentation resources through the member MCP server', function () {
+    [$member] = institutionMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->resource(McpGuideResource::class)
+        ->assertOk()
+        ->assertName('docs-mcp-guide')
+        ->assertTitle('MajlisIlmu MCP Guide')
+        ->assertSee([
+            '# MajlisIlmu MCP Guide',
+            'Verified documentation resources',
+            'Current member-write-capable resources include:',
+            '| `member-update-record` | Update a writable member record | `resource_key`, `record_key`, `payload` |',
+        ]);
+
+    MemberServer::actingAs($member)
+        ->resource(CrudComparisonResource::class)
+        ->assertOk()
+        ->assertName('docs-crud-capability-matrix')
+        ->assertTitle('MajlisIlmu API / MCP / Filament Capability Matrix')
+        ->assertSee([
+            '# API / MCP / Filament Capability Matrix',
+            'Runtime Ahli resource inventory (4 registered resources)',
+            'No `validate_only` preview path today.',
+        ]);
+
+    $token = $member->createToken('mcp-member-resource-list-test', [McpTokenManager::MEMBER_ABILITY])->plainTextToken;
+
+    $initialize = $this->withToken($token)->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'initialize-member-mcp-resources',
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => [
+                'name' => 'Pest',
+                'version' => '1.0.0',
+            ],
+        ],
+    ])->assertOk();
+
+    $sessionId = $initialize->headers->get('MCP-Session-Id');
+
+    expect($sessionId)->not->toBeNull();
+
+    $listResources = $this->withToken($token)->withHeaders([
+        'MCP-Session-Id' => (string) $sessionId,
+    ])->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'list-member-mcp-resources',
+        'method' => 'resources/list',
+        'params' => [],
+    ])->assertOk();
+
+    $resources = collect($listResources->json('result.resources'))->keyBy('name');
+
+    expect($resources->keys()->all())->toContain('docs-mcp-guide', 'docs-crud-capability-matrix');
+    expect($resources->get('docs-mcp-guide'))->toMatchArray([
+        'uri' => 'file://docs/MAJLISILMU_MCP_GUIDE.md',
+        'mimeType' => 'text/markdown',
+    ]);
+    expect($resources->get('docs-crud-capability-matrix'))->toMatchArray([
+        'uri' => 'file://docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md',
+        'mimeType' => 'text/markdown',
+    ]);
 });
 
 /**

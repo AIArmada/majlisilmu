@@ -151,6 +151,17 @@ ChatGPT does **not** read `_meta` as model context unless the tool response expl
 
 If you want ChatGPT to understand a capability, expose it as a dedicated tool with a clear schema and description. One tool should map to one user intent, the same way one API operation maps to one HTTP action.
 
+### Verified documentation resources
+
+Both admin and member servers also expose these read-only markdown resources through MCP `resources/list` and `resources/read`:
+
+| Resource | URI | Purpose |
+|---|---|---|
+| `docs-mcp-guide` | `file://docs/MAJLISILMU_MCP_GUIDE.md` | Verified guide for MCP auth, transport, and tool/resource behavior |
+| `docs-crud-capability-matrix` | `file://docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md` | Verified capability matrix for API, MCP, and Filament CRUD boundaries |
+
+Treat these two resources as model-readable documentation pages, not as replacements for the live tool/resource descriptors.
+
 ### Admin MCP tool catalog
 
 The admin server is the model-visible API-like surface for admin workflows. The tools below are the current contract that ChatGPT can call:
@@ -222,13 +233,16 @@ Schema fields describe the exact upload rules:
 
 The admin tool catalog above is the canonical list of model-visible operations. The admin server exposes those tools for resource discovery, record browsing, relation traversal, schema discovery, and supported create/update workflows.
 
-Current supported admin resources include:
+Current structurally write-capable admin resources include:
 
 - `speakers`
 - `events`
 - `institutions`
 - `references`
+- `venues`
 - `subdistricts`
+
+Read-only admin resources are still discoverable through the resource list and metadata tools; use the capability matrix for the full runtime inventory.
 
 Write-tool preview tip:
 
@@ -241,7 +255,7 @@ Write-tool preview tip:
 
 The member tool catalog above is the canonical list of model-visible operations. The member server exposes those tools for resource discovery, record browsing, schema discovery, and supported member-side update workflows.
 
-Current supported member resources include:
+Current member-write-capable resources include:
 
 - `institutions`
 - `speakers`
@@ -270,9 +284,10 @@ Useful environment variables:
 - `routes/ai.php` — MCP server registration and OAuth routes.
 - `app/Mcp/Servers/AdminServer.php` — admin MCP server definition.
 - `app/Mcp/Servers/MemberServer.php` — member MCP server definition.
+- `app/Mcp/Resources/Docs/*` — verified markdown MCP resources exposed by both servers.
 - `app/Support/Mcp/McpWriteSchemaFormatter.php` — sanitized MCP write-schema formatter.
 - `app/Support/Mcp/McpFilePayloadNormalizer.php` — JSON file descriptor staging and validation for MCP writes.
-- `routes/ai.php` — web and local MCP registration.
+- `tests/Unit/McpGuideDocsTest.php` — MCP guide regression coverage for verified resource and CRUD claims.
 - `app/Console/Commands/IssueMcpToken.php` — command for issuing scoped tokens.
 - `app/Support/Mcp/McpTokenManager.php` — token issuance, listing, and revocation logic.
 - `tests/Feature/Mcp/AdminServerTest.php` — admin MCP regression coverage.
@@ -312,7 +327,7 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `member-list-records` | Search and paginate records for one member resource | `resource_key`, `search?`, `page?`, `per_page?` |
 | `member-get-record` | Read one member record | `resource_key`, `record_key` |
 | `member-get-write-schema` | Fetch the writable update contract for one member record | `resource_key`, `record_key` |
-| `member-update-record` | Update a writable member record | `resource_key`, `record_key`, `payload`, `validate_only?` |
+| `member-update-record` | Update a writable member record | `resource_key`, `record_key`, `payload` |
 
 ### Reading rules for the appendix
 

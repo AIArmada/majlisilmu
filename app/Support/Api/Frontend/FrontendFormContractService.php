@@ -39,7 +39,7 @@ class FrontendFormContractService
     public function manifest(?User $user): array
     {
         return [
-            'version' => '2026-04-17',
+            'version' => '2026-04-20',
             'docs' => [
                 'ui' => $this->urlResolver->docsUrl(),
                 'openapi' => $this->urlResolver->docsJsonUrl(),
@@ -96,7 +96,7 @@ class FrontendFormContractService
             'rules' => [
                 'Treat error.code as the machine-readable failure type.',
                 'Use meta.request_id for request tracing and support handoff.',
-                'Use UTC timestamps and UTC date-filter boundaries.',
+                'Use UTC timestamps, but send date-only filters in the user local calendar together with timezone context.',
                 'Use the admin record route_key returned by admin collection or detail payloads for record-specific schema and mutation paths.',
                 'Fetch the exact form or schema contract before sending write payloads.',
             ],
@@ -145,11 +145,24 @@ class FrontendFormContractService
                     'track_endpoint' => route('api.client.share.track'),
                     'auth_required' => false,
                     'payload_bearer_auth_optional' => true,
-                    'authenticated_tracking_required' => true,
+                    'track_bearer_auth_optional' => true,
+                    'authenticated_tracking_required' => false,
                     'origins' => $this->shareTrackingService->supportedOrigins(),
                     'channels' => $this->shareTrackingService->supportedChannels(),
                     'copy_link_channel' => 'copy_link',
                     'native_share_channel' => 'native_share',
+                ],
+                'share_analytics' => [
+                    'method' => 'GET',
+                    'endpoint' => route('api.client.share.analytics'),
+                    'link_endpoint_template' => route('api.client.share.analytics.links.show', ['link' => 'link'], false),
+                    'auth_required' => true,
+                    'filters' => [
+                        'type' => ['all', 'event', 'institution', 'speaker', 'series', 'reference', 'search', 'page'],
+                        'sort' => ['recent', 'visits', 'signups', 'registrations', 'checkins', 'submissions'],
+                        'status' => ['all', 'active', 'inactive'],
+                        'outcome' => ['all', 'signup', 'event_registration', 'event_checkin', 'event_submission', 'event_save', 'event_going', 'institution_follow', 'speaker_follow', 'series_follow', 'reference_follow', 'saved_search_created'],
+                    ],
                 ],
                 'speakers_index' => [
                     'method' => 'GET',

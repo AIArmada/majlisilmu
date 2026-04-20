@@ -102,6 +102,7 @@ it('exposes corrected frontend contract metadata', function () {
     $followFlow = $manifest['flows']['follow'] ?? [];
     $inspirationFlow = $manifest['flows']['inspirations_random'] ?? [];
     $shareFlow = $manifest['flows']['share'] ?? [];
+    $shareAnalyticsFlow = $manifest['flows']['share_analytics'] ?? [];
     $institutionsNearFlow = $manifest['flows']['institutions_near'] ?? [];
     $quickstart = $manifest['ai_quickstart']['read_order'] ?? [];
 
@@ -113,11 +114,12 @@ it('exposes corrected frontend contract metadata', function () {
     $submitEventConditionalRules = collect($submitEvent['conditional_rules'] ?? []);
 
     expect($submitEvent['captcha_required_when_turnstile_enabled'])->toBeTrue()
-        ->and($manifest['version'] ?? null)->toBe('2026-04-17')
+        ->and($manifest['version'] ?? null)->toBe('2026-04-20')
         ->and($manifest['docs']['ui'] ?? null)->toBe('https://api.majlisilmu.test/docs')
         ->and($manifest['docs']['openapi'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($manifest['routing_surfaces']['public']['manifest_endpoint'] ?? null)->toContain('/api/v1/manifest')
         ->and($manifest['routing_surfaces']['admin']['manifest_endpoint'] ?? null)->toContain('/api/v1/admin/manifest')
+        ->and($manifest['rules'] ?? [])->toContain('Use UTC timestamps, but send date-only filters in the user local calendar together with timezone context.')
         ->and($manifest['rules'] ?? [])->toContain('Use the admin record route_key returned by admin collection or detail payloads for record-specific schema and mutation paths.')
         ->and($quickstart[0]['endpoint'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($submitEventFields)->toContain('parent_event_id', 'scoped_institution_id')
@@ -139,10 +141,17 @@ it('exposes corrected frontend contract metadata', function () {
         ->and($shareFlow['payload_endpoint'] ?? null)->toContain('/api/v1/share/payload')
         ->and($shareFlow['track_endpoint'] ?? null)->toContain('/api/v1/share/track')
         ->and($shareFlow['payload_bearer_auth_optional'] ?? null)->toBeTrue()
+        ->and($shareFlow['track_bearer_auth_optional'] ?? null)->toBeTrue()
+        ->and($shareFlow['authenticated_tracking_required'] ?? null)->toBeFalse()
         ->and($shareFlow['channels'] ?? [])->toContain('copy_link', 'native_share')
         ->and($shareFlow['origins'] ?? [])->toContain('web', 'iosapp', 'android', 'macapp')
         ->and($shareFlow['copy_link_channel'] ?? null)->toBe('copy_link')
         ->and($shareFlow['native_share_channel'] ?? null)->toBe('native_share')
+        ->and($shareAnalyticsFlow['endpoint'] ?? null)->toContain('/api/v1/share/analytics')
+        ->and($shareAnalyticsFlow['link_endpoint_template'] ?? null)->toContain('/api/v1/share/analytics/links/link')
+        ->and($shareAnalyticsFlow['auth_required'] ?? null)->toBeTrue()
+        ->and($shareAnalyticsFlow['filters']['type'] ?? [])->toContain('event', 'institution', 'speaker', 'series', 'reference', 'search', 'page')
+        ->and($shareAnalyticsFlow['filters']['sort'] ?? [])->toContain('recent', 'visits', 'signups', 'registrations', 'checkins', 'submissions')
         ->and($institutionsNearFlow['endpoint'] ?? null)->toContain('/api/v1/institutions/near')
         ->and($institutionsNearFlow['near_format'] ?? null)->toBe('lat,lng')
         ->and($institutionsNearFlow['radius_parameter'] ?? null)->toBe('radius_km');
