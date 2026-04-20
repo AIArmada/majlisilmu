@@ -18,6 +18,7 @@ use App\Models\Institution;
 use App\Models\PassportUser;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\GitHub\GitHubIssueReportContract;
 use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -469,6 +470,13 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'destructiveHint' => false,
         'openWorldHint' => true,
     ]);
+
+    $githubIssueCategorySchema = data_get($tools->get('member-create-github-issue'), 'inputSchema.properties.category');
+
+    expect($githubIssueCategorySchema['enum'] ?? null)->toBe(GitHubIssueReportContract::categories())
+        ->and($githubIssueCategorySchema['default'] ?? null)->toBe(GitHubIssueReportContract::DEFAULT_CATEGORY)
+        ->and((string) ($githubIssueCategorySchema['description'] ?? ''))
+        ->toContain('bug', 'docs_mismatch', 'proposal', 'feature_request', 'parameter_change', 'other');
 });
 
 it('returns forbidden for Passport-authenticated users without member access on the member MCP stream endpoint', function () {
@@ -850,6 +858,7 @@ function configureGithubIssueReportingForMemberMcp(array $overrides = []): void
         'custom_instructions' => 'Use repository tests and conventions when following up.',
         'admin_model' => 'GPT-5.4',
         'admin_model_fallbacks' => ['GPT-5.2-Codex', 'Auto'],
+        'admin_copilot_assignment_enabled' => true,
         'copilot_assignee' => 'copilot-swe-agent[bot]',
     ], $overrides));
 }

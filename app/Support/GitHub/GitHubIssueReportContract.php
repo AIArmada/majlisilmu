@@ -10,6 +10,17 @@ final class GitHubIssueReportContract
 {
     public const string DEFAULT_CATEGORY = 'bug';
 
+    public static function categoryDescription(): string
+    {
+        $choices = [];
+
+        foreach (self::categoryLabels() as $value => $label) {
+            $choices[] = sprintf('%s (%s)', $value, $label);
+        }
+
+        return 'Valid values: '.implode(', ', $choices).'.';
+    }
+
     /**
      * @return list<string>
      */

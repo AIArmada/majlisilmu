@@ -210,6 +210,8 @@ Use this section as the quick MCP-only capability summary.
 | Update | `admin-update-record` | `member-update-record` |
 | Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` | No |
 
+Admin GitHub issue reports can skip Copilot assignment entirely by setting `GITHUB_ISSUE_REPORTING_ADMIN_COPILOT_ASSIGNMENT_ENABLED=false` on the server.
+
 ### Writable resource matrix
 
 | Resource | Admin MCP | Member MCP | Notes |

@@ -105,6 +105,42 @@ it('assigns copilot for admin api reporters and falls back configured models', f
     Http::assertSent(fn ($request): bool => data_get($request->data(), 'assignees.0') === 'copilot-swe-agent[bot]');
 });
 
+it('creates a plain github issue for admin api reporters when copilot assignment is disabled', function () {
+    $admin = apiGithubIssueAdminUser();
+
+    Sanctum::actingAs($admin);
+
+    configureGitHubIssueReporting([
+        'admin_copilot_assignment_enabled' => false,
+    ]);
+
+    Http::fake([
+        'https://api.github.com/repos/AIArmada/majlisilmu/issues' => Http::response([
+            'number' => 457,
+            'title' => '[Bug] Fix MCP connector issue creation',
+            'url' => 'https://api.github.com/repos/AIArmada/majlisilmu/issues/457',
+            'html_url' => 'https://github.com/AIArmada/majlisilmu/issues/457',
+        ], 201),
+    ]);
+
+    $response = $this->postJson(route('api.client.github-issues.store'), githubIssuePayload())
+        ->assertCreated();
+
+    expect($response->json('data.issue.assigned_to_copilot'))->toBeFalse()
+        ->and($response->json('data.issue.copilot_model'))->toBeNull()
+        ->and($response->json('data.issue.attempted_models'))->toBe([]);
+
+    Http::assertSentCount(1);
+    Http::assertSent(function ($request): bool {
+        $payload = $request->data();
+
+        return $request->method() === 'POST'
+            && (string) $request->url() === 'https://api.github.com/repos/AIArmada/majlisilmu/issues'
+            && data_get($payload, 'assignees') === null
+            && data_get($payload, 'agent_assignment') === null;
+    });
+});
+
 function configureGitHubIssueReporting(array $overrides = []): void
 {
     config()->set('services.github.issues', array_replace([
@@ -119,6 +155,7 @@ function configureGitHubIssueReporting(array $overrides = []): void
         'custom_instructions' => 'Use repository tests and conventions when following up.',
         'admin_model' => 'GPT-5.4',
         'admin_model_fallbacks' => ['GPT-5.2-Codex', 'Auto'],
+        'admin_copilot_assignment_enabled' => true,
         'copilot_assignee' => 'copilot-swe-agent[bot]',
     ], $overrides));
 }
