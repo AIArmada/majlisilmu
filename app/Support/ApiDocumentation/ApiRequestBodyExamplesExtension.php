@@ -127,6 +127,19 @@ final class ApiRequestBodyExamplesExtension extends OperationExtension
             'description' => 'The start time on the poster does not match the event description.',
             'evidence' => ['poster-screenshot.jpg', 'venue-notice.pdf'],
         ],
+        'post github-issues' => [
+            'category' => 'docs_mismatch',
+            'title' => 'Clarify the MCP issue creation contract',
+            'summary' => 'The MCP guide and the runtime tool behavior describe slightly different required fields for issue submission.',
+            'platform' => 'chatgpt',
+            'client_name' => 'ChatGPT',
+            'client_version' => 'GPT-5.4',
+            'current_endpoint' => '/mcp/member',
+            'tool_name' => 'member-create-github-issue',
+            'expected_behavior' => 'The guide should match the live tool schema exactly.',
+            'actual_behavior' => 'The guide still references an older contract shape.',
+            'proposal' => 'Document the final shared API and MCP payload shape in one canonical section.',
+        ],
     ];
 
     public function handle(Operation $operation, RouteInfo $routeInfo): void

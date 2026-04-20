@@ -6,6 +6,7 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
+use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
 use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
 use App\Mcp\Tools\Admin\AdminDocumentationSearchTool;
@@ -44,6 +45,7 @@ class AdminServer extends Server
         AdminGetRecordTool::class,
         AdminGetWriteSchemaTool::class,
         AdminCreateRecordTool::class,
+        AdminCreateGitHubIssueTool::class,
         AdminUpdateRecordTool::class,
     ];
 }

@@ -109,6 +109,7 @@ The public/authenticated API is not a second generic CRUD registry. It is a set 
 ### Authenticated workflow families
 
 - account settings and MCP token self-service
+- GitHub issue reporting for API and MCP/API integration feedback
 - authenticated contribution create/suggest/review actions
 - membership claims
 - advanced event submission

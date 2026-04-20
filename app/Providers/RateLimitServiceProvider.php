@@ -39,6 +39,9 @@ class RateLimitServiceProvider extends ServiceProvider
         // Report submission: 3 per hour per user/IP
         RateLimiter::for('reports', fn (Request $request) => Limit::perHour(3)->by($request->user()?->id ?: $request->ip()));
 
+        // GitHub issue reporting: 3 per hour per user/IP
+        RateLimiter::for('github-issues', fn (Request $request) => Limit::perHour(3)->by($request->user()?->id ?: $request->ip()));
+
         // Saved searches: 20 per minute
         RateLimiter::for('saved-searches', fn (Request $request) => Limit::perMinute(20)->by($request->user()?->id ?: $request->ip()));
 

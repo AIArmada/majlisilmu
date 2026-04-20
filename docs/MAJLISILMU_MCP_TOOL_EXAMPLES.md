@@ -72,6 +72,24 @@ Fetch the write schema first and follow the field-specific `mcp_upload`, `accept
 }
 ```
 
+### Create a GitHub issue and auto-assign Copilot
+
+```json
+{
+  "tool": "admin-create-github-issue",
+  "arguments": {
+    "category": "docs_mismatch",
+    "title": "Clarify MCP GitHub issue reporting",
+    "summary": "The tool and API contracts should document the same required fields and response shape.",
+    "platform": "chatgpt",
+    "client_name": "ChatGPT",
+    "client_version": "GPT-5.4",
+    "tool_name": "admin-create-github-issue",
+    "proposal": "Keep one shared API + MCP issue-reporting contract in the docs."
+  }
+}
+```
+
 ## Member MCP
 
 ### Discover accessible resources
@@ -123,6 +141,25 @@ Fetch the write schema first and follow the field-specific `mcp_upload`, `accept
       }
     },
     "validate_only": false
+  }
+}
+```
+
+### Create a plain GitHub issue
+
+```json
+{
+  "tool": "member-create-github-issue",
+  "arguments": {
+    "category": "bug",
+    "title": "Member MCP issue reporting edge case",
+    "summary": "The member tool should create a plain issue without Copilot assignment.",
+    "platform": "chatgpt",
+    "client_name": "ChatGPT",
+    "client_version": "GPT-5.4",
+    "tool_name": "member-create-github-issue",
+    "expected_behavior": "The issue is created with user and platform context.",
+    "actual_behavior": "The feature is not available yet."
   }
 }
 ```

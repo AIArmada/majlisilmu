@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+$githubIssueModelFallbacks = array_values(array_filter(array_map(
+    static fn (string $value): string => trim($value),
+    explode(',', (string) env('GITHUB_ISSUE_REPORTING_ADMIN_MODEL_FALLBACKS', 'GPT-5.2-Codex,Auto')),
+), static fn (string $value): bool => $value !== ''));
+
 return [
 
     /*
@@ -52,6 +57,23 @@ return [
         'site_key' => env('TURNSTILE_SITE_KEY'),
         'secret_key' => env('TURNSTILE_SECRET_KEY'),
         'verify_url' => env('TURNSTILE_VERIFY_URL', 'https://challenges.cloudflare.com/turnstile/v0/siteverify'),
+    ],
+
+    'github' => [
+        'issues' => [
+            'enabled' => (bool) env('GITHUB_ISSUE_REPORTING_ENABLED', false),
+            'token' => env('GITHUB_ISSUE_REPORTING_TOKEN'),
+            'api_base' => env('GITHUB_ISSUE_REPORTING_API_BASE', 'https://api.github.com'),
+            'api_version' => env('GITHUB_ISSUE_REPORTING_API_VERSION', '2026-03-10'),
+            'repository_owner' => env('GITHUB_ISSUE_REPORTING_REPOSITORY_OWNER', 'AIArmada'),
+            'repository_name' => env('GITHUB_ISSUE_REPORTING_REPOSITORY_NAME', 'majlisilmu'),
+            'base_branch' => env('GITHUB_ISSUE_REPORTING_BASE_BRANCH', 'main'),
+            'custom_agent' => env('GITHUB_ISSUE_REPORTING_CUSTOM_AGENT'),
+            'custom_instructions' => env('GITHUB_ISSUE_REPORTING_CUSTOM_INSTRUCTIONS'),
+            'admin_model' => env('GITHUB_ISSUE_REPORTING_ADMIN_MODEL', 'GPT-5.4'),
+            'admin_model_fallbacks' => $githubIssueModelFallbacks,
+            'copilot_assignee' => env('GITHUB_ISSUE_REPORTING_COPILOT_ASSIGNEE', 'copilot-swe-agent[bot]'),
+        ],
     ],
 
 ];

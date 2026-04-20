@@ -11,6 +11,7 @@ use App\Enums\RegistrationMode;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\AdminServer;
+use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
 use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
 use App\Mcp\Tools\Admin\AdminDocumentationSearchTool;
@@ -32,6 +33,7 @@ use App\Models\User;
 use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Laravel\Passport\Passport;
 use Spatie\Permission\Models\Role;
@@ -798,6 +800,61 @@ it('accepts nullable optional MCP arguments that are advertised by the tool sche
             ->etc());
 });
 
+it('creates github issues through the admin MCP tool with Copilot model fallback', function () {
+    configureGithubIssueReportingForMcp();
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://api.github.com/repos/AIArmada/majlisilmu/issues' => Http::sequence()
+            ->push(['message' => 'Validation Failed', 'errors' => [['field' => 'agent_assignment.model', 'message' => 'Unsupported model']]], 422)
+            ->push([
+                'number' => 321,
+                'title' => '[Bug] Admin MCP GitHub issue',
+                'url' => 'https://api.github.com/repos/AIArmada/majlisilmu/issues/321',
+                'html_url' => 'https://github.com/AIArmada/majlisilmu/issues/321',
+            ], 201),
+    ]);
+
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateGitHubIssueTool::class, [
+            'category' => 'bug',
+            'title' => 'Admin MCP GitHub issue',
+            'summary' => 'The admin MCP GitHub issue tool should fall back to the next configured model when the first one is rejected.',
+            'platform' => 'chatgpt',
+            'client_name' => 'ChatGPT',
+            'client_version' => 'GPT-5.4',
+            'tool_name' => 'admin-create-github-issue',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.issue.assigned_to_copilot', true)
+            ->where('data.issue.copilot_model', 'GPT-5.2-Codex')
+            ->where('data.issue.attempted_models', ['GPT-5.4', 'GPT-5.2-Codex'])
+            ->etc());
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn ($request): bool => data_get($request->data(), 'agent_assignment.model') === 'GPT-5.4');
+    Http::assertSent(fn ($request): bool => data_get($request->data(), 'agent_assignment.model') === 'GPT-5.2-Codex');
+    Http::assertSent(fn ($request): bool => data_get($request->data(), 'assignees.0') === 'copilot-swe-agent[bot]');
+});
+
+it('hides the admin github issue tool when github issue reporting is disabled', function () {
+    configureGithubIssueReportingForMcp(['enabled' => false]);
+
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateGitHubIssueTool::class, [
+            'category' => 'bug',
+            'title' => 'Hidden tool',
+            'summary' => 'This should not be callable when disabled.',
+            'platform' => 'chatgpt',
+        ])
+        ->assertHasErrors(['Tool [admin-create-github-issue] not found.']);
+});
+
 it('denies non-admin users from MCP tools', function () {
     $user = User::factory()->create();
 
@@ -906,6 +963,8 @@ it('serves the admin MCP stream for Passport-authenticated admin users', functio
 });
 
 it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-authenticated admins', function () {
+    configureGithubIssueReportingForMcp();
+
     $admin = adminMcpUser('super_admin');
 
     Passport::actingAs(adminPassportUser($admin), ['mcp:use']);
@@ -952,6 +1011,7 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-get-record',
         'admin-get-write-schema',
         'admin-create-record',
+        'admin-create-github-issue',
         'admin-update-record',
     );
 
@@ -983,6 +1043,13 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'destructiveHint' => false,
         'openWorldHint' => false,
     ]);
+
+    expect($tools->get('admin-create-github-issue')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => false,
+        'idempotentHint' => false,
+        'destructiveHint' => false,
+        'openWorldHint' => true,
+    ]);
 });
 
 it('rejects Passport-authenticated users without admin access on the admin MCP stream endpoint', function () {
@@ -1010,6 +1077,8 @@ it('rejects member-scoped tokens on the admin MCP stream endpoint even for dual-
 });
 
 it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
+    configureGithubIssueReportingForMcp();
+
     $admin = adminMcpUser('super_admin');
     $token = $admin->createToken('mcp-http-test')->plainTextToken;
 
@@ -1051,6 +1120,7 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-get-record',
         'admin-get-write-schema',
         'admin-create-record',
+        'admin-create-github-issue',
         'admin-update-record',
     );
 });
@@ -1284,6 +1354,27 @@ function adminMcpImageDescriptor(string $name): array
         'mime_type' => 'image/png',
         'content_base64' => base64_encode($contents),
     ];
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ */
+function configureGithubIssueReportingForMcp(array $overrides = []): void
+{
+    config()->set('services.github.issues', array_replace([
+        'enabled' => true,
+        'token' => 'github-token',
+        'api_base' => 'https://api.github.com',
+        'api_version' => '2026-03-10',
+        'repository_owner' => 'AIArmada',
+        'repository_name' => 'majlisilmu',
+        'base_branch' => 'main',
+        'custom_agent' => null,
+        'custom_instructions' => 'Use repository tests and conventions when following up.',
+        'admin_model' => 'GPT-5.4',
+        'admin_model_fallbacks' => ['GPT-5.2-Codex', 'Auto'],
+        'copilot_assignee' => 'copilot-swe-agent[bot]',
+    ], $overrides));
 }
 
 /**

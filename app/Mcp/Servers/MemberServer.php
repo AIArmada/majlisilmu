@@ -6,6 +6,7 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
+use App\Mcp\Tools\Member\MemberCreateGitHubIssueTool;
 use App\Mcp\Tools\Member\MemberDocumentationFetchTool;
 use App\Mcp\Tools\Member\MemberDocumentationSearchTool;
 use App\Mcp\Tools\Member\MemberGetRecordTool;
@@ -40,6 +41,7 @@ class MemberServer extends Server
         MemberListRecordsTool::class,
         MemberGetRecordTool::class,
         MemberGetWriteSchemaTool::class,
+        MemberCreateGitHubIssueTool::class,
         MemberUpdateRecordTool::class,
     ];
 }
