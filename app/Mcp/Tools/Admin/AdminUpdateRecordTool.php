@@ -31,7 +31,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
 
     public function handle(Request $request): ResponseFactory|Response
     {
-        return $this->structuredResponse(function () use ($request): array {
+        return $this->safeResponse(function () use ($request): ResponseFactory|Response {
             $actor = $this->authorizeAdmin($request);
 
             $validated = $this->validateArguments($request, [
@@ -39,12 +39,15 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
                 'record_key' => ['required', 'string'],
                 'payload' => ['required', 'array'],
                 'validate_only' => ['sometimes', 'boolean'],
+                'apply_defaults' => ['sometimes', 'boolean'],
             ]);
 
             /** @var array<string, mixed> $payload */
             $payload = $validated['payload'];
             $resourceKey = (string) $validated['resource_key'];
             $recordKey = (string) $validated['record_key'];
+            $validateOnly = (bool) ($validated['validate_only'] ?? false);
+            $applyDefaults = (bool) ($validated['apply_defaults'] ?? false);
 
             $this->ensureDestructiveMediaClearFlagsAreUnsupported($payload);
             $schemaResponse = $this->resourceService->writeSchema(
@@ -56,14 +59,28 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
             $normalizedMediaPayload = $this->normalizeMcpMediaPayload($payload, $schemaResponse);
 
             try {
+                if ($validateOnly && $applyDefaults) {
+                    $normalizedMediaPayload['payload'] = $this->payloadWithSchemaDefaults($normalizedMediaPayload['payload'], $schemaResponse);
+                }
+
                 $payload = $this->normalizePayloadForWriteTool($resourceKey, $normalizedMediaPayload['payload']);
 
-                return $this->resourceService->updateRecord(
+                return Response::structured($this->resourceService->updateRecord(
                     resourceKey: $resourceKey,
                     recordKey: $recordKey,
                     payload: $payload,
                     actor: $actor,
-                    validateOnly: (bool) ($validated['validate_only'] ?? false),
+                    validateOnly: $validateOnly,
+                ));
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                return $this->writeValidationErrorResponse(
+                    exception: $exception,
+                    payload: $normalizedMediaPayload['payload'],
+                    schemaResponse: $schemaResponse,
+                    resourceKey: $resourceKey,
+                    operation: 'update',
+                    validateOnly: $validateOnly,
+                    applyDefaults: $applyDefaults,
                 );
             } finally {
                 $this->cleanupMcpMediaPayload($normalizedMediaPayload);
@@ -82,6 +99,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
             'record_key' => $schema->string()->required()->min(1),
             'payload' => $schema->object()->required(),
             'validate_only' => $schema->boolean()->default(false),
+            'apply_defaults' => $schema->boolean()->default(false),
         ];
     }
 }
