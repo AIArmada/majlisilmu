@@ -309,9 +309,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
 
     /**
      * @param  array<string, mixed>|null  $fieldDefinition
-     *
-     * @return list<string|int> Only scalar enum/catalog values are surfaced because MCP write schema option
-     *                          lists are currently exposed as string or integer identifiers.
+     * @return list<string|int>
      */
     private function allowedValuesForField(?array $fieldDefinition): array
     {
@@ -321,6 +319,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             return [];
         }
 
+        // MCP write schema option lists are currently exposed as string or integer identifiers.
         return array_values(array_filter(
             $allowedValues,
             static fn (mixed $value): bool => is_string($value) || is_int($value),
