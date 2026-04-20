@@ -8,10 +8,12 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
-use App\Mcp\Resources\Docs\CrudComparisonResource;
+use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\AdminServer;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
+use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
+use App\Mcp\Tools\Admin\AdminDocumentationSearchTool;
 use App\Mcp\Tools\Admin\AdminGetRecordTool;
 use App\Mcp\Tools\Admin\AdminGetResourceMetaTool;
 use App\Mcp\Tools\Admin\AdminGetWriteSchemaTool;
@@ -938,6 +940,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
     $tools = collect($listTools->json('result.tools'))->keyBy('name');
 
     expect($tools->keys()->all())->toContain(
+        'search',
+        'fetch',
         'admin-list-resources',
         'admin-get-resource-meta',
         'admin-list-records',
@@ -946,6 +950,16 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-create-record',
         'admin-update-record',
     );
+
+    expect($tools->get('search')['securitySchemes'] ?? [])->toContainEqual([
+        'type' => 'oauth2',
+        'scopes' => ['mcp:use'],
+    ]);
+
+    expect($tools->get('fetch')['securitySchemes'] ?? [])->toContainEqual([
+        'type' => 'oauth2',
+        'scopes' => ['mcp:use'],
+    ]);
 
     expect($tools->get('admin-list-resources')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
@@ -1025,6 +1039,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
     $toolNames = collect($listTools->json('result.tools'))->pluck('name')->all();
 
     expect($toolNames)->toContain(
+        'search',
+        'fetch',
         'admin-list-resources',
         'admin-get-resource-meta',
         'admin-list-records',
@@ -1033,6 +1049,117 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-create-record',
         'admin-update-record',
     );
+});
+
+it('searches and fetches verified documentation through admin MCP tools', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminDocumentationSearchTool::class, [
+            'query' => 'capability matrix venues',
+        ])
+        ->assertOk()
+        ->assertName('search')
+        ->assertTitle('Search Verified Documentation')
+        ->assertSee([
+            'docs-mcp-guide',
+            'MajlisIlmu MCP Guide',
+        ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminDocumentationFetchTool::class, [
+            'id' => 'docs-mcp-guide',
+        ])
+        ->assertOk()
+        ->assertName('fetch')
+        ->assertTitle('Fetch Verified Documentation Page')
+        ->assertSee([
+            'docs-mcp-guide',
+            '# MajlisIlmu MCP Guide',
+            '### MCP capability matrix',
+            'Tool-centric clients like ChatGPT and the OpenAI Responses MCP integration import tools from `tools/list`',
+        ]);
+});
+
+it('lists and reads the documentation routing prompt through the admin MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->prompt(DocumentationToolRoutingPrompt::class, [
+            'topic' => 'crud',
+        ])
+        ->assertOk()
+        ->assertName('documentation-tool-routing')
+        ->assertTitle('Documentation Tool Routing')
+        ->assertSee([
+            'Use the verified documentation tools like this:',
+            'Use `fetch` first',
+            'Topic-specific guidance for "crud":',
+            'Fetch `docs-mcp-guide` and focus on the MCP capability matrix, writable resource matrix, and preview sections.',
+        ]);
+
+    $token = $admin->createToken('mcp-admin-prompt-list-test')->plainTextToken;
+
+    $initialize = $this->withToken($token)->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'initialize-admin-mcp-prompts',
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => [
+                'name' => 'Pest',
+                'version' => '1.0.0',
+            ],
+        ],
+    ])->assertOk();
+
+    $sessionId = $initialize->headers->get('MCP-Session-Id');
+
+    expect($sessionId)->not->toBeNull();
+
+    $listPrompts = $this->withToken($token)->withHeaders([
+        'MCP-Session-Id' => (string) $sessionId,
+    ])->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'list-admin-mcp-prompts',
+        'method' => 'prompts/list',
+        'params' => [],
+    ])->assertOk();
+
+    $prompts = collect($listPrompts->json('result.prompts'))->keyBy('name');
+
+    expect($prompts->keys()->all())->toContain('documentation-tool-routing');
+    expect($prompts->get('documentation-tool-routing'))->toMatchArray([
+        'title' => 'Documentation Tool Routing',
+        'description' => 'Short guidance for deciding when to use the verified documentation search and fetch tools exposed by this server, with an optional topic hint for more targeted advice.',
+        'arguments' => [
+            [
+                'name' => 'topic',
+                'description' => 'Optional focus area such as crud, auth, media uploads, runtime records, search, or fetch.',
+                'required' => false,
+            ],
+        ],
+    ]);
+
+    $getPrompt = $this->withToken($token)->withHeaders([
+        'MCP-Session-Id' => (string) $sessionId,
+    ])->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'get-admin-mcp-prompt',
+        'method' => 'prompts/get',
+        'params' => [
+            'name' => 'documentation-tool-routing',
+            'arguments' => [
+                'topic' => 'crud',
+            ],
+        ],
+    ])->assertOk();
+
+    expect($getPrompt->json('result.description'))->toBe('Short guidance for deciding when to use the verified documentation search and fetch tools exposed by this server, with an optional topic hint for more targeted advice.');
+    expect($getPrompt->json('result.messages.0.content.text'))->toContain('Use `fetch` first');
+    expect($getPrompt->json('result.messages.0.content.text'))->toContain('Topic-specific guidance for "crud":');
+    expect($getPrompt->json('result.messages.0.content.text'))->toContain('Fetch `docs-mcp-guide` and focus on the MCP capability matrix, writable resource matrix, and preview sections.');
 });
 
 it('lists and reads verified documentation resources through the admin MCP server', function () {
@@ -1046,19 +1173,9 @@ it('lists and reads verified documentation resources through the admin MCP serve
         ->assertSee([
             '# MajlisIlmu MCP Guide',
             'Verified documentation resources',
+            '### MCP capability matrix',
             'Current structurally write-capable admin resources include:',
             '- `venues`',
-        ]);
-
-    AdminServer::actingAs($admin)
-        ->resource(CrudComparisonResource::class)
-        ->assertOk()
-        ->assertName('docs-crud-capability-matrix')
-        ->assertTitle('MajlisIlmu API / MCP / Filament Capability Matrix')
-        ->assertSee([
-            '# API / MCP / Filament Capability Matrix',
-            'Structural write-capable intersection',
-            '| `venues` | `R + meta + related + S + C + U + P` |',
         ]);
 
     $token = $admin->createToken('mcp-admin-resource-list-test')->plainTextToken;
@@ -1092,13 +1209,10 @@ it('lists and reads verified documentation resources through the admin MCP serve
 
     $resources = collect($listResources->json('result.resources'))->keyBy('name');
 
-    expect($resources->keys()->all())->toContain('docs-mcp-guide', 'docs-crud-capability-matrix');
+    expect($resources->keys()->all())->toContain('docs-mcp-guide');
+    expect($resources->keys()->all())->not->toContain('docs-crud-capability-matrix');
     expect($resources->get('docs-mcp-guide'))->toMatchArray([
         'uri' => 'file://docs/MAJLISILMU_MCP_GUIDE.md',
-        'mimeType' => 'text/markdown',
-    ]);
-    expect($resources->get('docs-crud-capability-matrix'))->toMatchArray([
-        'uri' => 'file://docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md',
         'mimeType' => 'text/markdown',
     ]);
 });

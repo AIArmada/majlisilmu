@@ -18,6 +18,24 @@ use Throwable;
 abstract class AbstractAdminTool extends Tool
 {
     /**
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    public function toArray(): array
+    {
+        $tool = parent::toArray();
+        $securitySchemes = $this->securitySchemes();
+
+        $tool['securitySchemes'] = $securitySchemes;
+        $tool['_meta'] = array_merge(
+            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
+            ['securitySchemes' => $securitySchemes],
+        );
+
+        return $tool;
+    }
+
+    /**
      * @param  array<string, mixed>  $rules
      * @return array<string, mixed>
      */
@@ -44,8 +62,16 @@ abstract class AbstractAdminTool extends Tool
      */
     protected function structuredResponse(callable $callback): ResponseFactory|Response
     {
+        return $this->safeResponse(fn (): ResponseFactory => Response::structured($callback()));
+    }
+
+    /**
+     * @param  callable(): (ResponseFactory|Response)  $callback
+     */
+    protected function safeResponse(callable $callback): ResponseFactory|Response
+    {
         try {
-            return Response::structured($callback());
+            return $callback();
         } catch (ValidationException $exception) {
             return $this->errorResponse(
                 ValidationMessages::from($exception),
@@ -123,5 +149,18 @@ abstract class AbstractAdminTool extends Tool
 
         return Response::make(Response::error($message))
             ->withStructuredContent($structured);
+    }
+
+    /**
+     * @return list<array{type: string, scopes: list<string>}>
+     */
+    protected function securitySchemes(): array
+    {
+        return [
+            [
+                'type' => 'oauth2',
+                'scopes' => ['mcp:use'],
+            ],
+        ];
     }
 }

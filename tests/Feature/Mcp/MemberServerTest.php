@@ -1,9 +1,11 @@
 <?php
 
 use App\Actions\Membership\AddMemberToSubject;
-use App\Mcp\Resources\Docs\CrudComparisonResource;
+use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\MemberServer;
+use App\Mcp\Tools\Member\MemberDocumentationFetchTool;
+use App\Mcp\Tools\Member\MemberDocumentationSearchTool;
 use App\Mcp\Tools\Member\MemberGetRecordTool;
 use App\Mcp\Tools\Member\MemberGetResourceMetaTool;
 use App\Mcp\Tools\Member\MemberGetWriteSchemaTool;
@@ -357,6 +359,8 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
     $tools = collect($listTools->json('result.tools'))->keyBy('name');
 
     expect($tools->keys()->all())->toContain(
+        'search',
+        'fetch',
         'member-list-resources',
         'member-get-resource-meta',
         'member-list-records',
@@ -364,6 +368,16 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'member-get-write-schema',
         'member-update-record',
     );
+
+    expect($tools->get('search')['securitySchemes'] ?? [])->toContainEqual([
+        'type' => 'oauth2',
+        'scopes' => ['mcp:use'],
+    ]);
+
+    expect($tools->get('fetch')['securitySchemes'] ?? [])->toContainEqual([
+        'type' => 'oauth2',
+        'scopes' => ['mcp:use'],
+    ]);
 
     expect($tools->get('member-list-resources')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
@@ -464,6 +478,8 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
     $toolNames = collect($listTools->json('result.tools'))->pluck('name')->all();
 
     expect($toolNames)->toContain(
+        'search',
+        'fetch',
         'member-list-resources',
         'member-get-resource-meta',
         'member-list-records',
@@ -471,6 +487,116 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'member-get-write-schema',
         'member-update-record',
     );
+});
+
+it('searches and fetches verified documentation through member MCP tools', function () {
+    [$member] = institutionMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberDocumentationSearchTool::class, [
+            'query' => 'member write capable resources',
+        ])
+        ->assertOk()
+        ->assertName('search')
+        ->assertTitle('Search Verified Documentation')
+        ->assertSee([
+            'docs-mcp-guide',
+            'MajlisIlmu MCP Guide',
+        ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberDocumentationFetchTool::class, [
+            'id' => 'docs-mcp-guide',
+        ])
+        ->assertOk()
+        ->assertName('fetch')
+        ->assertTitle('Fetch Verified Documentation Page')
+        ->assertSee([
+            'docs-mcp-guide',
+            '# MajlisIlmu MCP Guide',
+            'Current member-write-capable resources include:',
+        ]);
+});
+
+it('lists and reads the documentation routing prompt through the member MCP server', function () {
+    [$member] = institutionMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->prompt(DocumentationToolRoutingPrompt::class, [
+            'topic' => 'media uploads',
+        ])
+        ->assertOk()
+        ->assertName('documentation-tool-routing')
+        ->assertTitle('Documentation Tool Routing')
+        ->assertSee([
+            'Use the verified documentation tools like this:',
+            'Use `fetch` first',
+            'Topic-specific guidance for "media uploads":',
+            'Fetch `docs-mcp-guide` and focus on the MCP media/file upload contract and preview rules sections.',
+        ]);
+
+    $token = $member->createToken('mcp-member-prompt-list-test', [McpTokenManager::MEMBER_ABILITY])->plainTextToken;
+
+    $initialize = $this->withToken($token)->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'initialize-member-mcp-prompts',
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => [
+                'name' => 'Pest',
+                'version' => '1.0.0',
+            ],
+        ],
+    ])->assertOk();
+
+    $sessionId = $initialize->headers->get('MCP-Session-Id');
+
+    expect($sessionId)->not->toBeNull();
+
+    $listPrompts = $this->withToken($token)->withHeaders([
+        'MCP-Session-Id' => (string) $sessionId,
+    ])->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'list-member-mcp-prompts',
+        'method' => 'prompts/list',
+        'params' => [],
+    ])->assertOk();
+
+    $prompts = collect($listPrompts->json('result.prompts'))->keyBy('name');
+
+    expect($prompts->keys()->all())->toContain('documentation-tool-routing');
+    expect($prompts->get('documentation-tool-routing'))->toMatchArray([
+        'title' => 'Documentation Tool Routing',
+        'description' => 'Short guidance for deciding when to use the verified documentation search and fetch tools exposed by this server, with an optional topic hint for more targeted advice.',
+        'arguments' => [
+            [
+                'name' => 'topic',
+                'description' => 'Optional focus area such as crud, auth, media uploads, runtime records, search, or fetch.',
+                'required' => false,
+            ],
+        ],
+    ]);
+
+    $getPrompt = $this->withToken($token)->withHeaders([
+        'MCP-Session-Id' => (string) $sessionId,
+    ])->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'get-member-mcp-prompt',
+        'method' => 'prompts/get',
+        'params' => [
+            'name' => 'documentation-tool-routing',
+            'arguments' => [
+                'topic' => 'media uploads',
+            ],
+        ],
+    ])->assertOk();
+
+    expect($getPrompt->json('result.description'))->toBe('Short guidance for deciding when to use the verified documentation search and fetch tools exposed by this server, with an optional topic hint for more targeted advice.');
+    expect($getPrompt->json('result.messages.0.content.text'))->toContain('Use `fetch` first');
+    expect($getPrompt->json('result.messages.0.content.text'))->toContain('Topic-specific guidance for "media uploads":');
+    expect($getPrompt->json('result.messages.0.content.text'))->toContain('Fetch `docs-mcp-guide` and focus on the MCP media/file upload contract and preview rules sections.');
 });
 
 it('lists and reads verified documentation resources through the member MCP server', function () {
@@ -484,19 +610,9 @@ it('lists and reads verified documentation resources through the member MCP serv
         ->assertSee([
             '# MajlisIlmu MCP Guide',
             'Verified documentation resources',
+            '### MCP capability matrix',
             'Current member-write-capable resources include:',
             '| `member-update-record` | Update a writable member record | `resource_key`, `record_key`, `payload` |',
-        ]);
-
-    MemberServer::actingAs($member)
-        ->resource(CrudComparisonResource::class)
-        ->assertOk()
-        ->assertName('docs-crud-capability-matrix')
-        ->assertTitle('MajlisIlmu API / MCP / Filament Capability Matrix')
-        ->assertSee([
-            '# API / MCP / Filament Capability Matrix',
-            'Runtime Ahli resource inventory (4 registered resources)',
-            'No `validate_only` preview path today.',
         ]);
 
     $token = $member->createToken('mcp-member-resource-list-test', [McpTokenManager::MEMBER_ABILITY])->plainTextToken;
@@ -530,13 +646,10 @@ it('lists and reads verified documentation resources through the member MCP serv
 
     $resources = collect($listResources->json('result.resources'))->keyBy('name');
 
-    expect($resources->keys()->all())->toContain('docs-mcp-guide', 'docs-crud-capability-matrix');
+    expect($resources->keys()->all())->toContain('docs-mcp-guide');
+    expect($resources->keys()->all())->not->toContain('docs-crud-capability-matrix');
     expect($resources->get('docs-mcp-guide'))->toMatchArray([
         'uri' => 'file://docs/MAJLISILMU_MCP_GUIDE.md',
-        'mimeType' => 'text/markdown',
-    ]);
-    expect($resources->get('docs-crud-capability-matrix'))->toMatchArray([
-        'uri' => 'file://docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md',
         'mimeType' => 'text/markdown',
     ]);
 });

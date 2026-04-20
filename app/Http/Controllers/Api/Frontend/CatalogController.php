@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Frontend;
 use App\Enums\MemberSubjectType;
 use App\Enums\TagType;
 use App\Support\Api\Frontend\FrontendCatalogService;
+use App\Support\Location\PreferredCountryResolver;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -30,23 +31,34 @@ class CatalogController extends FrontendController
 
     #[Endpoint(
         title: 'List public states catalog',
-        description: 'Returns the public states catalog for a selected `country_id`.',
+        description: 'Returns the public states catalog for a selected `country_id`, or the current public-country scope when `country_id` is omitted.',
     )]
     public function states(Request $request): JsonResponse
     {
+        $countryId = $request->filled('country_id')
+            ? $request->integer('country_id')
+            : app(PreferredCountryResolver::class)->resolveId($request);
+
         return response()->json([
-            'data' => $this->catalogs->states($request->integer('country_id')),
+            'data' => $this->catalogs->states($countryId),
         ]);
     }
 
     #[Endpoint(
         title: 'List public districts catalog',
-        description: 'Returns the public districts catalog for a selected `state_id`.',
+        description: 'Returns the public districts catalog for a selected `state_id`, or the current public-country scope when `state_id` is omitted.',
     )]
     public function districts(Request $request): JsonResponse
     {
+        $stateId = $request->filled('state_id') ? $request->integer('state_id') : null;
+        $countryId = $stateId === null
+            ? ($request->filled('country_id')
+                ? $request->integer('country_id')
+                : app(PreferredCountryResolver::class)->resolveId($request))
+            : null;
+
         return response()->json([
-            'data' => $this->catalogs->districts($request->integer('state_id')),
+            'data' => $this->catalogs->districts($stateId, $countryId),
         ]);
     }
 

@@ -153,14 +153,90 @@ If you want ChatGPT to understand a capability, expose it as a dedicated tool wi
 
 ### Verified documentation resources
 
-Both admin and member servers also expose these read-only markdown resources through MCP `resources/list` and `resources/read`:
+Both admin and member servers expose this read-only markdown resource through MCP `resources/list` and `resources/read`:
 
 | Resource | URI | Purpose |
 |---|---|---|
-| `docs-mcp-guide` | `file://docs/MAJLISILMU_MCP_GUIDE.md` | Verified guide for MCP auth, transport, and tool/resource behavior |
-| `docs-crud-capability-matrix` | `file://docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md` | Verified capability matrix for API, MCP, and Filament CRUD boundaries |
+| `docs-mcp-guide` | `file://docs/MAJLISILMU_MCP_GUIDE.md` | Verified guide for MCP auth, transport, discovery primitives, capability matrix, media rules, and current admin/member write behavior |
 
-Treat these two resources as model-readable documentation pages, not as replacements for the live tool/resource descriptors.
+Treat this resource as the model-readable documentation page for MajlisIlmu MCP, not as a replacement for the live tool/resource descriptors.
+
+The broader internal cross-surface parity docs (`MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.*`) are intentionally not exposed through MCP.
+
+Tool-centric clients like ChatGPT and the OpenAI Responses MCP integration import tools from `tools/list`, not raw resources from `resources/list`. To make these docs reliably discoverable in those clients, both servers also expose read-only `search` and `fetch` documentation tools.
+
+### Documentation search and fetch tools
+
+Both servers expose two MCP-standard read-only documentation tools for model discoverability:
+
+| Tool | Purpose | Notes |
+|---|---|---|
+| `search` | Search the verified documentation page exposed by this server | Input: one `query` string. Returns JSON text with `{results:[{id,title,url}]}`. |
+| `fetch` | Fetch the verified documentation page by id | Input: one `id` string returned by `search`. Returns JSON text with `{id,title,text,url,metadata}`. |
+
+These tools search and fetch only the verified MCP guide exposed above. They do **not** search admin/member resource records.
+
+### Documentation routing prompt
+
+Both servers also expose one small MCP prompt for clients that support prompt discovery:
+
+| Prompt | Purpose | Arguments |
+|---|---|---|
+| `documentation-tool-routing` | Short guidance for deciding when to use `search` vs `fetch` for the verified docs pages | `topic?` |
+
+The prompt tells the model to:
+
+- fetch `docs-mcp-guide` directly when the question is clearly about MajlisIlmu MCP docs
+- use `search` when the topic is fuzzy or a discovery step is still helpful
+- keep runtime data access on the admin/member record tools instead of the docs tools
+- optionally accept a `topic` hint such as `crud`, `auth`, `media uploads`, `runtime records`, `search`, or `fetch` for more targeted guidance
+
+### MCP capability matrix
+
+Use this section as the quick MCP-only capability summary.
+
+| Capability | Admin MCP | Member MCP |
+| --- | --- | --- |
+| Docs search | `search` | `search` |
+| Docs fetch | `fetch` | `fetch` |
+| Resource discovery | `admin-list-resources` | `member-list-resources` |
+| Resource metadata | `admin-get-resource-meta` | `member-get-resource-meta` |
+| Record list | `admin-list-records` | `member-list-records` |
+| Record read | `admin-get-record` | `member-get-record` |
+| Related-record traversal | `admin-list-related-records` | No generic related-record tool |
+| Write schema discovery | `admin-get-write-schema` | `member-get-write-schema` |
+| Create | `admin-create-record` | Not exposed |
+| Update | `admin-update-record` | `member-update-record` |
+| Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` | No |
+
+### Writable resource matrix
+
+| Resource | Admin MCP | Member MCP | Notes |
+| --- | --- | --- | --- |
+| `events` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update | Member scope only; no member create |
+| `institutions` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update | Member scope limited to linked institutions |
+| `speakers` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update | Member scope limited to linked speakers |
+| `references` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update | Member scope limited to linked references |
+| `venues` | list/get/meta + schema + create + update + preview | Not exposed | Admin-only through the current MCP surface |
+| `subdistricts` | list/get/meta + schema + create + update + preview | Not exposed | No media upload fields |
+
+### Relation traversal rules
+
+- Admin only: use `admin-get-resource-meta` to discover whether a relation is exposed, then call `admin-list-related-records` with that relation name.
+- Member MCP has no generic related-record tool today.
+- Do not assume every admin resource has a relation you can traverse; rely on metadata returned by the live tool.
+
+### Record and schema reading rules
+
+- Use `record_key` values from prior MCP results; prefer returned route-key-style identifiers when the record payload exposes them.
+- Treat live write schemas as the field-level source of truth for payload structure, required fields, and media support.
+- This guide summarizes server-level capability only; actor-specific authorization still applies at runtime.
+
+### Non-goals
+
+- This guide is not the raw HTTP admin API contract.
+- This guide is not a Filament panel parity matrix.
+- This guide does not promise delete, restore, reorder, or replicate support through MCP.
 
 ### Admin MCP tool catalog
 
@@ -168,6 +244,8 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 
 | Tool | Purpose | Raw HTTP admin equivalent |
 |---|---|---|
+| `search` | Search the verified MajlisIlmu MCP documentation pages exposed by this server | MCP-only documentation discovery tool |
+| `fetch` | Fetch one verified MajlisIlmu documentation page by id | MCP-only documentation fetch tool |
 | `admin-list-resources` | List accessible admin resources and their capability summary | `GET /api/v1/admin/manifest` |
 | `admin-get-resource-meta` | Read one admin resource's metadata, pages, relations, abilities, and write-support flags | `GET /api/v1/admin/{resourceKey}/meta` |
 | `admin-list-records` | List records for one admin resource with optional search and pagination | `GET /api/v1/admin/{resourceKey}` |
@@ -192,6 +270,8 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 
 | Tool | Purpose |
 |---|---|
+| `search` | Search the verified MajlisIlmu MCP documentation pages exposed by this server |
+| `fetch` | Fetch one verified MajlisIlmu documentation page by id |
 | `member-list-resources` | List accessible Ahli-scoped member resources |
 | `member-get-resource-meta` | Read one member resource's metadata, permissions, and available write support |
 | `member-list-records` | List records for one member resource with optional search and pagination |
@@ -203,6 +283,7 @@ Member tool behavior notes:
 
 - Member tools are constrained to the Ahli workspace boundary and live membership relationships.
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
+- Member update tools do not support `validate_only`; there is no preview-only member write path today.
 - Media/file upload fields accept JSON base64 descriptors only when the matching member write schema advertises them.
 - As with admin tools, ChatGPT only understands what the tool descriptor exposes; if a capability is not registered as a tool, the model will not assume it exists.
 
@@ -225,7 +306,7 @@ Schema fields describe the exact upload rules:
 - `mcp_upload.shape` is `file_descriptor` for a single file and `array<file_descriptor>` for multiple files.
 - `accepted_mime_types`, `max_file_size_kb`, and `max_files` are authoritative for that field.
 - `mcp_upload.replacement_semantics` describes whether the submitted descriptor or descriptor array replaces the target media collection.
-- `validate_only=true` previews normalize descriptors into file summaries without persisting media.
+- When a write tool supports `validate_only=true` (currently admin create/update only), previews normalize descriptors into file summaries without persisting media.
 - `current_media` stays metadata-only and does not expose signed or temporary URLs.
 - `clear_*` media flags remain unsupported through MCP and are rejected even when clients submit them manually.
 
@@ -309,6 +390,8 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 
 | Tool | When to use it | Core arguments |
 |---|---|---|
+| `search` | Search the verified MCP/docs pages exposed by this server | `query` |
+| `fetch` | Fetch the full text of one verified docs page | `id` |
 | `admin-list-resources` | Discover accessible admin resources | `verbose?`, `writable_only?` |
 | `admin-get-resource-meta` | Inspect one resource’s metadata, routes, relations, and abilities | `resource_key` |
 | `admin-list-records` | Search and paginate records for one admin resource | `resource_key`, `search?`, `page?`, `per_page?` |
@@ -322,6 +405,8 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 
 | Tool | When to use it | Core arguments |
 |---|---|---|
+| `search` | Search the verified MCP/docs pages exposed by this server | `query` |
+| `fetch` | Fetch the full text of one verified docs page | `id` |
 | `member-list-resources` | Discover accessible Ahli-scoped resources | `verbose?` |
 | `member-get-resource-meta` | Inspect one member resource’s metadata and write support | `resource_key` |
 | `member-list-records` | Search and paginate records for one member resource | `resource_key`, `search?`, `page?`, `per_page?` |
@@ -334,4 +419,5 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 - Read-only tools should be treated as discovery and preview operations.
 - Write tools are schema-guided and should always be preceded by the matching write-schema call.
 - The model should treat these tools as the full ChatGPT-visible connector API. If a capability is not listed here, it is not part of the supported tool contract.
+- `documentation-tool-routing` is an optional prompt for clients that support prompts; it explains when to use the verified docs `search` and `fetch` tools and accepts an optional `topic` hint for more targeted routing advice.
 - For tiny call examples, see `docs/MAJLISILMU_MCP_TOOL_EXAMPLES.md`.
