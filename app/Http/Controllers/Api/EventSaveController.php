@@ -34,7 +34,7 @@ class EventSaveController extends Controller
             ->with(['institution:id,name,slug', 'venue:id,name', 'speakers:id,name,slug'])
             ->active()
             ->orderBy('starts_at')
-            ->paginate(ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 100));
+            ->simplePaginate(ApiPagination::normalizePerPage($request->integer('per_page', 20), default: 20, max: 100));
 
         return response()->json([
             'data' => collect($savedEvents->items())
@@ -43,9 +43,7 @@ class EventSaveController extends Controller
             'meta' => [
                 'request_id' => request()->header('X-Request-ID', (string) Str::uuid()),
                 'pagination' => [
-                    'page' => $savedEvents->currentPage(),
-                    'per_page' => $savedEvents->perPage(),
-                    'total' => $savedEvents->total(),
+                    ...ApiPagination::simplePaginationMeta($savedEvents),
                 ],
             ],
         ]);

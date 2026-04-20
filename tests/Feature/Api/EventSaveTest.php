@@ -9,7 +9,12 @@ use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
-    $this->event = Event::factory()->create(['status' => 'approved', 'visibility' => 'public']);
+    $this->event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'saves_count' => 0,
+        'going_count' => 0,
+    ]);
 });
 
 test('authenticated user can save an event', function () {
@@ -187,7 +192,7 @@ test('saved events index still includes cancelled events', function () {
     $response = $this->getJson(route('api.events.saved.index'));
 
     $response->assertOk()
-        ->assertJsonPath('meta.pagination.total', 2)
+        ->assertJsonPath('meta.pagination.has_more', false)
         ->assertJsonPath('data.0.id', $savedEvent->id)
         ->assertJsonPath('data.0.title', 'Saved Event One')
         ->assertJsonPath('data.0.slug', 'saved-event-one')
@@ -223,6 +228,7 @@ test('saved events index clamps per_page values to the supported maximum', funct
     $this->getJson(route('api.events.saved.index', ['per_page' => 500]))
         ->assertOk()
         ->assertJsonPath('meta.pagination.per_page', 100)
+        ->assertJsonPath('meta.pagination.has_more', true)
         ->assertJsonCount(100, 'data');
 });
 

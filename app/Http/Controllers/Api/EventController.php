@@ -515,18 +515,14 @@ class EventController extends Controller
             ->where('user_id', $user->getKey())
             ->exists();
 
-        $savesCount = (int) DB::table('event_saves')
-            ->where('event_id', $event->getKey())
-            ->count();
+        $savesCount = (int) ($event->saves_count ?? 0);
 
         $isSaved = DB::table('event_saves')
             ->where('user_id', $user->getKey())
             ->where('event_id', $event->getKey())
             ->exists();
 
-        $goingCount = (int) DB::table('event_attendees')
-            ->where('event_id', $event->getKey())
-            ->count();
+        $goingCount = (int) ($event->going_count ?? 0);
 
         $isGoing = DB::table('event_attendees')
             ->where('user_id', $user->getKey())

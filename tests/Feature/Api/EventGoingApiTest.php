@@ -95,7 +95,7 @@ it('lists the current users going events', function () {
 
     $this->getJson(route('api.events.going.index'))
         ->assertOk()
-        ->assertJsonPath('meta.pagination.total', 2)
+        ->assertJsonPath('meta.pagination.has_more', false)
         ->assertJsonPath('data.0.id', $first->id)
         ->assertJsonPath('data.0.title', 'Going Event One')
         ->assertJsonPath('data.0.slug', 'going-event-one')

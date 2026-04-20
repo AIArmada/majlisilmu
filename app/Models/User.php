@@ -92,6 +92,9 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
                 $user->captureDeletedRelationsSnapshot();
             }
 
+            $savedEventIds = $user->snapshotEventIds($user->deletedRelationsSnapshot, 'event_saves');
+            $goingEventIds = $user->snapshotEventIds($user->deletedRelationsSnapshot, 'event_attendees');
+
             $user->socialAccounts()->each(fn ($account) => $account->delete());
             $user->deleteAuthenticationState();
             $user->institutions()->detach();
@@ -101,6 +104,9 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
             $user->memberEvents()->detach();
             $user->savedEvents()->detach();
             $user->goingEvents()->detach();
+
+            $user->syncEventEngagementCounts($savedEventIds, 'event_saves', 'saves_count');
+            $user->syncEventEngagementCounts($goingEventIds, 'event_attendees', 'going_count');
 
             $user->ownedEvents()->update(['user_id' => null]);
             $user->submittedEvents()->update(['submitter_id' => null]);
@@ -354,6 +360,9 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
      */
     protected function restoreManyToManyRelations(array $snapshot): void
     {
+        $savedEventIds = $this->snapshotEventIds($snapshot, 'event_saves');
+        $goingEventIds = $this->snapshotEventIds($snapshot, 'event_attendees');
+
         DB::table('institution_user')->insertOrIgnore($this->snapshotRows($snapshot, 'institution_user'));
         DB::table('speaker_user')->insertOrIgnore($this->snapshotRows($snapshot, 'speaker_user'));
         DB::table('reference_user')->insertOrIgnore($this->snapshotRows($snapshot, 'reference_user'));
@@ -369,7 +378,41 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
             ], $row);
         })->all());
 
+        $this->syncEventEngagementCounts($savedEventIds, 'event_saves', 'saves_count');
+        $this->syncEventEngagementCounts($goingEventIds, 'event_attendees', 'going_count');
+
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return list<string>
+     */
+    private function snapshotEventIds(array $snapshot, string $key): array
+    {
+        return collect($this->snapshotRows($snapshot, $key))
+            ->pluck('event_id')
+            ->filter(fn (mixed $eventId): bool => is_string($eventId) || is_int($eventId))
+            ->map(static fn (mixed $eventId): string => (string) $eventId)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $eventIds
+     */
+    private function syncEventEngagementCounts(array $eventIds, string $pivotTable, string $column): void
+    {
+        foreach ($eventIds as $eventId) {
+            $count = (int) DB::table($pivotTable)
+                ->where('event_id', $eventId)
+                ->count();
+
+            Event::query()
+                ->whereKey($eventId)
+                ->update([$column => $count]);
+        }
     }
 
     /**

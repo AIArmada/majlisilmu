@@ -131,6 +131,24 @@ it('returns current user event state for active unlisted events', function () {
         ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
 });
 
+it('returns stored engagement counts for the current user event state', function () {
+    $user = User::factory()->create();
+    $event = registrationReadyEvent([
+        'saves_count' => 12,
+        'going_count' => 34,
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $this->getJson(route('api.events.me.show', $event))
+        ->assertOk()
+        ->assertJsonPath('data.saved.is_saved', false)
+        ->assertJsonPath('data.saved.saves_count', 12)
+        ->assertJsonPath('data.going.is_going', false)
+        ->assertJsonPath('data.going.going_count', 34)
+        ->assertJsonPath('meta.request_id', fn (string $requestId) => filled($requestId));
+});
+
 it('requires authentication to inspect the current users event state', function () {
     $event = registrationReadyEvent();
 

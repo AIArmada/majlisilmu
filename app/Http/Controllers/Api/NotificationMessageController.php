@@ -37,13 +37,16 @@ class NotificationMessageController extends Controller
             ->when($status === 'read', fn ($builder) => $builder->whereNotNull('read_at'));
 
         $notifications = $query->paginate($perPage);
+        $unreadCount = $status === 'unread'
+            ? $notifications->total()
+            : $user->notificationMessages()->visibleInInbox()->whereNull('read_at')->count();
 
         return response()->json([
             'data' => collect($notifications->items())
                 ->map(fn (NotificationMessage $message): array => NotificationMessagePayloadData::fromModel($message)->toArray())
                 ->all(),
             'meta' => [
-                'unread_count' => $user->notificationMessages()->visibleInInbox()->whereNull('read_at')->count(),
+                'unread_count' => $unreadCount,
                 'pagination' => [
                     'page' => $notifications->currentPage(),
                     'per_page' => $notifications->perPage(),

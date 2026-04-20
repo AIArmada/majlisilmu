@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Event;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -144,6 +145,14 @@ it('deletes the authenticated user account, revokes tokens, and keeps a sanitize
         'remember_token' => 'remember-me-token',
     ]);
 
+    $engagementEvent = Event::factory()->create([
+        'saves_count' => 27,
+        'going_count' => 31,
+    ]);
+
+    $user->savedEvents()->attach($engagementEvent->id);
+    $user->goingEvents()->attach($engagementEvent->id);
+
     $plainTextToken = $user->createToken('iPhone 17')->plainTextToken;
     $passportAccessTokenId = Str::random(80);
 
@@ -218,6 +227,19 @@ it('deletes the authenticated user account, revokes tokens, and keeps a sanitize
     $this->assertDatabaseMissing('oauth_access_tokens', ['user_id' => $user->id]);
     $this->assertDatabaseMissing('oauth_refresh_tokens', ['access_token_id' => $passportAccessTokenId]);
     $this->assertDatabaseMissing('oauth_device_codes', ['user_id' => $user->id]);
+    $this->assertDatabaseMissing('event_saves', [
+        'event_id' => $engagementEvent->id,
+        'user_id' => $user->id,
+    ]);
+    $this->assertDatabaseMissing('event_attendees', [
+        'event_id' => $engagementEvent->id,
+        'user_id' => $user->id,
+    ]);
+    $this->assertDatabaseHas('events', [
+        'id' => $engagementEvent->id,
+        'saves_count' => 0,
+        'going_count' => 0,
+    ]);
 
     $deletedModel = DeletedModel::query()
         ->where('key', $user->id)

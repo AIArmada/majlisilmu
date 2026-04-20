@@ -38,7 +38,6 @@ use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\SpeakerSearchService;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -641,7 +640,7 @@ it('allows direct institution gallery uploads on public contribution update sugg
         'subjectType' => 'institusi',
         'subject' => $institution->slug,
     ]), [
-        'gallery' => [UploadedFile::fake()->image('institution-gallery.jpg', 1600, 900)],
+        'gallery' => [fakeGeneratedImageUpload('institution-gallery.jpg', 1600, 900)],
     ], [
         'Accept' => 'application/json',
     ])
@@ -838,7 +837,7 @@ it('allows direct speaker avatar uploads on public contribution update suggestio
         'subjectType' => 'penceramah',
         'subject' => $speaker->slug,
     ]), [
-        'avatar' => UploadedFile::fake()->image('speaker-avatar.jpg', 1200, 1200),
+        'avatar' => fakeGeneratedImageUpload('speaker-avatar.jpg', 1200, 1200),
     ], [
         'Accept' => 'application/json',
     ])
@@ -900,7 +899,7 @@ it('allows direct speaker gallery uploads on public contribution update suggesti
         'subjectType' => 'penceramah',
         'subject' => $speaker->slug,
     ]), [
-        'gallery' => [UploadedFile::fake()->image('speaker-gallery.jpg', 1200, 1200)],
+        'gallery' => [fakeGeneratedImageUpload('speaker-gallery.jpg', 1200, 1200)],
     ], [
         'Accept' => 'application/json',
     ])
@@ -924,7 +923,7 @@ it('rejects unsupported speaker media files on public contribution update sugges
         'subjectType' => 'penceramah',
         'subject' => $speaker->slug,
     ]), [
-        'poster' => UploadedFile::fake()->image('speaker-poster.jpg'),
+        'poster' => fakeGeneratedImageUpload('speaker-poster.jpg'),
     ], [
         'Accept' => 'application/json',
     ])
@@ -1003,8 +1002,8 @@ it('allows direct event poster and gallery uploads on public contribution update
         'subjectType' => 'majlis',
         'subject' => $event->slug,
     ]), [
-        'poster' => UploadedFile::fake()->image('event-poster.jpg', 1200, 1600),
-        'gallery' => [UploadedFile::fake()->image('event-gallery.jpg', 1200, 800)],
+        'poster' => fakeGeneratedImageUpload('event-poster.jpg', 1200, 1600),
+        'gallery' => [fakeGeneratedImageUpload('event-gallery.jpg', 1200, 800)],
     ], [
         'Accept' => 'application/json',
     ])
@@ -1098,6 +1097,52 @@ it('falls back to local speaker and institution search on the frontend unified s
         ->toContain((string) $institution->id);
 });
 
+it('returns full unified search totals while limiting speaker and institution previews', function () {
+    foreach (range(1, 6) as $index) {
+        $speaker = Speaker::factory()->create([
+            'name' => sprintf('Audit Search Total Speaker %d', $index),
+            'honorific' => null,
+            'pre_nominal' => [],
+            'post_nominal' => [],
+            'qualifications' => [],
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        app(SpeakerSearchService::class)->syncSpeakerRecord($speaker);
+
+        Institution::factory()->create([
+            'name' => sprintf('Audit Search Total Institution %d', $index),
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+    }
+
+    Speaker::factory()->create([
+        'name' => 'Other Search Speaker',
+        'honorific' => null,
+        'pre_nominal' => [],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Other Search Institution',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson('/api/v1/search?search='.urlencode('Audit Search Total'))
+        ->assertOk();
+
+    expect($response->json('data.speakers.total'))->toBe(6)
+        ->and($response->json('data.institutions.total'))->toBe(6)
+        ->and($response->json('data.speakers.items'))->toHaveCount(4)
+        ->and($response->json('data.institutions.items'))->toHaveCount(4);
+});
+
 it('falls back to local speaker directory search when typesense fails', function () {
     $speaker = Speaker::factory()->create([
         'name' => 'Aisyah Binti Hassan',
@@ -1179,7 +1224,7 @@ it('serializes event list payloads with card image metadata for mobile clients',
         'starts_at' => now()->addDays(2),
     ]);
 
-    $event->addMedia(UploadedFile::fake()->image('event-poster.jpg', 1200, 1600))
+    $event->addMedia(fakeGeneratedImageUpload('event-poster.jpg', 1200, 1600))
         ->toMediaCollection('poster');
 
     $item = Closure::bind(
@@ -1211,7 +1256,7 @@ it('returns card image metadata on public events index responses', function () {
         'starts_at' => now()->addDay(),
     ]);
 
-    $posterEvent->addMedia(UploadedFile::fake()->image('home-poster.jpg', 1200, 1600))
+    $posterEvent->addMedia(fakeGeneratedImageUpload('home-poster.jpg', 1200, 1600))
         ->toMediaCollection('poster');
 
     $speaker = Speaker::factory()->create([
@@ -1265,10 +1310,10 @@ it('serializes institution directory payloads with card media aliases for mobile
         'country_id' => $malaysiaId,
     ]);
 
-    $institution->addMedia(UploadedFile::fake()->image('directory-logo.jpg', 640, 640))
+    $institution->addMedia(fakeGeneratedImageUpload('directory-logo.jpg', 640, 640))
         ->toMediaCollection('logo');
 
-    $institution->addMedia(UploadedFile::fake()->image('directory-cover.jpg', 1600, 900))
+    $institution->addMedia(fakeGeneratedImageUpload('directory-cover.jpg', 1600, 900))
         ->toMediaCollection('cover');
 
     Event::factory()->for($institution)->create([
@@ -1482,7 +1527,7 @@ it('bumps the institution directory cache version when institution media changes
         ->assertOk()
         ->json('meta.cache.version');
 
-    $institution->addMedia(UploadedFile::fake()->image('institution-cache-logo.jpg', 800, 800))
+    $institution->addMedia(fakeGeneratedImageUpload('institution-cache-logo.jpg', 800, 800))
         ->toMediaCollection('logo');
 
     $updatedVersion = $this->getJson(route('api.client.institutions.index'))
@@ -1587,7 +1632,7 @@ it('exposes the institution public image url in the frontend institution detail 
         'is_active' => true,
     ]);
 
-    $institution->addMedia(UploadedFile::fake()->image('detail-logo.jpg', 800, 800))
+    $institution->addMedia(fakeGeneratedImageUpload('detail-logo.jpg', 800, 800))
         ->toMediaCollection('logo');
 
     $response = $this->getJson(route('api.client.institutions.show', ['institutionKey' => $institution->slug]))
@@ -1671,9 +1716,9 @@ it('serializes institution detail payloads with address and donation metadata fo
         'description' => 'Institution detail serializer coverage',
     ]);
 
-    $institution->addMedia(UploadedFile::fake()->image('detail-dto-logo.jpg', 800, 800))
+    $institution->addMedia(fakeGeneratedImageUpload('detail-dto-logo.jpg', 800, 800))
         ->toMediaCollection('logo');
-    $institution->addMedia(UploadedFile::fake()->image('detail-dto-cover.jpg', 1600, 900))
+    $institution->addMedia(fakeGeneratedImageUpload('detail-dto-cover.jpg', 1600, 900))
         ->toMediaCollection('cover');
 
     $institution->address()->updateOrCreate([], [
@@ -1700,7 +1745,7 @@ it('serializes institution detail payloads with address and donation metadata fo
         'is_default' => true,
     ]));
 
-    $donationChannel->addMedia(UploadedFile::fake()->image('institution-qr.png', 600, 600))
+    $donationChannel->addMedia(fakeGeneratedImageUpload('institution-qr.png', 600, 600))
         ->toMediaCollection('qr');
 
     $user->follow($institution);
@@ -1799,7 +1844,7 @@ it('exposes 7-item institution detail lists with canonical address lines and qr 
         'status' => 'verified',
     ]);
 
-    $channel->addMedia(UploadedFile::fake()->image('qr.png', 300, 300))
+    $channel->addMedia(fakeGeneratedImageUpload('qr.png', 300, 300))
         ->toMediaCollection('qr');
 
     foreach (range(1, 8) as $index) {
@@ -1855,7 +1900,7 @@ it('rejects unsupported files on public contribution update suggestions', functi
         'subjectType' => 'institusi',
         'subject' => $institution->slug,
     ]), [
-        'cover' => UploadedFile::fake()->image('institution-cover.jpg'),
+        'cover' => fakeGeneratedImageUpload('institution-cover.jpg'),
     ], [
         'Accept' => 'application/json',
     ])
@@ -2001,7 +2046,7 @@ it('returns profile-quality speaker avatar urls from the frontend search api', f
         'is_active' => true,
     ]);
 
-    $speaker->addMedia(UploadedFile::fake()->image('kazim.jpg', 1200, 1200))
+    $speaker->addMedia(fakeGeneratedImageUpload('kazim.jpg', 1200, 1200))
         ->toMediaCollection('avatar');
 
     $this->getJson(route('api.client.speakers.index', ['search' => 'kazim']))
@@ -2192,7 +2237,7 @@ it('bumps the speaker directory cache version when speaker media changes', funct
         ->assertOk()
         ->json('meta.cache.version');
 
-    $speaker->addMedia(UploadedFile::fake()->image('speaker-cache-media.jpg', 1200, 1200))
+    $speaker->addMedia(fakeGeneratedImageUpload('speaker-cache-media.jpg', 1200, 1200))
         ->toMediaCollection('avatar');
 
     $updatedVersion = $this->getJson(route('api.client.speakers.index'))
@@ -2476,7 +2521,7 @@ it('returns random inspiration payloads with category and media metadata for mob
         'is_active' => true,
     ]);
 
-    $inspiration->addMedia(UploadedFile::fake()->image('inspiration.jpg', 1200, 900))
+    $inspiration->addMedia(fakeGeneratedImageUpload('inspiration.jpg', 1200, 900))
         ->toMediaCollection('main');
 
     $response = $this->getJson(route('api.client.inspirations.random', ['locale' => 'ms']))
@@ -2515,7 +2560,7 @@ it('submits and cancels membership claims through the frontend api', function ()
         'subject' => $institution->slug,
     ]), [
         'justification' => 'I manage this institution.',
-        'evidence' => [UploadedFile::fake()->image('evidence.jpg')],
+        'evidence' => [fakeGeneratedImageUpload('evidence.jpg')],
     ], [
         'Accept' => 'application/json',
     ])->assertCreated();
@@ -2745,8 +2790,8 @@ it('submits events with media through the frontend api', function () {
         'organizer_institution_id' => $institution->getKey(),
         'speakers' => [$speaker->getKey()],
         'submission_country_id' => 132,
-        'poster' => UploadedFile::fake()->image('poster.jpg'),
-        'gallery' => [UploadedFile::fake()->image('gallery.jpg')],
+        'poster' => fakeGeneratedImageUpload('poster.jpg'),
+        'gallery' => [fakeGeneratedImageUpload('gallery.jpg')],
     ], [
         'Accept' => 'application/json',
     ]);
@@ -2985,7 +3030,7 @@ it('mirrors public detail media and public contact payloads', function () {
         'platform' => 'website',
         'url' => 'https://speaker.example.test',
     ]);
-    $speaker->addMedia(UploadedFile::fake()->image('speaker-cover.jpg'))->toMediaCollection('cover');
+    $speaker->addMedia(fakeGeneratedImageUpload('speaker-cover.jpg'))->toMediaCollection('cover');
 
     $venue = Venue::factory()->create([
         'status' => 'verified',
@@ -2996,7 +3041,7 @@ it('mirrors public detail media and public contact payloads', function () {
         'value' => '+60312345678',
         'is_public' => true,
     ]);
-    $venue->addMedia(UploadedFile::fake()->image('venue-cover.jpg'))->toMediaCollection('cover');
+    $venue->addMedia(fakeGeneratedImageUpload('venue-cover.jpg'))->toMediaCollection('cover');
 
     $reference = Reference::factory()->create([
         'status' => 'verified',
@@ -3006,7 +3051,7 @@ it('mirrors public detail media and public contact payloads', function () {
         'platform' => 'website',
         'url' => 'https://reference.example.test',
     ]);
-    $reference->addMedia(UploadedFile::fake()->image('reference-front-cover.jpg'))->toMediaCollection('front_cover');
+    $reference->addMedia(fakeGeneratedImageUpload('reference-front-cover.jpg'))->toMediaCollection('front_cover');
 
     $speakerResponse = $this->getJson(route('api.client.speakers.show', ['speakerKey' => $speaker->slug]))
         ->assertOk();
@@ -3050,7 +3095,7 @@ it('serializes venue and reference detail payloads with core metadata for mobile
         'platform' => 'website',
         'url' => 'https://venue.example.test',
     ]);
-    $venue->addMedia(UploadedFile::fake()->image('venue-dto-cover.jpg', 1600, 900))->toMediaCollection('cover');
+    $venue->addMedia(fakeGeneratedImageUpload('venue-dto-cover.jpg', 1600, 900))->toMediaCollection('cover');
 
     $reference = Reference::factory()->create([
         'title' => 'Rujukan DTO API',
@@ -3066,8 +3111,8 @@ it('serializes venue and reference detail payloads with core metadata for mobile
         'platform' => 'website',
         'url' => 'https://reference-dto.example.test',
     ]);
-    $reference->addMedia(UploadedFile::fake()->image('reference-front.jpg', 1200, 1600))->toMediaCollection('front_cover');
-    $reference->addMedia(UploadedFile::fake()->image('reference-back.jpg', 1200, 1600))->toMediaCollection('back_cover');
+    $reference->addMedia(fakeGeneratedImageUpload('reference-front.jpg', 1200, 1600))->toMediaCollection('front_cover');
+    $reference->addMedia(fakeGeneratedImageUpload('reference-back.jpg', 1200, 1600))->toMediaCollection('back_cover');
 
     $user->follow($reference);
 
@@ -3117,7 +3162,7 @@ it('serializes series detail payloads with follow and media metadata for mobile 
         'is_active' => true,
     ]);
 
-    $series->addMedia(UploadedFile::fake()->image('series-cover.jpg', 1600, 900))->toMediaCollection('cover');
+    $series->addMedia(fakeGeneratedImageUpload('series-cover.jpg', 1600, 900))->toMediaCollection('cover');
 
     $user->follow($series);
 
@@ -3158,10 +3203,10 @@ it('mirrors the public speaker page payload for app clients', function () {
             ]],
         ],
     ]);
-    $speaker->addMedia(UploadedFile::fake()->image('speaker-avatar.jpg'))->toMediaCollection('avatar');
-    $speaker->addMedia(UploadedFile::fake()->image('speaker-cover.jpg'))->toMediaCollection('cover');
-    $speaker->addMedia(UploadedFile::fake()->image('speaker-gallery-1.jpg'))->toMediaCollection('gallery');
-    $speaker->addMedia(UploadedFile::fake()->image('speaker-gallery-2.jpg'))->toMediaCollection('gallery');
+    $speaker->addMedia(fakeGeneratedImageUpload('speaker-avatar.jpg'))->toMediaCollection('avatar');
+    $speaker->addMedia(fakeGeneratedImageUpload('speaker-cover.jpg'))->toMediaCollection('cover');
+    $speaker->addMedia(fakeGeneratedImageUpload('speaker-gallery-1.jpg'))->toMediaCollection('gallery');
+    $speaker->addMedia(fakeGeneratedImageUpload('speaker-gallery-2.jpg'))->toMediaCollection('gallery');
     $speaker->update(['job_title' => 'Penasihat Dakwah']);
 
     $speakerState = State::query()->create([
@@ -3195,7 +3240,7 @@ it('mirrors the public speaker page payload for app clients', function () {
         'status' => 'verified',
         'is_active' => true,
     ]);
-    $institution->addMedia(UploadedFile::fake()->image('institution-cover.jpg'))->toMediaCollection('cover');
+    $institution->addMedia(fakeGeneratedImageUpload('institution-cover.jpg'))->toMediaCollection('cover');
     $speaker->institutions()->attach($institution->id, [
         'position' => 'Mudarris',
         'is_primary' => true,
@@ -3309,7 +3354,13 @@ it('mirrors the public speaker page payload for app clients', function () {
         ->and($response->json('data.upcoming_events.0.is_pending'))->toBeTrue()
         ->and($response->json('data.upcoming_events.0.is_cancelled'))->toBeFalse()
         ->and($response->json('data.upcoming_events.0.institution.public_image_url'))->toBe($institution->public_image_url)
+        ->and(count($response->json('data.upcoming_events')))->toBe(1)
+        ->and($response->json('data.upcoming_total'))->toBe(1)
+        ->and(count($response->json('data.past_events')))->toBe(1)
+        ->and($response->json('data.past_total'))->toBe(1)
+        ->and(count($response->json('data.other_role_upcoming_participations')))->toBe(1)
         ->and($response->json('data.other_role_upcoming_total'))->toBe(1)
+        ->and(count($response->json('data.other_role_past_participations')))->toBe(0)
         ->and($response->json('data.other_role_past_total'))->toBe(0)
         ->and($response->json('data.other_role_upcoming_participations.0.role'))->toBe('moderator')
         ->and($response->json('data.other_role_upcoming_participations.0.role_label'))->toBe(EventKeyPersonRole::Moderator->getLabel())
