@@ -12,9 +12,61 @@ use App\Support\Mcp\McpFilePayloadNormalizer;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
+use Laravel\Mcp\ResponseFactory;
+use Laravel\Mcp\Support\ValidationMessages;
 
 abstract class AbstractAdminWriteTool extends AbstractAdminTool
 {
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     */
+    protected function payloadWithSchemaDefaults(array $payload, array $schemaResponse): array
+    {
+        $defaults = Arr::get($schemaResponse, 'data.schema.defaults', []);
+
+        if (! is_array($defaults)) {
+            return $payload;
+        }
+
+        return $this->mergeMissingValues($defaults, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     */
+    protected function writeValidationErrorResponse(
+        ValidationException $exception,
+        array $payload,
+        array $schemaResponse,
+        string $resourceKey,
+        string $operation,
+        bool $validateOnly,
+        bool $applyDefaults,
+    ): ResponseFactory {
+        $candidatePayload = $validateOnly && $applyDefaults
+            ? $this->normalizePayloadForWriteTool($resourceKey, $this->payloadWithSchemaDefaults($payload, $schemaResponse))
+            : null;
+
+        return $this->errorResponse(
+            ValidationMessages::from($exception),
+            'validation_error',
+            [
+                'errors' => $exception->errors(),
+                'feedback' => $this->validationFeedback(
+                    $exception,
+                    $payload,
+                    $schemaResponse,
+                    $operation,
+                    $validateOnly,
+                    $applyDefaults,
+                    $candidatePayload,
+                ),
+            ],
+        );
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -121,5 +173,260 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             is_bool($value) => $value,
             default => $value !== null,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $defaults
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function mergeMissingValues(array $defaults, array $payload): array
+    {
+        foreach ($defaults as $key => $value) {
+            if (! array_key_exists($key, $payload)) {
+                $payload[$key] = $value;
+
+                continue;
+            }
+
+            if (is_array($value) && is_array($payload[$key]) && ! array_is_list($value) && ! array_is_list($payload[$key])) {
+                $payload[$key] = $this->mergeMissingValues($value, $payload[$key]);
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     * @param  array<string, mixed>|null  $candidatePayload
+     * @return array<string, mixed>
+     */
+    private function validationFeedback(
+        ValidationException $exception,
+        array $payload,
+        array $schemaResponse,
+        string $operation,
+        bool $validateOnly,
+        bool $applyDefaults,
+        ?array $candidatePayload,
+    ): array {
+        $schema = Arr::get($schemaResponse, 'data.schema', []);
+        $fieldContracts = $this->fieldContracts($schema);
+        $failedRules = $exception->validator !== null
+            ? array_map(
+                static fn (array $rules): array => array_values(array_map('strtolower', array_keys($rules))),
+                $exception->validator->failed(),
+            )
+            : [];
+
+        $issues = [];
+
+        foreach ($exception->errors() as $field => $messages) {
+            $contract = $this->fieldContract($field, $fieldContracts);
+            $allowedValues = is_array($contract['allowed_values'] ?? null) ? array_values($contract['allowed_values']) : null;
+            $currentValue = $this->fieldValue($payload, $field);
+            $missing = ! $this->fieldExists($payload, $field) || $currentValue === null || $currentValue === '';
+            $default = $contract['default'] ?? null;
+            $closestValidValue = $this->closestValidValue($currentValue, $allowedValues);
+            $suggested = $missing
+                ? ($default ?? $allowedValues[0] ?? null)
+                : ($closestValidValue ?? $default ?? $allowedValues[0] ?? null);
+            $requiredBecause = $this->requiredBecause($field, $schema, $candidatePayload ?? $payload);
+            $autoFillSafe = $missing && array_key_exists('default', $contract);
+
+            $issue = array_filter([
+                'field' => $field,
+                'messages' => $messages,
+                'rule_codes' => $failedRules[$field] ?? [],
+                'severity' => $autoFillSafe ? 'auto_fixable' : 'blocking_error',
+                'missing' => $missing,
+                'current_value' => $this->fieldExists($payload, $field) ? $currentValue : null,
+                'allowed_values' => $allowedValues,
+                'closest_valid_value' => $closestValidValue,
+                'suggested' => $suggested,
+                'example_value' => $default ?? $allowedValues[0] ?? null,
+                'default' => $default,
+                'auto_fill_safe' => $autoFillSafe,
+                'required_because' => $requiredBecause,
+            ], static fn (mixed $value): bool => $value !== null);
+
+            $issues[] = $issue;
+        }
+
+        $feedback = [
+            'operation' => $operation,
+            'validate_only' => $validateOnly,
+            'apply_defaults' => $applyDefaults,
+            'issues' => $issues,
+        ];
+
+        if ($candidatePayload !== null) {
+            $feedback['normalized_payload'] = $candidatePayload;
+        }
+
+        return $feedback;
+    }
+
+    /**
+     * @param  array<string, mixed>  $schema
+     * @return array<string, array<string, mixed>>
+     */
+    private function fieldContracts(array $schema): array
+    {
+        $fields = $schema['fields'] ?? [];
+
+        if (! is_array($fields)) {
+            return [];
+        }
+
+        $contracts = [];
+
+        foreach ($fields as $field) {
+            if (! is_array($field) || ! is_string($field['name'] ?? null)) {
+                continue;
+            }
+
+            $contracts[$field['name']] = $field;
+        }
+
+        return $contracts;
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $fieldContracts
+     * @return array<string, mixed>
+     */
+    private function fieldContract(string $field, array $fieldContracts): array
+    {
+        if (array_key_exists($field, $fieldContracts)) {
+            return $fieldContracts[$field];
+        }
+
+        $wildcardField = preg_replace('/\.\d+(?=\.|$)/', '.*', $field);
+
+        if (is_string($wildcardField) && array_key_exists($wildcardField, $fieldContracts)) {
+            return $fieldContracts[$wildcardField];
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function fieldExists(array $payload, string $field): bool
+    {
+        $segments = explode('.', $field);
+        $current = $payload;
+
+        foreach ($segments as $segment) {
+            if (! is_array($current) || ! array_key_exists($segment, $current)) {
+                return false;
+            }
+
+            $current = $current[$segment];
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function fieldValue(array $payload, string $field): mixed
+    {
+        return data_get($payload, $field);
+    }
+
+    /**
+     * @param  list<string|int>|null  $allowedValues
+     * @return string|int|null
+     */
+    private function closestValidValue(mixed $value, ?array $allowedValues): string|int|null
+    {
+        if (! is_string($value) || $allowedValues === null || $allowedValues === []) {
+            return null;
+        }
+
+        $normalizedValue = strtolower(trim($value));
+
+        if ($normalizedValue === '') {
+            return null;
+        }
+
+        $closest = null;
+        $shortestDistance = null;
+
+        foreach ($allowedValues as $allowedValue) {
+            if (! is_string($allowedValue) && ! is_int($allowedValue)) {
+                continue;
+            }
+
+            $candidate = strtolower((string) $allowedValue);
+            $distance = levenshtein($normalizedValue, $candidate);
+
+            if ($shortestDistance === null || $distance < $shortestDistance) {
+                $closest = $allowedValue;
+                $shortestDistance = $distance;
+            }
+        }
+
+        return $closest;
+    }
+
+    /**
+     * @param  array<string, mixed>  $schema
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>|null
+     */
+    private function requiredBecause(string $field, array $schema, array $payload): ?array
+    {
+        $conditionalRules = $schema['conditional_rules'] ?? [];
+
+        if (! is_array($conditionalRules)) {
+            return null;
+        }
+
+        foreach ($conditionalRules as $rule) {
+            if (! is_array($rule) || ($rule['field'] ?? null) !== $field) {
+                continue;
+            }
+
+            if (is_array($rule['required_when'] ?? null)) {
+                $matched = [];
+
+                foreach ($rule['required_when'] as $otherField => $expectedValues) {
+                    $actualValue = data_get($payload, $otherField);
+
+                    if (is_array($expectedValues) && in_array($actualValue, $expectedValues, true)) {
+                        $matched[$otherField] = $actualValue;
+                    }
+                }
+
+                if ($matched !== []) {
+                    return $matched;
+                }
+            }
+
+            if (is_array($rule['required_unless'] ?? null)) {
+                $matched = [];
+
+                foreach ($rule['required_unless'] as $otherField => $expectedValues) {
+                    $actualValue = data_get($payload, $otherField);
+
+                    if (is_array($expectedValues) && ! in_array($actualValue, $expectedValues, true)) {
+                        $matched[$otherField] = $actualValue;
+                    }
+                }
+
+                if ($matched !== []) {
+                    return $matched;
+                }
+            }
+        }
+
+        return null;
     }
 }

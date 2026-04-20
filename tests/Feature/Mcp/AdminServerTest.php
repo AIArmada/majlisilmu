@@ -290,6 +290,7 @@ it('returns write schema for supported resources and rejects unknown resources',
             ->where('data.schema.tool_arguments.resource_key', 'speakers')
             ->where('data.schema.tool_arguments.payload', 'object')
             ->where('data.schema.tool_arguments.validate_only', false)
+            ->where('data.schema.tool_arguments.apply_defaults', false)
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
             ->where('data.schema.media_uploads_supported', true)
@@ -690,6 +691,57 @@ it('surfaces admin event validation failures through MCP write tools', function 
             ]),
         ])
         ->assertHasErrors(['Sekurang-kurangnya seorang penceramah diperlukan untuk jenis majlis ini.']);
+});
+
+it('returns default autofill hints and conditional requirement feedback for admin MCP dry runs', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'validate_only' => true,
+            'apply_defaults' => true,
+            'payload' => [
+                'title' => 'AI Feedback Event Preview',
+                'event_date' => '2026-06-10',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.feedback.validate_only', true)
+            ->where('error.details.feedback.apply_defaults', true)
+            ->where('error.details.feedback.normalized_payload.timezone', 'Asia/Kuala_Lumpur')
+            ->where('error.details.feedback.normalized_payload.event_format', EventFormat::Physical->value)
+            ->where('error.details.feedback.normalized_payload.prayer_time', EventPrayerTime::LainWaktu->value)
+            ->where('error.details.feedback.issues.0.field', 'custom_time')
+            ->where('error.details.feedback.issues.0.severity', 'blocking_error')
+            ->where('error.details.feedback.issues.0.required_because.prayer_time', EventPrayerTime::LainWaktu->value)
+            ->etc());
+});
+
+it('returns enum suggestions for invalid admin MCP dry-run values', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'validate_only' => true,
+            'apply_defaults' => true,
+            'payload' => [
+                'title' => 'AI Feedback Invalid Enum Preview',
+                'event_date' => '2026-06-10',
+                'custom_time' => '8:30 PM',
+                'event_format' => 'physicl',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.feedback.issues.0.field', 'event_format')
+            ->where('error.details.feedback.issues.0.allowed_values.0', EventFormat::Physical->value)
+            ->where('error.details.feedback.issues.0.closest_valid_value', EventFormat::Physical->value)
+            ->where('error.details.feedback.issues.0.suggested', EventFormat::Physical->value)
+            ->where('error.details.feedback.issues.0.severity', 'blocking_error')
+            ->etc());
 });
 
 it('rejects malformed MCP media descriptors through write tools', function () {

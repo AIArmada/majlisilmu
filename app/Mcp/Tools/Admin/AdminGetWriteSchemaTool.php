@@ -74,6 +74,7 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
                 'record_key' => $recordKey ?? 'record',
                 'payload' => 'object',
                 'validate_only' => false,
+                'apply_defaults' => false,
             ];
         }
 
@@ -81,6 +82,7 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
             'resource_key' => $resourceKey,
             'payload' => 'object',
             'validate_only' => false,
+            'apply_defaults' => false,
         ];
     }
 
