@@ -199,12 +199,12 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
                     'auto_apply_safe' => false,
                 ];
 
-                $remainingBlockers[] = array_filter([
+                $remainingBlockers[] = [
                     'field' => $field,
                     'type' => $this->isMissingRemediationValue($currentValue) ? 'required_choice' : 'invalid_choice',
                     'options' => $allowedValues,
-                    'messages' => array_values(array_map(static fn (mixed $message): string => (string) $message, $messages)),
-                ], static fn (mixed $value): bool => $value !== []);
+                    'messages' => array_values(array_map('strval', $messages)),
+                ];
 
                 continue;
             }
@@ -212,7 +212,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             $remainingBlockers[] = [
                 'field' => $field,
                 'type' => $this->isMissingRemediationValue($currentValue) ? 'missing_value' : 'validation_error',
-                'messages' => array_values(array_map(static fn (mixed $message): string => (string) $message, $messages)),
+                'messages' => array_values(array_map('strval', $messages)),
             ];
         }
 

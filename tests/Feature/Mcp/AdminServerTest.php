@@ -481,6 +481,8 @@ it('returns retryable remediation details for validate only admin update validat
         'gender' => 'male',
         'status' => 'verified',
     ]);
+    $expectedGender = $speaker->gender;
+    $expectedStatus = $speaker->status;
 
     AdminServer::actingAs($admin)
         ->tool(AdminUpdateRecordTool::class, [
@@ -495,13 +497,13 @@ it('returns retryable remediation details for validate only admin update validat
             ->where('error.code', 'validation_error')
             ->where('error.details.fix_plan.0.action', 'set_field')
             ->where('error.details.fix_plan.0.field', 'gender')
-            ->where('error.details.fix_plan.0.value', 'male')
+            ->where('error.details.fix_plan.0.value', $expectedGender)
             ->where('error.details.fix_plan.1.action', 'set_field')
             ->where('error.details.fix_plan.1.field', 'status')
-            ->where('error.details.fix_plan.1.value', 'verified')
+            ->where('error.details.fix_plan.1.value', $expectedStatus)
             ->where('error.details.normalized_payload_preview.name', 'Retryable Admin MCP Speaker Updated')
-            ->where('error.details.normalized_payload_preview.gender', 'male')
-            ->where('error.details.normalized_payload_preview.status', 'verified')
+            ->where('error.details.normalized_payload_preview.gender', $expectedGender)
+            ->where('error.details.normalized_payload_preview.status', $expectedStatus)
             ->has('error.details.remaining_blockers', 0)
             ->where('error.details.can_retry', true)
             ->etc());
