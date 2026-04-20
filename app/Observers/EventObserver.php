@@ -70,12 +70,14 @@ class EventObserver
 
     public function created(Event $event): void
     {
+        $this->publicListingsCache->bustHomepageStats();
         $this->publicListingsCache->bustMajlisListing();
         $this->publicDirectoryCacheVersion->bumpForEvent($event);
     }
 
     public function updated(Event $event): void
     {
+        $this->publicListingsCache->bustHomepageStats();
         $this->publicListingsCache->bustMajlisListing();
         $this->publicDirectoryCacheVersion->bumpForEvent($event);
 
@@ -106,6 +108,7 @@ class EventObserver
     {
         $this->syncSlugRedirectAction->purgeForModel($event);
         $this->generateEventSlugAction->syncEventSlugsForTitle($event->title);
+        $this->publicListingsCache->bustHomepageStats();
         $this->publicListingsCache->bustMajlisListing();
         $this->publicDirectoryCacheVersion->bumpForEvent($event);
     }

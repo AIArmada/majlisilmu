@@ -6,6 +6,13 @@ use Illuminate\Support\Facades\Cache;
 
 class PublicListingsCache
 {
+    public function bustHomepageStats(): void
+    {
+        Cache::forget('home.stats.events.upcoming');
+        Cache::forget('home.stats.speakers.upcoming');
+        Cache::forget('home.stats.institutions.upcoming');
+    }
+
     public function bustMajlisListing(): void
     {
         Cache::forget('default_events_search_v2');

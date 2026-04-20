@@ -242,6 +242,30 @@ describe('Event Show Page Going Feature', function () {
             ->assertSee('href="'.route('login', ['redirect' => $eventUrl]).'"', false);
     });
 
+    it('does not leak alpine share state into the rendered body text', function () {
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $response = $this->get(route('events.show', $event));
+
+        $response->assertOk();
+
+        $dom = new DOMDocument;
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($response->getContent());
+        libxml_clear_errors();
+
+        $body = $dom->getElementsByTagName('body')->item(0);
+        $bodyText = $body?->textContent ?? '';
+
+        expect($bodyText)->not->toContain('shareModalOpen: false');
+        expect($bodyText)->not->toContain("copyLink(shouldTrack = true, provider = 'copy_link')");
+    });
+
     it('shows correct going count in the UI', function () {
         $users = User::factory()->count(5)->create();
         $event = Event::factory()->create([

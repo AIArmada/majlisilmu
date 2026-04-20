@@ -39,6 +39,7 @@ class SpeakerObserver
             }
         }
 
+        $this->publicListingsCache->bustHomepageStats();
         $this->publicListingsCache->bustMajlisListing();
         $this->publicDirectoryCacheVersion->bumpSpeaker();
     }
@@ -50,6 +51,7 @@ class SpeakerObserver
         $this->generateEventSlugAction->syncEventSlugsForSpeakerId((string) $speaker->getKey());
         $this->generateEventSlugAction->syncEventSlugsForSpeakerName($speaker->name);
         $this->speakerSearchService->purgeSpeakerRecord($speaker);
+        $this->publicListingsCache->bustHomepageStats();
         $this->publicListingsCache->bustMajlisListing();
         $this->publicDirectoryCacheVersion->bumpSpeaker();
     }

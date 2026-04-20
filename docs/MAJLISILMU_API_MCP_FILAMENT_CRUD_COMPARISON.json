@@ -1,0 +1,385 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-04-20",
+  "title": "API / MCP / Filament CRUD Comparison Matrix",
+  "markdown_companion": "docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md",
+  "legend": {
+    "R": "read / list / get",
+    "S": "schema endpoint or schema tool available",
+    "C": "create",
+    "U": "update",
+    "D": "delete",
+    "P": "validate_only preview available",
+    "panel_pages": "Filament pages discovered from the resource class",
+    "can_create": "Filament policy gate, not just route presence"
+  },
+  "surfaces": [
+    {
+      "key": "public_api",
+      "auth": "public for discovery, bearer-authenticated for some mutations",
+      "shape": "workflow / contract based",
+      "description": "public forms, catalogs, submissions, and self-service state changes"
+    },
+    {
+      "key": "authenticated_api",
+      "auth": "auth:sanctum",
+      "shape": "workflow / contract based",
+      "description": "current-user workflows, state transitions, and moderation-side actions"
+    },
+    {
+      "key": "admin_api",
+      "auth": "auth:sanctum + admin gate",
+      "shape": "generic resource interface",
+      "description": "the admin Filament resource registry exposed over HTTP"
+    },
+    {
+      "key": "admin_mcp",
+      "auth": "auth:sanctum + admin gate",
+      "shape": "generic tool interface",
+      "description": "the same admin resource registry exposed through MCP tools"
+    },
+    {
+      "key": "member_mcp",
+      "auth": "auth:sanctum + member gate",
+      "shape": "scoped tool interface",
+      "description": "Ahli-scoped subset of the admin resource contract"
+    },
+    {
+      "key": "admin_panel",
+      "auth": "Filament admin panel",
+      "shape": "UI/resource surface",
+      "description": "broader operational CRUD, delete/restore, and relation management"
+    },
+    {
+      "key": "ahli_panel",
+      "auth": "Filament Ahli panel",
+      "shape": "UI/resource surface",
+      "description": "narrower member workspace for owned/member-linked records"
+    }
+  ],
+  "api_workflow_families": {
+    "discovery_read_contracts": [
+      "manifest",
+      "forms/*",
+      "catalogs/*",
+      "search",
+      "institutions",
+      "speakers",
+      "venues",
+      "references",
+      "series"
+    ],
+    "public_create_contracts": [
+      "submit-event",
+      "contributions/institutions",
+      "contributions/speakers",
+      "reports"
+    ],
+    "authenticated_state_workflow_contracts": [
+      "saved-searches",
+      "follows",
+      "events/{event}/saved",
+      "events/{event}/going",
+      "membership-claims",
+      "contributions/*",
+      "notifications",
+      "notification-settings",
+      "account-settings",
+      "institution-workspace",
+      "mcp-tokens",
+      "event registrations",
+      "check-ins",
+      "advanced-events"
+    ]
+  },
+  "writable_entity_intersection": {
+    "events": {
+      "public_api": "submit-event create + public read/search/detail",
+      "admin_api": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "admin_mcp": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "member_mcp": {
+        "read": true,
+        "schema": true,
+        "update": true,
+        "preview": false,
+        "scope": "Ahli-scoped"
+      },
+      "admin_panel": {
+        "pages": ["index", "create", "view", "edit"],
+        "can_create": false
+      },
+      "ahli_panel": {
+        "pages": ["index", "view", "edit"],
+        "can_create": false
+      },
+      "drift_note": "panel create exists but is policy-disabled; MCP media uploads stay unsupported"
+    },
+    "institutions": {
+      "public_api": "contribution create + public read/detail",
+      "admin_api": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "admin_mcp": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "member_mcp": {
+        "read": true,
+        "schema": true,
+        "update": true,
+        "preview": false,
+        "scope": "Ahli-scoped"
+      },
+      "admin_panel": {
+        "pages": ["index", "create", "view", "edit"],
+        "can_create": false
+      },
+      "ahli_panel": {
+        "pages": ["edit"],
+        "can_create": false
+      },
+      "drift_note": "same create mismatch as events"
+    },
+    "speakers": {
+      "public_api": "contribution create + public read/detail",
+      "admin_api": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "admin_mcp": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "member_mcp": {
+        "read": true,
+        "schema": true,
+        "update": true,
+        "preview": false,
+        "scope": "Ahli-scoped"
+      },
+      "admin_panel": {
+        "pages": ["index", "create", "view", "edit"],
+        "can_create": false
+      },
+      "ahli_panel": {
+        "pages": ["index", "view", "edit"],
+        "can_create": false
+      },
+      "drift_note": "same create mismatch as events"
+    },
+    "references": {
+      "public_api": "public read/detail + suggestion workflow",
+      "admin_api": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "admin_mcp": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "member_mcp": {
+        "read": true,
+        "schema": true,
+        "update": true,
+        "preview": false,
+        "scope": "Ahli-scoped"
+      },
+      "admin_panel": {
+        "pages": ["index", "create", "edit"],
+        "can_create": false
+      },
+      "ahli_panel": {
+        "pages": ["index", "edit"],
+        "can_create": false
+      },
+      "drift_note": "public API does not do direct reference CRUD; it uses suggestion flows"
+    },
+    "venues": {
+      "public_api": "public read/detail only",
+      "admin_api": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "admin_mcp": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "member_mcp": {
+        "read": false,
+        "schema": false,
+        "update": false,
+        "preview": false,
+        "scope": "not exposed"
+      },
+      "admin_panel": {
+        "pages": ["index", "create", "view", "edit"],
+        "can_create": true
+      },
+      "ahli_panel": {
+        "pages": [],
+        "can_create": false
+      },
+      "drift_note": "panel and API/MCP are aligned here"
+    },
+    "subdistricts": {
+      "public_api": "public catalog read only",
+      "admin_api": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "admin_mcp": {
+        "read": true,
+        "schema": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "preview": true
+      },
+      "member_mcp": {
+        "read": false,
+        "schema": false,
+        "update": false,
+        "preview": false,
+        "scope": "not exposed"
+      },
+      "admin_panel": {
+        "pages": ["index", "create", "edit"],
+        "can_create": true
+      },
+      "ahli_panel": {
+        "pages": [],
+        "can_create": false
+      },
+      "drift_note": "panel and API/MCP are aligned here"
+    }
+  },
+  "coverage_gaps": {
+    "geography_catalogs": {
+      "examples": ["countries", "states", "districts"],
+      "admin_api_admin_mcp": "R only",
+      "admin_panel": "CRUD in panel",
+      "ahli_panel": "-",
+      "notes": "intended as geography reference data; API/MCP keep them read-only"
+    },
+    "directory_content_extras": {
+      "examples": ["tags", "spaces", "series", "inspirations", "donation-channels"],
+      "admin_api_admin_mcp": "R only",
+      "admin_panel": "CRUD in panel",
+      "ahli_panel": "-",
+      "notes": "panel-only writes; admin API/MCP can still read where the resource is discoverable"
+    },
+    "moderation_workflow_records": {
+      "examples": ["reports", "membership-claims", "contribution-requests"],
+      "admin_api_admin_mcp": "R only",
+      "admin_panel": "list / view, plus resource-specific UI",
+      "ahli_panel": "-",
+      "notes": "the public/authenticated API owns the actual submission workflow"
+    },
+    "system_authz_analytics": {
+      "examples": ["users", "slug-redirects", "ai-model-pricings", "ai-usage-logs", "audits", "tracked-properties", "signal-goals", "signal-segments", "saved-signal-reports", "signal-alert-rules", "signal-alert-logs", "roles", "permissions"],
+      "admin_api_admin_mcp": "R only",
+      "admin_panel": "CRUD or read-only mix, depending on the resource",
+      "ahli_panel": "-",
+      "notes": "intentionally not mirrored into admin API/MCP writes"
+    }
+  },
+  "ahli_workspace_mapping": {
+    "events": {
+      "admin_equivalent": "App\\Filament\\Resources\\Events\\EventResource",
+      "ahli_panel_pages": ["index", "view", "edit"],
+      "member_mcp_write": "update only",
+      "notes": "scoped to member-owned or member-linked events"
+    },
+    "institutions": {
+      "admin_equivalent": "App\\Filament\\Resources\\Institutions\\InstitutionResource",
+      "ahli_panel_pages": ["edit"],
+      "member_mcp_write": "update only",
+      "notes": "member workspace only, no list page"
+    },
+    "references": {
+      "admin_equivalent": "App\\Filament\\Resources\\References\\ReferenceResource",
+      "ahli_panel_pages": ["index", "edit"],
+      "member_mcp_write": "update only",
+      "notes": "reference membership scope only"
+    },
+    "speakers": {
+      "admin_equivalent": "App\\Filament\\Resources\\Speakers\\SpeakerResource",
+      "ahli_panel_pages": ["index", "view", "edit"],
+      "member_mcp_write": "update only",
+      "notes": "speaker membership scope only"
+    }
+  },
+  "current_asymmetries": [
+    "Admin API / Admin MCP can write more than the admin panel can create for events, institutions, references, and speakers. The panel has the route, but the resource-level canCreate() gate is false.",
+    "Delete / restore / replicate are panel-led concerns. The generic admin HTTP and MCP resource layers do not expose delete routes.",
+    "Member MCP is update-only. It is deliberately narrower than the admin write contract and currently omits validate_only.",
+    "Public API is workflow-first. If you add a new entity, first decide whether it belongs in a public workflow contract, the admin resource registry, both, or neither.",
+    "MCP is not a media transport. If a write contract involves files, the admin HTTP form may support it, but the MCP path should stay JSON-only unless a dedicated media flow is added later."
+  ],
+  "source_of_truth_files": [
+    "routes/api.php",
+    "routes/ai.php",
+    "app/Support/Api/Frontend/FrontendFormContractService.php",
+    "app/Support/Api/Admin/AdminResourceRegistry.php",
+    "app/Support/Api/Admin/AdminResourceMutationService.php",
+    "app/Support/Api/Member/MemberResourceMutationService.php",
+    "app/Mcp/Servers/AdminServer.php",
+    "app/Mcp/Servers/MemberServer.php",
+    "app/Providers/Filament/AdminPanelProvider.php",
+    "app/Providers/Filament/AhliPanelProvider.php",
+    "app/Filament/Resources/*",
+    "app/Filament/Ahli/Resources/*"
+  ],
+  "update_rule": "Whenever a resource is added, removed, or its write policy changes, update this matrix in the same change set."
+}

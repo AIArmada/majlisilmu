@@ -2,6 +2,13 @@
 
 namespace App\Support\Api\Admin;
 
+use App\Enums\EventFormat;
+use App\Enums\EventStructure;
+use App\Enums\EventType;
+use App\Enums\EventVisibility;
+use App\Enums\PrayerReference;
+use App\Enums\TimingMode;
+use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\Event;
 use App\Models\Speaker;
@@ -135,6 +142,7 @@ class AdminResourceRegistry
         $key = $this->keyFor($resourceClass);
         $pages = $resourceClass::getPages();
         $supportsMutation = $this->mutationService->supports($resourceClass);
+        $filters = $this->filterMetadata($resourceClass);
         $dateSemantics = is_a($resourceClass::getModel(), Event::class, true)
             ? [
                 'storage_timezone' => 'UTC',
@@ -167,7 +175,7 @@ class AdminResourceRegistry
                 'restore_any' => $resourceClass::canRestoreAny(),
                 'reorder' => $resourceClass::canReorder(),
             ],
-            'filters' => $this->filterMetadata($resourceClass),
+            'filters' => $filters,
             'write_support' => [
                 'schema' => $supportsMutation,
                 'store' => $supportsMutation && array_key_exists('create', $pages),
@@ -188,7 +196,7 @@ class AdminResourceRegistry
                     ? route('api.admin.resources.update', ['resourceKey' => $key, 'recordKey' => 'record'], false)
                     : null,
             ],
-            'mcp_tools' => $this->mcpTools($key, $supportsMutation, $pages, $dateSemantics),
+            'mcp_tools' => $this->mcpTools($key, $supportsMutation, $pages, $dateSemantics, $filters),
             'panel_routes' => [
                 'index' => array_key_exists('index', $pages) ? $resourceClass::getUrl('index', panel: 'admin') : null,
                 'create' => array_key_exists('create', $pages) ? $resourceClass::getUrl('create', panel: 'admin') : null,
@@ -261,6 +269,74 @@ class AdminResourceRegistry
         }
 
         return $this->filtersCache[$resourceClass] = match ($resourceClass) {
+            EventResource::class => [
+                [
+                    'key' => 'status',
+                    'label' => 'Status',
+                    'type' => 'select',
+                    'options' => [
+                        'draft' => 'Draft',
+                        'pending' => 'Pending Review',
+                        'needs_changes' => 'Needs Changes',
+                        'approved' => 'Approved',
+                        'cancelled' => 'Cancelled',
+                        'rejected' => 'Rejected',
+                    ],
+                ],
+                [
+                    'key' => 'visibility',
+                    'label' => 'Visibility',
+                    'type' => 'select',
+                    'options' => collect(EventVisibility::cases())->mapWithKeys(
+                        static fn (EventVisibility $visibility): array => [$visibility->value => $visibility->getLabel()]
+                    )->all(),
+                ],
+                [
+                    'key' => 'event_structure',
+                    'label' => 'Event Structure',
+                    'type' => 'select',
+                    'options' => collect(EventStructure::cases())->mapWithKeys(
+                        static fn (EventStructure $structure): array => [$structure->value => $structure->label()]
+                    )->all(),
+                ],
+                [
+                    'key' => 'event_format',
+                    'label' => 'Event Format',
+                    'type' => 'select',
+                    'options' => collect(EventFormat::cases())->mapWithKeys(
+                        static fn (EventFormat $format): array => [$format->value => $format->getLabel()]
+                    )->all(),
+                ],
+                [
+                    'key' => 'event_type',
+                    'label' => 'Event Type',
+                    'type' => 'select',
+                    'options' => collect(EventType::cases())->mapWithKeys(
+                        static fn (EventType $eventType): array => [$eventType->value => $eventType->getLabel()]
+                    )->all(),
+                ],
+                [
+                    'key' => 'timing_mode',
+                    'label' => 'Timing Mode',
+                    'type' => 'select',
+                    'options' => collect(TimingMode::cases())->mapWithKeys(
+                        static fn (TimingMode $timingMode): array => [$timingMode->value => $timingMode->label()]
+                    )->all(),
+                ],
+                [
+                    'key' => 'prayer_reference',
+                    'label' => 'Prayer Reference',
+                    'type' => 'select',
+                    'options' => collect(PrayerReference::cases())->mapWithKeys(
+                        static fn (PrayerReference $reference): array => [$reference->value => $reference->label()]
+                    )->all(),
+                ],
+                [
+                    'key' => 'is_active',
+                    'label' => 'Active',
+                    'type' => 'boolean',
+                ],
+            ],
             SpeakerResource::class => [
                 [
                     'key' => 'status',
@@ -301,9 +377,10 @@ class AdminResourceRegistry
     /**
      * @param  array<string, mixed>  $pages
      * @param  array<string, mixed>|null  $dateSemantics
+     * @param  list<array{key: string, label: string, type: string, options?: array<string, string>}>  $filters
      * @return array<string, mixed>
      */
-    private function mcpTools(string $key, bool $supportsMutation, array $pages, ?array $dateSemantics): array
+    private function mcpTools(string $key, bool $supportsMutation, array $pages, ?array $dateSemantics, array $filters): array
     {
         $listRecordsArguments = [
             'resource_key' => $key,
@@ -311,6 +388,10 @@ class AdminResourceRegistry
             'page' => 1,
             'per_page' => 15,
         ];
+
+        if ($filters !== []) {
+            $listRecordsArguments['filters'] = 'object';
+        }
 
         if ($dateSemantics !== null) {
             $listRecordsArguments['starts_after'] = null;

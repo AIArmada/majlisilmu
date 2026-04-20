@@ -19,7 +19,7 @@ class AdminListRecordsTool extends AbstractAdminTool
 {
     protected string $name = 'admin-list-records';
 
-    protected string $description = 'List records for one admin resource with optional search, date filters, and pagination.';
+    protected string $description = 'List records for one admin resource with optional search, structured filters, date filters, and pagination.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -33,6 +33,7 @@ class AdminListRecordsTool extends AbstractAdminTool
             $validated = $this->validateArguments($request, [
                 'resource_key' => ['required', 'string'],
                 'search' => ['sometimes', 'nullable', 'string'],
+                'filters' => ['sometimes', 'nullable', 'array'],
                 'starts_after' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
                 'starts_before' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
                 'starts_on_local_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
@@ -45,6 +46,7 @@ class AdminListRecordsTool extends AbstractAdminTool
                 search: (string) ($validated['search'] ?? ''),
                 page: (int) ($validated['page'] ?? 1),
                 perPage: (int) ($validated['per_page'] ?? 15),
+                filters: is_array($validated['filters'] ?? null) ? $validated['filters'] : [],
                 startsAfter: $validated['starts_after'] ?? null,
                 startsBefore: $validated['starts_before'] ?? null,
                 startsOnLocalDate: $validated['starts_on_local_date'] ?? null,
@@ -61,6 +63,7 @@ class AdminListRecordsTool extends AbstractAdminTool
         return [
             'resource_key' => $schema->string()->required()->min(1),
             'search' => $schema->string()->nullable(),
+            'filters' => $schema->object()->nullable(),
             'starts_after' => $schema->string()->nullable(),
             'starts_before' => $schema->string()->nullable(),
             'starts_on_local_date' => $schema->string()->nullable(),

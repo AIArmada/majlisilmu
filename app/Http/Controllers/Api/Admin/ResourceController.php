@@ -35,9 +35,15 @@ class ResourceController extends Controller
 
     #[PathParameter('resourceKey', 'Admin resource key from `GET /admin/manifest`, for example `events`, `institutions`, or `speakers`.', example: 'events')]
     #[QueryParameter('search', 'Optional free-text search across the resource\'s searchable columns.', required: false, type: 'string', infer: false, example: 'maghrib')]
-    #[QueryParameter('filter[status]', 'Optional status filter for resources that expose a status filter. Speakers accept `pending`, `verified`, and `rejected`.', required: false, type: 'string', infer: false, example: 'verified')]
+    #[QueryParameter('filter[status]', 'Optional status filter for resources that expose a status filter. Speakers accept `pending`, `verified`, and `rejected`; events accept `draft`, `pending`, `needs_changes`, `approved`, `cancelled`, and `rejected`.', required: false, type: 'string', infer: false, example: 'verified')]
     #[QueryParameter('filter[is_active]', 'Optional active-state filter for resources that expose it. Use `true` or `false`.', required: false, type: 'boolean', infer: false, example: true)]
     #[QueryParameter('filter[has_events]', 'Optional event-history filter for speaker resources. Use `true` for speakers linked to at least one event and `false` for speakers with no linked events.', required: false, type: 'boolean', infer: false, example: true)]
+    #[QueryParameter('filter[visibility]', 'Optional visibility filter for event resources. Accepts `public`, `private`, or `unlisted`.', required: false, type: 'string', infer: false, example: 'public')]
+    #[QueryParameter('filter[event_structure]', 'Optional event-structure filter for event resources.', required: false, type: 'string', infer: false, example: 'standalone')]
+    #[QueryParameter('filter[event_format]', 'Optional event-format filter for event resources. Accepts `physical`, `online`, or `hybrid`.', required: false, type: 'string', infer: false, example: 'online')]
+    #[QueryParameter('filter[event_type]', 'Optional event-type filter for event resources. Pass a single value or repeat the parameter for multiple event types.', required: false, type: 'string', infer: false, example: 'kuliah_ceramah')]
+    #[QueryParameter('filter[timing_mode]', 'Optional timing-mode filter for event resources. Accepts `absolute` or `prayer_relative`.', required: false, type: 'string', infer: false, example: 'prayer_relative')]
+    #[QueryParameter('filter[prayer_reference]', 'Optional prayer-reference filter for prayer-relative event resources.', required: false, type: 'string', infer: false, example: 'maghrib')]
     #[QueryParameter('starts_after', 'Optional date filter for date-aware admin resources. Interpreted in the resolved request timezone and converted to UTC before querying.', required: false, type: 'string', infer: false, example: '2026-04-12')]
     #[QueryParameter('starts_before', 'Optional date filter for date-aware admin resources. Interpreted in the resolved request timezone and converted to UTC before querying.', required: false, type: 'string', infer: false, example: '2026-04-12')]
     #[QueryParameter('starts_on_local_date', 'Optional local-date filter for date-aware admin resources. Interpreted in the resolved request timezone and converted to UTC day boundaries before querying.', required: false, type: 'string', infer: false, example: '2026-04-12')]
@@ -166,15 +172,8 @@ class ResourceController extends Controller
     private function queryFilters(Request $request): array
     {
         $filterBag = $request->query('filter');
-        $filters = is_array($filterBag) ? $filterBag : [];
 
-        $legacyFilters = array_filter([
-            'status' => $request->query('status'),
-            'is_active' => $request->query('is_active'),
-            'has_events' => $request->query('has_events'),
-        ], static fn (mixed $value): bool => $value !== null);
-
-        return array_merge($legacyFilters, $filters);
+        return is_array($filterBag) ? $filterBag : [];
     }
 
     private function queryString(Request $request, string $key): ?string
