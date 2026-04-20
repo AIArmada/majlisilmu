@@ -230,7 +230,8 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             $missing = ! $this->fieldExists($payload, $field) || $currentValue === null || $currentValue === '';
             $default = $contract['default'] ?? null;
             $closestValidValue = $this->closestValidValue($currentValue, $allowedValues);
-            $suggested = $this->suggestedValue($missing, $default, $closestValidValue, $allowedValues);
+            $firstAllowedValue = $this->firstAllowedValue($allowedValues);
+            $suggested = $this->suggestedValue($missing, $default, $closestValidValue, $firstAllowedValue);
             $requiredBecause = $this->requiredBecause($field, $schema, $candidatePayload ?? $payload);
             $autoFillSafe = $missing && array_key_exists('default', $contract);
 
@@ -262,8 +263,8 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             if ($default !== null) {
                 $issue['default'] = $default;
                 $issue['example_value'] = $default;
-            } elseif ($allowedValues !== null && $allowedValues !== []) {
-                $issue['example_value'] = $allowedValues[0];
+            } elseif ($firstAllowedValue !== null) {
+                $issue['example_value'] = $firstAllowedValue;
             }
 
             if ($requiredBecause !== null) {
@@ -458,7 +459,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
      */
     private function normalizeFieldPathForWildcard(string $field): string
     {
-        return (string) preg_replace('/\.\d+(?=\.|$)/', '.*', $field);
+        return preg_replace('/\.\d+(?=\.|$)/', '.*', $field) ?? $field;
     }
 
     /**
@@ -468,13 +469,30 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
         bool $missing,
         mixed $default,
         string|int|null $closestValidValue,
-        ?array $allowedValues,
+        string|int|null $firstAllowedValue,
     ): mixed {
         if ($missing) {
-            return $default ?? $allowedValues[0] ?? null;
+            return $default ?? $firstAllowedValue;
         }
 
-        return $closestValidValue ?? $default ?? $allowedValues[0] ?? null;
+        return $closestValidValue ?? $default ?? $firstAllowedValue;
+    }
+
+    /**
+     * @param  list<string|int>|null  $allowedValues
+     * @return string|int|null
+     */
+    private function firstAllowedValue(?array $allowedValues): string|int|null
+    {
+        if ($allowedValues === null || $allowedValues === []) {
+            return null;
+        }
+
+        $firstAllowedValue = reset($allowedValues);
+
+        return is_string($firstAllowedValue) || is_int($firstAllowedValue)
+            ? $firstAllowedValue
+            : null;
     }
 
     /**

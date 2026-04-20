@@ -744,6 +744,46 @@ it('returns enum suggestions for invalid admin MCP dry-run values', function () 
             ->etc());
 });
 
+it('returns structured admin MCP validation feedback outside validate-only previews', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'payload' => adminMcpEventPayload([
+                'institution' => $institution,
+                'speaker' => $speaker,
+                'reference' => $reference,
+                'series' => $series,
+                'domain_tag' => $domainTag,
+                'discipline_tag' => $disciplineTag,
+            ], [
+                'event_format' => 'physicl',
+            ]),
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.feedback.validate_only', false)
+            ->where('error.details.feedback.apply_defaults', false)
+            ->where('error.details.feedback.issues.0.field', 'event_format')
+            ->where('error.details.feedback.issues.0.closest_valid_value', EventFormat::Physical->value)
+            ->etc());
+});
+
 it('rejects malformed MCP media descriptors through write tools', function () {
     ensureMcpMalaysiaCountryExists();
 
