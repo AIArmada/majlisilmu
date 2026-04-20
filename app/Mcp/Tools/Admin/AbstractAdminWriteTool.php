@@ -322,7 +322,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             return $fieldContracts[$field];
         }
 
-        $wildcardField = preg_replace('/\.\d+(?=\.|$)/', '.*', $field);
+        $wildcardField = $this->normalizeFieldPathForWildcard($field);
 
         if (is_string($wildcardField) && array_key_exists($wildcardField, $fieldContracts)) {
             return $fieldContracts[$wildcardField];
@@ -451,6 +451,14 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
         }
 
         return null;
+    }
+
+    /**
+     * Convert concrete array indexes like contacts.0.value into schema wildcard paths like contacts.*.value.
+     */
+    private function normalizeFieldPathForWildcard(string $field): string
+    {
+        return (string) preg_replace('/\.\d+(?=\.|$)/', '.*', $field);
     }
 
     /**
