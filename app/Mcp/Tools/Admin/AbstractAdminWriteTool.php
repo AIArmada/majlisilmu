@@ -189,7 +189,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
                 continue;
             }
 
-            if (is_array($value) && is_array($payload[$key]) && ! array_is_list($value) && ! array_is_list($payload[$key])) {
+            if ($this->shouldMergeRecursively($value, $payload[$key])) {
                 $payload[$key] = $this->mergeMissingValues($value, $payload[$key]);
             }
         }
@@ -236,21 +236,41 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             $requiredBecause = $this->requiredBecause($field, $schema, $candidatePayload ?? $payload);
             $autoFillSafe = $missing && array_key_exists('default', $contract);
 
-            $issue = array_filter([
+            $issue = [
                 'field' => $field,
                 'messages' => $messages,
                 'rule_codes' => $failedRules[$field] ?? [],
                 'severity' => $autoFillSafe ? 'auto_fixable' : 'blocking_error',
                 'missing' => $missing,
-                'current_value' => $this->fieldExists($payload, $field) ? $currentValue : null,
-                'allowed_values' => $allowedValues,
-                'closest_valid_value' => $closestValidValue,
-                'suggested' => $suggested,
-                'example_value' => $default ?? $allowedValues[0] ?? null,
-                'default' => $default,
                 'auto_fill_safe' => $autoFillSafe,
-                'required_because' => $requiredBecause,
-            ], static fn (mixed $value): bool => $value !== null);
+            ];
+
+            if ($this->fieldExists($payload, $field)) {
+                $issue['current_value'] = $currentValue;
+            }
+
+            if ($allowedValues !== null) {
+                $issue['allowed_values'] = $allowedValues;
+            }
+
+            if ($closestValidValue !== null) {
+                $issue['closest_valid_value'] = $closestValidValue;
+            }
+
+            if ($suggested !== null) {
+                $issue['suggested'] = $suggested;
+            }
+
+            if ($default !== null) {
+                $issue['default'] = $default;
+                $issue['example_value'] = $default;
+            } elseif ($allowedValues !== null && $allowedValues !== []) {
+                $issue['example_value'] = $allowedValues[0];
+            }
+
+            if ($requiredBecause !== null) {
+                $issue['required_because'] = $requiredBecause;
+            }
 
             $issues[] = $issue;
         }
@@ -365,6 +385,15 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             }
 
             $candidate = strtolower((string) $allowedValue);
+
+            if ($candidate === $normalizedValue) {
+                return $allowedValue;
+            }
+
+            if ($shortestDistance !== null && abs(strlen($normalizedValue) - strlen($candidate)) > $shortestDistance) {
+                continue;
+            }
+
             $distance = levenshtein($normalizedValue, $candidate);
 
             if ($shortestDistance === null || $distance < $shortestDistance) {
@@ -428,5 +457,13 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
         }
 
         return null;
+    }
+
+    private function shouldMergeRecursively(mixed $defaultValue, mixed $payloadValue): bool
+    {
+        return is_array($defaultValue)
+            && is_array($payloadValue)
+            && ! array_is_list($defaultValue)
+            && ! array_is_list($payloadValue);
     }
 }
