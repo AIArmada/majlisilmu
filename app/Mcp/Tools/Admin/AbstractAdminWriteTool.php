@@ -176,7 +176,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
         $schema = Arr::get($schemaResponse, 'data.schema', []);
         $fieldMap = $this->fieldMapFromSchemaResponse($schemaResponse);
         $defaults = is_array($schema['defaults'] ?? null) ? $schema['defaults'] : [];
-        $normalizedPayloadPreview = $payload;
+        $normalizedPayloadPreview = [...$payload];
 
         $fixPlan = [];
         $remainingBlockers = [];
@@ -319,7 +319,8 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             return [];
         }
 
-        // MCP write schema option lists are currently exposed as string or integer identifiers.
+        // MCP write schema option lists are currently exposed as string or integer identifiers,
+        // so non-scalar entries are ignored instead of being surfaced as retry suggestions.
         return array_values(array_filter(
             $allowedValues,
             static fn (mixed $value): bool => is_string($value) || is_int($value),
