@@ -42,6 +42,7 @@ class EventSubmissionController extends FrontendController
         FrontendMediaSyncService $frontendMediaSyncService,
     ): JsonResponse {
         $user = $this->currentUser($request);
+        $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
 
         $validated = $request->validate([
             'parent_event_id' => ['nullable', 'uuid'],
@@ -97,9 +98,9 @@ class EventSubmissionController extends FrontendController
             'submitter_phone' => ['nullable', 'string', 'max:20'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'captcha_token' => ['nullable', 'string'],
-            'poster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp'],
+            'poster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
             'gallery' => ['nullable', 'array', 'max:10'],
-            'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp'],
+            'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
         ]);
 
         $this->assertGuestContactRules($validated, $user);

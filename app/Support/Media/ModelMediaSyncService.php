@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support\Media;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 use Spatie\MediaLibrary\HasMedia;
 
 class ModelMediaSyncService
@@ -21,7 +23,7 @@ class ModelMediaSyncService
         }
 
         $model->clearMediaCollection($collection);
-        $model->addMedia($file)->toMediaCollection($collection);
+        $this->addMedia($model, $file, $collection);
     }
 
     /**
@@ -38,7 +40,33 @@ class ModelMediaSyncService
                 continue;
             }
 
-            $model->addMedia($file)->toMediaCollection($collection);
+            $this->addMedia($model, $file, $collection);
         }
+    }
+
+    protected function addMedia(HasMedia $model, UploadedFile $file, string $collection): void
+    {
+        $modelRecord = $model instanceof Model ? $model : null;
+        $extension = strtolower((string) ($file->extension() ?: $file->getClientOriginalExtension()));
+        $suffix = strtolower(substr((string) Str::ulid(), 0, 8));
+        $fileName = MediaFileNamer::resolveBaseNameFromModel($modelRecord)."-{$suffix}";
+
+        if ($extension !== '') {
+            $fileName .= ".{$extension}";
+        }
+
+        $model
+            ->addMedia($file)
+            ->usingFileName($fileName)
+            ->usingName(MediaFileNamer::resolveDisplayNameFromModel(
+                $modelRecord,
+                $collection,
+                $file->getClientOriginalName(),
+            ))
+            ->withCustomProperties([
+                'collection' => $collection,
+                'original_file_name' => $file->getClientOriginalName(),
+            ])
+            ->toMediaCollection($collection);
     }
 }

@@ -3,8 +3,11 @@
 use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\Reference;
+use App\Models\Report;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
@@ -203,4 +206,36 @@ it('accepts shared reference report categories through the api controller', func
         'entity_id' => $reference->id,
         'category' => 'fake_reference',
     ]);
+});
+
+it('stores report evidence uploads through the api controller', function () {
+    Storage::fake((string) config('media-library.disk_name', 'public'));
+
+    $user = User::factory()->create();
+    $reference = Reference::factory()->create();
+
+    $response = $this->actingAs($user, 'sanctum')
+        ->post('/api/v1/reports', [
+            'entity_type' => 'reference',
+            'entity_id' => $reference->id,
+            'category' => 'fake_reference',
+            'evidence' => [
+                UploadedFile::fake()->image('evidence.png', 600, 400),
+                UploadedFile::fake()->createWithContent('details.pdf', "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF"),
+            ],
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.id', fn ($value) => is_string($value) && $value !== '')
+        ->assertJsonCount(2, 'data.evidence')
+        ->assertJsonPath('data.evidence.0.file_name', fn ($value) => is_string($value) && $value !== '');
+
+    $report = Report::query()
+        ->where('entity_type', 'reference')
+        ->where('entity_id', $reference->id)
+        ->firstOrFail();
+
+    expect($report->getMedia('evidence'))->toHaveCount(2);
 });

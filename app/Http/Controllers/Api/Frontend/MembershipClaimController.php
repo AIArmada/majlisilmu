@@ -65,10 +65,12 @@ class MembershipClaimController extends FrontendController
             abort(403, $user->directoryFeedbackBanMessage());
         }
 
+        $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
+
         $validated = $request->validate([
             'justification' => ['required', 'string', 'max:2000'],
             'evidence' => ['required', 'array', 'min:1', 'max:8'],
-            'evidence.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf'],
+            'evidence.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf', "max:{$maxUploadSizeKb}"],
         ]);
 
         $claimSubject = $resolveMembershipClaimSubjectAction->handle($subjectType, $subject);

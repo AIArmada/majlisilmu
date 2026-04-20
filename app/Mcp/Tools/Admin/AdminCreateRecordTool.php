@@ -44,15 +44,26 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
             $payload = $validated['payload'];
             $resourceKey = (string) $validated['resource_key'];
 
-            $this->ensureMediaUploadsAreUnsupported($payload);
-            $payload = $this->normalizePayloadForWriteTool($resourceKey, $payload);
-
-            return $this->resourceService->storeRecord(
+            $this->ensureDestructiveMediaClearFlagsAreUnsupported($payload);
+            $schemaResponse = $this->resourceService->writeSchema(
                 resourceKey: $resourceKey,
-                payload: $payload,
+                operation: 'create',
                 actor: $actor,
-                validateOnly: (bool) ($validated['validate_only'] ?? false),
             );
+            $normalizedMediaPayload = $this->normalizeMcpMediaPayload($payload, $schemaResponse);
+
+            try {
+                $payload = $this->normalizePayloadForWriteTool($resourceKey, $normalizedMediaPayload['payload']);
+
+                return $this->resourceService->storeRecord(
+                    resourceKey: $resourceKey,
+                    payload: $payload,
+                    actor: $actor,
+                    validateOnly: (bool) ($validated['validate_only'] ?? false),
+                );
+            } finally {
+                $this->cleanupMcpMediaPayload($normalizedMediaPayload);
+            }
         });
     }
 
