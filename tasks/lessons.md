@@ -1,5 +1,6 @@
 # Lessons
 
+- When exposing static docs through MCP resources, audit the markdown against the live CRUD/tool/resource implementation first and add regression tests; stale docs become model-visible context immediately once they are registered.
 - When account deletion has a grace-period restore requirement, model it as two buckets: preserve shared domain records by detaching/nulling restorable links, and delete only user-private records into the snapshot; include roles/permissions because package delete hooks can detach them before the deleted-model snapshot is written.
 - When an existing database disagrees with edited create migrations, add a forward migration for that installed schema; tests on fresh migrations can pass while the real local API path still fails on old column types.
 - When a user provides both PDF and Markdown versions of a report and asks to use the md file, treat the Markdown copy as the source of truth and keep subsequent implementation notes aligned to it.

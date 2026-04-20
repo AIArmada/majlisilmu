@@ -5,7 +5,7 @@
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
 
-This is the current mobile-facing API contract. It reflects the live routes and controllers, including the Action-class refactors and the new native-client endpoints for auth tokens, going, registration, and check-in.
+This is the current mobile-facing API contract. It reflects the live routes and controllers, including the Action-class refactors and the native-client endpoints for auth tokens, share tracking, analytics, going, registration, and check-in.
 
 Use this document as the source of truth for mobile and AI agent integrations.
 
@@ -117,7 +117,9 @@ Mobile and native clients can now use the same share-tracking contract as the we
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/share/payload` | Optional bearer | Builds a canonical share payload for a public Majlis Ilmu URL |
-| `POST` | `/share/track` | Bearer required | Records that the user actually invoked a share action |
+| `POST` | `/share/track` | Optional bearer | Records that the client actually invoked a share action |
+| `GET` | `/share/analytics` | Bearer required | Returns the authenticated share dashboard and paginated link library |
+| `GET` | `/share/analytics/links/{link}` | Bearer required | Returns analytics detail for one tracked share link |
 
 ### `GET /share/payload`
 
@@ -134,7 +136,7 @@ Response highlights:
 - `platform_links`: provider intent links for channels such as WhatsApp, Telegram, Threads, Facebook, X, Instagram, TikTok, and email.
 - `channel_urls`: tracked destination URLs per channel, including `copy_link` and `native_share`.
 - `native_share`: ready-to-use `{ title, text, url, message }` payload for iOS, Android, and macOS share sheets.
-- `tracking_token`: returned with tracked payloads. Authenticated API clients can send it back to `/share/track` after the client actually performs the share action; anonymous web callers use the public web tracking route.
+- `tracking_token`: returned with tracked payloads. Authenticated and guest API clients can send it back to `/share/track` after the client actually performs the share action.
 
 Example:
 
@@ -161,6 +163,63 @@ Recommended client flow:
 1. Call `GET /share/payload` with the public URL, share text, and the current client `origin`.
 2. Use `platform_links` for provider intents, `channel_urls.copy_link` for clipboard copy, or `native_share` for system share sheets.
 3. After the share action is actually triggered, authenticated API clients call `POST /share/track` with the chosen channel and returned `tracking_token`.
+
+Guest/native clients can use the same `POST /share/track` endpoint without a bearer token when they are sharing from an anonymous session.
+
+### `GET /share/analytics`
+
+Authenticated share dashboard endpoint for iOS and Android clients.
+
+Query parameters:
+
+- `type` optional shared subject filter. Supported values are `all`, `event`, `institution`, `speaker`, `series`, `reference`, `search`, and `page`.
+- `sort` optional link sort mode. Supported values are `recent`, `visits`, `signups`, `registrations`, `checkins`, and `submissions`.
+- `status` optional link activity filter. Supported values are `all`, `active`, and `inactive`.
+- `outcome` optional outcome filter. Supported values mirror the dashboard outcome buckets such as `signup`, `event_registration`, `event_checkin`, `event_submission`, `event_save`, `event_going`, `institution_follow`, `speaker_follow`, `series_follow`, `reference_follow`, and `saved_search_created`.
+- `page` pagination page number for the link library.
+- `per_page` pagination page size for the link library.
+
+Response highlights:
+
+- `summary`: aggregate outbound shares, visits, unique visitors, and conversion totals for the authenticated user.
+- `provider_breakdown`: per-channel activity summary for the tracked share channels.
+- `subject_summaries` and `top_subjects`: cross-link and per-subject share performance.
+- `top_links`: the most active tracked links for quick mobile dashboard cards.
+- `recent_responses`: the latest recorded share outcomes.
+- `links`: paginated filtered link results with pagination metadata.
+
+Example:
+
+```http
+GET /api/v1/share/analytics?type=event&sort=visits&status=active&page=1&per_page=12
+Authorization: Bearer <access_token>
+```
+
+### `GET /share/analytics/links/{link}`
+
+Authenticated detail endpoint for a single tracked share link.
+
+Path parameter:
+
+- `link` tracked share link UUID returned by the analytics dashboard.
+
+Response highlights:
+
+- `link`: the tracked link record with destination URL, subject metadata, and activity counters.
+- `summary`: link-specific outbound share, visit, and conversion totals.
+- `provider_breakdown`: per-channel activity for the selected link.
+- `share_links`: provider share-again URLs for the tracked destination.
+- `daily_performance`: 14-day link performance series.
+- `outcome_breakdown`: conversion bucket summary for the link.
+- `recent_visits` and `recent_outcomes`: latest visit and conversion records.
+- `activity_window`: first/last activity timestamps for the link.
+
+Example:
+
+```http
+GET /api/v1/share/analytics/links/18c51525-c8ed-4bb5-92df-9d842a7c4441
+Authorization: Bearer <access_token>
+```
 
 ---
 
@@ -428,7 +487,9 @@ Notes:
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/submit-event` | Submit the public/authenticated event form, including poster/gallery uploads |
-| `POST` | `/share/track` | Record an authenticated outbound share action for analytics |
+| `POST` | `/share/track` | Record a guest or authenticated outbound share action for analytics |
+| `GET` | `/share/analytics` | Fetch the authenticated Dawah impact dashboard for mobile clients |
+| `GET` | `/share/analytics/links/{link}` | Fetch detailed performance for one tracked share link |
 | `GET` | `/account-settings` | Return current profile settings |
 | `PUT` | `/account-settings` | Update current profile settings |
 | `GET` | `/contributions` | Contribution inbox for the current user |
@@ -1074,7 +1135,7 @@ This section summarizes the non-obvious rules that AI agents must internalize be
 
 ### Timestamp interpretation
 
-All timestamps in API responses end in `Z` (UTC). To display "local time" for Malaysian users, add 8 hours (`UTC+8 = MYT`). When building date filters, always convert MYT user intent to UTC boundaries before sending.
+All timestamps in API responses end in `Z` (UTC). Convert them to the viewer's timezone in the client, or rely on localized helper fields when you send timezone context. For date-only filters, send the user's local calendar date together with timezone context (for example `X-Timezone`) so the server can convert that local date to the correct UTC boundaries.
 
 ### Prohibited address fields for speakers
 

@@ -8,6 +8,8 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
+use App\Mcp\Resources\Docs\CrudComparisonResource;
+use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\AdminServer;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
 use App\Mcp\Tools\Admin\AdminGetRecordTool;
@@ -1031,6 +1033,74 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-create-record',
         'admin-update-record',
     );
+});
+
+it('lists and reads verified documentation resources through the admin MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->resource(McpGuideResource::class)
+        ->assertOk()
+        ->assertName('docs-mcp-guide')
+        ->assertTitle('MajlisIlmu MCP Guide')
+        ->assertSee([
+            '# MajlisIlmu MCP Guide',
+            'Verified documentation resources',
+            'Current structurally write-capable admin resources include:',
+            '- `venues`',
+        ]);
+
+    AdminServer::actingAs($admin)
+        ->resource(CrudComparisonResource::class)
+        ->assertOk()
+        ->assertName('docs-crud-capability-matrix')
+        ->assertTitle('MajlisIlmu API / MCP / Filament Capability Matrix')
+        ->assertSee([
+            '# API / MCP / Filament Capability Matrix',
+            'Structural write-capable intersection',
+            '| `venues` | `R + meta + related + S + C + U + P` |',
+        ]);
+
+    $token = $admin->createToken('mcp-admin-resource-list-test')->plainTextToken;
+
+    $initialize = $this->withToken($token)->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'initialize-admin-mcp-resources',
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => [
+                'name' => 'Pest',
+                'version' => '1.0.0',
+            ],
+        ],
+    ])->assertOk();
+
+    $sessionId = $initialize->headers->get('MCP-Session-Id');
+
+    expect($sessionId)->not->toBeNull();
+
+    $listResources = $this->withToken($token)->withHeaders([
+        'MCP-Session-Id' => (string) $sessionId,
+    ])->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'list-admin-mcp-resources',
+        'method' => 'resources/list',
+        'params' => [],
+    ])->assertOk();
+
+    $resources = collect($listResources->json('result.resources'))->keyBy('name');
+
+    expect($resources->keys()->all())->toContain('docs-mcp-guide', 'docs-crud-capability-matrix');
+    expect($resources->get('docs-mcp-guide'))->toMatchArray([
+        'uri' => 'file://docs/MAJLISILMU_MCP_GUIDE.md',
+        'mimeType' => 'text/markdown',
+    ]);
+    expect($resources->get('docs-crud-capability-matrix'))->toMatchArray([
+        'uri' => 'file://docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md',
+        'mimeType' => 'text/markdown',
+    ]);
 });
 
 function ensureMcpMalaysiaCountryExists(): int

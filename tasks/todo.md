@@ -1,3 +1,28 @@
+# MCP Documentation Resources
+
+- [x] Audit `docs/MAJLISILMU_MCP_GUIDE.md` and `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md` against the live admin/member MCP CRUD surface
+- [x] Fix any stale MCP guide claims before exposing the docs through MCP
+- [x] Add read-only MCP resources for the verified markdown docs on both admin and member servers
+- [x] Add regression coverage for guide accuracy plus MCP resource discovery and reads
+- [x] Run formatter, focused Pest coverage, PHPStan, and diff checks
+
+## Review
+
+- Added `app/Mcp/Resources/Docs/McpGuideResource.php` and `app/Mcp/Resources/Docs/CrudComparisonResource.php`, backed by the shared `MarkdownDocumentResource`, so both admin and member MCP servers now expose the verified markdown docs through MCP `resources/list` and `resources/read`.
+- Registered both documentation resources on `App\Mcp\Servers\AdminServer` and `App\Mcp\Servers\MemberServer`, and updated the server instructions so MCP clients know those verified docs resources exist.
+- Re-verified the two markdown docs before exposure:
+  - `docs/MAJLISILMU_MCP_GUIDE.md` was corrected to include `venues` in the admin write-capable MCP resource set, to remove the unsupported `validate_only?` argument from `member-update-record`, and to document the new MCP docs resources.
+  - `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md` matched the current runtime CRUD/capability model and did not require content changes.
+- Added `tests/Unit/McpGuideDocsTest.php` to lock the guide against the live admin/member write-capable resource sets and the member tool schema, and extended `tests/Feature/Mcp/AdminServerTest.php` plus `tests/Feature/Mcp/MemberServerTest.php` to prove both servers discover and read the new docs resources.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => pass
+  - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideDocsTest.php` => 2 passed, 9 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/CrudComparisonDocsTest.php` => 2 passed, 17 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 33 passed, 364 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php` => 21 passed, 197 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Mcp/Resources/Docs app/Mcp/Servers/AdminServer.php app/Mcp/Servers/MemberServer.php` => pass
+  - `git diff --check` => pass
+
 # Event Detail Share Console Fix
 
 - [x] Reproduce the console error in the browser
