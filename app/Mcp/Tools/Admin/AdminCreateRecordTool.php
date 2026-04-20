@@ -7,6 +7,7 @@ namespace App\Mcp\Tools\Admin;
 use App\Support\Api\Admin\AdminResourceService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -31,7 +32,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
 
     public function handle(Request $request): ResponseFactory|Response
     {
-        return $this->structuredResponse(function () use ($request): array {
+        return $this->safeResponse(function () use ($request): ResponseFactory|Response {
             $actor = $this->authorizeAdmin($request);
 
             $validated = $this->validateArguments($request, [
@@ -51,16 +52,25 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
                 actor: $actor,
             );
             $normalizedMediaPayload = $this->normalizeMcpMediaPayload($payload, $schemaResponse);
+            $validateOnly = (bool) ($validated['validate_only'] ?? false);
 
             try {
                 $payload = $this->normalizePayloadForWriteTool($resourceKey, $normalizedMediaPayload['payload']);
 
-                return $this->resourceService->storeRecord(
-                    resourceKey: $resourceKey,
-                    payload: $payload,
-                    actor: $actor,
-                    validateOnly: (bool) ($validated['validate_only'] ?? false),
-                );
+                try {
+                    return Response::structured($this->resourceService->storeRecord(
+                        resourceKey: $resourceKey,
+                        payload: $payload,
+                        actor: $actor,
+                        validateOnly: $validateOnly,
+                    ));
+                } catch (ValidationException $exception) {
+                    if ($validateOnly) {
+                        return $this->validateOnlyErrorResponse($exception, $payload, $schemaResponse);
+                    }
+
+                    throw $exception;
+                }
             } finally {
                 $this->cleanupMcpMediaPayload($normalizedMediaPayload);
             }
