@@ -230,9 +230,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             $missing = ! $this->fieldExists($payload, $field) || $currentValue === null || $currentValue === '';
             $default = $contract['default'] ?? null;
             $closestValidValue = $this->closestValidValue($currentValue, $allowedValues);
-            $suggested = $missing
-                ? ($default ?? $allowedValues[0] ?? null)
-                : ($closestValidValue ?? $default ?? $allowedValues[0] ?? null);
+            $suggested = $this->suggestedValue($missing, $default, $closestValidValue, $allowedValues);
             $requiredBecause = $this->requiredBecause($field, $schema, $candidatePayload ?? $payload);
             $autoFillSafe = $missing && array_key_exists('default', $contract);
 
@@ -390,10 +388,6 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
                 return $allowedValue;
             }
 
-            if ($shortestDistance !== null && abs(strlen($normalizedValue) - strlen($candidate)) > $shortestDistance) {
-                continue;
-            }
-
             $distance = levenshtein($normalizedValue, $candidate);
 
             if ($shortestDistance === null || $distance < $shortestDistance) {
@@ -459,6 +453,26 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
         return null;
     }
 
+    /**
+     * @param  list<string|int>|null  $allowedValues
+     */
+    private function suggestedValue(
+        bool $missing,
+        mixed $default,
+        string|int|null $closestValidValue,
+        ?array $allowedValues,
+    ): mixed {
+        if ($missing) {
+            return $default ?? $allowedValues[0] ?? null;
+        }
+
+        return $closestValidValue ?? $default ?? $allowedValues[0] ?? null;
+    }
+
+    /**
+     * Recursively merge nested object-like payload fragments while treating list values as atomic.
+     * Lists represent explicit user selections and should replace defaults instead of being merged item-by-item.
+     */
     private function shouldMergeRecursively(mixed $defaultValue, mixed $payloadValue): bool
     {
         return is_array($defaultValue)
