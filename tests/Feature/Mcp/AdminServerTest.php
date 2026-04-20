@@ -438,6 +438,75 @@ it('previews admin speaker updates through the MCP write tool without persisting
         ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
 });
 
+it('returns remediation details for validate only admin create validation failures', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Remediation Preview Speaker',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.fix_plan.0.action', 'set_field')
+            ->where('error.details.fix_plan.0.field', 'gender')
+            ->where('error.details.fix_plan.0.value', 'male')
+            ->where('error.details.fix_plan.1.action', 'choose_one')
+            ->where('error.details.fix_plan.1.field', 'status')
+            ->where('error.details.fix_plan.1.options.0', 'pending')
+            ->where('error.details.fix_plan.1.options.1', 'verified')
+            ->where('error.details.fix_plan.1.options.2', 'rejected')
+            ->where('error.details.fix_plan.2.action', 'set_field')
+            ->where('error.details.fix_plan.2.field', 'address')
+            ->where('error.details.normalized_payload_preview.name', 'Remediation Preview Speaker')
+            ->where('error.details.normalized_payload_preview.gender', 'male')
+            ->where('error.details.normalized_payload_preview.address.country_id', 132)
+            ->where('error.details.remaining_blockers.0.field', 'status')
+            ->where('error.details.remaining_blockers.0.type', 'required_choice')
+            ->where('error.details.can_retry', false)
+            ->etc());
+});
+
+it('returns retryable remediation details for validate only admin update validation failures', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $speaker = Speaker::factory()->create([
+        'name' => 'Retryable Admin MCP Speaker',
+        'gender' => 'male',
+        'status' => 'verified',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => $speaker->getKey(),
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Retryable Admin MCP Speaker Updated',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.fix_plan.0.action', 'set_field')
+            ->where('error.details.fix_plan.0.field', 'gender')
+            ->where('error.details.fix_plan.0.value', 'male')
+            ->where('error.details.fix_plan.1.action', 'set_field')
+            ->where('error.details.fix_plan.1.field', 'status')
+            ->where('error.details.fix_plan.1.value', 'verified')
+            ->where('error.details.normalized_payload_preview.name', 'Retryable Admin MCP Speaker Updated')
+            ->where('error.details.normalized_payload_preview.gender', 'male')
+            ->where('error.details.normalized_payload_preview.status', 'verified')
+            ->has('error.details.remaining_blockers', 0)
+            ->where('error.details.can_retry', true)
+            ->etc());
+});
+
 it('registers admin write tools when the MCP actor is a normalized Passport user', function () {
     $admin = adminMcpUser('super_admin');
 

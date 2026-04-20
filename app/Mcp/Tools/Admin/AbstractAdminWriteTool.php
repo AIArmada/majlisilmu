@@ -12,6 +12,8 @@ use App\Support\Mcp\McpFilePayloadNormalizer;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
+use Laravel\Mcp\ResponseFactory;
+use Laravel\Mcp\Support\ValidationMessages;
 
 abstract class AbstractAdminWriteTool extends AbstractAdminTool
 {
@@ -120,6 +122,208 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             is_array($value) => $value !== [],
             is_bool($value) => $value,
             default => $value !== null,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     */
+    protected function validateOnlyErrorResponse(
+        ValidationException $exception,
+        array $payload,
+        array $schemaResponse,
+    ): ResponseFactory {
+        return $this->errorResponse(
+            ValidationMessages::from($exception),
+            'validation_error',
+            [
+                'errors' => $exception->errors(),
+                ...$this->validateOnlyRemediationPlan($payload, $schemaResponse, $exception),
+            ],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     * @return array{
+     *     fix_plan: list<array<string, mixed>>,
+     *     remaining_blockers: list<array<string, mixed>>,
+     *     normalized_payload_preview: array<string, mixed>,
+     *     can_retry: bool
+     * }
+     */
+    protected function validateOnlyRemediationPlan(
+        array $payload,
+        array $schemaResponse,
+        ValidationException $exception,
+    ): array {
+        $schema = Arr::get($schemaResponse, 'data.schema', []);
+        $fieldMap = $this->fieldMapFromSchemaResponse($schemaResponse);
+        $defaults = is_array($schema['defaults'] ?? null) ? $schema['defaults'] : [];
+        $normalizedPayloadPreview = $payload;
+
+        $fixPlan = [];
+        $remainingBlockers = [];
+
+        foreach ($exception->errors() as $field => $messages) {
+            if (! is_string($field) || ! is_array($messages)) {
+                continue;
+            }
+
+            $fieldDefinition = $this->fieldDefinitionForPath($field, $fieldMap);
+            $currentValue = data_get($normalizedPayloadPreview, $field);
+            $defaultValue = $this->defaultValueForPath($field, $defaults, $fieldDefinition);
+
+            if ($defaultValue['exists'] && $this->isMissingRemediationValue($currentValue)) {
+                data_set($normalizedPayloadPreview, $field, $defaultValue['value']);
+
+                $fixPlan[$field] = [
+                    'action' => 'set_field',
+                    'field' => $field,
+                    'value' => $defaultValue['value'],
+                    'auto_apply_safe' => true,
+                ];
+
+                continue;
+            }
+
+            $allowedValues = $this->allowedValuesForField($fieldDefinition);
+
+            if ($allowedValues !== []) {
+                $fixPlan[$field] = [
+                    'action' => $this->allowsMultipleChoices($fieldDefinition) ? 'choose_many' : 'choose_one',
+                    'field' => $field,
+                    'options' => $allowedValues,
+                    'auto_apply_safe' => false,
+                ];
+
+                $remainingBlockers[] = array_filter([
+                    'field' => $field,
+                    'type' => $this->isMissingRemediationValue($currentValue) ? 'required_choice' : 'invalid_choice',
+                    'options' => $allowedValues,
+                    'messages' => array_values(array_map(static fn (mixed $message): string => (string) $message, $messages)),
+                ], static fn (mixed $value): bool => $value !== []);
+
+                continue;
+            }
+
+            $remainingBlockers[] = [
+                'field' => $field,
+                'type' => $this->isMissingRemediationValue($currentValue) ? 'missing_value' : 'validation_error',
+                'messages' => array_values(array_map(static fn (mixed $message): string => (string) $message, $messages)),
+            ];
+        }
+
+        return [
+            'fix_plan' => array_values($fixPlan),
+            'remaining_blockers' => $remainingBlockers,
+            'normalized_payload_preview' => $normalizedPayloadPreview,
+            'can_retry' => $remainingBlockers === [],
+        ];
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $fieldMap
+     * @return array<string, mixed>|null
+     */
+    private function fieldDefinitionForPath(string $path, array $fieldMap): ?array
+    {
+        return $fieldMap[$path] ?? null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $schemaResponse
+     * @return array<string, array<string, mixed>>
+     */
+    private function fieldMapFromSchemaResponse(array $schemaResponse): array
+    {
+        $fields = Arr::get($schemaResponse, 'data.schema.fields', []);
+
+        if (! is_array($fields)) {
+            return [];
+        }
+
+        $fieldMap = [];
+
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            $name = $field['name'] ?? null;
+
+            if (! is_string($name) || $name === '') {
+                continue;
+            }
+
+            $fieldMap[$name] = $field;
+        }
+
+        return $fieldMap;
+    }
+
+    /**
+     * @param  array<string, mixed>  $defaults
+     * @param  array<string, mixed>|null  $fieldDefinition
+     * @return array{exists: bool, value: mixed}
+     */
+    private function defaultValueForPath(string $path, array $defaults, ?array $fieldDefinition): array
+    {
+        if (Arr::has($defaults, $path)) {
+            return [
+                'exists' => true,
+                'value' => data_get($defaults, $path),
+            ];
+        }
+
+        if (is_array($fieldDefinition) && array_key_exists('default', $fieldDefinition)) {
+            return [
+                'exists' => true,
+                'value' => $fieldDefinition['default'],
+            ];
+        }
+
+        return [
+            'exists' => false,
+            'value' => null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $fieldDefinition
+     * @return list<string|int>
+     */
+    private function allowedValuesForField(?array $fieldDefinition): array
+    {
+        $allowedValues = $fieldDefinition['allowed_values'] ?? null;
+
+        if (! is_array($allowedValues)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $allowedValues,
+            static fn (mixed $value): bool => is_string($value) || is_int($value),
+        ));
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $fieldDefinition
+     */
+    private function allowsMultipleChoices(?array $fieldDefinition): bool
+    {
+        return is_string($fieldDefinition['type'] ?? null)
+            && str_starts_with((string) $fieldDefinition['type'], 'array<');
+    }
+
+    private function isMissingRemediationValue(mixed $value): bool
+    {
+        return match (true) {
+            is_string($value) => trim($value) === '',
+            is_array($value) => $value === [],
+            default => $value === null,
         };
     }
 }
