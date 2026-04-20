@@ -924,6 +924,10 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         ],
     ])->assertOk();
 
+    expect($initialize->json('result.instructions'))->toContain('institution-type nouns (`masjid`, `surau`, `madrasah`, `maahad`, `pondok`, `sekolah`, `kolej`, `universiti`) should be searched as `institutions` first')
+        ->toContain('venue-type nouns (`dewan`, `auditorium`, `stadium`, `perpustakaan`, `padang`, `hotel`) should be searched as `venues` first')
+        ->toContain('`spaces` are finer-grained sublocations inside institutions');
+
     $sessionId = $initialize->headers->get('MCP-Session-Id');
 
     expect($sessionId)->not->toBeNull();
@@ -1094,6 +1098,7 @@ it('lists and reads the documentation routing prompt through the admin MCP serve
         ->assertSee([
             'Use the verified documentation tools like this:',
             'Use `fetch` first',
+            'Search `institutions` first when the noun matches an institution type',
             'Topic-specific guidance for "crud":',
             'Fetch `docs-mcp-guide` and focus on the MCP capability matrix, writable resource matrix, and preview sections.',
         ]);
@@ -1136,7 +1141,7 @@ it('lists and reads the documentation routing prompt through the admin MCP serve
         'arguments' => [
             [
                 'name' => 'topic',
-                'description' => 'Optional focus area such as crud, auth, media uploads, runtime records, search, or fetch.',
+                'description' => 'Optional focus area such as crud, auth, media uploads, runtime records, entity selection, search, or fetch.',
                 'required' => false,
             ],
         ],
@@ -1158,6 +1163,7 @@ it('lists and reads the documentation routing prompt through the admin MCP serve
 
     expect($getPrompt->json('result.description'))->toBe('Short guidance for deciding when to use the verified documentation search and fetch tools exposed by this server, with an optional topic hint for more targeted advice.');
     expect($getPrompt->json('result.messages.0.content.text'))->toContain('Use `fetch` first');
+    expect($getPrompt->json('result.messages.0.content.text'))->toContain('Search `institutions` first when the noun matches an institution type');
     expect($getPrompt->json('result.messages.0.content.text'))->toContain('Topic-specific guidance for "crud":');
     expect($getPrompt->json('result.messages.0.content.text'))->toContain('Fetch `docs-mcp-guide` and focus on the MCP capability matrix, writable resource matrix, and preview sections.');
 });
@@ -1174,6 +1180,8 @@ it('lists and reads verified documentation resources through the admin MCP serve
             '# MajlisIlmu MCP Guide',
             'Verified documentation resources',
             '### MCP capability matrix',
+            '### Entity selection heuristics for record search',
+            '### Quick search playbook',
             'Current structurally write-capable admin resources include:',
             '- `venues`',
         ]);

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\InstitutionType;
+use App\Enums\VenueType;
 use App\Support\Api\Admin\AdminResourceMutationService;
 use App\Support\Api\Member\MemberResourceMutationService;
 use Filament\Facades\Filament;
@@ -41,7 +43,22 @@ it('keeps the MCP guide aligned with the verified admin and member write-capable
         ->toContain('The broader internal cross-surface parity docs (`MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.*`) are intentionally not exposed through MCP.')
         ->toContain('### MCP capability matrix')
         ->toContain('| Related-record traversal | `admin-list-related-records` | No generic related-record tool |')
-        ->toContain('| `venues` | list/get/meta + schema + create + update + preview | Not exposed |');
+        ->toContain('| `venues` | list/get/meta + schema + create + update + preview | Not exposed |')
+        ->toContain('### Entity selection heuristics for record search')
+        ->toContain('`spaces` as finer-grained sublocations inside an institution')
+        ->toContain('`Masjid Abidin` should be searched in `institutions` first.')
+        ->toContain('### Quick search playbook')
+        ->toContain('Mosque, surau, school, campus, madrasah, maahad, pondok, or university-style names → search `institutions` first.')
+        ->toContain('Standalone hall/dewan, auditorium, stadium, library, field, or hotel-style names → search `venues` first.')
+        ->toContain('resolve the parent `institution` first, then use `spaces` for the internal location when needed.');
+
+    foreach (InstitutionType::cases() as $type) {
+        expect($markdown)->toContain('`'.$type->value.'`');
+    }
+
+    foreach (VenueType::cases() as $type) {
+        expect($markdown)->toContain('`'.$type->value.'`');
+    }
 });
 
 it('keeps the member update tool appendix aligned with the live member MCP schema', function () {

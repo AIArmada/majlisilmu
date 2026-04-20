@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mcp\Prompts;
 
+use App\Enums\InstitutionType;
+use App\Enums\VenueType;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -39,7 +41,7 @@ class DocumentationToolRoutingPrompt extends Prompt
         return [
             new Argument(
                 name: 'topic',
-                description: 'Optional focus area such as crud, auth, media uploads, runtime records, search, or fetch.',
+                description: 'Optional focus area such as crud, auth, media uploads, runtime records, entity selection, search, or fetch.',
                 required: false,
             ),
         ];
@@ -60,7 +62,9 @@ Known verified page id:
 Do not use `search` or `fetch` for live runtime records or mutations:
 - use the admin/member resource, record, relation, and write-schema tools for runtime data
 - use the docs tools only for verified documentation
-
+TEXT,
+            $this->entitySelectionGuidance(),
+            <<<'TEXT'
 Recommended flow:
 1. If the question is obviously about the exposed MCP docs, call `fetch` with `docs-mcp-guide` directly.
 2. Otherwise call `search` with a short topical query.
@@ -73,6 +77,20 @@ TEXT,
         ]));
     }
 
+    private function entitySelectionGuidance(): string
+    {
+        $institutionTerms = $this->formattedTerms($this->institutionTerms());
+        $venueTerms = $this->formattedTerms($this->venueTerms());
+
+        return <<<TEXT
+For named-place queries, use this entity-selection heuristic before guessing record types:
+- Search `institutions` first when the noun matches an institution type such as {$institutionTerms}.
+- Search `venues` first when the noun matches a venue type such as {$venueTerms}.
+- Treat `spaces` as finer-grained sublocations inside an institution, not as the default first lookup target for named mosques, surau, or other institution identities.
+- Example: `Masjid Abidin` should be searched in `institutions` first. If the noun does not match the institution-type terms and sounds like a standalone physical place, look in `venues` next.
+TEXT;
+    }
+
     private function topicSpecificGuidance(string $topic): string
     {
         $normalizedTopic = Str::of($topic)->lower()->squish()->value();
@@ -82,6 +100,10 @@ TEXT,
         }
 
         $displayTopic = trim($topic);
+        $institutionTerms = $this->institutionTerms();
+        $venueTerms = $this->venueTerms();
+        $institutionTermsList = $this->formattedTerms($institutionTerms);
+        $venueTermsList = $this->formattedTerms($venueTerms);
 
         return match (true) {
             $this->matchesAny($normalizedTopic, ['crud', 'create', 'update', 'delete', 'preview', 'parity', 'capability']) => <<<TEXT
@@ -108,6 +130,13 @@ Topic-specific guidance for "{$displayTopic}":
 - Use admin/member list, get-record, related-record, and write-schema tools for runtime records.
 - Use the verified docs only when you need to confirm what a tool or surface is supposed to do.
 TEXT,
+            $this->matchesAny($normalizedTopic, array_merge(['entity', 'selection', 'institution', 'venue', 'space', 'location'], $institutionTerms, $venueTerms)) => <<<TEXT
+Topic-specific guidance for "{$displayTopic}":
+- Search `institutions` first for institution-type nouns such as {$institutionTermsList}.
+- Search `venues` first for venue-type nouns such as {$venueTermsList}.
+- Only search `spaces` first when the user is clearly asking about an internal hall, room, or sublocation inside a known institution.
+- Example: `Masjid Abidin` belongs in `institutions` first, not `venues` or `spaces`.
+TEXT,
             $this->matchesAny($normalizedTopic, ['search']) => <<<TEXT
 Topic-specific guidance for "{$displayTopic}":
 - Start with `search` because the question is still discovery-oriented.
@@ -127,6 +156,39 @@ Topic-specific guidance for "{$displayTopic}":
 - Prefer `docs-mcp-guide`, because it is the canonical exposed MCP guide and includes the capability matrix and writable resource summaries.
 TEXT,
         };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function institutionTerms(): array
+    {
+        return array_map(
+            static fn (InstitutionType $type): string => $type->value,
+            InstitutionType::cases(),
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function venueTerms(): array
+    {
+        return array_map(
+            static fn (VenueType $type): string => $type->value,
+            VenueType::cases(),
+        );
+    }
+
+    /**
+     * @param  list<string>  $terms
+     */
+    private function formattedTerms(array $terms): string
+    {
+        return implode(', ', array_map(
+            static fn (string $term): string => sprintf('`%s`', $term),
+            $terms,
+        ));
     }
 
     /**

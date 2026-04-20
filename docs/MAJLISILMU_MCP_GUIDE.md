@@ -226,6 +226,38 @@ Use this section as the quick MCP-only capability summary.
 - Member MCP has no generic related-record tool today.
 - Do not assume every admin resource has a relation you can traverse; rely on metadata returned by the live tool.
 
+### Entity selection heuristics for record search
+
+Use these heuristics before guessing which top-level resource to search:
+
+- Search `institutions` first when the noun matches an institution type from `App\Enums\InstitutionType`:
+  - `masjid`
+  - `surau`
+  - `madrasah`
+  - `maahad`
+  - `pondok`
+  - `sekolah`
+  - `kolej`
+  - `universiti`
+- Search `venues` first when the noun matches a venue type from `App\Enums\VenueType`:
+  - `dewan`
+  - `auditorium`
+  - `stadium`
+  - `perpustakaan`
+  - `padang`
+  - `hotel`
+- Treat `spaces` as finer-grained sublocations inside an institution, not as the default first lookup target for named mosques, surau, or other institution identities.
+- Example: `Masjid Abidin` should be searched in `institutions` first. If the noun does not match the institution-type terms and sounds like a standalone physical place, look in `venues` next.
+
+### Quick search playbook
+
+When the user asks you to “look for” a named place, start with the most likely top-level resource instead of fanning out across multiple resource types immediately:
+
+- Mosque, surau, school, campus, madrasah, maahad, pondok, or university-style names → search `institutions` first.
+- Standalone hall/dewan, auditorium, stadium, library, field, or hotel-style names → search `venues` first.
+- Room, wing, floor, block, or hall inside a known institution → resolve the parent `institution` first, then use `spaces` for the internal location when needed.
+- Only broaden to a second top-level resource when the first pass returns no good match or the user’s wording is genuinely ambiguous.
+
 ### Record and schema reading rules
 
 - Use `record_key` values from prior MCP results; prefer returned route-key-style identifiers when the record payload exposes them.
