@@ -17,6 +17,20 @@ use Laravel\Mcp\Support\ValidationMessages;
 
 abstract class AbstractAdminWriteTool extends AbstractAdminTool
 {
+    private const ACTION_SET_FIELD = 'set_field';
+
+    private const ACTION_CHOOSE_ONE = 'choose_one';
+
+    private const ACTION_CHOOSE_MANY = 'choose_many';
+
+    private const BLOCKER_REQUIRED_CHOICE = 'required_choice';
+
+    private const BLOCKER_INVALID_CHOICE = 'invalid_choice';
+
+    private const BLOCKER_MISSING_VALUE = 'missing_value';
+
+    private const BLOCKER_VALIDATION_ERROR = 'validation_error';
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -180,7 +194,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
                 data_set($normalizedPayloadPreview, $field, $defaultValue['value']);
 
                 $fixPlan[$field] = [
-                    'action' => 'set_field',
+                    'action' => self::ACTION_SET_FIELD,
                     'field' => $field,
                     'value' => $defaultValue['value'],
                     'auto_apply_safe' => true,
@@ -193,7 +207,9 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
 
             if ($allowedValues !== []) {
                 $fixPlan[$field] = [
-                    'action' => $this->allowsMultipleChoices($fieldDefinition) ? 'choose_many' : 'choose_one',
+                    'action' => $this->allowsMultipleChoices($fieldDefinition)
+                        ? self::ACTION_CHOOSE_MANY
+                        : self::ACTION_CHOOSE_ONE,
                     'field' => $field,
                     'options' => $allowedValues,
                     'auto_apply_safe' => false,
@@ -332,9 +348,9 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
     private function determineBlockerType(mixed $currentValue, bool $hasAllowedValues): string
     {
         if ($this->isMissingRemediationValue($currentValue)) {
-            return $hasAllowedValues ? 'required_choice' : 'missing_value';
+            return $hasAllowedValues ? self::BLOCKER_REQUIRED_CHOICE : self::BLOCKER_MISSING_VALUE;
         }
 
-        return $hasAllowedValues ? 'invalid_choice' : 'validation_error';
+        return $hasAllowedValues ? self::BLOCKER_INVALID_CHOICE : self::BLOCKER_VALIDATION_ERROR;
     }
 }
