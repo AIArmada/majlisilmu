@@ -67,7 +67,11 @@ class MemberCreateGitHubIssueTool extends AbstractMemberTool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'category' => $schema->string()->required()->min(1),
+            'category' => $schema->string()
+                ->required()
+                ->enum(GitHubIssueReportContract::categories())
+                ->default(GitHubIssueReportContract::DEFAULT_CATEGORY)
+                ->description(GitHubIssueReportContract::categoryDescription()),
             'title' => $schema->string()->required()->min(3),
             'summary' => $schema->string()->required()->min(10),
             'description' => $schema->string()->nullable(),

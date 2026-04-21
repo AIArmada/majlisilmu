@@ -64,6 +64,10 @@ class GitHubIssueReporter
     {
         $this->ensureConfigured();
 
+        if (! $this->adminCopilotAssignmentEnabled()) {
+            return $this->createPlainIssue($title, $body);
+        }
+
         $attemptedModels = [];
         $modelErrors = [];
 
@@ -302,5 +306,10 @@ class GitHubIssueReporter
     private function copilotAssignee(): string
     {
         return (string) config('services.github.issues.copilot_assignee', 'copilot-swe-agent[bot]');
+    }
+
+    private function adminCopilotAssignmentEnabled(): bool
+    {
+        return (bool) config('services.github.issues.admin_copilot_assignment_enabled', true);
     }
 }
