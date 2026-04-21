@@ -344,6 +344,7 @@ Schema fields describe the exact upload rules:
 - `accepted_mime_types`, `max_file_size_kb`, and `max_files` are authoritative for that field.
 - `mcp_upload.replacement_semantics` describes whether the submitted descriptor or descriptor array replaces the target media collection.
 - When a write tool supports `validate_only=true` (currently admin create/update only), previews normalize descriptors into file summaries without persisting media.
+- Admin preview validation failures now include schema-driven `feedback` hints (`allowed_values`, `suggested`, `closest_valid_value`, `default`, `required_because`) and can return a candidate `normalized_payload` when `apply_defaults=true`.
 - `current_media` stays metadata-only and does not expose signed or temporary URLs.
 - `clear_*` media flags remain unsupported through MCP and are rejected even when clients submit them manually.
 
@@ -365,7 +366,9 @@ Read-only admin resources are still discoverable through the resource list and m
 Write-tool preview tip:
 
 - `admin-create-record` and `admin-update-record` accept `validate_only=true` to validate, normalize, and preview a write without persisting it.
+- Add `apply_defaults=true` on preview calls when you want the server to apply schema defaults before validation and return a candidate autofilled payload in validation feedback.
 - Preview responses return the normalized payload plus warning metadata for supported write-side checks.
+- Validation failures return schema-driven `feedback` issues with suggested values, defaults, and conditional `required_because` context.
 - MCP write schemas advertise supported media/file fields with JSON descriptor metadata, do not advertise destructive media clear-flags, and reject clear-flags if a client submits them anyway.
 - Update previews also include the current record snapshot so you can compare what would change before retrying without `validate_only`.
 
@@ -435,8 +438,8 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `admin-list-related-records` | Traverse a named relation on a record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `admin-get-record` | Read one admin record and its permissions | `resource_key`, `record_key` |
 | `admin-get-write-schema` | Fetch the create/update contract for a writable admin record | `resource_key`, `operation`, `record_key?` |
-| `admin-create-record` | Create or preview a writable admin record | `resource_key`, `payload`, `validate_only?` |
-| `admin-update-record` | Update or preview a writable admin record | `resource_key`, `record_key`, `payload`, `validate_only?` |
+| `admin-create-record` | Create or preview a writable admin record | `resource_key`, `payload`, `validate_only?`, `apply_defaults?` |
+| `admin-update-record` | Update or preview a writable admin record | `resource_key`, `record_key`, `payload`, `validate_only?`, `apply_defaults?` |
 
 ### Member MCP tools
 

@@ -364,6 +364,45 @@ it('previews admin speaker updates without persisting the record', function () {
         ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
 });
 
+it('returns autofill hints and conditional requirements in admin api dry runs', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $this->postJson('/api/v1/admin/events?validate_only=1&apply_defaults=1', [
+        'title' => 'Admin API AI Feedback Preview',
+        'event_date' => '2026-06-10',
+    ])->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_error')
+        ->assertJsonPath('error.details.feedback.validate_only', true)
+        ->assertJsonPath('error.details.feedback.apply_defaults', true)
+        ->assertJsonPath('error.details.feedback.normalized_payload.timezone', 'Asia/Kuala_Lumpur')
+        ->assertJsonPath('error.details.feedback.normalized_payload.event_format', EventFormat::Physical->value)
+        ->assertJsonPath('error.details.feedback.normalized_payload.prayer_time', EventPrayerTime::LainWaktu->value)
+        ->assertJsonPath('error.details.feedback.issues.0.field', 'custom_time')
+        ->assertJsonPath('error.details.feedback.issues.0.required_because.prayer_time', EventPrayerTime::LainWaktu->value);
+});
+
+it('returns structured enum suggestions for admin api validation errors', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $this->postJson('/api/v1/admin/events', [
+        'title' => 'Admin API Invalid Enum Preview',
+        'event_date' => '2026-06-10',
+        'custom_time' => '8:30 PM',
+        'event_format' => 'physicl',
+    ])->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_error')
+        ->assertJsonPath('error.details.feedback.validate_only', false)
+        ->assertJsonPath('error.details.feedback.apply_defaults', false)
+        ->assertJsonPath('error.details.feedback.issues.0.field', 'event_format')
+        ->assertJsonPath('error.details.feedback.issues.0.closest_valid_value', EventFormat::Physical->value)
+        ->assertJsonPath('error.details.feedback.issues.0.suggested', EventFormat::Physical->value)
+        ->assertJsonPath('error.details.feedback.issues.0.allowed_values.0', EventFormat::Physical->value);
+});
+
 it('lists related records for admin resource relations', function () {
     $admin = adminApiUser('super_admin');
     $relatedTitle = 'Nested Relation Event '.Str::ulid();
