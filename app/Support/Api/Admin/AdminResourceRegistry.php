@@ -435,6 +435,13 @@ class AdminResourceRegistry
                     'record_key' => 'record',
                 ],
             ],
+            'get_record_actions' => [
+                'tool' => 'admin-get-record-actions',
+                'arguments' => [
+                    'resource_key' => $key,
+                    'record_key' => 'record',
+                ],
+            ],
             'get_create_schema' => $supportsMutation
                 ? [
                     'tool' => 'admin-get-write-schema',

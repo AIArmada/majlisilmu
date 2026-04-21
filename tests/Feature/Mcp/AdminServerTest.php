@@ -18,7 +18,12 @@ use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
 use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
 use App\Mcp\Tools\Admin\AdminDocumentationSearchTool;
+use App\Mcp\Tools\Admin\AdminGetContributionRequestReviewSchemaTool;
+use App\Mcp\Tools\Admin\AdminGetEventModerationSchemaTool;
+use App\Mcp\Tools\Admin\AdminGetMembershipClaimReviewSchemaTool;
+use App\Mcp\Tools\Admin\AdminGetRecordActionsTool;
 use App\Mcp\Tools\Admin\AdminGetRecordTool;
+use App\Mcp\Tools\Admin\AdminGetReportTriageSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetResourceMetaTool;
 use App\Mcp\Tools\Admin\AdminGetWriteSchemaTool;
 use App\Mcp\Tools\Admin\AdminListRecordsTool;
@@ -44,6 +49,7 @@ use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
+use App\Models\Venue;
 use App\Support\GitHub\GitHubIssueReportContract;
 use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Carbon;
@@ -268,6 +274,8 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->where('data.resource.mcp_tools.list_records.tool', 'admin-list-records')
             ->where('data.resource.mcp_tools.list_records.arguments.resource_key', 'speakers')
             ->where('data.resource.mcp_tools.list_records.arguments.filters', 'object')
+            ->where('data.resource.mcp_tools.get_record_actions.tool', 'admin-get-record-actions')
+            ->where('data.resource.mcp_tools.get_record_actions.arguments.record_key', 'record')
             ->where('data.resource.mcp_tools.create.arguments.validate_only', false)
             ->where('data.resource.mcp_tools.update.arguments.validate_only', false)
             ->etc());
@@ -295,6 +303,36 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->where('data.resource.key', 'speakers')
             ->where('data.record.route_key', $speaker->getRouteKey())
             ->where('data.record.attributes.name', 'Admin MCP Speaker')
+            ->etc());
+});
+
+it('returns focused next-step actions for admin records through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $event = Event::factory()->create([
+        'title' => 'Admin MCP Actionable Event',
+        'status' => 'pending',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetRecordActionsTool::class, [
+            'resource_key' => 'events',
+            'record_key' => $event->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'events')
+            ->where('data.record.route_key', $event->getRouteKey())
+            ->where('data.focus_actions.recommended_keys.0', 'get_event_moderation_schema')
+            ->where('data.focus_actions.actions', fn ($actions): bool => empty(array_diff(
+                ['get_record', 'get_update_schema', 'update_record', 'get_event_moderation_schema', 'moderate_event'],
+                collect($actions)->pluck('key')->all(),
+            )))
+            ->where('data.focus_actions.actions', fn ($actions): bool => data_get(collect($actions)->firstWhere('key', 'get_event_moderation_schema'), 'tool') === 'admin-get-event-moderation-schema')
+            ->where('data.focus_actions.actions', fn ($actions): bool => data_get(collect($actions)->firstWhere('key', 'moderate_event'), 'tool') === 'admin-moderate-event')
+            ->where('data.focus_actions.actions', fn ($actions): bool => collect(data_get(collect($actions)->firstWhere('key', 'moderate_event'), 'requires', []))->contains('get_event_moderation_schema'))
+            ->where('data.focus_actions.actions', fn ($actions): bool => collect(data_get(collect($actions)->firstWhere('key', 'moderate_event'), 'schema.available_actions', []))
+                ->pluck('key')
+                ->contains('approve'))
             ->etc());
 });
 
@@ -359,6 +397,7 @@ it('exposes timezone-aware metadata for admin event resources', function () {
             ->where('data.resource.mcp_tools.list_records.arguments.starts_before', null)
             ->where('data.resource.mcp_tools.list_records.arguments.starts_on_local_date', null)
             ->where('data.resource.mcp_tools.get_record.tool', 'admin-get-record')
+            ->where('data.resource.mcp_tools.get_record_actions.tool', 'admin-get-record-actions')
             ->where('data.resource.mcp_tools.get_record.arguments.resource_key', 'events')
             ->where('data.resource.mcp_tools.get_record.arguments.record_key', 'record')
             ->etc());
@@ -570,6 +609,88 @@ it('reviews contribution requests through the admin MCP workflow tool', function
         ->and($request->fresh()?->reason_code)->toBe('needs_more_evidence')
         ->and($speaker->fresh()?->status)->toBe('rejected')
         ->and($speaker->fresh()?->is_active)->toBeFalse();
+});
+
+it('returns explicit admin workflow schemas through dedicated MCP schema tools', function () {
+    $admin = adminMcpUser('super_admin');
+    $event = Event::factory()->create([
+        'status' => 'pending',
+    ]);
+    $report = Report::factory()->create([
+        'status' => 'open',
+    ]);
+    $speaker = Speaker::factory()->create([
+        'name' => 'Schema MCP Speaker',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+    $request = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Create,
+        'subject_type' => ContributionSubjectType::Speaker,
+        'entity_type' => $speaker->getMorphClass(),
+        'entity_id' => $speaker->getKey(),
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'name' => $speaker->name,
+            'gender' => 'female',
+        ],
+    ]);
+    $institution = Institution::factory()->create();
+    $claimant = User::factory()->create();
+    $claim = MembershipClaim::factory()
+        ->forInstitution($institution)
+        ->create([
+            'claimant_id' => $claimant->getKey(),
+            'status' => 'pending',
+        ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetEventModerationSchemaTool::class, [
+            'record_key' => $event->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'events')
+            ->where('data.record.route_key', $event->getRouteKey())
+            ->where('data.schema.action', 'moderate_event')
+            ->where('data.schema.defaults.action', 'approve')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetReportTriageSchemaTool::class, [
+            'record_key' => $report->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'reports')
+            ->where('data.record.route_key', $report->getRouteKey())
+            ->where('data.schema.action', 'triage_report')
+            ->where('data.schema.defaults.action', 'triage')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetContributionRequestReviewSchemaTool::class, [
+            'record_key' => $request->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'contribution-requests')
+            ->where('data.record.route_key', $request->getRouteKey())
+            ->where('data.schema.action', 'review_contribution_request')
+            ->where('data.schema.defaults.action', 'approve')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetMembershipClaimReviewSchemaTool::class, [
+            'record_key' => $claim->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'membership-claims')
+            ->where('data.record.route_key', $claim->getRouteKey())
+            ->where('data.schema.action', 'review_membership_claim')
+            ->where('data.schema.defaults.action', 'approve')
+            ->etc());
 });
 
 it('exposes series write schema and creates and updates series through the admin MCP server', function () {
@@ -882,6 +1003,141 @@ it('exposes inspiration write schema and creates and updates inspirations throug
         ->and($inspiration->is_active)->toBeFalse();
 });
 
+it('surfaces space report and inspiration update semantics through admin MCP write schemas', function () {
+    $admin = adminMcpUser('super_admin');
+    $space = Space::factory()->create([
+        'capacity' => 40,
+    ]);
+    $report = Report::factory()->create([
+        'status' => 'open',
+    ]);
+    $inspiration = Inspiration::factory()->create([
+        'source' => 'Schema Source',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'spaces',
+            'operation' => 'update',
+            'record_key' => (string) $space->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'spaces')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('slug'), 'uniqueness_scope') === 'spaces.slug'
+                    && data_get($fieldMap->get('capacity'), 'clear_semantics.explicit_null') === 'clear_to_null'
+                    && data_get($fieldMap->get('institutions'), 'collection_semantics.submitted_array') === 'replace_relation_sync';
+            })
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'reports',
+            'operation' => 'update',
+            'record_key' => (string) $report->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'reports')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('entity_type'), 'paired_with') === 'entity_id'
+                    && data_get($fieldMap->get('category'), 'allowed_values_resolved_from') === 'entity_type'
+                    && data_get($fieldMap->get('reporter_id'), 'relation') === 'users'
+                    && data_get($fieldMap->get('resolution_note'), 'clear_semantics.explicit_null') === 'clear_to_null'
+                    && data_get($fieldMap->get('evidence'), 'collection_semantics.explicit_null') === 'preserve_existing_collection'
+                    && data_get($fieldMap->get('evidence'), 'raw_http_clear_flag') === 'clear_evidence';
+            })
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'inspirations',
+            'operation' => 'update',
+            'record_key' => (string) $inspiration->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'inspirations')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('content'), 'input_normalization.kind') === 'rich_text_document'
+                    && data_get($fieldMap->get('source'), 'clear_semantics.explicit_null') === 'clear_to_null'
+                    && data_get($fieldMap->get('main'), 'mutation_semantics') === 'replace_single_media_collection'
+                    && data_get($fieldMap->get('main'), 'raw_http_clear_flag') === 'clear_main';
+            })
+            ->etc());
+});
+
+it('surfaces tag and subdistrict update semantics through admin MCP write schemas', function () {
+    $admin = adminMcpUser('super_admin');
+    $tag = Tag::factory()->discipline()->verified()->create();
+
+    $countryId = ensureMcpMalaysiaCountryExists();
+    $suffix = Str::lower(Str::random(8));
+    $stateId = DB::table('states')->insertGetId([
+        'country_id' => $countryId,
+        'name' => 'Admin MCP Negeri '.$suffix,
+        'country_code' => 'MY',
+    ]);
+    $districtId = DB::table('districts')->insertGetId([
+        'country_id' => $countryId,
+        'state_id' => $stateId,
+        'name' => 'Admin MCP Daerah '.$suffix,
+        'country_code' => 'MY',
+    ]);
+    $subdistrictId = DB::table('subdistricts')->insertGetId([
+        'country_id' => $countryId,
+        'state_id' => $stateId,
+        'district_id' => $districtId,
+        'name' => 'Admin MCP Subdistrict '.$suffix,
+        'country_code' => 'MY',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'tags',
+            'operation' => 'update',
+            'record_key' => (string) $tag->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'tags')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('name'), 'translation_fallback.en') === 'name.ms'
+                    && data_get($fieldMap->get('name.en'), 'clear_semantics.explicit_null') === 'fallback_to_name.ms'
+                    && data_get($fieldMap->get('order_column'), 'clear_semantics.explicit_null') === 'recompute_with_sortable_scope';
+            })
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'subdistricts',
+            'operation' => 'update',
+            'record_key' => (string) $subdistrictId,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'subdistricts')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('country_id'), 'relation') === 'countries'
+                    && data_get($fieldMap->get('state_id'), 'must_match') === ['country_id']
+                    && data_get($fieldMap->get('district_id'), 'clear_semantics.explicit_null') === 'allowed_only_for_federal_territory_state'
+                    && data_get($fieldMap->get('district_id'), 'must_match') === ['country_id', 'state_id']
+                    && data_get($fieldMap->get('name'), 'normalization.trim') === true;
+            })
+            ->etc());
+});
+
 it('returns write schema for supported resources and rejects unknown resources', function () {
     $admin = adminMcpUser('super_admin');
 
@@ -1176,13 +1432,40 @@ it('creates and updates speakers through MCP write tools', function () {
                 'is_freelance' => false,
                 'is_active' => true,
                 'avatar' => adminMcpImageDescriptor('admin-mcp-avatar'),
-                'address' => [],
+                'address' => [
+                    'country_id' => 132,
+                ],
             ],
         ])
         ->assertOk();
 
     $speaker = Speaker::query()->where('name', 'Admin MCP Created Speaker')->firstOrFail();
     $speakerId = (string) $speaker->getKey();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'speakers',
+            'operation' => 'update',
+            'record_key' => $speakerId,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'speakers')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+                $qualificationItemFields = collect(data_get($fieldMap->get('qualifications'), 'item_schema.fields', []))->keyBy('name');
+
+                return data_get($fieldMap->get('address'), 'required') === false
+                    && data_get($fieldMap->get('address'), 'clear_semantics.empty_object') === 'invalid_without_country'
+                    && data_get($fieldMap->get('address.country_id'), 'required_when_parent_present_on_update') === true
+                    && data_get($fieldMap->get('language_ids'), 'collection_semantics.submitted_array') === 'replace_relation_sync'
+                    && data_get($fieldMap->get('contacts'), 'collection_semantics.explicit_null') === 'clear_collection'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to') === 'twitter'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation') === false
+                    && $qualificationItemFields->has('institution')
+                    && $qualificationItemFields->has('degree');
+            })
+            ->etc());
 
     expect($speaker->name)->toBe('Admin MCP Created Speaker')
         ->and($speaker->status)->toBe('verified')
@@ -1205,7 +1488,9 @@ it('creates and updates speakers through MCP write tools', function () {
                 'gallery' => [
                     adminMcpImageDescriptor('admin-mcp-gallery'),
                 ],
-                'address' => [],
+                'address' => [
+                    'country_id' => 132,
+                ],
             ],
         ])
         ->assertOk()
@@ -1215,6 +1500,36 @@ it('creates and updates speakers through MCP write tools', function () {
             ->etc());
 
     expect($speaker->fresh()?->getMedia('gallery'))->toHaveCount(1);
+});
+
+it('requires an explicit speaker country when the address is mutated through admin MCP write tools', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $speaker = Speaker::factory()->create([
+        'name' => 'Admin MCP Speaker Address Guard',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => (string) $speaker->getKey(),
+            'payload' => [
+                'name' => 'Admin MCP Speaker Address Guard',
+                'gender' => 'male',
+                'status' => 'verified',
+                'address' => [],
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.errors', function ($errors): bool {
+                return (collect($errors)->get('address.country_id')[0] ?? null) === 'The address country is required.';
+            })
+            ->etc());
 });
 
 it('creates and updates institutions through MCP write tools', function () {
@@ -1249,6 +1564,33 @@ it('creates and updates institutions through MCP write tools', function () {
         ->and($institution->allow_public_event_submission)->toBeTrue();
 
     AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'institutions',
+            'operation' => 'update',
+            'record_key' => $institutionId,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'institutions')
+            ->where('data.schema.operation', 'update')
+            ->where('data.schema.transport', 'mcp')
+            ->where('data.schema.tool', 'admin-update-record')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+                $contactItemFields = collect(data_get($fieldMap->get('contacts'), 'item_schema.fields', []))->keyBy('name');
+
+                return data_get($fieldMap->get('address'), 'required') === false
+                    && data_get($fieldMap->get('address.country_id'), 'required') === false
+                    && data_get($fieldMap->get('nickname'), 'clear_semantics.explicit_null') === 'preserve_existing'
+                    && data_get($fieldMap->get('contacts'), 'collection_semantics.explicit_null') === 'clear_collection'
+                    && $contactItemFields->has('type')
+                    && $contactItemFields->has('value')
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to') === 'twitter'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation') === false;
+            })
+            ->etc());
+
+    AdminServer::actingAs($admin)
         ->tool(AdminUpdateRecordTool::class, [
             'resource_key' => 'institutions',
             'record_key' => $institutionId,
@@ -1274,6 +1616,188 @@ it('creates and updates institutions through MCP write tools', function () {
     expect($institution->fresh()?->slug)->not->toBe('attempted-admin-institution-injection')
         ->and(abs(((float) $institution->fresh()?->addressModel?->lat) - (float) $originalLat))->toBeLessThan(0.000001)
         ->and(abs(((float) $institution->fresh()?->addressModel?->lng) - (float) $originalLng))->toBeLessThan(0.000001);
+});
+
+it('preserves institution nickname on null and clears it on empty string through admin MCP write tools', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'name' => 'Admin MCP Institution Nickname',
+        'nickname' => 'MCP Surau',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'institutions',
+            'record_key' => $institution->getKey(),
+            'payload' => [
+                'name' => 'Admin MCP Institution Nickname',
+                'nickname' => null,
+                'type' => 'masjid',
+                'status' => 'verified',
+                'is_active' => true,
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.nickname', 'MCP Surau')
+            ->etc());
+
+    expect($institution->fresh()?->nickname)->toBe('MCP Surau');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'institutions',
+            'record_key' => $institution->getKey(),
+            'payload' => [
+                'name' => 'Admin MCP Institution Nickname',
+                'nickname' => '',
+                'type' => 'masjid',
+                'status' => 'verified',
+                'is_active' => true,
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.nickname', null)
+            ->etc());
+
+    expect($institution->fresh()?->nickname)->toBeNull();
+});
+
+it('surfaces venue and reference update semantics through admin MCP write schemas', function () {
+    $admin = adminMcpUser('super_admin');
+    $venue = Venue::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'venues',
+            'operation' => 'update',
+            'record_key' => (string) $venue->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'venues')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('name'), 'required') === false
+                    && data_get($fieldMap->get('address'), 'required') === false
+                    && data_get($fieldMap->get('address'), 'clear_semantics.empty_object') === 'delete_existing_address'
+                    && data_get($fieldMap->get('facilities'), 'input_normalization.kind') === 'facility_list_to_boolean_map'
+                    && data_get($fieldMap->get('contacts'), 'collection_semantics.explicit_null') === 'clear_collection'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to') === 'twitter'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation') === false;
+            })
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'references',
+            'operation' => 'update',
+            'record_key' => (string) $reference->getRouteKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'references')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('author'), 'clear_semantics.explicit_null') === 'clear_to_null'
+                    && data_get($fieldMap->get('publication_year'), 'normalization.empty_string_at_mutation_layer') === 'null'
+                    && data_get($fieldMap->get('social_media'), 'collection_semantics.submitted_array') === 'replace_collection'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to') === 'twitter'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation') === false;
+            })
+            ->etc());
+});
+
+it('surfaces event series and donation channel update semantics through admin MCP write schemas', function () {
+    $admin = adminMcpUser('super_admin');
+    $event = Event::factory()->create([
+        'status' => 'approved',
+    ]);
+    $series = Series::factory()->create([
+        'description' => 'Series schema surface',
+    ]);
+    $institution = Institution::factory()->create();
+    $donationChannel = DonationChannel::factory()->create([
+        'donatable_type' => (string) (new Institution)->getMorphClass(),
+        'donatable_id' => (string) $institution->getKey(),
+        'recipient' => 'Schema Donation Channel',
+        'method' => 'bank_account',
+        'bank_name' => 'CIMB',
+        'account_number' => '1234567890',
+        'status' => 'verified',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'events',
+            'operation' => 'update',
+            'record_key' => (string) $event->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'events')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+                $otherKeyPeopleFields = collect(data_get($fieldMap->get('other_key_people'), 'item_schema.fields', []))->keyBy('name');
+
+                return data_get($fieldMap->get('title'), 'required') === false
+                    && data_get($fieldMap->get('references'), 'collection_semantics.explicit_null') === 'clear_collection'
+                    && data_get($fieldMap->get('speakers'), 'collection_semantics.submitted_array') === 'replace_speaker_subset_and_rebuild_key_people'
+                    && data_get($fieldMap->get('organizer_type'), 'accepted_aliases.institution') === Institution::class
+                    && data_get($fieldMap->get('registration_mode'), 'lock_behavior.when_event_has_registrations') === 'retain_current_value'
+                    && $otherKeyPeopleFields->has('role')
+                    && $otherKeyPeopleFields->has('name');
+            })
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'series',
+            'operation' => 'update',
+            'record_key' => (string) $series->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'series')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('slug'), 'uniqueness_scope') === 'series.slug'
+                    && data_get($fieldMap->get('description'), 'clear_semantics.explicit_null') === 'clear_to_null'
+                    && data_get($fieldMap->get('languages'), 'collection_semantics.submitted_array') === 'replace_relation_sync';
+            })
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'donation-channels',
+            'operation' => 'update',
+            'record_key' => (string) $donationChannel->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.resource_key', 'donation-channels')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('donatable_type'), 'accepted_aliases.events') === (string) (new Event)->getMorphClass()
+                    && data_get($fieldMap->get('method'), 'switch_clears_fields.ewallet') === ['bank_code', 'bank_name', 'account_number', 'duitnow_type', 'duitnow_value']
+                    && data_get($fieldMap->get('label'), 'clear_semantics.explicit_null') === 'clear_to_null'
+                    && data_get($fieldMap->get('reference_note'), 'normalization.empty_string_at_mutation_layer') === 'null';
+            })
+            ->etc());
 });
 
 it('creates and updates events through MCP write tools', function () {
@@ -1844,7 +2368,9 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'jsonrpc' => '2.0',
         'id' => 'list-tools-admin-mcp-passport',
         'method' => 'tools/list',
-        'params' => [],
+        'params' => [
+            'per_page' => 50,
+        ],
     ])->assertOk();
 
     $tools = collect($listTools->json('result.tools'))->keyBy('name');
@@ -1856,7 +2382,12 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-get-resource-meta',
         'admin-list-records',
         'admin-get-record',
+        'admin-get-record-actions',
         'admin-get-write-schema',
+        'admin-get-event-moderation-schema',
+        'admin-get-report-triage-schema',
+        'admin-get-contribution-request-review-schema',
+        'admin-get-membership-claim-review-schema',
         'admin-create-record',
         'admin-create-github-issue',
         'admin-moderate-event',
@@ -1884,6 +2415,11 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
     expect(collect((array) data_get($tools->get('admin-list-records'), 'inputSchema.properties.filters.type'))->contains('object'))->toBeTrue();
 
     expect($tools->get('admin-get-write-schema')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => true,
+        'idempotentHint' => true,
+    ]);
+
+    expect($tools->get('admin-get-event-moderation-schema')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
         'idempotentHint' => true,
     ]);
@@ -1964,7 +2500,9 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'jsonrpc' => '2.0',
         'id' => 'list-tools-admin-mcp',
         'method' => 'tools/list',
-        'params' => [],
+        'params' => [
+            'per_page' => 50,
+        ],
     ])->assertOk();
 
     $toolNames = collect($listTools->json('result.tools'))->pluck('name')->all();
@@ -1976,7 +2514,12 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-get-resource-meta',
         'admin-list-records',
         'admin-get-record',
+        'admin-get-record-actions',
         'admin-get-write-schema',
+        'admin-get-event-moderation-schema',
+        'admin-get-report-triage-schema',
+        'admin-get-contribution-request-review-schema',
+        'admin-get-membership-claim-review-schema',
         'admin-create-record',
         'admin-create-github-issue',
         'admin-moderate-event',

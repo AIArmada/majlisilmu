@@ -157,7 +157,7 @@ class AdminResourceMutationService
                 'slug_behavior' => 'auto_managed',
                 'defaults' => $defaults,
                 'current_media' => $record instanceof Event ? $this->mediaState($record, ['poster', 'gallery']) : null,
-                'fields' => $this->eventFields(),
+                'fields' => $this->eventFields($updating),
                 'catalogs' => [],
                 'conditional_rules' => [
                     ['field' => 'custom_time', 'required_when' => ['prayer_time' => [EventPrayerTime::LainWaktu->value]]],
@@ -283,7 +283,7 @@ class AdminResourceMutationService
                 'slug_behavior' => 'auto_managed',
                 'defaults' => $defaults,
                 'current_media' => $record instanceof Venue ? $this->mediaState($record, ['cover', 'gallery']) : null,
-                'fields' => $this->venueFields(),
+                'fields' => $this->venueFields($updating),
                 'catalogs' => $this->addressCatalogs('address'),
                 'conditional_rules' => [],
             ],
@@ -1045,15 +1045,36 @@ class AdminResourceMutationService
     {
         $fields = [
             $this->field('name', 'string', required: true, maxLength: 255),
-            $this->field('nickname', 'string', required: false, maxLength: 255),
+            $this->field('nickname', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta(
+                explicitNull: 'preserve_existing',
+            )),
             $this->field('type', 'string', required: true, default: InstitutionType::Masjid->value, allowedValues: $this->enumValues(InstitutionType::class)),
             $this->field('description', 'string', required: false),
             $this->field('status', 'string', required: true, allowedValues: ['unverified', 'pending', 'verified', 'rejected']),
             $this->field('is_active', 'boolean', required: false, default: true),
-            $this->field('address', 'object', required: true),
-            $this->field('address.country_id', 'integer', required: ! $updating, default: SharedFormSchema::preferredPublicCountryId()),
-            $this->field('contacts', 'array<object>', required: false),
-            $this->field('social_media', 'array<object>', required: false),
+            $this->field('address', 'object', required: ! $updating, meta: [
+                'mutation_semantics' => 'deep_merge_when_present',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing',
+                    'empty_object' => $updating
+                        ? 'preserve_existing_when_record_has_address'
+                        : 'invalid_without_country',
+                    'explicit_null_children' => 'clear_supported_nullable_fields',
+                ],
+                'safe_client_strategy' => 'send_only_nested_fields_that_should_change',
+                'nested_field_omission' => 'preserve_existing',
+            ]),
+            $this->field('address.country_id', 'integer', required: ! $updating, default: SharedFormSchema::preferredPublicCountryId(), meta: [
+                'required_on_create' => true,
+                'required_on_update' => false,
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted_on_update' => 'preserve_existing_if_available',
+                    'explicit_null' => 'invalid_without_existing_country',
+                ],
+            ]),
+            $this->field('contacts', 'array<object>', required: false, meta: $this->contactCollectionMeta()),
+            $this->field('social_media', 'array<object>', required: false, meta: $this->socialMediaCollectionMeta()),
             $this->field('logo', 'file', required: false, acceptedMimeTypes: $this->logoMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
@@ -1070,25 +1091,101 @@ class AdminResourceMutationService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function contactCollectionMeta(): array
+    {
+        return [
+            'collection_semantics' => $this->replaceCollectionSemantics(),
+            'item_schema' => $this->contactItemSchema(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function socialMediaCollectionMeta(): array
+    {
+        return [
+            'collection_semantics' => $this->replaceCollectionSemantics(),
+            'input_normalization' => [
+                'kind' => 'canonical_social_handle_storage',
+                'handle_platforms' => $this->socialHandlePlatforms(),
+                'platform_aliases' => [
+                    'x' => [
+                        'normalizes_to' => SocialMediaPlatform::Twitter->value,
+                        'accepted_by_write_validation' => false,
+                    ],
+                ],
+                'canonical_storage' => [
+                    'identifier_field' => 'username',
+                    'url_field' => 'url',
+                    'handle_platform_url_storage' => 'may_be_null_after_normalization',
+                ],
+            ],
+            'item_schema' => $this->socialMediaItemSchema(),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function socialHandlePlatforms(): array
+    {
+        return [
+            SocialMediaPlatform::Facebook->value,
+            SocialMediaPlatform::Twitter->value,
+            SocialMediaPlatform::Instagram->value,
+            SocialMediaPlatform::YouTube->value,
+            SocialMediaPlatform::TikTok->value,
+            SocialMediaPlatform::Telegram->value,
+            SocialMediaPlatform::WhatsApp->value,
+            SocialMediaPlatform::LinkedIn->value,
+            SocialMediaPlatform::Threads->value,
+        ];
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function donationChannelFields(): array
     {
         return [
-            $this->field('donatable_type', 'string', required: true, default: (string) (new Institution)->getMorphClass(), allowedValues: $this->donationChannelOwnerTypeValues()),
-            $this->field('donatable_id', 'string', required: true),
-            $this->field('label', 'string', required: false, maxLength: 255),
+            $this->field('donatable_type', 'string', required: true, default: (string) (new Institution)->getMorphClass(), allowedValues: $this->donationChannelOwnerTypeValues(), meta: [
+                'mutation_semantics' => 'replace_scalar_with_owner_alias_normalization',
+                'accepted_aliases' => [
+                    'institutions' => (string) (new Institution)->getMorphClass(),
+                    Institution::class => (string) (new Institution)->getMorphClass(),
+                    'speakers' => (string) (new Speaker)->getMorphClass(),
+                    Speaker::class => (string) (new Speaker)->getMorphClass(),
+                    'events' => (string) (new Event)->getMorphClass(),
+                    Event::class => (string) (new Event)->getMorphClass(),
+                ],
+                'paired_with' => 'donatable_id',
+            ]),
+            $this->field('donatable_id', 'string', required: true, meta: [
+                'paired_with' => 'donatable_type',
+                'relation_lookup' => 'resolved_from_normalized_owner_type',
+            ]),
+            $this->field('label', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
             $this->field('recipient', 'string', required: true, maxLength: 255),
-            $this->field('method', 'string', required: true, default: 'bank_account', allowedValues: ['bank_account', 'duitnow', 'ewallet']),
-            $this->field('bank_code', 'string', required: false, maxLength: 32),
+            $this->field('method', 'string', required: true, default: 'bank_account', allowedValues: ['bank_account', 'duitnow', 'ewallet'], meta: [
+                'mutation_semantics' => 'replace_scalar_with_method_partition_reset',
+                'switch_clears_fields' => [
+                    'bank_account' => ['duitnow_type', 'duitnow_value', 'ewallet_provider', 'ewallet_handle', 'ewallet_qr_payload'],
+                    'duitnow' => ['bank_code', 'bank_name', 'account_number', 'ewallet_provider', 'ewallet_handle', 'ewallet_qr_payload'],
+                    'ewallet' => ['bank_code', 'bank_name', 'account_number', 'duitnow_type', 'duitnow_value'],
+                ],
+            ]),
+            $this->field('bank_code', 'string', required: false, maxLength: 32, meta: $this->trimmedStringMutationMeta()),
             $this->field('bank_name', 'string', required: false, maxLength: 255),
             $this->field('account_number', 'string', required: false, maxLength: 64),
             $this->field('duitnow_type', 'string', required: false, maxLength: 64),
             $this->field('duitnow_value', 'string', required: false, maxLength: 255),
             $this->field('ewallet_provider', 'string', required: false, maxLength: 64),
-            $this->field('ewallet_handle', 'string', required: false, maxLength: 255),
-            $this->field('ewallet_qr_payload', 'string', required: false),
-            $this->field('reference_note', 'string', required: false),
+            $this->field('ewallet_handle', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
+            $this->field('ewallet_qr_payload', 'string', required: false, meta: $this->trimmedStringMutationMeta()),
+            $this->field('reference_note', 'string', required: false, meta: $this->trimmedStringMutationMeta()),
             $this->field('status', 'string', required: true, default: 'unverified', allowedValues: ['unverified', 'verified', 'rejected', 'inactive']),
             $this->field('is_default', 'boolean', required: false, default: false),
             $this->field('qr', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
@@ -1102,15 +1199,25 @@ class AdminResourceMutationService
     private function reportFields(): array
     {
         return [
-            $this->field('entity_type', 'string', required: true, default: 'event', allowedValues: $this->resolveReportEntityMetadataAction->validKeys()),
-            $this->field('entity_id', 'string', required: true),
-            $this->field('category', 'string', required: true, default: 'wrong_info', allowedValues: $this->resolveReportCategoryOptionsAction->validKeys()),
-            $this->field('description', 'string', required: false, maxLength: 2000),
+            $this->field('entity_type', 'string', required: true, default: 'event', allowedValues: $this->resolveReportEntityMetadataAction->validKeys(), meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'paired_with' => 'entity_id',
+            ]),
+            $this->field('entity_id', 'string', required: true, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'paired_with' => 'entity_type',
+                'relation_lookup' => 'resolved_from_entity_type',
+            ]),
+            $this->field('category', 'string', required: true, default: 'wrong_info', allowedValues: $this->resolveReportCategoryOptionsAction->validKeys(), meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'allowed_values_resolved_from' => 'entity_type',
+            ]),
+            $this->field('description', 'string', required: false, maxLength: 2000, meta: $this->trimmedStringMutationMeta()),
             $this->field('status', 'string', required: true, default: 'open', allowedValues: ['open', 'triaged', 'resolved', 'dismissed']),
-            $this->field('reporter_id', 'string', required: false),
-            $this->field('handled_by', 'string', required: false),
-            $this->field('resolution_note', 'string', required: false, maxLength: 2000),
-            $this->field('evidence', 'array<file>', required: false, acceptedMimeTypes: $this->evidenceMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 8),
+            $this->field('reporter_id', 'string', required: false, meta: $this->nullableRelationScalarMeta('users')),
+            $this->field('handled_by', 'string', required: false, meta: $this->nullableRelationScalarMeta('users')),
+            $this->field('resolution_note', 'string', required: false, maxLength: 2000, meta: $this->trimmedStringMutationMeta()),
+            $this->field('evidence', 'array<file>', required: false, acceptedMimeTypes: $this->evidenceMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 8, meta: $this->multipleMediaFieldMutationMeta('clear_evidence', explicitNull: 'preserve_existing_collection')),
             $this->field('clear_evidence', 'boolean', required: false, default: false),
         ];
     }
@@ -1124,19 +1231,61 @@ class AdminResourceMutationService
             $this->field('name', 'string', required: true, maxLength: 255),
             $this->field('gender', 'string', required: true, default: Gender::Male->value, allowedValues: $this->enumValues(Gender::class)),
             $this->field('is_freelance', 'boolean', required: false, default: false),
-            $this->field('job_title', 'string', required: false, maxLength: 255),
-            $this->field('honorific', 'array<string>', required: false, allowedValues: $this->enumValues(Honorific::class)),
-            $this->field('pre_nominal', 'array<string>', required: false, allowedValues: $this->enumValues(PreNominal::class)),
-            $this->field('post_nominal', 'array<string>', required: false, allowedValues: $this->enumValues(PostNominal::class)),
+            $this->field('job_title', 'string', required: false, maxLength: 255, meta: array_merge(
+                $this->trimmedStringMutationMeta(),
+                [
+                    'coerced_when' => [
+                        'is_freelance_false' => 'stored_as_null',
+                    ],
+                ],
+            )),
+            $this->field('honorific', 'array<string>', required: false, allowedValues: $this->enumValues(Honorific::class), meta: $this->simpleArrayCollectionMeta()),
+            $this->field('pre_nominal', 'array<string>', required: false, allowedValues: $this->enumValues(PreNominal::class), meta: $this->simpleArrayCollectionMeta()),
+            $this->field('post_nominal', 'array<string>', required: false, allowedValues: $this->enumValues(PostNominal::class), meta: $this->simpleArrayCollectionMeta()),
             $this->field('bio', 'rich_text', required: false),
-            $this->field('qualifications', 'array<object>', required: false),
-            $this->field('language_ids', 'array<int>', required: false),
+            $this->field('qualifications', 'array<object>', required: false, meta: $this->qualificationCollectionMeta()),
+            $this->field('language_ids', 'array<int>', required: false, meta: [
+                'collection_semantics' => $this->replaceCollectionSemantics(
+                    submittedArray: 'replace_relation_sync',
+                    itemIdsPreserved: null,
+                    ordering: null,
+                ),
+                'relation' => 'languages',
+            ]),
             $this->field('status', 'string', required: true, allowedValues: ['pending', 'verified', 'rejected']),
             $this->field('is_active', 'boolean', required: false, default: true),
-            $this->field('address', 'object', required: true),
-            $this->field('address.country_id', 'integer', required: ! $updating, default: SharedFormSchema::preferredPublicCountryId()),
-            $this->field('contacts', 'array<object>', required: false),
-            $this->field('social_media', 'array<object>', required: false),
+            $this->field('address', 'object', required: ! $updating, meta: [
+                'mutation_semantics' => 'deep_merge_when_present_visible_fields_only',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing',
+                    'empty_object' => 'invalid_without_country',
+                    'explicit_null_children' => 'clear_supported_nullable_fields',
+                ],
+                'nested_field_omission' => 'preserve_existing_visible_fields',
+                'prohibited_nested_fields' => [
+                    'line1',
+                    'line2',
+                    'postcode',
+                    'lat',
+                    'lng',
+                    'google_maps_url',
+                    'google_place_id',
+                    'waze_url',
+                ],
+                'safe_client_strategy' => 'omit_address_to_preserve_or_resend_country_when_mutating',
+            ]),
+            $this->field('address.country_id', 'integer', required: ! $updating, default: SharedFormSchema::preferredPublicCountryId(), meta: [
+                'required_on_create' => true,
+                'required_on_update' => false,
+                'required_when_parent_present_on_update' => true,
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted_on_update' => 'preserve_existing_if_address_omitted',
+                    'explicit_null' => 'invalid_without_country',
+                ],
+            ]),
+            $this->field('contacts', 'array<object>', required: false, meta: $this->contactCollectionMeta()),
+            $this->field('social_media', 'array<object>', required: false, meta: $this->socialMediaCollectionMeta()),
             $this->field('avatar', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
@@ -1159,15 +1308,15 @@ class AdminResourceMutationService
     {
         return [
             $this->field('title', 'string', required: true, maxLength: 255),
-            $this->field('author', 'string', required: false, maxLength: 255),
+            $this->field('author', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
             $this->field('type', 'string', required: true, default: ReferenceType::Book->value, allowedValues: $this->enumValues(ReferenceType::class)),
-            $this->field('publication_year', 'string', required: false, maxLength: 255),
-            $this->field('publisher', 'string', required: false, maxLength: 255),
+            $this->field('publication_year', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
+            $this->field('publisher', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
             $this->field('description', 'string', required: false),
             $this->field('is_canonical', 'boolean', required: false, default: false),
             $this->field('status', 'string', required: true, default: 'verified', allowedValues: ['pending', 'verified']),
             $this->field('is_active', 'boolean', required: false, default: true),
-            $this->field('social_media', 'array<object>', required: false),
+            $this->field('social_media', 'array<object>', required: false, meta: $this->socialMediaCollectionMeta()),
             $this->field('front_cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('back_cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 10),
@@ -1184,11 +1333,21 @@ class AdminResourceMutationService
     {
         return [
             $this->field('title', 'string', required: true, maxLength: 255),
-            $this->field('slug', 'string', required: true, maxLength: 255),
-            $this->field('description', 'string', required: false, maxLength: 5000),
+            $this->field('slug', 'string', required: true, maxLength: 255, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'normalization' => ['trim' => true],
+                'uniqueness_scope' => 'series.slug',
+            ]),
+            $this->field('description', 'string', required: false, maxLength: 5000, meta: $this->trimmedStringMutationMeta()),
             $this->field('visibility', 'string', required: true, default: 'public', allowedValues: ['public', 'unlisted', 'private']),
             $this->field('is_active', 'boolean', required: false, default: true),
-            $this->field('languages', 'array<int>', required: false),
+            $this->field('languages', 'array<int>', required: false, meta: $this->relationCollectionMeta(
+                'languages',
+                submittedArray: 'replace_relation_sync',
+                itemIdsPreserved: null,
+                ordering: null,
+                safeClientStrategy: 'omit_field_to_preserve_or_send_full_relation_ids',
+            )),
             $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('clear_cover', 'boolean', required: false, default: false),
@@ -1205,10 +1364,15 @@ class AdminResourceMutationService
             $this->field('category', 'string', required: true, default: InspirationCategory::QuranQuote->value, allowedValues: $this->enumValues(InspirationCategory::class)),
             $this->field('locale', 'string', required: true, default: $this->defaultSupportedLocale(), allowedValues: $this->supportedLocaleValues()),
             $this->field('title', 'string', required: true, maxLength: 255),
-            $this->field('content', 'rich_text', required: true),
-            $this->field('source', 'string', required: false, maxLength: 255),
+            $this->field('content', 'rich_text', required: true, meta: [
+                'input_normalization' => [
+                    'kind' => 'rich_text_document',
+                    'accepts_plain_string' => true,
+                ],
+            ]),
+            $this->field('source', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
             $this->field('is_active', 'boolean', required: false, default: true),
-            $this->field('main', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('main', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), meta: $this->singleMediaFieldMutationMeta('clear_main')),
             $this->field('clear_main', 'boolean', required: false, default: false),
         ];
     }
@@ -1220,27 +1384,66 @@ class AdminResourceMutationService
     {
         return [
             $this->field('name', 'string', required: true, maxLength: 255),
-            $this->field('slug', 'string', required: true, maxLength: 255),
-            $this->field('capacity', 'integer', required: false),
+            $this->field('slug', 'string', required: true, maxLength: 255, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'normalization' => ['trim' => true],
+                'uniqueness_scope' => 'spaces.slug',
+            ]),
+            $this->field('capacity', 'integer', required: false, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing',
+                    'explicit_null' => 'clear_to_null',
+                ],
+                'normalization' => [
+                    'empty_string_at_mutation_layer' => 'null',
+                    'integer_cast' => true,
+                    'minimum' => 1,
+                ],
+            ]),
             $this->field('is_active', 'boolean', required: false, default: true),
-            $this->field('institutions', 'array<string>', required: false),
+            $this->field('institutions', 'array<string>', required: false, meta: $this->relationCollectionMeta(
+                'institutions',
+                submittedArray: 'replace_relation_sync',
+                itemIdsPreserved: null,
+                ordering: null,
+                safeClientStrategy: 'omit_field_to_preserve_or_send_full_institution_ids',
+            )),
         ];
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function venueFields(): array
+    private function venueFields(bool $updating): array
     {
         return [
-            $this->field('name', 'string', required: true, maxLength: 255),
-            $this->field('type', 'string', required: true, default: VenueType::Dewan->value, allowedValues: $this->enumValues(VenueType::class)),
-            $this->field('status', 'string', required: true, default: 'verified', allowedValues: ['unverified', 'pending', 'verified', 'rejected']),
+            $this->field('name', 'string', required: ! $updating, maxLength: 255),
+            $this->field('type', 'string', required: ! $updating, default: VenueType::Dewan->value, allowedValues: $this->enumValues(VenueType::class)),
+            $this->field('status', 'string', required: ! $updating, default: 'verified', allowedValues: ['unverified', 'pending', 'verified', 'rejected']),
             $this->field('is_active', 'boolean', required: false, default: true),
-            $this->field('facilities', 'array<string>', required: false, allowedValues: $this->venueFacilityValues()),
-            $this->field('address', 'object', required: true),
-            $this->field('contacts', 'array<object>', required: false),
-            $this->field('social_media', 'array<object>', required: false),
+            $this->field('facilities', 'array<string>', required: false, allowedValues: $this->venueFacilityValues(), meta: $this->facilitiesCollectionMeta()),
+            $this->field('address', 'object', required: ! $updating, meta: [
+                'mutation_semantics' => 'deep_merge_when_present',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing',
+                    'empty_object' => $updating ? 'delete_existing_address' : 'invalid_without_country',
+                    'explicit_null_children' => 'clear_supported_nullable_fields',
+                ],
+                'safe_client_strategy' => 'fetch_current_record_before_editing_nested_address',
+                'nested_field_omission' => 'preserve_existing',
+            ]),
+            $this->field('address.country_id', 'integer', required: ! $updating, default: SharedFormSchema::preferredPublicCountryId(), meta: [
+                'required_on_create' => true,
+                'required_on_update' => false,
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted_on_update' => 'preserve_existing_if_available',
+                    'explicit_null' => 'invalid_country_selection',
+                ],
+            ]),
+            $this->field('contacts', 'array<object>', required: false, meta: $this->contactCollectionMeta()),
+            $this->field('social_media', 'array<object>', required: false, meta: $this->socialMediaCollectionMeta()),
             $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('clear_cover', 'boolean', required: false, default: false),
@@ -1254,10 +1457,31 @@ class AdminResourceMutationService
     private function subdistrictFields(): array
     {
         return [
-            $this->field('country_id', 'integer', required: true),
-            $this->field('state_id', 'integer', required: true),
-            $this->field('district_id', 'integer', required: false),
-            $this->field('name', 'string', required: true, maxLength: 255),
+            $this->field('country_id', 'integer', required: true, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'relation' => 'countries',
+            ]),
+            $this->field('state_id', 'integer', required: true, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'relation' => 'states',
+                'must_match' => ['country_id'],
+            ]),
+            $this->field('district_id', 'integer', required: false, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'relation' => 'districts',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing',
+                    'explicit_null' => 'allowed_only_for_federal_territory_state',
+                ],
+                'required_unless' => [
+                    'state_id' => $this->federalTerritoryStateIds(),
+                ],
+                'must_match' => ['country_id', 'state_id'],
+            ]),
+            $this->field('name', 'string', required: true, maxLength: 255, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'normalization' => ['trim' => true],
+            ]),
         ];
     }
 
@@ -1267,52 +1491,222 @@ class AdminResourceMutationService
     private function tagFields(): array
     {
         return [
-            $this->field('name', 'object', required: true),
-            $this->field('name.ms', 'string', required: true, maxLength: 255),
-            $this->field('name.en', 'string', required: false, maxLength: 255),
-            $this->field('type', 'string', required: true, default: TagType::Domain->value, allowedValues: $this->enumValues(TagType::class)),
+            $this->field('name', 'object', required: true, meta: [
+                'mutation_semantics' => 'replace_translation_object',
+                'translation_fallback' => [
+                    'en' => 'name.ms',
+                ],
+            ]),
+            $this->field('name.ms', 'string', required: true, maxLength: 255, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'normalization' => ['trim' => true],
+            ]),
+            $this->field('name.en', 'string', required: false, maxLength: 255, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted' => 'fallback_to_name.ms',
+                    'explicit_null' => 'fallback_to_name.ms',
+                ],
+                'normalization' => [
+                    'trim' => true,
+                    'empty_string_at_mutation_layer' => 'fallback_to_name.ms',
+                ],
+            ]),
+            $this->field('type', 'string', required: true, default: TagType::Domain->value, allowedValues: $this->enumValues(TagType::class), meta: [
+                'mutation_semantics' => 'replace_scalar',
+            ]),
             $this->field('status', 'string', required: true, default: 'verified', allowedValues: ['pending', 'verified']),
-            $this->field('order_column', 'integer', required: false),
+            $this->field('order_column', 'integer', required: false, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing',
+                    'explicit_null' => 'recompute_with_sortable_scope',
+                ],
+                'normalization' => [
+                    'empty_string_at_mutation_layer' => 'recompute_with_sortable_scope',
+                    'integer_cast' => true,
+                ],
+            ]),
         ];
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function eventFields(): array
+    private function eventFields(bool $updating): array
     {
         return [
-            $this->field('title', 'string', required: true, maxLength: 255),
+            $this->field('title', 'string', required: ! $updating, maxLength: 255),
             $this->field('description', 'rich_text', required: false),
-            $this->field('event_date', 'date', required: true),
-            $this->field('prayer_time', 'string', required: true, default: EventPrayerTime::LainWaktu->value, allowedValues: $this->enumValues(EventPrayerTime::class)),
+            $this->field('event_date', 'date', required: ! $updating),
+            $this->field('prayer_time', 'string', required: ! $updating, default: EventPrayerTime::LainWaktu->value, allowedValues: $this->enumValues(EventPrayerTime::class)),
             $this->field('custom_time', 'string', required: false, maxLength: 32),
             $this->field('end_time', 'string', required: false, maxLength: 32),
-            $this->field('timezone', 'string', required: true, default: 'Asia/Kuala_Lumpur', maxLength: 64),
-            $this->field('event_format', 'string', required: true, default: EventFormat::Physical->value, allowedValues: $this->enumValues(EventFormat::class)),
-            $this->field('visibility', 'string', required: true, default: EventVisibility::Public->value, allowedValues: $this->enumValues(EventVisibility::class)),
-            $this->field('event_url', 'string', required: false, maxLength: 255),
-            $this->field('live_url', 'string', required: false, maxLength: 255),
-            $this->field('recording_url', 'string', required: false, maxLength: 255),
-            $this->field('gender', 'string', required: true, default: EventGenderRestriction::All->value, allowedValues: $this->enumValues(EventGenderRestriction::class)),
-            $this->field('age_group', 'array<string>', required: true, allowedValues: $this->enumValues(EventAgeGroup::class)),
+            $this->field('timezone', 'string', required: ! $updating, default: 'Asia/Kuala_Lumpur', maxLength: 64),
+            $this->field('event_format', 'string', required: ! $updating, default: EventFormat::Physical->value, allowedValues: $this->enumValues(EventFormat::class)),
+            $this->field('visibility', 'string', required: ! $updating, default: EventVisibility::Public->value, allowedValues: $this->enumValues(EventVisibility::class)),
+            $this->field('event_url', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta(omitted: 'preserve_existing_via_server_state_merge')),
+            $this->field('live_url', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta(omitted: 'preserve_existing_via_server_state_merge')),
+            $this->field('recording_url', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta(omitted: 'preserve_existing_via_server_state_merge')),
+            $this->field('gender', 'string', required: ! $updating, default: EventGenderRestriction::All->value, allowedValues: $this->enumValues(EventGenderRestriction::class)),
+            $this->field('age_group', 'array<string>', required: ! $updating, allowedValues: $this->enumValues(EventAgeGroup::class), meta: [
+                'collection_semantics' => $this->replaceCollectionSemantics(
+                    explicitNull: 'invalid_type',
+                    emptyArray: 'invalid_minimum_size',
+                    itemIdsPreserved: null,
+                    ordering: null,
+                    safeClientStrategy: 'omit_field_to_preserve_or_send_full_age_group_array',
+                    omitted: 'preserve_existing_collection_via_server_state_merge',
+                ),
+            ]),
             $this->field('children_allowed', 'boolean', required: false, default: false),
             $this->field('is_muslim_only', 'boolean', required: false, default: false),
-            $this->field('languages', 'array<int>', required: false),
-            $this->field('event_type', 'array<string>', required: true, allowedValues: $this->enumValues(EventType::class)),
-            $this->field('domain_tags', 'array<string>', required: false),
-            $this->field('discipline_tags', 'array<string>', required: false),
-            $this->field('source_tags', 'array<string>', required: false),
-            $this->field('issue_tags', 'array<string>', required: false),
-            $this->field('references', 'array<string>', required: false),
-            $this->field('organizer_type', 'string', required: false, allowedValues: [Institution::class, Speaker::class]),
-            $this->field('organizer_id', 'string', required: false),
-            $this->field('series', 'array<string>', required: false),
-            $this->field('institution_id', 'string', required: false),
-            $this->field('venue_id', 'string', required: false),
-            $this->field('space_id', 'string', required: false),
-            $this->field('speakers', 'array<string>', required: false),
-            $this->field('other_key_people', 'array<object>', required: false),
+            $this->field('languages', 'array<int>', required: false, meta: $this->relationCollectionMeta(
+                'languages',
+                submittedArray: 'replace_relation_sync',
+                itemIdsPreserved: null,
+                ordering: null,
+                safeClientStrategy: 'omit_field_to_preserve_or_send_full_relation_ids',
+                omitted: 'preserve_existing_collection_via_server_state_merge',
+            )),
+            $this->field('event_type', 'array<string>', required: ! $updating, allowedValues: $this->enumValues(EventType::class), meta: [
+                'collection_semantics' => $this->replaceCollectionSemantics(
+                    explicitNull: 'invalid_type',
+                    emptyArray: 'invalid_minimum_size',
+                    itemIdsPreserved: null,
+                    ordering: null,
+                    safeClientStrategy: 'omit_field_to_preserve_or_send_full_event_type_array',
+                    omitted: 'preserve_existing_collection_via_server_state_merge',
+                ),
+            ]),
+            $this->field('domain_tags', 'array<string>', required: false, meta: array_merge(
+                $this->relationCollectionMeta(
+                    'tags',
+                    submittedArray: 'replace_relation_sync',
+                    itemIdsPreserved: null,
+                    ordering: null,
+                    safeClientStrategy: 'omit_field_to_preserve_or_send_full_tag_ids',
+                    omitted: 'preserve_existing_collection_via_server_state_merge',
+                ),
+                ['tag_type' => TagType::Domain->value],
+            )),
+            $this->field('discipline_tags', 'array<string>', required: false, meta: array_merge(
+                $this->relationCollectionMeta(
+                    'tags',
+                    submittedArray: 'replace_relation_sync',
+                    itemIdsPreserved: null,
+                    ordering: null,
+                    safeClientStrategy: 'omit_field_to_preserve_or_send_full_tag_ids',
+                    omitted: 'preserve_existing_collection_via_server_state_merge',
+                ),
+                ['tag_type' => TagType::Discipline->value],
+            )),
+            $this->field('source_tags', 'array<string>', required: false, meta: array_merge(
+                $this->relationCollectionMeta(
+                    'tags',
+                    submittedArray: 'replace_relation_sync',
+                    itemIdsPreserved: null,
+                    ordering: null,
+                    safeClientStrategy: 'omit_field_to_preserve_or_send_full_tag_ids',
+                    omitted: 'preserve_existing_collection_via_server_state_merge',
+                ),
+                ['tag_type' => TagType::Source->value],
+            )),
+            $this->field('issue_tags', 'array<string>', required: false, meta: array_merge(
+                $this->relationCollectionMeta(
+                    'tags',
+                    submittedArray: 'replace_relation_sync',
+                    itemIdsPreserved: null,
+                    ordering: null,
+                    safeClientStrategy: 'omit_field_to_preserve_or_send_full_tag_ids',
+                    omitted: 'preserve_existing_collection_via_server_state_merge',
+                ),
+                ['tag_type' => TagType::Issue->value],
+            )),
+            $this->field('references', 'array<string>', required: false, meta: $this->relationCollectionMeta(
+                'references',
+                submittedArray: 'replace_relation_sync',
+                itemIdsPreserved: null,
+                ordering: null,
+                safeClientStrategy: 'omit_field_to_preserve_or_send_full_reference_ids',
+                omitted: 'preserve_existing_collection_via_server_state_merge',
+            )),
+            $this->field('organizer_type', 'string', required: false, allowedValues: [Institution::class, Speaker::class], meta: [
+                'mutation_semantics' => 'replace_scalar_with_alias_normalization',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing_via_server_state_merge',
+                    'explicit_null' => 'clear_to_null_when_organizer_id_is_null',
+                ],
+                'accepted_aliases' => [
+                    'institution' => Institution::class,
+                    'speaker' => Speaker::class,
+                ],
+                'paired_with' => 'organizer_id',
+            ]),
+            $this->field('organizer_id', 'string', required: false, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing_via_server_state_merge',
+                    'explicit_null' => 'clear_to_null_when_organizer_type_is_null',
+                ],
+                'paired_with' => 'organizer_type',
+            ]),
+            $this->field('series', 'array<string>', required: false, meta: $this->relationCollectionMeta(
+                'series',
+                submittedArray: 'replace_relation_sync',
+                itemIdsPreserved: null,
+                ordering: null,
+                safeClientStrategy: 'omit_field_to_preserve_or_send_full_series_ids',
+                omitted: 'preserve_existing_collection_via_server_state_merge',
+            )),
+            $this->field('institution_id', 'string', required: false, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing_via_server_state_merge',
+                    'explicit_null' => 'clear_to_null',
+                ],
+                'exclusive_with' => ['venue_id'],
+            ]),
+            $this->field('venue_id', 'string', required: false, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing_via_server_state_merge',
+                    'explicit_null' => 'clear_to_null',
+                ],
+                'exclusive_with' => ['institution_id', 'space_id'],
+            ]),
+            $this->field('space_id', 'string', required: false, meta: [
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing_via_server_state_merge',
+                    'explicit_null' => 'clear_to_null',
+                ],
+                'requires' => ['institution_id'],
+                'prohibited_with' => ['venue_id'],
+            ]),
+            $this->field('speakers', 'array<string>', required: false, meta: [
+                'relation' => 'key_people',
+                'subset_scope' => 'speakers',
+                'collection_semantics' => $this->replaceCollectionSemantics(
+                    submittedArray: 'replace_speaker_subset_and_rebuild_key_people',
+                    itemIdsPreserved: false,
+                    ordering: 'payload_order_sets_order_column_before_other_key_people',
+                    safeClientStrategy: 'omit_field_to_preserve_or_send_full_speaker_list',
+                    omitted: 'preserve_existing_collection_via_server_state_merge',
+                ),
+            ]),
+            $this->field('other_key_people', 'array<object>', required: false, meta: [
+                'relation' => 'key_people',
+                'subset_scope' => 'other_key_people',
+                'collection_semantics' => $this->replaceCollectionSemantics(
+                    submittedArray: 'replace_other_key_people_subset_and_rebuild_key_people',
+                    itemIdsPreserved: false,
+                    ordering: 'payload_order_sets_order_column_after_speakers',
+                    safeClientStrategy: 'omit_field_to_preserve_or_send_full_other_key_people_array',
+                    omitted: 'preserve_existing_collection_via_server_state_merge',
+                ),
+                'item_schema' => $this->eventKeyPersonItemSchema(),
+            ]),
             $this->field('poster', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
             $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 10),
             $this->field('clear_poster', 'boolean', required: false, default: false),
@@ -1322,13 +1716,22 @@ class AdminResourceMutationService
             $this->field('is_active', 'boolean', required: false, default: true),
             $this->field('escalated_at', 'datetime', required: false),
             $this->field('registration_required', 'boolean', required: false, default: false),
-            $this->field('registration_mode', 'string', required: false, default: RegistrationMode::Event->value, allowedValues: $this->enumValues(RegistrationMode::class)),
+            $this->field('registration_mode', 'string', required: false, default: RegistrationMode::Event->value, allowedValues: $this->enumValues(RegistrationMode::class), meta: [
+                'mutation_semantics' => 'replace_setting_with_runtime_lock',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing_via_server_state_merge',
+                ],
+                'lock_behavior' => [
+                    'when_event_has_registrations' => 'retain_current_value',
+                ],
+            ]),
         ];
     }
 
     /**
      * @param  list<string|int>|null  $allowedValues
      * @param  list<string>|null  $acceptedMimeTypes
+     * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
      */
     private function field(
@@ -1341,17 +1744,293 @@ class AdminResourceMutationService
         ?array $acceptedMimeTypes = null,
         ?int $maxFileSizeKb = null,
         ?int $maxFiles = null,
+        array $meta = [],
+    ): array {
+        return array_merge(
+            array_filter([
+                'name' => $name,
+                'type' => $type,
+                'required' => $required,
+                'default' => $default,
+                'max_length' => $maxLength,
+                'allowed_values' => $allowedValues,
+                'accepted_mime_types' => $acceptedMimeTypes,
+                'max_file_size_kb' => $maxFileSizeKb,
+                'max_files' => $maxFiles,
+            ], static fn (mixed $value): bool => $value !== null),
+            array_filter($meta, static fn (mixed $value): bool => $value !== null),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function contactItemSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'paired_required_fields' => [
+                ['category', 'value'],
+            ],
+            'fields' => [
+                $this->field('category', 'string', required: false, allowedValues: $this->enumValues(ContactCategory::class), meta: [
+                    'required_with' => ['value'],
+                ]),
+                $this->field('value', 'string', required: false, maxLength: 255, meta: [
+                    'required_with' => ['category'],
+                    'used_for_categories' => [
+                        ContactCategory::Phone->value,
+                        ContactCategory::WhatsApp->value,
+                        ContactCategory::Email->value,
+                    ],
+                ]),
+                $this->field('type', 'string', required: false, default: ContactType::Main->value, allowedValues: $this->enumValues(ContactType::class)),
+                $this->field('is_public', 'boolean', required: false, default: true),
+                $this->field('order_column', 'integer', required: false, meta: [
+                    'omitted' => 'assigned_from_payload_order_starting_at_1',
+                ]),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function socialMediaItemSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'required_fields' => ['platform'],
+            'at_least_one_of' => ['username', 'url'],
+            'fields' => [
+                $this->field('platform', 'string', required: false, allowedValues: $this->enumValues(SocialMediaPlatform::class), meta: [
+                    'required_with' => ['username', 'url'],
+                ]),
+                $this->field('username', 'string', required: false, maxLength: 255, meta: [
+                    'required_without' => ['url'],
+                ]),
+                $this->field('url', 'string', required: false, maxLength: 255, meta: [
+                    'required_without' => ['username'],
+                    'format' => 'url',
+                ]),
+                $this->field('order_column', 'integer', required: false, meta: [
+                    'omitted' => 'assigned_from_payload_order_starting_at_1',
+                ]),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function qualificationCollectionMeta(): array
+    {
+        return [
+            'collection_semantics' => $this->replaceCollectionSemantics(
+                itemIdsPreserved: null,
+                ordering: null,
+            ),
+            'item_schema' => [
+                'type' => 'object',
+                'paired_required_fields' => [
+                    ['institution', 'degree'],
+                ],
+                'empty_entries_discarded' => true,
+                'fields' => [
+                    $this->field('institution', 'string', required: false, maxLength: 255, meta: [
+                        'required_with' => ['degree'],
+                    ]),
+                    $this->field('degree', 'string', required: false, maxLength: 255, meta: [
+                        'required_with' => ['institution'],
+                    ]),
+                    $this->field('field', 'string', required: false, maxLength: 255),
+                    $this->field('year', 'string', required: false, maxLength: 4, meta: [
+                        'format' => 'yyyy',
+                    ]),
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function facilitiesCollectionMeta(): array
+    {
+        return [
+            'collection_semantics' => $this->replaceCollectionSemantics(
+                itemIdsPreserved: null,
+                ordering: 'not_applicable_set_semantics',
+            ),
+            'input_normalization' => [
+                'kind' => 'facility_list_to_boolean_map',
+                'storage_shape' => 'object<boolean>',
+                'list_entries_become_true' => true,
+                'explicit_false_values_preserved_when_keyed' => true,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function simpleArrayCollectionMeta(): array
+    {
+        return [
+            'collection_semantics' => $this->replaceCollectionSemantics(
+                itemIdsPreserved: null,
+                ordering: null,
+                safeClientStrategy: 'send_full_array_when_editing',
+            ),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function relationCollectionMeta(
+        string $relation,
+        string $submittedArray = 'replace_relation_sync',
+        ?bool $itemIdsPreserved = null,
+        ?string $ordering = null,
+        string $safeClientStrategy = 'omit_field_to_preserve_or_send_full_relation_ids',
+        string $omitted = 'preserve_existing_collection',
+    ): array {
+        return [
+            'relation' => $relation,
+            'collection_semantics' => $this->replaceCollectionSemantics(
+                submittedArray: $submittedArray,
+                itemIdsPreserved: $itemIdsPreserved,
+                ordering: $ordering,
+                safeClientStrategy: $safeClientStrategy,
+                omitted: $omitted,
+            ),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function nullableRelationScalarMeta(string $relation): array
+    {
+        return [
+            'relation' => $relation,
+            'mutation_semantics' => 'replace_scalar',
+            'clear_semantics' => [
+                'omitted' => 'preserve_existing',
+                'explicit_null' => 'clear_to_null',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function singleMediaFieldMutationMeta(string $rawHttpClearFlag): array
+    {
+        return [
+            'mutation_semantics' => 'replace_single_media_collection',
+            'clear_semantics' => [
+                'omitted' => 'preserve_existing_collection',
+                'explicit_null' => 'preserve_existing_collection',
+                'submitted_file' => 'replace_collection',
+            ],
+            'raw_http_clear_flag' => $rawHttpClearFlag,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function multipleMediaFieldMutationMeta(
+        string $rawHttpClearFlag,
+        string $omitted = 'preserve_existing_collection',
+        string $explicitNull = 'preserve_existing_collection',
+        string $emptyArray = 'clear_collection',
+        string $submittedArray = 'replace_collection',
+    ): array {
+        return [
+            'collection_semantics' => [
+                'omitted' => $omitted,
+                'explicit_null' => $explicitNull,
+                'empty_array' => $emptyArray,
+                'submitted_array' => $submittedArray,
+                'item_ids_preserved' => false,
+                'ordering' => 'payload_order_sets_media_order',
+                'safe_client_strategy' => 'send_full_media_array_when_replacing',
+            ],
+            'raw_http_clear_flag' => $rawHttpClearFlag,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function eventKeyPersonItemSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'required_fields' => ['role'],
+            'at_least_one_of' => ['speaker_id', 'name'],
+            'empty_or_invalid_entries_discarded' => true,
+            'fields' => [
+                $this->field('role', 'string', required: false, allowedValues: $this->enumValues(EventKeyPersonRole::class), meta: [
+                    'required_with' => ['speaker_id', 'name'],
+                    'disallowed_values' => [EventKeyPersonRole::Speaker->value],
+                ]),
+                $this->field('speaker_id', 'string', required: false, meta: [
+                    'required_without' => ['name'],
+                ]),
+                $this->field('name', 'string', required: false, maxLength: 255, meta: [
+                    'required_without' => ['speaker_id'],
+                ]),
+                $this->field('is_public', 'boolean', required: false, default: true),
+                $this->field('notes', 'string', required: false, maxLength: 500),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function trimmedStringMutationMeta(
+        string $omitted = 'preserve_existing',
+        string $explicitNull = 'clear_to_null',
+        ?string $emptyStringAtMutationLayer = 'null',
+    ): array {
+        return [
+            'mutation_semantics' => 'replace_scalar',
+            'clear_semantics' => [
+                'omitted' => $omitted,
+                'explicit_null' => $explicitNull,
+            ],
+            'normalization' => array_filter([
+                'trim' => true,
+                'empty_string_at_mutation_layer' => $emptyStringAtMutationLayer,
+            ], static fn (mixed $value): bool => $value !== null),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function replaceCollectionSemantics(
+        string $submittedArray = 'replace_collection',
+        string $explicitNull = 'clear_collection',
+        string $emptyArray = 'clear_collection',
+        ?bool $itemIdsPreserved = false,
+        ?string $ordering = 'payload_order_sets_order_column_when_missing',
+        string $safeClientStrategy = 'fetch_modify_resend_full_collection',
+        string $omitted = 'preserve_existing_collection',
     ): array {
         return array_filter([
-            'name' => $name,
-            'type' => $type,
-            'required' => $required,
-            'default' => $default,
-            'max_length' => $maxLength,
-            'allowed_values' => $allowedValues,
-            'accepted_mime_types' => $acceptedMimeTypes,
-            'max_file_size_kb' => $maxFileSizeKb,
-            'max_files' => $maxFiles,
+            'omitted' => $omitted,
+            'explicit_null' => $explicitNull,
+            'empty_array' => $emptyArray,
+            'submitted_array' => $submittedArray,
+            'item_ids_preserved' => $itemIdsPreserved,
+            'ordering' => $ordering,
+            'safe_client_strategy' => $safeClientStrategy,
         ], static fn (mixed $value): bool => $value !== null);
     }
 

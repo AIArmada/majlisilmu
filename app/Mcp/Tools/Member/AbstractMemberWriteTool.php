@@ -6,7 +6,6 @@ namespace App\Mcp\Tools\Member;
 
 use App\Models\User;
 use App\Support\Api\Member\MemberResourceService;
-use App\Support\Location\PreferredCountryResolver;
 use App\Support\Mcp\McpAuthenticatedUserResolver;
 use App\Support\Mcp\McpFilePayloadNormalizer;
 use Illuminate\Support\Arr;
@@ -41,14 +40,6 @@ abstract class AbstractMemberWriteTool extends AbstractMemberTool
      */
     protected function normalizePayloadForWriteTool(string $resourceKey, array $payload): array
     {
-        if ($resourceKey !== 'speakers' || ! is_array($payload['address'] ?? null) || $payload['address'] !== []) {
-            return $payload;
-        }
-
-        $payload['address'] = [
-            'country_id' => app(PreferredCountryResolver::class)->resolveId(),
-        ];
-
         return $payload;
     }
 

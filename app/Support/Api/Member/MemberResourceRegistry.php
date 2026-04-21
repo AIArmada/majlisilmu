@@ -297,6 +297,13 @@ class MemberResourceRegistry
                     'record_key' => 'record',
                 ],
             ],
+            'get_record_actions' => [
+                'tool' => 'member-get-record-actions',
+                'arguments' => [
+                    'resource_key' => $key,
+                    'record_key' => 'record',
+                ],
+            ],
             'get_update_schema' => $canWrite
                 ? [
                     'tool' => 'member-get-write-schema',
