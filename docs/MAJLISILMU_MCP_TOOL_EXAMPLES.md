@@ -35,7 +35,8 @@ For the full connector rules, tool catalog, and API mappings, see `docs/MAJLISIL
       "gender": "male",
       "status": "verified"
     },
-    "validate_only": true
+    "validate_only": true,
+    "apply_defaults": true
   }
 }
 ```
