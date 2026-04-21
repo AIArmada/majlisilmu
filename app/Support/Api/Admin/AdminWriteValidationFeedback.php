@@ -232,15 +232,11 @@ final class AdminWriteValidationFeedback
             return null;
         }
 
-        if (is_int($value)) {
-            return in_array($value, $allowedValues, true) ? $value : null;
-        }
-
-        if (! is_string($value)) {
+        if (! is_string($value) && ! is_int($value)) {
             return null;
         }
 
-        $normalizedValue = strtolower(trim($value));
+        $normalizedValue = strtolower(trim((string) $value));
 
         if ($normalizedValue === '') {
             return null;

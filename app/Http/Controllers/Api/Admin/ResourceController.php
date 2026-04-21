@@ -272,7 +272,7 @@ class ResourceController extends Controller
         bool $applyDefaults,
     ): JsonResponse {
         $candidatePayload = $validateOnly && $applyDefaults
-            ? $this->validationFeedback->payloadWithSchemaDefaults($payload, $schemaResponse)
+            ? $payload
             : null;
 
         return response()->json([
