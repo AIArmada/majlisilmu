@@ -565,7 +565,7 @@ Payload guidance:
 Assignment behavior:
 
 - Non-admin callers create a plain GitHub issue.
-- Admin callers create the issue and automatically assign Copilot.
+- Admin callers create the issue and automatically assign Copilot unless `GITHUB_ISSUE_REPORTING_ADMIN_COPILOT_ASSIGNMENT_ENABLED=false` is set on the server.
 - Copilot model selection is config-driven on the server and may fall back across multiple configured values before using `Auto`.
 
 ### Public contribution rules you must follow
