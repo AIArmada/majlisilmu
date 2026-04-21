@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Admin;
 
 use App\Models\User;
+use App\Support\Api\Admin\AdminValidateOnlyRemediationPlanner;
 use App\Support\Api\Admin\AdminResourceService;
 use App\Support\Api\Admin\AdminWriteValidationFeedback;
 use App\Support\Location\PreferredCountryResolver;
@@ -41,24 +42,37 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
     ): ResponseFactory {
         $feedback = app(AdminWriteValidationFeedback::class);
         $candidatePayload = $validateOnly && $applyDefaults
-            ? $this->normalizePayloadForWriteTool($resourceKey, $this->payloadWithSchemaDefaults($payload, $schemaResponse))
+            ? $payload
             : null;
+
+        $details = [
+            'errors' => $exception->errors(),
+            'feedback' => $feedback->feedback(
+                $exception,
+                $payload,
+                $schemaResponse,
+                $operation,
+                $validateOnly,
+                $applyDefaults,
+                $candidatePayload,
+            ),
+        ];
+
+        if ($validateOnly) {
+            $details = [
+                ...$details,
+                ...app(AdminValidateOnlyRemediationPlanner::class)->build(
+                    payload: $payload,
+                    schemaResponse: $schemaResponse,
+                    errors: $exception->errors(),
+                ),
+            ];
+        }
 
         return $this->errorResponse(
             $feedback->message($exception),
             'validation_error',
-            [
-                'errors' => $exception->errors(),
-                'feedback' => $feedback->feedback(
-                    $exception,
-                    $payload,
-                    $schemaResponse,
-                    $operation,
-                    $validateOnly,
-                    $applyDefaults,
-                    $candidatePayload,
-                ),
-            ],
+            $details,
         );
     }
 
@@ -169,4 +183,5 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             default => $value !== null,
         };
     }
+
 }

@@ -7,6 +7,7 @@ namespace App\Mcp\Tools\Admin;
 use App\Support\Api\Admin\AdminResourceService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -54,6 +55,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
                 actor: $actor,
             );
             $normalizedMediaPayload = $this->normalizeMcpMediaPayload($payload, $schemaResponse);
+            $validateOnly = (bool) ($validated['validate_only'] ?? false);
 
             try {
                 if ($validateOnly && $applyDefaults) {
@@ -68,10 +70,10 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
                     actor: $actor,
                     validateOnly: $validateOnly,
                 ));
-            } catch (\Illuminate\Validation\ValidationException $exception) {
+            } catch (ValidationException $exception) {
                 return $this->writeValidationErrorResponse(
                     exception: $exception,
-                    payload: $normalizedMediaPayload['payload'],
+                    payload: $payload,
                     schemaResponse: $schemaResponse,
                     resourceKey: $resourceKey,
                     operation: 'create',
