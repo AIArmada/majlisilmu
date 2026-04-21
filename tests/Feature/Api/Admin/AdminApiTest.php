@@ -1,5 +1,8 @@
 <?php
 
+use App\Enums\ContributionRequestStatus;
+use App\Enums\ContributionRequestType;
+use App\Enums\ContributionSubjectType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -7,9 +10,15 @@ use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
+use App\Models\ContributionRequest;
+use App\Models\DonationChannel;
 use App\Models\Event;
+use App\Models\Inspiration;
 use App\Models\Institution;
+use App\Models\MembershipClaim;
+use App\Models\ModerationReview;
 use App\Models\Reference;
+use App\Models\Report;
 use App\Models\Series;
 use App\Models\Space;
 use App\Models\Speaker;
@@ -41,15 +50,22 @@ it('lists accessible admin resources for privileged users', function () {
     $response = $this->getJson('/api/v1/admin/manifest')
         ->assertOk();
 
-    expect($response->json('data.version'))->toBe('2026-04-16')
+    expect($response->json('data.version'))->toBe('2026-04-21')
         ->and($response->json('data.docs.ui'))->toBe('https://api.majlisilmu.test/docs')
         ->and($response->json('data.docs.openapi'))->toBe('https://api.majlisilmu.test/docs.json')
+        ->and($response->json('data.surface_sync.strategy'))->toBe('curated_parity')
+        ->and($response->json('data.surface_sync.default_panel_only_operations'))->toContain('delete', 'restore', 'replicate', 'reorder')
+        ->and($response->json('data.surface_sync.workflow_first_capabilities'))->toContain('event moderation', 'contribution review')
+        ->and($response->json('data.workflow_actions.moderate_event.mcp_tool'))->toBe('admin-moderate-event')
+        ->and($response->json('data.workflow_actions.triage_report.mcp_tool'))->toBe('admin-triage-report')
+        ->and($response->json('data.workflow_actions.review_contribution_request.mcp_tool'))->toBe('admin-review-contribution-request')
+        ->and($response->json('data.workflow_actions.review_membership_claim.mcp_tool'))->toBe('admin-review-membership-claim')
         ->and($response->json('data.write_workflow.discover_resources'))->toContain('/api/v1/admin/manifest')
         ->and($response->json('data.rules'))->toContain('Use the admin record route_key returned by admin collection or detail payloads for record-specific paths.');
 
     $resourceKeys = collect($response->json('data.resources'))->pluck('key')->all();
 
-    expect($resourceKeys)->toContain('speakers', 'events', 'institutions', 'references', 'subdistricts', 'venues');
+    expect($resourceKeys)->toContain('speakers', 'events', 'inspirations', 'institutions', 'references', 'reports', 'series', 'spaces', 'subdistricts', 'venues', 'tags', 'donation-channels');
 });
 
 it('allows viewer-role users who can access the admin panel to reach the admin api manifest', function () {
@@ -333,6 +349,8 @@ it('previews admin speaker updates without persisting the record', function () {
         'name' => 'Previewable Admin API Speaker',
         'job_title' => null,
     ]);
+    $originalName = (string) $speaker->name;
+    $originalJobTitle = $speaker->job_title;
     $speakerRouteKey = (string) $speaker->getRouteKey();
 
     Sanctum::actingAs($admin);
@@ -360,8 +378,8 @@ it('previews admin speaker updates without persisting the record', function () {
         ->assertJsonPath('data.preview.destructive_media_fields.0', 'clear_cover')
         ->assertJsonPath('data.preview.warnings.0.field', 'clear_cover');
 
-    expect(Speaker::query()->findOrFail($speaker->getKey())->name)->toBe('Previewable Admin API Speaker')
-        ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
+    expect(Speaker::query()->findOrFail($speaker->getKey())->name)->toBe($originalName)
+        ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBe($originalJobTitle);
 });
 
 it('returns autofill hints and conditional requirements in admin api dry runs', function () {
@@ -421,7 +439,12 @@ it('returns remediation details for validate-only admin api create validation fa
         ->and($fixPlan->get('address'))->toMatchArray([
             'action' => 'set_field',
             'field' => 'address',
-            'value' => ['country_id' => 132],
+            'value' => [
+                'country_id' => 132,
+                'state_id' => null,
+                'district_id' => null,
+                'subdistrict_id' => null,
+            ],
             'auto_apply_safe' => true,
         ])
         ->and($remainingBlockers->get('status'))->toMatchArray([
@@ -436,7 +459,7 @@ it('returns structured enum suggestions for admin api validation errors', functi
 
     Sanctum::actingAs($admin);
 
-    $this->postJson('/api/v1/admin/events', [
+    $response = $this->postJson('/api/v1/admin/events', [
         'title' => 'Admin API Invalid Enum Preview',
         'event_date' => '2026-06-10',
         'custom_time' => '8:30 PM',
@@ -444,11 +467,16 @@ it('returns structured enum suggestions for admin api validation errors', functi
     ])->assertUnprocessable()
         ->assertJsonPath('error.code', 'validation_error')
         ->assertJsonPath('error.details.feedback.validate_only', false)
-        ->assertJsonPath('error.details.feedback.apply_defaults', false)
-        ->assertJsonPath('error.details.feedback.issues.0.field', 'event_format')
-        ->assertJsonPath('error.details.feedback.issues.0.closest_valid_value', EventFormat::Physical->value)
-        ->assertJsonPath('error.details.feedback.issues.0.suggested', EventFormat::Physical->value)
-        ->assertJsonPath('error.details.feedback.issues.0.allowed_values.0', EventFormat::Physical->value);
+        ->assertJsonPath('error.details.feedback.apply_defaults', false);
+
+    $issue = collect($response->json('error.details.feedback.issues'))
+        ->firstWhere('field', 'event_format');
+
+    expect($issue)
+        ->toBeArray()
+        ->and($issue['closest_valid_value'] ?? null)->toBe(EventFormat::Physical->value)
+        ->and($issue['suggested'] ?? null)->toBe(EventFormat::Physical->value)
+        ->and(data_get($issue, 'allowed_values.0'))->toBe(EventFormat::Physical->value);
 });
 
 it('returns retryable remediation details for validate-only admin api update validation failures', function () {
@@ -523,6 +551,583 @@ it('lists related records for admin resource relations', function () {
         ->assertJsonPath('meta.parent_record.route_key', $speakerRouteKey)
         ->assertJsonPath('meta.relation.name', 'events')
         ->assertJsonPath('meta.relation.related_resource.key', 'events');
+});
+
+it('exposes tag write schema and can create and update tags through the api', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/tags/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'tags')
+        ->assertJsonPath('data.schema.resource_key', 'tags')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.content_type', 'application/json')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/tags')
+        ->json('data.schema');
+
+    expect(collect($schema['fields'] ?? [])->pluck('name')->all())
+        ->toContain('name', 'name.ms', 'name.en', 'type', 'status', 'order_column');
+
+    $createResponse = $this->postJson('/api/v1/admin/tags', [
+        'name' => [
+            'ms' => 'Tadabbur',
+            'en' => 'Reflection',
+        ],
+        'type' => 'discipline',
+        'status' => 'verified',
+    ])->assertCreated();
+
+    $tagRouteKey = (string) $createResponse->json('data.record.route_key');
+    $tag = Tag::query()->findOrFail($tagRouteKey);
+
+    expect($tag->type)->toBe('discipline')
+        ->and($tag->status)->toBe('verified')
+        ->and($tag->getTranslation('name', 'ms'))->toBe('Tadabbur')
+        ->and($tag->getTranslation('slug', 'ms'))->toBe('tadabbur');
+
+    $this->putJson('/api/v1/admin/tags/'.$tagRouteKey, [
+        'name' => [
+            'ms' => 'Rasuah',
+            'en' => 'Corruption',
+        ],
+        'type' => 'issue',
+        'status' => 'pending',
+        'order_column' => 5,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.type', 'issue')
+        ->assertJsonPath('data.record.attributes.status', 'pending')
+        ->assertJsonPath('data.record.attributes.order_column', 5);
+
+    $tag->refresh();
+
+    expect($tag->type)->toBe('issue')
+        ->and($tag->status)->toBe('pending')
+        ->and($tag->order_column)->toBe(5)
+        ->and($tag->getTranslation('name', 'en'))->toBe('Corruption')
+        ->and($tag->getTranslation('slug', 'en'))->toBe('corruption');
+});
+
+it('exposes event moderation schema and can request changes through the admin workflow endpoints', function () {
+    $admin = adminApiUser('super_admin');
+    $submitter = User::factory()->create();
+    $event = Event::factory()->create([
+        'status' => 'pending',
+        'submitter_id' => $submitter->getKey(),
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $schemaResponse = $this->getJson('/api/v1/admin/events/'.$event->getRouteKey().'/moderation-schema')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'events')
+        ->assertJsonPath('data.record.route_key', $event->getRouteKey())
+        ->assertJsonPath('data.schema.action', 'moderate_event')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/events/'.$event->getRouteKey().'/moderate');
+
+    $actionField = collect($schemaResponse->json('data.schema.fields'))->firstWhere('name', 'action');
+
+    expect($actionField['allowed_values'] ?? [])
+        ->toContain('approve', 'request_changes', 'reject', 'cancel')
+        ->not->toContain('reconsider', 'remoderate', 'revert_to_draft');
+
+    $this->postJson('/api/v1/admin/events/'.$event->getRouteKey().'/moderate', [
+        'action' => 'request_changes',
+        'reason_code' => 'incomplete_info',
+        'note' => 'Please add venue details before approval.',
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.status', 'needs_changes');
+
+    $event->refresh();
+
+    expect((string) $event->status)->toBe('needs_changes');
+
+    $review = ModerationReview::query()->where('event_id', $event->getKey())->latest()->first();
+
+    expect($review?->decision)->toBe('needs_changes')
+        ->and($review?->reason_code)->toBe('incomplete_info');
+
+    $this->assertDatabaseHas('notification_messages', [
+        'user_id' => $submitter->getKey(),
+        'trigger' => 'submission_needs_changes',
+    ]);
+});
+
+it('exposes contribution request review schema and can approve requests through the admin workflow endpoints', function () {
+    $admin = adminApiUser('moderator');
+    $institution = Institution::factory()->create([
+        'description' => 'Before review',
+        'status' => 'verified',
+    ]);
+    $request = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Update,
+        'subject_type' => ContributionSubjectType::Institution,
+        'entity_type' => $institution->getMorphClass(),
+        'entity_id' => $institution->getKey(),
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'description' => 'After review',
+        ],
+        'original_data' => [
+            'description' => 'Before review',
+        ],
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/contribution-requests/'.$request->getRouteKey().'/review-schema')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'contribution-requests')
+        ->assertJsonPath('data.record.route_key', $request->getRouteKey())
+        ->assertJsonPath('data.schema.action', 'review_contribution_request')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/contribution-requests/'.$request->getRouteKey().'/review')
+        ->assertJsonPath('data.schema.conditional_rules.0.field', 'reason_code');
+
+    $this->postJson('/api/v1/admin/contribution-requests/'.$request->getRouteKey().'/review', [
+        'action' => 'approve',
+        'reviewer_note' => 'Looks accurate.',
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.status', 'approved')
+        ->assertJsonPath('data.record.attributes.reviewer_note', 'Looks accurate.');
+
+    expect($request->fresh()?->status)->toBe(ContributionRequestStatus::Approved)
+        ->and($request->fresh()?->reviewer_id)->toBe($admin->getKey())
+        ->and($request->fresh()?->reviewer_note)->toBe('Looks accurate.')
+        ->and($institution->fresh()?->description)->toBe('After review');
+});
+
+it('exposes report triage schema and can resolve reports through the admin workflow endpoints', function () {
+    $admin = adminApiUser('moderator');
+    $reporter = User::factory()->create();
+    $report = Report::factory()->create([
+        'reporter_id' => $reporter->getKey(),
+        'status' => 'open',
+        'handled_by' => null,
+        'resolution_note' => null,
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $schemaResponse = $this->getJson('/api/v1/admin/reports/'.$report->getRouteKey().'/triage-schema')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'reports')
+        ->assertJsonPath('data.record.route_key', $report->getRouteKey())
+        ->assertJsonPath('data.schema.action', 'triage_report')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/reports/'.$report->getRouteKey().'/triage');
+
+    $actionField = collect($schemaResponse->json('data.schema.fields'))->firstWhere('name', 'action');
+
+    expect($actionField['allowed_values'] ?? [])
+        ->toContain('triage', 'resolve', 'dismiss')
+        ->not->toContain('reopen');
+
+    $this->postJson('/api/v1/admin/reports/'.$report->getRouteKey().'/triage', [
+        'action' => 'resolve',
+        'resolution_note' => 'Handled through the admin API.',
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.status', 'resolved')
+        ->assertJsonPath('data.record.attributes.resolution_note', 'Handled through the admin API.');
+
+    $report->refresh();
+
+    expect($report->status)->toBe('resolved')
+        ->and($report->handled_by)->toBe($admin->getKey())
+        ->and($report->resolution_note)->toBe('Handled through the admin API.');
+});
+
+it('exposes report write schema and can create and update reports through the api', function () {
+    $admin = adminApiUser('moderator');
+    $reporter = User::factory()->create();
+    $event = Event::factory()->create();
+    $reference = Reference::factory()->verified()->create();
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/reports/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'reports')
+        ->assertJsonPath('data.schema.resource_key', 'reports')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.content_type', 'multipart/form-data')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/reports')
+        ->json('data.schema');
+
+    expect(collect($schema['fields'] ?? [])->pluck('name')->all())
+        ->toContain('entity_type', 'entity_id', 'category', 'status', 'reporter_id', 'handled_by', 'resolution_note', 'evidence', 'clear_evidence');
+
+    $createResponse = $this->withHeaders(['Accept' => 'application/json'])->post('/api/v1/admin/reports', [
+        'entity_type' => 'event',
+        'entity_id' => (string) $event->getKey(),
+        'category' => 'wrong_info',
+        'description' => 'Created through admin API.',
+        'status' => 'open',
+        'reporter_id' => (string) $reporter->getKey(),
+        'evidence' => [
+            fakeGeneratedImageUpload('admin-api-report-evidence.png', 640, 640),
+        ],
+    ])->assertCreated();
+
+    $reportRouteKey = (string) $createResponse->json('data.record.route_key');
+    $report = Report::query()->with(['entity', 'reporter', 'handler', 'media'])->findOrFail($reportRouteKey);
+
+    expect($report->entity_type)->toBe('event')
+        ->and($report->entity_id)->toBe($event->getKey())
+        ->and($report->category)->toBe('wrong_info')
+        ->and($report->status)->toBe('open')
+        ->and($report->reporter_id)->toBe($reporter->getKey())
+        ->and($report->handled_by)->toBeNull()
+        ->and($report->getMedia('evidence'))->toHaveCount(1);
+
+    $this->getJson('/api/v1/admin/reports/schema?operation=update&recordKey='.$reportRouteKey)
+        ->assertOk()
+        ->assertJsonPath('data.schema.method', 'PUT')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/reports/'.$reportRouteKey)
+        ->assertJsonPath('data.schema.defaults.entity_type', 'event')
+        ->assertJsonPath('data.schema.defaults.entity_id', (string) $event->getKey())
+        ->assertJsonPath('data.schema.defaults.clear_evidence', false);
+
+    $this->putJson('/api/v1/admin/reports/'.$reportRouteKey, [
+        'entity_type' => 'reference',
+        'entity_id' => (string) $reference->getKey(),
+        'category' => 'fake_reference',
+        'description' => 'Updated through admin API.',
+        'status' => 'resolved',
+        'reporter_id' => (string) $reporter->getKey(),
+        'handled_by' => (string) $admin->getKey(),
+        'resolution_note' => 'Resolved through admin API.',
+        'clear_evidence' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.entity_type', 'reference')
+        ->assertJsonPath('data.record.attributes.category', 'fake_reference')
+        ->assertJsonPath('data.record.attributes.status', 'resolved')
+        ->assertJsonPath('data.record.attributes.resolution_note', 'Resolved through admin API.');
+
+    $report->refresh();
+
+    expect($report->entity_type)->toBe('reference')
+        ->and($report->entity_id)->toBe($reference->getKey())
+        ->and($report->category)->toBe('fake_reference')
+        ->and($report->status)->toBe('resolved')
+        ->and($report->handled_by)->toBe($admin->getKey())
+        ->and($report->resolution_note)->toBe('Resolved through admin API.')
+        ->and($report->getMedia('evidence'))->toHaveCount(0);
+});
+
+it('exposes inspiration write schema and can create and update inspirations through the api', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/inspirations/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'inspirations')
+        ->assertJsonPath('data.schema.resource_key', 'inspirations')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.content_type', 'multipart/form-data')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/inspirations')
+        ->json('data.schema');
+
+    expect(collect($schema['fields'] ?? [])->pluck('name')->all())
+        ->toContain('category', 'locale', 'title', 'content', 'source', 'main', 'clear_main');
+
+    $createResponse = $this->withHeaders(['Accept' => 'application/json'])->post('/api/v1/admin/inspirations', [
+        'category' => 'quran_quote',
+        'locale' => 'ms',
+        'title' => 'Admin API Inspiration',
+        'content' => 'Admin API inspiration content.',
+        'source' => 'Admin API Source',
+        'is_active' => true,
+        'main' => fakeGeneratedImageUpload('admin-api-inspiration-main.png', 1280, 720),
+    ])->assertCreated();
+
+    $inspirationRouteKey = (string) $createResponse->json('data.record.route_key');
+    $inspiration = Inspiration::query()->findOrFail($inspirationRouteKey);
+
+    expect($inspiration->getRawOriginal('category'))->toBe('quran_quote')
+        ->and($inspiration->locale)->toBe('ms')
+        ->and($inspiration->title)->toBe('Admin API Inspiration')
+        ->and($inspiration->is_active)->toBeTrue()
+        ->and($inspiration->getMedia('main'))->toHaveCount(1);
+
+    $this->putJson('/api/v1/admin/inspirations/'.$inspirationRouteKey, [
+        'category' => 'hadith_quote',
+        'locale' => 'en',
+        'title' => 'Admin API Inspiration Updated',
+        'content' => [
+            'type' => 'doc',
+            'content' => [[
+                'type' => 'paragraph',
+                'content' => [[
+                    'type' => 'text',
+                    'text' => 'Updated inspiration content.',
+                ]],
+            ]],
+        ],
+        'source' => 'Updated API Source',
+        'is_active' => false,
+        'clear_main' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.category', 'hadith_quote')
+        ->assertJsonPath('data.record.attributes.locale', 'en')
+        ->assertJsonPath('data.record.attributes.title', 'Admin API Inspiration Updated')
+        ->assertJsonPath('data.record.attributes.is_active', false);
+
+    $inspiration->refresh();
+
+    expect($inspiration->getRawOriginal('category'))->toBe('hadith_quote')
+        ->and($inspiration->locale)->toBe('en')
+        ->and($inspiration->title)->toBe('Admin API Inspiration Updated')
+        ->and($inspiration->source)->toBe('Updated API Source')
+        ->and($inspiration->is_active)->toBeFalse()
+        ->and($inspiration->getMedia('main'))->toHaveCount(0);
+});
+
+it('exposes series write schema and can create and update series through the api', function () {
+    $admin = adminApiUser('super_admin');
+    $suffix = Str::lower((string) Str::ulid());
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/series/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'series')
+        ->assertJsonPath('data.schema.resource_key', 'series')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.content_type', 'multipart/form-data')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/series')
+        ->json('data.schema');
+
+    expect(collect($schema['fields'] ?? [])->pluck('name')->all())
+        ->toContain('title', 'slug', 'description', 'visibility', 'languages', 'cover', 'gallery');
+
+    $createResponse = $this->withHeaders(['Accept' => 'application/json'])->post('/api/v1/admin/series', [
+        'title' => 'Admin API Series '.$suffix,
+        'slug' => 'admin-api-series-'.$suffix,
+        'description' => 'Series created through the admin API.',
+        'visibility' => 'public',
+        'is_active' => true,
+        'cover' => fakeGeneratedImageUpload('series-cover.png', 1280, 720),
+        'gallery' => [
+            fakeGeneratedImageUpload('series-gallery.png', 1280, 720),
+        ],
+    ])->assertCreated();
+
+    $seriesRouteKey = (string) $createResponse->json('data.record.route_key');
+    $series = Series::query()->findOrFail($seriesRouteKey);
+
+    expect($series->title)->toBe('Admin API Series '.$suffix)
+        ->and($series->slug)->toBe('admin-api-series-'.$suffix)
+        ->and($series->getMedia('cover'))->toHaveCount(1)
+        ->and($series->getMedia('gallery'))->toHaveCount(1);
+
+    $this->putJson('/api/v1/admin/series/'.$seriesRouteKey, [
+        'title' => 'Admin API Series Updated '.$suffix,
+        'slug' => 'admin-api-series-updated-'.$suffix,
+        'description' => 'Series updated through the admin API.',
+        'visibility' => 'private',
+        'is_active' => false,
+        'languages' => [],
+        'clear_cover' => true,
+        'clear_gallery' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.title', 'Admin API Series Updated '.$suffix)
+        ->assertJsonPath('data.record.attributes.slug', 'admin-api-series-updated-'.$suffix)
+        ->assertJsonPath('data.record.attributes.visibility', 'private')
+        ->assertJsonPath('data.record.attributes.is_active', false);
+
+    $series->refresh();
+
+    expect($series->title)->toBe('Admin API Series Updated '.$suffix)
+        ->and($series->slug)->toBe('admin-api-series-updated-'.$suffix)
+        ->and($series->visibility)->toBe('private')
+        ->and($series->is_active)->toBeFalse()
+        ->and($series->getMedia('cover'))->toHaveCount(0)
+        ->and($series->getMedia('gallery'))->toHaveCount(0);
+});
+
+it('exposes space write schema and can create and update spaces through the api', function () {
+    $admin = adminApiUser('super_admin');
+    $suffix = Str::lower((string) Str::ulid());
+    $firstInstitution = Institution::factory()->create();
+    $secondInstitution = Institution::factory()->create();
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/spaces/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'spaces')
+        ->assertJsonPath('data.schema.resource_key', 'spaces')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.content_type', 'application/json')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/spaces')
+        ->json('data.schema');
+
+    expect(collect($schema['fields'] ?? [])->pluck('name')->all())
+        ->toContain('name', 'slug', 'capacity', 'is_active', 'institutions');
+
+    $createResponse = $this->postJson('/api/v1/admin/spaces', [
+        'name' => 'Admin API Space '.$suffix,
+        'slug' => 'admin-api-space-'.$suffix,
+        'capacity' => 80,
+        'is_active' => true,
+        'institutions' => [(string) $firstInstitution->getKey()],
+    ])->assertCreated();
+
+    $spaceRouteKey = (string) $createResponse->json('data.record.route_key');
+    $space = Space::query()->findOrFail($spaceRouteKey);
+
+    expect($space->name)->toBe('Admin API Space '.$suffix)
+        ->and($space->slug)->toBe('admin-api-space-'.$suffix)
+        ->and($space->capacity)->toBe(80)
+        ->and($space->institutions()->pluck('institutions.id')->all())->toContain($firstInstitution->getKey());
+
+    $this->putJson('/api/v1/admin/spaces/'.$spaceRouteKey, [
+        'name' => 'Admin API Space Updated '.$suffix,
+        'slug' => 'admin-api-space-updated-'.$suffix,
+        'capacity' => 120,
+        'is_active' => false,
+        'institutions' => [(string) $secondInstitution->getKey()],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.name', 'Admin API Space Updated '.$suffix)
+        ->assertJsonPath('data.record.attributes.slug', 'admin-api-space-updated-'.$suffix)
+        ->assertJsonPath('data.record.attributes.capacity', 120)
+        ->assertJsonPath('data.record.attributes.is_active', false);
+
+    $space->refresh();
+
+    expect($space->name)->toBe('Admin API Space Updated '.$suffix)
+        ->and($space->slug)->toBe('admin-api-space-updated-'.$suffix)
+        ->and($space->capacity)->toBe(120)
+        ->and($space->is_active)->toBeFalse()
+        ->and($space->institutions()->pluck('institutions.id')->all())->toContain($secondInstitution->getKey())
+        ->and($space->institutions()->pluck('institutions.id')->all())->not->toContain($firstInstitution->getKey());
+});
+
+it('exposes donation channel write schema and can create and update donation channels through the api', function () {
+    $admin = adminApiUser('super_admin');
+    $institution = Institution::factory()->create();
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/donation-channels/schema?operation=create')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'donation-channels')
+        ->assertJsonPath('data.schema.resource_key', 'donation-channels')
+        ->assertJsonPath('data.schema.method', 'POST')
+        ->assertJsonPath('data.schema.content_type', 'multipart/form-data')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/donation-channels')
+        ->json('data.schema');
+
+    expect(collect($schema['fields'] ?? [])->pluck('name')->all())
+        ->toContain('donatable_type', 'donatable_id', 'recipient', 'method', 'status', 'qr', 'clear_qr');
+
+    $createResponse = $this->withHeaders(['Accept' => 'application/json'])->post('/api/v1/admin/donation-channels', [
+        'donatable_type' => 'institution',
+        'donatable_id' => (string) $institution->getKey(),
+        'label' => 'Tabung Jumaat API',
+        'recipient' => 'Masjid API',
+        'method' => 'bank_account',
+        'bank_code' => 'MBB',
+        'bank_name' => 'Maybank',
+        'account_number' => '123456789012',
+        'reference_note' => 'Primary donation channel.',
+        'status' => 'verified',
+        'is_default' => true,
+        'qr' => fakeGeneratedImageUpload('admin-api-donation-channel-qr.png', 640, 640),
+    ])->assertCreated();
+
+    $donationChannelRouteKey = (string) $createResponse->json('data.record.route_key');
+    $donationChannel = DonationChannel::query()->findOrFail($donationChannelRouteKey);
+
+    expect($donationChannel->donatable_type)->toBe('institution')
+        ->and($donationChannel->donatable_id)->toBe($institution->getKey())
+        ->and($donationChannel->label)->toBe('Tabung Jumaat API')
+        ->and($donationChannel->recipient)->toBe('Masjid API')
+        ->and($donationChannel->method)->toBe('bank_account')
+        ->and($donationChannel->bank_name)->toBe('Maybank')
+        ->and($donationChannel->account_number)->toBe('123456789012')
+        ->and($donationChannel->duitnow_type)->toBeNull()
+        ->and($donationChannel->ewallet_provider)->toBeNull()
+        ->and($donationChannel->is_default)->toBeTrue()
+        ->and($donationChannel->getMedia('qr'))->toHaveCount(1);
+
+    $this->getJson('/api/v1/admin/donation-channels/schema?operation=update&recordKey='.$donationChannelRouteKey)
+        ->assertOk()
+        ->assertJsonPath('data.schema.method', 'PUT')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/donation-channels/'.$donationChannelRouteKey)
+        ->assertJsonPath('data.schema.defaults.donatable_type', 'institution')
+        ->assertJsonPath('data.schema.defaults.donatable_id', (string) $institution->getKey())
+        ->assertJsonPath('data.schema.defaults.clear_qr', false);
+
+    $this->putJson('/api/v1/admin/donation-channels/'.$donationChannelRouteKey, [
+        'donatable_type' => 'institution',
+        'donatable_id' => (string) $institution->getKey(),
+        'label' => 'Tabung Jumaat API Updated',
+        'recipient' => 'Masjid API Updated',
+        'method' => 'ewallet',
+        'ewallet_provider' => 'tng',
+        'ewallet_handle' => '60123456789',
+        'ewallet_qr_payload' => 'duitnow://payment/majlisilmu',
+        'reference_note' => 'Fallback donation channel.',
+        'status' => 'inactive',
+        'is_default' => false,
+        'clear_qr' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.label', 'Tabung Jumaat API Updated')
+        ->assertJsonPath('data.record.attributes.method', 'ewallet')
+        ->assertJsonPath('data.record.attributes.status', 'inactive');
+
+    $donationChannel->refresh();
+
+    expect($donationChannel->label)->toBe('Tabung Jumaat API Updated')
+        ->and($donationChannel->recipient)->toBe('Masjid API Updated')
+        ->and($donationChannel->method)->toBe('ewallet')
+        ->and($donationChannel->bank_code)->toBeNull()
+        ->and($donationChannel->bank_name)->toBeNull()
+        ->and($donationChannel->account_number)->toBeNull()
+        ->and($donationChannel->ewallet_provider)->toBe('tng')
+        ->and($donationChannel->ewallet_handle)->toBe('60123456789')
+        ->and($donationChannel->ewallet_qr_payload)->toBe('duitnow://payment/majlisilmu')
+        ->and($donationChannel->status)->toBe('inactive')
+        ->and($donationChannel->is_default)->toBeFalse()
+        ->and($donationChannel->getMedia('qr'))->toHaveCount(0);
+});
+
+it('exposes membership claim review schema and can approve claims through the admin workflow endpoints', function () {
+    $admin = adminApiUser('super_admin');
+    $institution = Institution::factory()->create();
+    $claimant = User::factory()->create();
+    $claim = MembershipClaim::factory()
+        ->forInstitution($institution)
+        ->create([
+            'claimant_id' => $claimant->getKey(),
+            'status' => 'pending',
+        ]);
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/membership-claims/'.$claim->getRouteKey().'/review-schema')
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'membership-claims')
+        ->assertJsonPath('data.record.route_key', $claim->getRouteKey())
+        ->assertJsonPath('data.schema.action', 'review_membership_claim')
+        ->assertJsonPath('data.schema.endpoint', '/api/v1/admin/membership-claims/'.$claim->getRouteKey().'/review')
+        ->assertJsonPath('data.schema.conditional_rules.0.field', 'granted_role_slug');
+
+    $this->postJson('/api/v1/admin/membership-claims/'.$claim->getRouteKey().'/review', [
+        'action' => 'approve',
+        'granted_role_slug' => 'admin',
+        'reviewer_note' => 'Approved through admin API.',
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.status', 'approved')
+        ->assertJsonPath('data.record.attributes.granted_role_slug', 'admin')
+        ->assertJsonPath('data.record.attributes.reviewer_note', 'Approved through admin API.');
+
+    expect($claim->fresh()?->status->value)->toBe('approved')
+        ->and($claim->fresh()?->granted_role_slug)->toBe('admin')
+        ->and($claim->fresh()?->reviewer_id)->toBe($admin->getKey())
+        ->and($institution->fresh()->members()->whereKey($claimant->getKey())->exists())->toBeTrue();
 });
 
 it('exposes admin speaker write schema and can create and update speakers through the api', function () {

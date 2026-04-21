@@ -208,7 +208,7 @@ final class AdminValidateOnlyRemediationPlanner
 
         foreach ($payload as $key => $value) {
             // Retry previews are serialized back to JSON, so only standard string/int array keys are retained.
-            if (! is_string($key) && ! is_int($key)) {
+            if (! is_string($key)) {
                 continue;
             }
 

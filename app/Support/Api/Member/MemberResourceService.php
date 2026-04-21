@@ -12,9 +12,12 @@ use Carbon\CarbonInterface;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class MemberResourceService
@@ -37,7 +40,7 @@ class MemberResourceService
 
         return [
             'data' => [
-                'version' => '2026-04-17',
+                'version' => '2026-04-21',
                 'audience' => 'member',
                 'panel' => 'ahli',
                 'docs' => [
@@ -47,13 +50,40 @@ class MemberResourceService
                 ],
                 'write_workflow' => [
                     'fetch_update_schema_tool' => 'member-get-write-schema',
+                    'list_related_records_tool' => 'member-list-related-records',
                     'update_tool' => 'member-update-record',
+                ],
+                'workflow_tools' => [
+                    'list_contribution_requests' => [
+                        'tool' => 'member-list-contribution-requests',
+                    ],
+                    'approve_contribution_request' => [
+                        'tool' => 'member-approve-contribution-request',
+                    ],
+                    'reject_contribution_request' => [
+                        'tool' => 'member-reject-contribution-request',
+                    ],
+                    'cancel_contribution_request' => [
+                        'tool' => 'member-cancel-contribution-request',
+                    ],
+                    'list_membership_claims' => [
+                        'tool' => 'member-list-membership-claims',
+                    ],
+                    'submit_membership_claim' => [
+                        'tool' => 'member-submit-membership-claim',
+                    ],
+                    'cancel_membership_claim' => [
+                        'tool' => 'member-cancel-membership-claim',
+                    ],
                 ],
                 'rules' => [
                     'Use the returned resource keys to scope follow-up MCP reads to your own memberships and related records.',
                     'Resource visibility follows the Ahli workspace boundary and live membership relationships, not the full admin panel.',
                     'Member MCP writes are limited to schema-guided updates for records the current user can already edit through the Ahli surface.',
                     'Fetch the exact update schema before every member write because required fields remain resource-specific.',
+                    'Use validate_only=true to preview and normalize a member write without persisting it.',
+                    'Use the relation keys returned by member resource metadata when traversing one-level related records.',
+                    'Use workflow_tools for Ahli queue flows such as contribution approvals and membership claims; resources cover scoped CRUD only.',
                     'Use mcp_tools for MCP clients; panel_routes are browser destinations and are not MCP call surfaces.',
                 ],
                 'resources' => array_values(array_map(
@@ -123,6 +153,71 @@ class MemberResourceService
     }
 
     /**
+     * @return array{data: list<array<string, mixed>>, meta: array<string, mixed>}
+     */
+    public function listRelatedRecords(string $resourceKey, string $recordKey, string $relation, string $search = '', int $page = 1, int $perPage = 15): array
+    {
+        $resourceClass = $this->resolveAccessibleResource($resourceKey);
+        $record = $this->registry->resolveRecord($resourceClass, $recordKey);
+        $resourceMeta = $this->registry->metadata($resourceClass);
+        $relationName = Str::snake(trim($relation));
+
+        abort_unless(in_array($relationName, $resourceMeta['relations'], true), 404);
+
+        $relationMethod = Str::camel($relationName);
+
+        if (! method_exists($record, $relationMethod)) {
+            throw new NotFoundHttpException;
+        }
+
+        /** @var Relation<Model, Model, mixed> $relationQuery */
+        $relationQuery = $record->{$relationMethod}();
+        $query = $relationQuery->getQuery();
+        $relatedModel = $relationQuery->getRelated();
+        $relatedResourceClass = $this->registry->resolveForModel($relatedModel::class);
+        $query->select($relatedModel->qualifyColumn('*'));
+        $normalizedSearch = trim($search);
+
+        if ($normalizedSearch !== '') {
+            if ($relatedResourceClass !== null) {
+                $this->applySearch($query, $relatedResourceClass, $normalizedSearch);
+            } else {
+                $this->applyGenericSearch($query, $relatedModel, $normalizedSearch);
+            }
+        }
+
+        if ($relatedResourceClass !== null) {
+            $this->applyDefaultOrdering($query, $relatedResourceClass);
+        } else {
+            $this->applyDefaultOrderingForModel($query, $relatedModel);
+        }
+
+        $records = $query->paginate(
+            perPage: ApiPagination::normalizePerPage($perPage, default: 15, max: 100),
+            page: max($page, 1),
+        );
+
+        return [
+            'data' => array_values(array_map(
+                fn (Model $relatedRecord): array => $this->serializeRelatedRecord($relatedResourceClass, $relatedRecord),
+                $records->items(),
+            )),
+            'meta' => [
+                'resource' => $resourceMeta,
+                'parent_record' => $this->registry->serializeRecordDetail($resourceClass, $record),
+                'relation' => [
+                    'name' => $relationName,
+                    'method' => $relationMethod,
+                    'related_model_class' => $relatedModel::class,
+                    'related_resource' => $relatedResourceClass !== null ? $this->registry->metadata($relatedResourceClass) : null,
+                ],
+                'search' => $normalizedSearch !== '' ? $normalizedSearch : null,
+                'pagination' => ApiPagination::paginationMeta($records),
+            ],
+        ];
+    }
+
+    /**
      * @return array{data: array{resource: array<string, mixed>, record: array<string, mixed>}}
      */
     public function showRecord(string $resourceKey, string $recordKey): array
@@ -160,9 +255,9 @@ class MemberResourceService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{data: array{resource: array<string, mixed>, record: array<string, mixed>}}
+     * @return array<string, mixed>
      */
-    public function updateRecord(string $resourceKey, string $recordKey, array $payload, ?User $actor = null): array
+    public function updateRecord(string $resourceKey, string $recordKey, array $payload, ?User $actor = null, bool $validateOnly = false): array
     {
         $resourceClass = $this->resolveWritableResource($resourceKey, $actor);
 
@@ -182,12 +277,39 @@ class MemberResourceService
 
         $validated = $this->mutationService->normalizeValidatedPayload($resourceClass, $validated, $record);
 
+        if ($validateOnly) {
+            return $this->previewWriteRecord($resourceClass, $validated, $record);
+        }
+
         $record = $this->mutationService->update($resourceClass, $record, $validated, $actor);
 
         return [
             'data' => [
                 'resource' => $this->registry->metadata($resourceClass),
                 'record' => $this->registry->serializeRecordDetail($resourceClass, $record),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array{data: array{resource: array<string, mixed>, preview: array<string, mixed>}}
+     */
+    private function previewWriteRecord(string $resourceClass, array $validated, Model $record): array
+    {
+        $preview = $this->mutationService->previewNormalizedPayload($validated);
+
+        return [
+            'data' => [
+                'resource' => $this->registry->metadata($resourceClass),
+                'preview' => array_merge(
+                    [
+                        'validate_only' => true,
+                        'operation' => 'update',
+                        'current_record' => $this->registry->serializeRecordDetail($resourceClass, $record),
+                    ],
+                    $preview,
+                ),
             ],
         ];
     }
@@ -220,6 +342,143 @@ class MemberResourceService
         }
 
         $query->orderBy($model->qualifyColumn($sortColumn), $sortColumn === 'created_at' ? 'desc' : 'asc');
+    }
+
+    /**
+     * @return array{
+     *   id: string,
+     *   route_key: string,
+     *   title: string|null,
+     *   attributes: array<string, mixed>,
+     *   abilities?: array<string, bool>,
+     *   panel_routes?: array<string, string|null>
+     * }
+     */
+    private function serializeRelatedRecord(?string $resourceClass, Model $record): array
+    {
+        if ($resourceClass !== null) {
+            return $this->registry->serializeRecord($resourceClass, $record);
+        }
+
+        return [
+            'id' => (string) $record->getKey(),
+            'route_key' => (string) $record->getRouteKey(),
+            'title' => $this->genericRecordTitle($record),
+            'attributes' => $this->serializeGenericAttributes($record),
+        ];
+    }
+
+    private function genericRecordTitle(Model $record): string
+    {
+        $table = $record->getTable();
+        $candidates = [
+            'title',
+            'name',
+            'label',
+            'slug',
+            'email',
+            $record->getRouteKeyName(),
+        ];
+
+        foreach (array_values(array_unique(array_filter($candidates, static fn (string $column): bool => $column !== ''))) as $column) {
+            if (! Schema::hasColumn($table, $column)) {
+                continue;
+            }
+
+            $value = $record->getAttribute($column);
+
+            if (is_string($value) && trim($value) !== '') {
+                return $value;
+            }
+
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return (string) $value;
+            }
+        }
+
+        return (string) $record->getRouteKey();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeGenericAttributes(Model $record): array
+    {
+        $attributes = $record->toArray();
+
+        if ($record instanceof User) {
+            return Arr::except($attributes, [
+                'email',
+                'email_verified_at',
+                'phone',
+                'phone_verified_at',
+                'daily_prayer_institution_id',
+                'friday_prayer_institution_id',
+            ]);
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function applyDefaultOrderingForModel(Builder $query, Model $model): void
+    {
+        $table = $model->getTable();
+        $candidates = [
+            'name',
+            'title',
+            'label',
+            'slug',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! Schema::hasColumn($table, $candidate)) {
+                continue;
+            }
+
+            $query->orderBy($model->qualifyColumn($candidate));
+
+            return;
+        }
+
+        if (Schema::hasColumn($table, 'created_at')) {
+            $query->orderBy($model->qualifyColumn('created_at'), 'desc');
+
+            return;
+        }
+
+        $query->orderBy($model->qualifyColumn($model->getKeyName()));
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function applyGenericSearch(Builder $query, Model $model, string $search): void
+    {
+        $table = $model->getTable();
+        $candidates = [
+            'title',
+            'name',
+            'label',
+            'slug',
+            'email',
+            'description',
+            $model->getRouteKeyName(),
+        ];
+        $columns = array_values(array_filter(array_unique($candidates), static fn (string $column): bool => Schema::hasColumn($table, $column)));
+
+        if ($columns === []) {
+            return;
+        }
+
+        $query->where(function (Builder $builder) use ($columns, $search, $model): void {
+            foreach ($columns as $index => $column) {
+                $method = $index === 0 ? 'where' : 'orWhere';
+                $builder->{$method}($model->qualifyColumn($column), 'like', "%{$search}%");
+            }
+        });
     }
 
     /**

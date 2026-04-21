@@ -12,6 +12,7 @@ use App\States\EventStatus\Cancelled;
 use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
+use App\Support\Moderation\EventModerationWorkflow;
 use App\Support\Submission\EntitySubmissionAccess;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -332,17 +333,7 @@ class ViewEvent extends ViewRecord
      */
     protected static function getReasonCodeOptions(): array
     {
-        return [
-            'incomplete_info' => 'Incomplete Information',
-            'duplicate' => 'Duplicate Event',
-            'inappropriate' => 'Inappropriate Content',
-            'spam' => 'Spam',
-            'wrong_category' => 'Wrong Category',
-            'inaccurate_details' => 'Inaccurate Details',
-            'missing_speaker' => 'Missing Speaker Information',
-            'missing_venue' => 'Missing Venue Information',
-            'other' => 'Other',
-        ];
+        return EventModerationWorkflow::reasonOptions();
     }
 
     protected function eventRecord(): Event

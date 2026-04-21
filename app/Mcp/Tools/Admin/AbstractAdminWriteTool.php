@@ -21,6 +21,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
     /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $schemaResponse
+     * @return array<string, mixed>
      */
     protected function payloadWithSchemaDefaults(array $payload, array $schemaResponse): array
     {

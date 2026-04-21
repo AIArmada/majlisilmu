@@ -1,6 +1,6 @@
 # MajlisIlmu MCP Guide
 
-Updated: April 20, 2026
+Updated: April 21, 2026
 Audience: developers and AI-client integrators.
 
 ## What MCP Means in MajlisIlmu
@@ -45,7 +45,7 @@ If you are writing or reviewing an AI-generated report, read the raw HTTP admin 
 
 - Route: `/mcp/member`
 - Server class: `App\Mcp\Servers\MemberServer`
-- Intended for Ahli/member workflows such as resource discovery, record browsing, record detail, schema discovery, and supported updates on writable member-visible resources.
+- Intended for Ahli/member workflows such as resource discovery, record browsing, record detail, schema discovery, supported updates on writable member-visible resources, contribution-request queues, and membership claims.
 
 ## How To Connect
 
@@ -203,12 +203,16 @@ Use this section as the quick MCP-only capability summary.
 | Resource metadata | `admin-get-resource-meta` | `member-get-resource-meta` |
 | Record list | `admin-list-records` | `member-list-records` |
 | Record read | `admin-get-record` | `member-get-record` |
-| Related-record traversal | `admin-list-related-records` | No generic related-record tool |
+| Related-record traversal | `admin-list-related-records` | `member-list-related-records` |
 | Write schema discovery | `admin-get-write-schema` | `member-get-write-schema` |
 | GitHub issue reporting | `admin-create-github-issue` | `member-create-github-issue` |
+| Event moderation | `admin-moderate-event` | Not exposed |
+| Report triage | `admin-triage-report` | Not exposed |
+| Contribution-request workflows | `admin-review-contribution-request` | `member-list-contribution-requests`, `member-approve-contribution-request`, `member-reject-contribution-request`, `member-cancel-contribution-request` |
+| Membership-claim workflows | `admin-review-membership-claim` | `member-list-membership-claims`, `member-submit-membership-claim`, `member-cancel-membership-claim` |
 | Create | `admin-create-record` | Not exposed |
 | Update | `admin-update-record` | `member-update-record` |
-| Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` | No |
+| Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` | Yes, on `member-update-record` |
 
 Admin GitHub issue reports can skip Copilot assignment entirely by setting `GITHUB_ISSUE_REPORTING_ADMIN_COPILOT_ASSIGNMENT_ENABLED=false` on the server.
 
@@ -216,17 +220,23 @@ Admin GitHub issue reports can skip Copilot assignment entirely by setting `GITH
 
 | Resource | Admin MCP | Member MCP | Notes |
 | --- | --- | --- | --- |
-| `events` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update | Member scope only; no member create |
-| `institutions` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update | Member scope limited to linked institutions |
-| `speakers` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update | Member scope limited to linked speakers |
-| `references` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update | Member scope limited to linked references |
+| `events` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update + preview | Member scope only; no member create |
+| `inspirations` | list/get/meta + schema + create + update + preview | Not exposed | Admin-only through the current MCP surface |
+| `institutions` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update + preview | Member scope limited to linked institutions |
+| `speakers` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update + preview | Member scope limited to linked speakers |
+| `references` | list/get/meta + schema + create + update + preview | list/get/meta + schema + update + preview | Member scope limited to linked references |
+| `reports` | list/get/meta + schema + create + update + preview | Not exposed | Admin CRUD plus explicit triage workflow |
+| `donation-channels` | list/get/meta + schema + create + update + preview | Not exposed | Admin-only payment channel management |
+| `series` | list/get/meta + schema + create + update + preview | Not exposed | Admin-only through the current MCP surface |
+| `spaces` | list/get/meta + schema + create + update + preview | Not exposed | Admin-only through the current MCP surface |
+| `tags` | list/get/meta + schema + create + update + preview | Not exposed | Admin-only taxonomy management |
 | `venues` | list/get/meta + schema + create + update + preview | Not exposed | Admin-only through the current MCP surface |
 | `subdistricts` | list/get/meta + schema + create + update + preview | Not exposed | No media upload fields |
 
 ### Relation traversal rules
 
 - Admin only: use `admin-get-resource-meta` to discover whether a relation is exposed, then call `admin-list-related-records` with that relation name.
-- Member MCP has no generic related-record tool today.
+- Member MCP: use `member-get-resource-meta` to discover whether a relation is exposed, then call `member-list-related-records` with that relation name.
 - Do not assume every admin resource has a relation you can traverse; rely on metadata returned by the live tool.
 
 ### Entity selection heuristics for record search
@@ -288,6 +298,10 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
 | `admin-get-write-schema` | Discover the create/update contract for a writable admin record | `GET /api/v1/admin/{resourceKey}/schema` |
 | `admin-create-github-issue` | Create a GitHub issue in the configured repository and auto-assign Copilot | `POST /api/v1/github-issues` (admin caller path) |
+| `admin-moderate-event` | Run one explicit moderation action on an event | `POST /api/v1/admin/events/{recordKey}/moderate` |
+| `admin-triage-report` | Run one explicit triage action on a report | `POST /api/v1/admin/reports/{recordKey}/triage` |
+| `admin-review-contribution-request` | Approve or reject one pending contribution request | `POST /api/v1/admin/contribution-requests/{recordKey}/review` |
+| `admin-review-membership-claim` | Approve or reject a pending membership claim | `POST /api/v1/admin/membership-claims/{recordKey}/review` |
 | `admin-create-record` | Create or preview a writable admin record | `POST /api/v1/admin/{resourceKey}` |
 | `admin-update-record` | Update or preview a writable admin record | `PUT /api/v1/admin/{resourceKey}/{recordKey}` |
 
@@ -312,8 +326,16 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-resources` | List accessible Ahli-scoped member resources |
 | `member-get-resource-meta` | Read one member resource's metadata, permissions, and available write support |
 | `member-list-records` | List records for one member resource with optional search and pagination |
+| `member-list-related-records` | List related records for one member record |
 | `member-get-record` | Read one member record by resource key and record key |
 | `member-get-write-schema` | Discover the writable update schema for one member record |
+| `member-list-contribution-requests` | List the authenticated member's own contribution requests plus any pending approvals |
+| `member-approve-contribution-request` | Approve one reviewable contribution request |
+| `member-reject-contribution-request` | Reject one reviewable contribution request |
+| `member-cancel-contribution-request` | Cancel one pending contribution request owned by the authenticated member |
+| `member-list-membership-claims` | List the authenticated member's membership claims |
+| `member-submit-membership-claim` | Submit a membership claim with justification and evidence uploads |
+| `member-cancel-membership-claim` | Cancel one pending membership claim owned by the authenticated member |
 | `member-create-github-issue` | Create a GitHub issue in the configured repository |
 | `member-update-record` | Update a writable member record using the schema-guided payload contract |
 
@@ -321,7 +343,10 @@ Member tool behavior notes:
 
 - Member tools are constrained to the Ahli workspace boundary and live membership relationships.
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
-- Member update tools do not support `validate_only`; there is no preview-only member write path today.
+- Member update tools support `validate_only=true` for preview-only member writes.
+- Member related-record traversal is limited to one level and only for relations exposed by member resource metadata.
+- Contribution-request workflow tools cover listing, approving, rejecting, and cancelling queue items that the authenticated member can legitimately act on through the Ahli surface.
+- Membership-claim workflow tools cover listing, submitting with evidence uploads, and cancelling the member's own pending claims.
 - `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
 - Media/file upload fields accept JSON base64 descriptors only when the matching member write schema advertises them.
 - As with admin tools, ChatGPT only understands what the tool descriptor exposes; if a capability is not registered as a tool, the model will not assume it exists.
@@ -345,7 +370,7 @@ Schema fields describe the exact upload rules:
 - `mcp_upload.shape` is `file_descriptor` for a single file and `array<file_descriptor>` for multiple files.
 - `accepted_mime_types`, `max_file_size_kb`, and `max_files` are authoritative for that field.
 - `mcp_upload.replacement_semantics` describes whether the submitted descriptor or descriptor array replaces the target media collection.
-- When a write tool supports `validate_only=true` (currently admin create/update only), previews normalize descriptors into file summaries without persisting media.
+- When a write tool supports `validate_only=true` (currently admin create/update and member update), previews normalize descriptors into file summaries without persisting media.
 - Admin preview validation failures now include schema-driven `feedback` hints (`allowed_values`, `suggested`, `closest_valid_value`, `default`, `required_because`) and can return a candidate `normalized_payload` when `apply_defaults=true`.
 - `current_media` stays metadata-only and does not expose signed or temporary URLs.
 - `clear_*` media flags remain unsupported through MCP and are rejected even when clients submit them manually.
@@ -358,8 +383,14 @@ Current structurally write-capable admin resources include:
 
 - `speakers`
 - `events`
+- `inspirations`
 - `institutions`
 - `references`
+- `reports`
+- `donation-channels`
+- `series`
+- `spaces`
+- `tags`
 - `venues`
 - `subdistricts`
 
@@ -441,6 +472,10 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `admin-list-related-records` | Traverse a named relation on a record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `admin-get-record` | Read one admin record and its permissions | `resource_key`, `record_key` |
 | `admin-get-write-schema` | Fetch the create/update contract for a writable admin record | `resource_key`, `operation`, `record_key?` |
+| `admin-moderate-event` | Run one explicit moderation action on an event | `record_key`, `action`, `reason_code?`, `note?` |
+| `admin-triage-report` | Run one explicit triage action on a report | `record_key`, `action`, `resolution_note?` |
+| `admin-review-contribution-request` | Approve or reject one pending contribution request | `record_key`, `action`, `reason_code?`, `reviewer_note?` |
+| `admin-review-membership-claim` | Approve or reject one pending membership claim | `record_key`, `action`, `granted_role_slug?`, `reviewer_note?` |
 | `admin-create-record` | Create or preview a writable admin record | `resource_key`, `payload`, `validate_only?`, `apply_defaults?` |
 | `admin-update-record` | Update or preview a writable admin record | `resource_key`, `record_key`, `payload`, `validate_only?`, `apply_defaults?` |
 
@@ -453,9 +488,17 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `member-list-resources` | Discover accessible Ahli-scoped resources | `verbose?` |
 | `member-get-resource-meta` | Inspect one member resource’s metadata and write support | `resource_key` |
 | `member-list-records` | Search and paginate records for one member resource | `resource_key`, `search?`, `page?`, `per_page?` |
+| `member-list-related-records` | Traverse a named relation on a member record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `member-get-record` | Read one member record | `resource_key`, `record_key` |
 | `member-get-write-schema` | Fetch the writable update contract for one member record | `resource_key`, `record_key` |
-| `member-update-record` | Update a writable member record | `resource_key`, `record_key`, `payload` |
+| `member-list-contribution-requests` | List the authenticated member's contribution queue and pending approvals | none |
+| `member-approve-contribution-request` | Approve one reviewable contribution request | `request_id`, `reviewer_note?` |
+| `member-reject-contribution-request` | Reject one reviewable contribution request | `request_id`, `reason_code`, `reviewer_note?` |
+| `member-cancel-contribution-request` | Cancel one pending contribution request owned by the member | `request_id` |
+| `member-list-membership-claims` | List the authenticated member's membership claims | none |
+| `member-submit-membership-claim` | Submit a membership claim with evidence uploads | `subject_type`, `subject`, `justification`, `evidence` |
+| `member-cancel-membership-claim` | Cancel one pending membership claim owned by the member | `claim_id` |
+| `member-update-record` | Update or preview a writable member record | `resource_key`, `record_key`, `payload`, `validate_only?` |
 
 ### Reading rules for the appendix
 

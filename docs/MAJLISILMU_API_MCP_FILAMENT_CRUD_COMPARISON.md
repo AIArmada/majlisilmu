@@ -26,7 +26,7 @@ If code changes here, update this Markdown file, the JSON companion, and `tests/
 - **Structural support and actor permission are different things.** `getPages()` and generic write support tell you whether a route/tool exists; the current actor still needs to pass middleware and model policy checks.
 - **Public and authenticated API are workflow-first.** They expose user-facing workflows and contracts, not a generic mirror of every Filament resource.
 - **Admin HTTP API and Admin MCP share the same mutation backend.** The writable resource set comes from `AdminResourceMutationService`.
-- **Member MCP is intentionally narrower.** It is Ahli-scoped, update-only, and has no related-record traversal tool.
+- **Member MCP is intentionally narrower.** It is Ahli-scoped, update-only for generic CRUD, and still narrower than admin even though it now supports one-level related-record traversal plus explicit workflow tools for contribution queues and membership claims.
 - **Panel-only operations stay panel-only.** Delete, restore, replicate, and reorder are not exposed by the generic admin HTTP API or the current MCP tool sets.
 
 ## Canonical source files
@@ -73,7 +73,7 @@ If code changes here, update this Markdown file, the JSON companion, and `tests/
 | Authenticated API | `auth:sanctum` | workflow / self-service contracts | contributions, reports, follows, saved searches, notifications, account settings, institution workspace, event state |
 | Admin API | `auth:sanctum` + `EnsureAdminApiAccess` | generic resource HTTP contract | admin resource manifest, list/get/meta, related records, schema-guided create/update |
 | Admin MCP | `auth:sanctum,api` + `EnsureAdminMcpAccess` | generic MCP tool contract | admin resource discovery, list/get/meta, related records, schema-guided create/update |
-| Member MCP | `auth:sanctum,api` + `EnsureMemberMcpAccess` | scoped MCP tool contract | Ahli-scoped discovery, list/get/meta, schema-guided update |
+| Member MCP | `auth:sanctum,api` + `EnsureMemberMcpAccess` | scoped MCP tool contract | Ahli-scoped discovery, list/get/meta, schema-guided update, and member workflow tools for contribution queues and membership claims |
 | Admin Panel | Filament admin panel | UI/resource surface | full operational UI, relation managers, deletes/restores/reorders where the resource supports them |
 | Ahli Panel | Filament Ahli panel | UI/resource surface | member-scoped editing workspace for owned or linked records |
 
@@ -120,6 +120,39 @@ The public/authenticated API is not a second generic CRUD registry. It is a set 
 - saved searches
 - notifications and notification destinations/settings
 
+## Surface sync operating model
+
+Use **curated parity**, not full symmetry at any cost.
+
+- Keep validation, normalization, side effects, and orchestration in shared actions/services; panel, API, and MCP should remain thin adapters over the same backend behavior.
+- Classify every future change before implementation as one of:
+	- `panel_only`
+	- `generic_admin_crud`
+	- `member_scoped_crud`
+	- `workflow_api`
+	- `workflow_action`
+- Treat these as **workflow-first capabilities** and expose them as named actions instead of generic CRUD when they need parity:
+	- event moderation
+	- contribution review
+	- membership-claim review
+	- report triage
+- Keep these operations panel-only by default unless a later product and security decision promotes them:
+	- `delete`
+	- `restore`
+	- `replicate`
+	- `reorder`
+- Keep these resource groups out of parity expansion by default:
+	- geography base tables: `countries`, `states`, `districts`
+	- system and vendor surfaces: `ai-model-pricings`, `ai-usage-logs`, `audits`, `users`, `slug-redirects`, `roles`, `permissions`, `tracked-properties`, `signal-goals`, `signal-segments`, `saved-signal-reports`, `signal-alert-rules`, `signal-alert-logs`
+- Every parity-affecting change should answer the same checklist in the PR or change description:
+	- Does the admin panel surface change?
+	- Does the admin API surface change?
+	- Does the admin MCP surface change?
+	- Does the Ahli panel surface change?
+	- Does the member MCP surface change?
+	- Does the public or authenticated workflow API surface change?
+	- If a surface does not change, is the gap intentional and documented?
+
 ## Runtime admin resource inventory (30 registered resources)
 
 This is the runtime admin panel inventory, not just the local `app/Filament/Resources` directory. The generic admin HTTP API and Admin MCP sit on top of this inventory and then filter it per actor.
@@ -134,20 +167,20 @@ This is the runtime admin panel inventory, not just the local `app/Filament/Reso
 | `contribution-requests` | app | `index`, `view` | no |
 | `countries` | app | `index`, `create`, `edit` | no |
 | `districts` | app | `index`, `create`, `edit` | no |
-| `donation-channels` | app | `index`, `create`, `edit` | no |
+| `donation-channels` | app | `index`, `create`, `edit` | yes |
 | `events` | app | `index`, `create`, `view`, `edit` | yes |
-| `inspirations` | app | `index`, `create`, `edit` | no |
+| `inspirations` | app | `index`, `create`, `edit` | yes |
 | `institutions` | app | `index`, `create`, `view`, `edit` | yes |
 | `membership-claims` | app | `index`, `view` | no |
 | `references` | app | `index`, `create`, `edit` | yes |
-| `reports` | app | `index`, `create`, `edit` | no |
-| `series` | app | `index`, `create`, `edit` | no |
+| `reports` | app | `index`, `create`, `edit` | yes |
+| `series` | app | `index`, `create`, `edit` | yes |
 | `slug-redirects` | app | `index`, `create`, `view`, `edit` | no |
-| `spaces` | app | `index`, `create`, `view`, `edit` | no |
+| `spaces` | app | `index`, `create`, `view`, `edit` | yes |
 | `speakers` | app | `index`, `create`, `view`, `edit` | yes |
 | `states` | app | `index`, `create`, `edit` | no |
 | `subdistricts` | app | `index`, `create`, `edit` | yes |
-| `tags` | app | `index`, `create`, `edit` | no |
+| `tags` | app | `index`, `create`, `edit` | yes |
 | `users` | app | `index`, `create`, `view`, `edit` | no |
 | `venues` | app | `index`, `create`, `view`, `edit` | yes |
 
@@ -192,24 +225,69 @@ All four Ahli resources are update-capable through Member MCP. None expose gener
 
 ## Structural write-capable intersection
 
-These six resources are the entire current generic admin write whitelist.
+These twelve resources are the entire current generic admin write whitelist.
 
 | Resource | Admin API | Admin MCP | Member MCP | Admin panel pages | Ahli panel pages | Workflow overlap |
 | --- | --- | --- | --- | --- | --- | --- |
-| `events` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + S + U` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/search/detail; public submit-event create; authenticated saved/going/check-ins/registrations |
-| `institutions` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + S + U` | `index`, `create`, `view`, `edit` | `edit` | public read/detail; authenticated contribution create/suggest; institution workspace; follows |
-| `speakers` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + S + U` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/detail; authenticated contribution create/suggest; follows |
-| `references` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + S + U` | `index`, `create`, `edit` | `index`, `edit` | public read/detail; authenticated suggest update; follows |
+| `events` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/search/detail; public submit-event create; authenticated saved/going/check-ins/registrations |
+| `inspirations` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public random inspiration discovery |
+| `institutions` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `edit` | public read/detail; authenticated contribution create/suggest; institution workspace; follows |
+| `speakers` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/detail; authenticated contribution create/suggest; follows |
+| `references` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `edit` | `index`, `edit` | public read/detail; authenticated suggest update; follows |
+| `reports` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | authenticated report submission; explicit admin report triage |
+| `donation-channels` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public institution donation details; event default donation detail |
+| `series` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public read/detail; authenticated follows; event-series assignment |
+| `spaces` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `view`, `edit` | not exposed | public space catalogs; event space assignment |
 | `venues` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `view`, `edit` | not exposed | public read/detail plus public venue catalogs |
 | `subdistricts` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public and admin catalog lookups only |
+| `tags` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | taxonomy and event-tagging management |
 
 ## Read-only generic admin groups
 
 These resources are readable through the generic admin registry, but not writable through the current generic admin HTTP/MCP write path.
 
 - **Geography:** `countries`, `states`, `districts`
-- **Directory/content extras:** `donation-channels`, `series`, `spaces`, `tags`, `inspirations`
-- **Moderation/workflow records:** `reports`, `membership-claims`, `contribution-requests`
+
+## Explicit admin workflow actions
+
+These capabilities remain outside generic admin CRUD, but now have explicit admin workflow parity where implemented.
+
+- **Event moderation:**
+	- HTTP schema: `GET /api/v1/admin/events/{recordKey}/moderation-schema`
+	- HTTP action: `POST /api/v1/admin/events/{recordKey}/moderate`
+	- MCP action: `admin-moderate-event`
+	- Action contract: `approve`, `request_changes`, `reject`, `cancel`, `reconsider`, `remoderate`, or `revert_to_draft` depending on the event status
+- **Report triage:**
+	- HTTP schema: `GET /api/v1/admin/reports/{recordKey}/triage-schema`
+	- HTTP action: `POST /api/v1/admin/reports/{recordKey}/triage`
+	- MCP action: `admin-triage-report`
+	- Action contract: `triage`, `resolve`, `dismiss`, or `reopen` depending on the report status
+- **Contribution-request review:**
+	- HTTP schema: `GET /api/v1/admin/contribution-requests/{recordKey}/review-schema`
+	- HTTP action: `POST /api/v1/admin/contribution-requests/{recordKey}/review`
+	- MCP action: `admin-review-contribution-request`
+	- Action contract: `approve` or `reject`; rejections require a `reason_code`
+- **Membership-claim review:**
+	- HTTP schema: `GET /api/v1/admin/membership-claims/{recordKey}/review-schema`
+	- HTTP action: `POST /api/v1/admin/membership-claims/{recordKey}/review`
+	- MCP action: `admin-review-membership-claim`
+	- Action contract: `approve` or `reject`; approvals require a `granted_role_slug`
+
+## Member workflow extensions
+
+Member MCP is still update-only for generic CRUD, but it now carries explicit Ahli workflow parity for queue-like self-service flows.
+
+- **Contribution-request queue tools:**
+	- `member-list-contribution-requests`
+	- `member-approve-contribution-request`
+	- `member-reject-contribution-request`
+	- `member-cancel-contribution-request`
+- **Membership-claim tools:**
+	- `member-list-membership-claims`
+	- `member-submit-membership-claim`
+	- `member-cancel-membership-claim`
+- These tools sit beside generic member CRUD and should be treated as workflow actions, not as implied create/update parity for every Ahli resource.
+- **Moderation/workflow records:** `membership-claims`, `contribution-requests`
 - **System/auth/ops:** `ai-model-pricings`, `ai-usage-logs`, `audits`, `users`, `slug-redirects`, `roles`, `permissions`, `tracked-properties`, `signal-goals`, `signal-segments`, `saved-signal-reports`, `signal-alert-rules`, `signal-alert-logs`
 
 ## MCP media and preview semantics
@@ -223,8 +301,9 @@ This is the area where the previous version drifted the most.
 - `apply_defaults=1` is supported during preview requests and returns a candidate autofilled payload in validation feedback.
 - Validation failures now expose schema-driven `feedback` with allowed values, suggestions, defaults, and conditional requirement context.
 - Validation failures in validate-only mode now return machine-readable remediation details: `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry`.
+
 - Schema `content_type` is resource-specific:
-	- `multipart/form-data` for media-capable resources such as `events`, `institutions`, `speakers`, `references`, and `venues`
+	- `multipart/form-data` for media-capable resources such as `events`, `institutions`, `reports`, `speakers`, `references`, and `venues`
 	- `application/json` for `subdistricts`
 
 ### Admin MCP
@@ -241,8 +320,8 @@ This is the area where the previous version drifted the most.
 ### Member MCP
 
 - Update only; no create tool.
-- No `validate_only` preview path today.
-- No generic related-record tool today.
+- Supports `validate_only` preview for updates.
+- Supports one-level related-record traversal.
 - Media fields follow the same descriptor transport as admin MCP when the schema advertises them.
 - Destructive `clear_*` media flags are also rejected here.
 
@@ -251,7 +330,7 @@ This is the area where the previous version drifted the most.
 - **Runtime admin inventory is broader than local app files.** Because the registry uses live Filament panel registration, vendor/plugin resources are part of the admin surface.
 - **Page keys do not equal permission.** `getPages()` and generic write support describe structural capability; per-actor authorization still comes from middleware and model policies.
 - **Admin API and Admin MCP share one mutation whitelist.** If `AdminResourceMutationService` changes, both transports change together.
-- **Member MCP is narrower than admin.** It maps only to the four Ahli resources and exposes updates only.
+- **Member MCP is narrower than admin.** Generic member CRUD still maps only to the four Ahli resources and exposes updates only, but the server now also carries workflow tools for contribution queues and membership claims.
 - **Public contributions and reports are authenticated workflows.** The API exposes form discovery publicly, but the actual create routes for contributions and reports live behind `auth:sanctum`.
 - **Delete, restore, replicate, and reorder remain panel-led.** Do not assume generic admin HTTP or MCP parity for those operations.
 - **Use returned `route_key` values for record-specific admin URLs and MCP record keys whenever available.**
@@ -263,6 +342,7 @@ Whenever any of these change:
 - Filament panel resource registration
 - `AdminResourceMutationService`
 - `MemberResourceMutationService`
+- workflow API controllers or contracts
 - `routes/api.php`
 - `routes/ai.php`
 - MCP schema formatter or file normalizer behavior
