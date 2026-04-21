@@ -671,19 +671,13 @@ class SharedFormSchema
      */
     private static function hasGoogleMapsInput(array $data): bool
     {
-        foreach ([
+        return array_any([
             'google_maps_url',
             'google_place_id',
             'google_display_name',
             'lat',
             'lng',
-        ] as $field) {
-            if (array_key_exists($field, $data)) {
-                return true;
-            }
-        }
-
-        return false;
+        ], fn ($field) => array_key_exists($field, $data));
     }
 
     /**

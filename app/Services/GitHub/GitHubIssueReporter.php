@@ -116,7 +116,7 @@ class GitHubIssueReporter
             'Auto',
         ], static fn (?string $value): bool => is_string($value) && trim($value) !== '');
 
-        return array_values(array_unique(array_map(static fn (string $value): string => trim($value), $candidates)));
+        return array_values(array_unique(array_map(trim(...), $candidates)));
     }
 
     public function repositoryFullName(): string
@@ -175,7 +175,7 @@ class GitHubIssueReporter
 
     private function shouldRetryWithNextModel(Response $response): bool
     {
-        if (! ($response->unprocessableEntity() || $response->badRequest())) {
+        if (! $response->unprocessableEntity() && ! $response->badRequest()) {
             return false;
         }
 

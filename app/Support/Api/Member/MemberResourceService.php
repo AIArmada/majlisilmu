@@ -320,13 +320,7 @@ class MemberResourceService
             return false;
         }
 
-        foreach ($this->registry->resources() as $resourceClass) {
-            if ($this->mutationService->supports($resourceClass) && $this->mutationService->canWriteResource($resourceClass, $user)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($this->registry->resources(), fn ($resourceClass) => $this->mutationService->supports($resourceClass) && $this->mutationService->canWriteResource($resourceClass, $user));
     }
 
     /**

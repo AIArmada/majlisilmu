@@ -102,7 +102,7 @@ function documentedMcpGuideBulletList(string $markdown, string $lead): array
 
     expect($matches[1] ?? null)->toBeString();
 
-    preg_match_all('/- `([^`]+)`/', (string) $matches[1], $keys);
+    preg_match_all('/- `([^`]+)`/', $matches[1], $keys);
 
     return collect($keys[1] ?? [])->sort()->values()->all();
 }

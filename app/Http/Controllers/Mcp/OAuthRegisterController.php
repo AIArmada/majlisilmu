@@ -14,6 +14,7 @@ use Laravel\Passport\Passport;
 
 class OAuthRegisterController extends BaseOAuthRegisterController
 {
+    #[\Override]
     public function __invoke(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [

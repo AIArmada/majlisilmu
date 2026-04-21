@@ -84,8 +84,8 @@ it('generates passport keys when none exist', function (): void {
     $originalKeyPath = Passport::keyPath('oauth-private.key');
 
     Passport::loadKeysFrom($sandboxPath);
-    config()->set('passport.private_key', null);
-    config()->set('passport.public_key', null);
+    config()->set('passport.private_key');
+    config()->set('passport.public_key');
 
     try {
         PassportKeyProvisioner::ensure();

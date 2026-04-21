@@ -232,9 +232,9 @@ final class McpFilePayloadNormalizer
         }
 
         $extension = $this->extensionFromMimeType($mimeType);
-        $extension = $extension !== '' ? $extension : strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+        $extension = $extension !== '' ? $extension : strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         $safeName = $baseName.($extension !== '' ? ".{$extension}" : '');
-        $path = $directory.'/'.((string) Str::uuid()).'-'.$safeName;
+        $path = $directory.'/'.(Str::uuid()).'-'.$safeName;
 
         if (file_put_contents($path, $contents) === false) {
             throw ValidationException::withMessages([
