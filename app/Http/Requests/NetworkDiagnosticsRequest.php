@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\Diagnostics\NetworkDiagnosticsEnvironment;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -54,27 +55,16 @@ class NetworkDiagnosticsRequest extends FormRequest
 
     protected function envBoolean(string $key, bool $default = false): bool
     {
-        $value = $this->envString($key);
-
-        if ($value === null) {
-            return $default;
-        }
-
-        $normalized = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-
-        return is_bool($normalized) ? $normalized : $default;
+        return $this->diagnosticsEnvironment()->boolean($key, $default);
     }
 
     protected function envString(string $key, ?string $default = null): ?string
     {
-        $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+        return $this->diagnosticsEnvironment()->string($key, $default);
+    }
 
-        if ($value === false) {
-            return $default;
-        }
-
-        $resolved = trim((string) $value);
-
-        return $resolved !== '' ? $resolved : $default;
+    protected function diagnosticsEnvironment(): NetworkDiagnosticsEnvironment
+    {
+        return app(NetworkDiagnosticsEnvironment::class);
     }
 }

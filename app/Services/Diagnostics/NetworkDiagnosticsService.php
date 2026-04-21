@@ -2,6 +2,7 @@
 
 namespace App\Services\Diagnostics;
 
+use App\Support\Diagnostics\NetworkDiagnosticsEnvironment;
 use InvalidArgumentException;
 use PDO;
 use Throwable;
@@ -84,6 +85,10 @@ use Throwable;
  */
 class NetworkDiagnosticsService
 {
+    public function __construct(
+        protected NetworkDiagnosticsEnvironment $environment,
+    ) {}
+
     /**
      * @return DiagnosticsReport
      */
@@ -928,37 +933,17 @@ class NetworkDiagnosticsService
 
     protected function envString(string $key, ?string $default = null): ?string
     {
-        $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
-
-        if ($value === false) {
-            return $default;
-        }
-
-        $resolved = trim((string) $value);
-
-        return $resolved !== '' ? $resolved : $default;
+        return $this->environment->string($key, $default);
     }
 
     protected function envInt(string $key, int $default): int
     {
-        $value = $this->envString($key);
-
-        if ($value === null || ! is_numeric($value)) {
-            return $default;
-        }
-
-        return (int) $value;
+        return $this->environment->int($key, $default);
     }
 
     protected function envIntOrNull(string $key): ?int
     {
-        $value = $this->envString($key);
-
-        if ($value === null || ! is_numeric($value)) {
-            return null;
-        }
-
-        return (int) $value;
+        return $this->environment->intOrNull($key);
     }
 
     protected function nullableString(mixed $value): ?string

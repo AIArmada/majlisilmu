@@ -1,5 +1,6 @@
 # Lessons
 
+- When a user explicitly wants a production feature to read values from `.env` without a config bridge, direct `$_ENV` / `$_SERVER` / `getenv()` lookups are not enough under `config:cache`; add an explicit environment-file fallback or the app will falsely report the values as missing.
 - When a user wants documentation exposed through MCP for ChatGPT/OpenAI clients, raw `resources/list` registration is not enough by itself; keep the resources, but also expose the same verified docs through model-friendly `search` / `fetch` tools because tool-centric clients import from `tools/list`.
 - When exposing static docs through MCP resources, audit the markdown against the live CRUD/tool/resource implementation first and add regression tests; stale docs become model-visible context immediately once they are registered.
 - When account deletion has a grace-period restore requirement, model it as two buckets: preserve shared domain records by detaching/nulling restorable links, and delete only user-private records into the snapshot; include roles/permissions because package delete hooks can detach them before the deleted-model snapshot is written.
