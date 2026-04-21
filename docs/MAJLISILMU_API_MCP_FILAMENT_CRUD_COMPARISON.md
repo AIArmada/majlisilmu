@@ -220,6 +220,7 @@ This is the area where the previous version drifted the most.
 
 - Write schemas come from `GET /api/v1/admin/{resourceKey}/schema`.
 - Preview uses `validate_only=1` on the `POST` or `PUT` request.
+- Validation failures in validate-only mode now return machine-readable remediation details: `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry`.
 - Schema `content_type` is resource-specific:
 	- `multipart/form-data` for media-capable resources such as `events`, `institutions`, `speakers`, `references`, and `venues`
 	- `application/json` for `subdistricts`
@@ -228,6 +229,7 @@ This is the area where the previous version drifted the most.
 
 - Write schemas are reformatted to MCP JSON contracts by `McpWriteSchemaFormatter`.
 - Create/update preview is supported through the `validate_only` boolean tool argument.
+- Validation failures in validate-only mode now return the same remediation fields as the admin HTTP API so AI clients can recover in one retry loop.
 - When a schema advertises file fields, MCP uploads use `json_base64_descriptor`, not multipart.
 - Descriptor normalization and staging is implemented by `McpFilePayloadNormalizer`.
 - Destructive media clear flags such as `clear_cover`, `clear_avatar`, `clear_gallery`, and siblings are intentionally removed from MCP schema fields and rejected by the write tools.

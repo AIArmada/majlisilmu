@@ -453,21 +453,37 @@ it('returns remediation details for validate-only admin create validation failur
         ])
         ->assertStructuredContent(fn ($json) => $json
             ->where('error.code', 'validation_error')
-            ->where('error.details.fix_plan.0.action', 'set_field')
-            ->where('error.details.fix_plan.0.field', 'gender')
-            ->where('error.details.fix_plan.0.value', 'male')
-            ->where('error.details.fix_plan.1.action', 'choose_one')
-            ->where('error.details.fix_plan.1.field', 'status')
-            ->where('error.details.fix_plan.1.options.0', 'pending')
-            ->where('error.details.fix_plan.1.options.1', 'verified')
-            ->where('error.details.fix_plan.1.options.2', 'rejected')
-            ->where('error.details.fix_plan.2.action', 'set_field')
-            ->where('error.details.fix_plan.2.field', 'address')
+            ->where('error.details.fix_plan', function (array $fixPlan): bool {
+                $keyedFixPlan = collect($fixPlan)->keyBy('field');
+
+                return $keyedFixPlan->get('gender') === [
+                    'action' => 'set_field',
+                    'field' => 'gender',
+                    'value' => 'male',
+                    'auto_apply_safe' => true,
+                ] && $keyedFixPlan->get('status') === [
+                    'action' => 'choose_one',
+                    'field' => 'status',
+                    'options' => ['pending', 'verified', 'rejected'],
+                    'auto_apply_safe' => false,
+                ] && $keyedFixPlan->get('address') === [
+                    'action' => 'set_field',
+                    'field' => 'address',
+                    'value' => ['country_id' => 132],
+                    'auto_apply_safe' => true,
+                ];
+            })
             ->where('error.details.normalized_payload_preview.name', 'Remediation Preview Speaker')
             ->where('error.details.normalized_payload_preview.gender', 'male')
             ->where('error.details.normalized_payload_preview.address.country_id', 132)
-            ->where('error.details.remaining_blockers.0.field', 'status')
-            ->where('error.details.remaining_blockers.0.type', 'required_choice')
+            ->where('error.details.remaining_blockers', function (array $remainingBlockers): bool {
+                $statusBlocker = collect($remainingBlockers)->keyBy('field')->get('status');
+
+                return is_array($statusBlocker)
+                    && ($statusBlocker['field'] ?? null) === 'status'
+                    && ($statusBlocker['type'] ?? null) === 'required_choice'
+                    && ($statusBlocker['options'] ?? null) === ['pending', 'verified', 'rejected'];
+            })
             ->where('error.details.can_retry', false)
             ->etc());
 });
@@ -495,12 +511,21 @@ it('returns retryable remediation details for validate-only admin update validat
         ])
         ->assertStructuredContent(fn ($json) => $json
             ->where('error.code', 'validation_error')
-            ->where('error.details.fix_plan.0.action', 'set_field')
-            ->where('error.details.fix_plan.0.field', 'gender')
-            ->where('error.details.fix_plan.0.value', $originalGender)
-            ->where('error.details.fix_plan.1.action', 'set_field')
-            ->where('error.details.fix_plan.1.field', 'status')
-            ->where('error.details.fix_plan.1.value', $originalStatus)
+            ->where('error.details.fix_plan', function (array $fixPlan) use ($originalGender, $originalStatus): bool {
+                $keyedFixPlan = collect($fixPlan)->keyBy('field');
+
+                return $keyedFixPlan->get('gender') === [
+                    'action' => 'set_field',
+                    'field' => 'gender',
+                    'value' => $originalGender,
+                    'auto_apply_safe' => true,
+                ] && $keyedFixPlan->get('status') === [
+                    'action' => 'set_field',
+                    'field' => 'status',
+                    'value' => $originalStatus,
+                    'auto_apply_safe' => true,
+                ];
+            })
             ->where('error.details.normalized_payload_preview.name', 'Retryable Admin MCP Speaker Updated')
             ->where('error.details.normalized_payload_preview.gender', $originalGender)
             ->where('error.details.normalized_payload_preview.status', $originalStatus)

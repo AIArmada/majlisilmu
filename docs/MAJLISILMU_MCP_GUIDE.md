@@ -366,6 +366,7 @@ Write-tool preview tip:
 
 - `admin-create-record` and `admin-update-record` accept `validate_only=true` to validate, normalize, and preview a write without persisting it.
 - Preview responses return the normalized payload plus warning metadata for supported write-side checks.
+- Validation failures in validate-only mode now include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.
 - MCP write schemas advertise supported media/file fields with JSON descriptor metadata, do not advertise destructive media clear-flags, and reject clear-flags if a client submits them anyway.
 - Update previews also include the current record snapshot so you can compare what would change before retrying without `validate_only`.
 
