@@ -170,21 +170,21 @@ function fakeGeneratedImageUpload(string $name = 'image.png', int $width = 1200,
         $overlay,
     );
 
-    $extension = strtolower((string) pathinfo($name, PATHINFO_EXTENSION));
+    $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
     ob_start();
 
     $encoded = match ($extension) {
         'jpg', 'jpeg' => imagejpeg($image, null, 90),
         'gif' => imagegif($image),
-        'webp' => function_exists('imagewebp') ? imagewebp($image, null, 90) : false,
+        'webp' => function_exists('imagewebp') && imagewebp($image, null, 90),
         default => imagepng($image),
     };
 
     $contents = ob_get_clean();
     imagedestroy($image);
 
-    if ($encoded !== true || ! is_string($contents) || $contents === '') {
+    if (! $encoded || ! is_string($contents) || $contents === '') {
         throw new RuntimeException('Unable to encode image fixture.');
     }
 

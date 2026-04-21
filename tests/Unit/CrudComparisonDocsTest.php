@@ -26,7 +26,7 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
     $runtimeAdminResources = collect(Filament::getPanel('admin')->getResources())
         ->map(function (string $resourceClass) use ($adminMutationService): array {
             $modelClass = $resourceClass::getModel();
-            $path = (new ReflectionClass($resourceClass))->getFileName() ?: '';
+            $path = new ReflectionClass($resourceClass)->getFileName() ?: '';
 
             return [
                 'resource_key' => Str::kebab(Str::pluralStudly(class_basename($modelClass))),

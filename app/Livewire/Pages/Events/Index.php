@@ -1438,7 +1438,7 @@ class Index extends Component implements HasForms
             'speaker_ids' => $this->normalizeStringArray($this->speaker_ids),
             'key_person_roles' => $this->normalizeStringArray($this->key_person_roles),
             'person_in_charge_ids' => $this->normalizeStringArray($this->person_in_charge_ids),
-            'person_in_charge_search' => filled($this->person_in_charge_search) ? trim((string) $this->person_in_charge_search) : null,
+            'person_in_charge_search' => filled($this->person_in_charge_search) ? trim($this->person_in_charge_search) : null,
             'moderator_ids' => $this->normalizeStringArray($this->moderator_ids),
             'imam_ids' => $this->normalizeStringArray($this->imam_ids),
             'khatib_ids' => $this->normalizeStringArray($this->khatib_ids),

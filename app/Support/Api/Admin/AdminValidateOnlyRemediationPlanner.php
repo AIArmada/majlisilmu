@@ -8,19 +8,19 @@ use Illuminate\Support\Arr;
 
 final class AdminValidateOnlyRemediationPlanner
 {
-    private const ACTION_SET_FIELD = 'set_field';
+    private const string ACTION_SET_FIELD = 'set_field';
 
-    private const ACTION_CHOOSE_ONE = 'choose_one';
+    private const string ACTION_CHOOSE_ONE = 'choose_one';
 
-    private const ACTION_CHOOSE_MANY = 'choose_many';
+    private const string ACTION_CHOOSE_MANY = 'choose_many';
 
-    private const BLOCKER_REQUIRED_CHOICE = 'required_choice';
+    private const string BLOCKER_REQUIRED_CHOICE = 'required_choice';
 
-    private const BLOCKER_INVALID_CHOICE = 'invalid_choice';
+    private const string BLOCKER_INVALID_CHOICE = 'invalid_choice';
 
-    private const BLOCKER_MISSING_VALUE = 'missing_value';
+    private const string BLOCKER_MISSING_VALUE = 'missing_value';
 
-    private const BLOCKER_VALIDATION_ERROR = 'validation_error';
+    private const string BLOCKER_VALIDATION_ERROR = 'validation_error';
 
     /**
      * @param  array<string, mixed>  $payload
@@ -81,7 +81,7 @@ final class AdminValidateOnlyRemediationPlanner
                     'field' => $field,
                     'type' => $this->determineBlockerType($currentValue, true),
                     'options' => $allowedValues,
-                    'messages' => array_values(array_map('strval', $messages)),
+                    'messages' => array_values(array_map(strval(...), $messages)),
                 ];
 
                 continue;
@@ -90,7 +90,7 @@ final class AdminValidateOnlyRemediationPlanner
             $remainingBlockers[] = [
                 'field' => $field,
                 'type' => $this->determineBlockerType($currentValue, false),
-                'messages' => array_values(array_map('strval', $messages)),
+                'messages' => array_values(array_map(strval(...), $messages)),
             ];
         }
 
@@ -186,7 +186,7 @@ final class AdminValidateOnlyRemediationPlanner
     private function allowsMultipleChoices(?array $fieldDefinition): bool
     {
         return is_string($fieldDefinition['type'] ?? null)
-            && str_starts_with((string) $fieldDefinition['type'], 'array<');
+            && str_starts_with($fieldDefinition['type'], 'array<');
     }
 
     private function isMissingRemediationValue(mixed $value): bool

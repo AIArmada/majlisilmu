@@ -198,63 +198,51 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
     protected function captureDeletedRelationsSnapshot(): void
     {
         $this->deletedRelationsSnapshot = [
-            'institution_user' => $this->institutions()->get()->map(function (Institution $institution): array {
-                return [
-                    'institution_id' => $institution->getKey(),
-                    'user_id' => $this->getKey(),
-                    'joined_at' => $this->pivotTimestamp($institution, 'joined_at'),
-                    'created_at' => $this->pivotTimestamp($institution, 'created_at'),
-                    'updated_at' => $this->pivotTimestamp($institution, 'updated_at'),
-                ];
-            })->all(),
-            'speaker_user' => $this->speakers()->get()->map(function (Speaker $speaker): array {
-                return [
-                    'speaker_id' => $speaker->getKey(),
-                    'user_id' => $this->getKey(),
-                    'joined_at' => $this->pivotTimestamp($speaker, 'joined_at'),
-                    'created_at' => $this->pivotTimestamp($speaker, 'created_at'),
-                    'updated_at' => $this->pivotTimestamp($speaker, 'updated_at'),
-                ];
-            })->all(),
-            'reference_user' => $this->references()->get()->map(function (Reference $reference): array {
-                return [
-                    'reference_id' => $reference->getKey(),
-                    'user_id' => $this->getKey(),
-                    'joined_at' => $this->pivotTimestamp($reference, 'joined_at'),
-                    'created_at' => $this->pivotTimestamp($reference, 'created_at'),
-                    'updated_at' => $this->pivotTimestamp($reference, 'updated_at'),
-                ];
-            })->all(),
+            'institution_user' => $this->institutions()->get()->map(fn (Institution $institution): array => [
+                'institution_id' => $institution->getKey(),
+                'user_id' => $this->getKey(),
+                'joined_at' => $this->pivotTimestamp($institution, 'joined_at'),
+                'created_at' => $this->pivotTimestamp($institution, 'created_at'),
+                'updated_at' => $this->pivotTimestamp($institution, 'updated_at'),
+            ])->all(),
+            'speaker_user' => $this->speakers()->get()->map(fn (Speaker $speaker): array => [
+                'speaker_id' => $speaker->getKey(),
+                'user_id' => $this->getKey(),
+                'joined_at' => $this->pivotTimestamp($speaker, 'joined_at'),
+                'created_at' => $this->pivotTimestamp($speaker, 'created_at'),
+                'updated_at' => $this->pivotTimestamp($speaker, 'updated_at'),
+            ])->all(),
+            'reference_user' => $this->references()->get()->map(fn (Reference $reference): array => [
+                'reference_id' => $reference->getKey(),
+                'user_id' => $this->getKey(),
+                'joined_at' => $this->pivotTimestamp($reference, 'joined_at'),
+                'created_at' => $this->pivotTimestamp($reference, 'created_at'),
+                'updated_at' => $this->pivotTimestamp($reference, 'updated_at'),
+            ])->all(),
             'user_venue' => DB::table('user_venue')
                 ->where('user_id', $this->id)
                 ->get()
                 ->map(fn (object $row): array => (array) $row)
                 ->all(),
-            'event_saves' => $this->savedEvents()->get()->map(function (Event $event): array {
-                return [
-                    'event_id' => $event->getKey(),
-                    'user_id' => $this->getKey(),
-                    'created_at' => $this->pivotTimestamp($event, 'created_at'),
-                    'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
-                ];
-            })->all(),
-            'event_attendees' => $this->goingEvents()->get()->map(function (Event $event): array {
-                return [
-                    'event_id' => $event->getKey(),
-                    'user_id' => $this->getKey(),
-                    'created_at' => $this->pivotTimestamp($event, 'created_at'),
-                    'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
-                ];
-            })->all(),
-            'event_user' => $this->memberEvents()->get()->map(function (Event $event): array {
-                return [
-                    'event_id' => $event->getKey(),
-                    'user_id' => $this->getKey(),
-                    'joined_at' => $this->pivotTimestamp($event, 'joined_at'),
-                    'created_at' => $this->pivotTimestamp($event, 'created_at'),
-                    'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
-                ];
-            })->all(),
+            'event_saves' => $this->savedEvents()->get()->map(fn (Event $event): array => [
+                'event_id' => $event->getKey(),
+                'user_id' => $this->getKey(),
+                'created_at' => $this->pivotTimestamp($event, 'created_at'),
+                'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
+            ])->all(),
+            'event_attendees' => $this->goingEvents()->get()->map(fn (Event $event): array => [
+                'event_id' => $event->getKey(),
+                'user_id' => $this->getKey(),
+                'created_at' => $this->pivotTimestamp($event, 'created_at'),
+                'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
+            ])->all(),
+            'event_user' => $this->memberEvents()->get()->map(fn (Event $event): array => [
+                'event_id' => $event->getKey(),
+                'user_id' => $this->getKey(),
+                'joined_at' => $this->pivotTimestamp($event, 'joined_at'),
+                'created_at' => $this->pivotTimestamp($event, 'created_at'),
+                'updated_at' => $this->pivotTimestamp($event, 'updated_at'),
+            ])->all(),
             'model_has_roles' => $this->permissionRows('model_has_roles'),
             'model_has_permissions' => $this->permissionRows('model_has_permissions'),
             'owned_event_ids' => $this->ownedEvents()->pluck('id')->all(),
@@ -283,14 +271,12 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
             'followings' => DB::table('followings')
                 ->where('user_id', $this->id)
                 ->get()
-                ->map(function (object $row): array {
-                    return [
-                        'followable_id' => $row->followable_id,
-                        'followable_type' => $row->followable_type,
-                        'created_at' => $row->created_at,
-                        'updated_at' => $row->updated_at,
-                    ];
-                })
+                ->map(fn (object $row): array => [
+                    'followable_id' => $row->followable_id,
+                    'followable_type' => $row->followable_type,
+                    'created_at' => $row->created_at,
+                    'updated_at' => $row->updated_at,
+                ])
                 ->all(),
         ];
 
@@ -372,11 +358,9 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, H
         DB::table('event_user')->insertOrIgnore($this->snapshotRows($snapshot, 'event_user'));
         DB::table($this->permissionTable('model_has_roles'))->insertOrIgnore($this->snapshotRows($snapshot, 'model_has_roles'));
         DB::table($this->permissionTable('model_has_permissions'))->insertOrIgnore($this->snapshotRows($snapshot, 'model_has_permissions'));
-        DB::table('followings')->insertOrIgnore(collect($this->snapshotRows($snapshot, 'followings'))->map(function (array $row): array {
-            return array_merge([
-                'user_id' => $this->id,
-            ], $row);
-        })->all());
+        DB::table('followings')->insertOrIgnore(collect($this->snapshotRows($snapshot, 'followings'))->map(fn (array $row): array => array_merge([
+            'user_id' => $this->id,
+        ], $row))->all());
 
         $this->syncEventEngagementCounts($savedEventIds, 'event_saves', 'saves_count');
         $this->syncEventEngagementCounts($goingEventIds, 'event_attendees', 'going_count');
