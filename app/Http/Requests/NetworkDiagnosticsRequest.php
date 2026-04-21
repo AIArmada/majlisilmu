@@ -17,7 +17,7 @@ class NetworkDiagnosticsRequest extends FormRequest
         $configuredToken = trim((string) $this->envString('NETWORK_DIAGNOSTICS_TOKEN', ''));
 
         if ($configuredToken === '') {
-            return app()->environment(['local', 'testing']);
+            return true;
         }
 
         $providedToken = $this->query('token');
@@ -49,7 +49,7 @@ class NetworkDiagnosticsRequest extends FormRequest
 
     protected function diagnosticsEnabled(): bool
     {
-        return $this->envBoolean('NETWORK_DIAGNOSTICS_ENABLED', app()->environment(['local', 'testing']));
+        return $this->envBoolean('NETWORK_DIAGNOSTICS_ENABLED', true);
     }
 
     protected function envBoolean(string $key, bool $default = false): bool

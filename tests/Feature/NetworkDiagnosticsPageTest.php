@@ -50,6 +50,20 @@ it('renders a database-to-database diagnostics report directly on the page', fun
         ->assertSee('Query round-trip');
 });
 
+it('is accessible when diagnostics token is not configured', function (): void {
+    $this->mock(NetworkDiagnosticsService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('run')
+            ->once()
+            ->withNoArgs()
+            ->andReturn(fakeDatabaseDiagnosticsReport());
+    });
+
+    $this->get(route('network-diagnostics'))
+        ->assertSuccessful()
+        ->assertSee('Current environment database')
+        ->assertSee('Target database');
+});
+
 it('shows env-based setup guidance when the target database is not configured yet', function (): void {
     setNetworkDiagnosticsEnv([
         'NETWORK_DIAGNOSTICS_ENABLED' => 'true',
