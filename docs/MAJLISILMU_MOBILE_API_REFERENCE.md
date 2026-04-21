@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-20
+**Last Updated:** 2026-04-22
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -496,6 +496,7 @@ Notes:
 - Public speaker directory list items expose `status` and `is_active` alongside the existing summary fields. Keep client logic aligned with those canonical fields instead of inferring alternate aliases.
 - These detail payloads now mirror the web client media collections and public-contact visibility rules.
 - Institution payloads expose `public_image_url` as the canonical cover -> logo -> placeholder image. Use that for cards and previews. Use `logo_url` or `cover_url` only when you need those explicit assets.
+- Public event detail payloads now serialize linked references with a normalized image contract for mobile cards and previews: `media.front_cover_url`, `media.back_cover_url`, plus top-level aliases `front_cover_url`, `back_cover_url`, `cover_url`, and `thumb_url`.
 - Institution directory requests can filter by the device's current location: `GET /api/v1/institutions?lat=3.1390&lng=101.6869&radius_km=15` or `GET /api/v1/institutions/near?near=3.1390,101.6869&radius_km=15`. `radius_km` defaults to 15, is clamped between 1 and 100, and is always expressed in kilometers. Nearby results are sorted nearest-first and include `distance_km`; non-nearby requests return `distance_km: null`.
 - Public `/events`, `/institutions`, `/institutions/near`, and `/speakers` list endpoints accept `fields=` for sparse top-level responses when mobile clients need smaller pagination payloads.
 - The inspiration endpoint returns `title`, plain-text `content`, `content_html`, `preview_text`, `source`, category metadata, and both thumb/full media URLs when an image exists.
@@ -1153,6 +1154,10 @@ Recommended event detail fetch sequence:
 
 1. `GET /events/{eventOrSlug}` with the includes required for the screen.
 2. If authenticated, fetch `GET /events/{event}/me`.
+
+Event-detail media note:
+
+- The event detail payload is now sufficient for reference-card artwork on native clients; you should not need an extra `GET /references/{referenceKey}` call just to render a linked book cover once the current backend deployment is in place.
 
 Recommended auth flow:
 

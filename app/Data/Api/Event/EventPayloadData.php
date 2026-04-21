@@ -2,9 +2,11 @@
 
 namespace App\Data\Api\Event;
 
+use App\Data\Api\Frontend\Search\ReferenceDetailMediaData;
 use App\Enums\EventType;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Timezone\UserDateTimeFormatter;
@@ -60,6 +62,22 @@ class EventPayloadData extends Data
                 ->all();
         }
 
+        if ($event->relationLoaded('references')) {
+            $event->references->loadMissing('media');
+
+            $payload['references'] = $event->references
+                ->values()
+                ->map(function (Reference $reference, int $index) use ($payload): array {
+                    $referencePayload = $payload['references'][$index] ?? null;
+
+                    return self::serializeReferencePayload(
+                        $reference,
+                        is_array($referencePayload) ? $referencePayload : [],
+                    );
+                })
+                ->all();
+        }
+
         return new self(payload: $payload);
     }
 
@@ -106,6 +124,27 @@ class EventPayloadData extends Data
             'map_lat' => $address?->lat,
             'map_lng' => $address?->lng,
             'waze_url' => $address?->waze_url,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function serializeReferencePayload(Reference $reference, array $payload): array
+    {
+        /** @var array{front_cover_url: string, back_cover_url: string} $media */
+        $media = ReferenceDetailMediaData::fromModel($reference)->toArray();
+        $frontCoverUrl = $media['front_cover_url'] !== '' ? $media['front_cover_url'] : null;
+        $backCoverUrl = $media['back_cover_url'] !== '' ? $media['back_cover_url'] : null;
+
+        return [
+            ...$payload,
+            'media' => $media,
+            'front_cover_url' => $frontCoverUrl,
+            'back_cover_url' => $backCoverUrl,
+            'cover_url' => $frontCoverUrl,
+            'thumb_url' => $frontCoverUrl,
         ];
     }
 

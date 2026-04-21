@@ -1,6 +1,6 @@
 # MajlisIlmu MCP Guide
 
-Updated: April 21, 2026
+Updated: April 22, 2026
 Audience: developers and AI-client integrators.
 
 ## What MCP Means in MajlisIlmu
@@ -26,6 +26,7 @@ Key rules:
 
 - `GET /api/v1/admin/{resourceKey}/schema` documents the raw HTTP admin contract.
 - `GET /mcp/admin` uses a separate MCP write-schema formatter; destructive `clear_*` media flags are removed there, while supported media/file fields are advertised with JSON base64 descriptor metadata.
+- Public/mobile event detail payload changes do not automatically imply MCP event-record changes. For example, the public `GET /api/v1/events/{event}` surface now exposes normalized reference cover aliases for native clients, but MCP event records still come from the admin/member resource services rather than `App\Http\Controllers\Api\EventController`.
 - `current_media` contains metadata only; it does not expose signed or temporary URLs.
 - Generic user record payloads intentionally redact `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`.
 - Record lookups use `route_key` for record-specific paths, and missing records return 404 rather than a generic server error.

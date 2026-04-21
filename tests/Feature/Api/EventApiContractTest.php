@@ -718,6 +718,38 @@ it('serializes event detail payloads with poster metadata and included speakers'
         ->and(array_key_exists('pivot', data_get($payload, 'speakers.0')))->toBeFalse();
 });
 
+it('serializes event detail payloads with a stable reference front cover url', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $reference = Reference::factory()->create([
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $reference->addMedia(fakeGeneratedImageUpload('reference-front-cover.png', 800, 1200))
+        ->toMediaCollection('front_cover');
+
+    $event->references()->attach($reference->id);
+
+    $response = $this->getJson('/api/v1/events/'.$event->id);
+
+    $response->assertOk()
+        ->assertJsonPath('data.references.0.id', $reference->id)
+        ->assertJsonPath('data.references.0.slug', $reference->slug)
+        ->assertJsonPath('data.references.0.title', $reference->title)
+        ->assertJsonPath('data.references.0.media.front_cover_url', fn (string $url) => filled($url))
+        ->assertJsonPath('data.references.0.front_cover_url', fn (string $url) => filled($url))
+        ->assertJsonPath('data.references.0.cover_url', fn (string $url) => filled($url))
+        ->assertJsonPath('data.references.0.thumb_url', fn (string $url) => filled($url));
+});
+
 it('serializes included institution address display fields on event detail payloads', function () {
     $countryId = DB::table('countries')->where('id', 132)->value('id');
 

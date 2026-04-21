@@ -268,6 +268,7 @@ Authenticated (`auth:sanctum`):
 Notes:
 - `DELETE /user` now keeps a sanitized deleted-account snapshot for the admin grace-period restore flow while still revoking transient credentials immediately.
 - `GET /me/events/going` and `GET /me/events/saved` now use simple pagination metadata (`page`, `per_page`, `has_more`, `next_page`) and do not expose `total`.
+- `GET /events/{event}` now serializes linked references with normalized cover aliases (`media.front_cover_url`, `front_cover_url`, `cover_url`, `thumb_url`) so native clients can render reference cards without depending on a second reference-detail request.
 
 Controllers:
 - `app/Http/Controllers/Api/*`
