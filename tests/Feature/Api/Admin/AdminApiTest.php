@@ -364,6 +364,133 @@ it('previews admin speaker updates without persisting the record', function () {
         ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
 });
 
+it('returns autofill hints and conditional requirements in admin api dry runs', function () {
+    ensureAdminApiMalaysiaCountryExists();
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $this->postJson('/api/v1/admin/events?validate_only=1&apply_defaults=1', [
+        'title' => 'Admin API AI Feedback Preview',
+        'event_date' => '2026-06-10',
+    ])->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_error')
+        ->assertJsonPath('error.details.feedback.validate_only', true)
+        ->assertJsonPath('error.details.feedback.apply_defaults', true)
+        ->assertJsonPath('error.details.feedback.normalized_payload.timezone', 'Asia/Kuala_Lumpur')
+        ->assertJsonPath('error.details.feedback.normalized_payload.event_format', EventFormat::Physical->value)
+        ->assertJsonPath('error.details.feedback.normalized_payload.prayer_time', EventPrayerTime::LainWaktu->value)
+        ->assertJsonPath('error.details.feedback.issues.0.field', 'custom_time')
+        ->assertJsonPath('error.details.feedback.issues.0.required_because.prayer_time', EventPrayerTime::LainWaktu->value);
+});
+
+it('returns remediation details for validate-only admin api create validation failures', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->postJson('/api/v1/admin/speakers?validate_only=1', [
+        'name' => 'Remediation Preview API Speaker',
+    ])->assertUnprocessable();
+
+    $fixPlan = collect($response->json('error.details.fix_plan'))->keyBy('field');
+    $remainingBlockers = collect($response->json('error.details.remaining_blockers'))->keyBy('field');
+
+    $response
+        ->assertJsonPath('error.code', 'validation_error')
+        ->assertJsonPath('error.details.normalized_payload_preview.name', 'Remediation Preview API Speaker')
+        ->assertJsonPath('error.details.normalized_payload_preview.gender', 'male')
+        ->assertJsonPath('error.details.normalized_payload_preview.address.country_id', 132)
+        ->assertJsonPath('error.details.can_retry', false);
+
+    expect($fixPlan->get('gender'))
+        ->toMatchArray([
+            'action' => 'set_field',
+            'field' => 'gender',
+            'value' => 'male',
+            'auto_apply_safe' => true,
+        ])
+        ->and($fixPlan->get('status'))->toMatchArray([
+            'action' => 'choose_one',
+            'field' => 'status',
+            'options' => ['pending', 'verified', 'rejected'],
+            'auto_apply_safe' => false,
+        ])
+        ->and($fixPlan->get('address'))->toMatchArray([
+            'action' => 'set_field',
+            'field' => 'address',
+            'value' => ['country_id' => 132],
+            'auto_apply_safe' => true,
+        ])
+        ->and($remainingBlockers->get('status'))->toMatchArray([
+            'field' => 'status',
+            'type' => 'required_choice',
+            'options' => ['pending', 'verified', 'rejected'],
+        ]);
+});
+
+it('returns structured enum suggestions for admin api validation errors', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $this->postJson('/api/v1/admin/events', [
+        'title' => 'Admin API Invalid Enum Preview',
+        'event_date' => '2026-06-10',
+        'custom_time' => '8:30 PM',
+        'event_format' => 'physicl',
+    ])->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_error')
+        ->assertJsonPath('error.details.feedback.validate_only', false)
+        ->assertJsonPath('error.details.feedback.apply_defaults', false)
+        ->assertJsonPath('error.details.feedback.issues.0.field', 'event_format')
+        ->assertJsonPath('error.details.feedback.issues.0.closest_valid_value', EventFormat::Physical->value)
+        ->assertJsonPath('error.details.feedback.issues.0.suggested', EventFormat::Physical->value)
+        ->assertJsonPath('error.details.feedback.issues.0.allowed_values.0', EventFormat::Physical->value);
+});
+
+it('returns retryable remediation details for validate-only admin api update validation failures', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    $speaker = Speaker::factory()->create([
+        'name' => 'Retryable Admin API Speaker',
+        'gender' => 'male',
+        'status' => 'verified',
+    ]);
+    $speakerRouteKey = (string) $speaker->getRouteKey();
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->putJson('/api/v1/admin/speakers/'.$speakerRouteKey.'?validate_only=1', [
+        'name' => 'Retryable Admin API Speaker Updated',
+    ])->assertUnprocessable();
+
+    $fixPlan = collect($response->json('error.details.fix_plan'))->keyBy('field');
+
+    $response
+        ->assertJsonPath('error.code', 'validation_error')
+        ->assertJsonPath('error.details.normalized_payload_preview.name', 'Retryable Admin API Speaker Updated')
+        ->assertJsonPath('error.details.normalized_payload_preview.gender', $speaker->gender)
+        ->assertJsonPath('error.details.normalized_payload_preview.status', $speaker->status)
+        ->assertJsonCount(0, 'error.details.remaining_blockers')
+        ->assertJsonPath('error.details.can_retry', true);
+
+    expect($fixPlan->get('gender'))->toMatchArray([
+        'action' => 'set_field',
+        'field' => 'gender',
+        'value' => $speaker->gender,
+        'auto_apply_safe' => true,
+    ])->and($fixPlan->get('status'))->toMatchArray([
+        'action' => 'set_field',
+        'field' => 'status',
+        'value' => $speaker->status,
+        'auto_apply_safe' => true,
+    ]);
+});
+
 it('lists related records for admin resource relations', function () {
     $admin = adminApiUser('super_admin');
     $relatedTitle = 'Nested Relation Event '.Str::ulid();

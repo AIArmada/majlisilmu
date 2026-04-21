@@ -291,6 +291,7 @@ it('returns write schema for supported resources and rejects unknown resources',
             ->where('data.schema.tool_arguments.resource_key', 'speakers')
             ->where('data.schema.tool_arguments.payload', 'object')
             ->where('data.schema.tool_arguments.validate_only', false)
+            ->where('data.schema.tool_arguments.apply_defaults', false)
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
             ->where('data.schema.media_uploads_supported', true)
@@ -437,6 +438,102 @@ it('previews admin speaker updates through the MCP write tool without persisting
 
     expect(Speaker::query()->findOrFail($speaker->getKey())->name)->toBe('Previewable Admin MCP Speaker')
         ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
+});
+
+it('returns remediation details for validate-only admin create validation failures', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Remediation Preview Speaker',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.fix_plan', function (array $fixPlan): bool {
+                $keyedFixPlan = collect($fixPlan)->keyBy('field');
+
+                return $keyedFixPlan->get('gender') === [
+                    'action' => 'set_field',
+                    'field' => 'gender',
+                    'value' => 'male',
+                    'auto_apply_safe' => true,
+                ] && $keyedFixPlan->get('status') === [
+                    'action' => 'choose_one',
+                    'field' => 'status',
+                    'options' => ['pending', 'verified', 'rejected'],
+                    'auto_apply_safe' => false,
+                ] && $keyedFixPlan->get('address') === [
+                    'action' => 'set_field',
+                    'field' => 'address',
+                    'value' => ['country_id' => 132],
+                    'auto_apply_safe' => true,
+                ];
+            })
+            ->where('error.details.normalized_payload_preview.name', 'Remediation Preview Speaker')
+            ->where('error.details.normalized_payload_preview.gender', 'male')
+            ->where('error.details.normalized_payload_preview.address.country_id', 132)
+            ->where('error.details.remaining_blockers', function (array $remainingBlockers): bool {
+                $statusBlocker = collect($remainingBlockers)->keyBy('field')->get('status');
+
+                return is_array($statusBlocker)
+                    && ($statusBlocker['field'] ?? null) === 'status'
+                    && ($statusBlocker['type'] ?? null) === 'required_choice'
+                    && ($statusBlocker['options'] ?? null) === ['pending', 'verified', 'rejected'];
+            })
+            ->where('error.details.can_retry', false)
+            ->etc());
+});
+
+it('returns retryable remediation details for validate-only admin update validation failures', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $speaker = Speaker::factory()->create([
+        'name' => 'Retryable Admin MCP Speaker',
+        'gender' => 'male',
+        'status' => 'verified',
+    ]);
+    $originalGender = $speaker->gender;
+    $originalStatus = $speaker->status;
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => $speaker->getKey(),
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Retryable Admin MCP Speaker Updated',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.fix_plan', function (array $fixPlan) use ($originalGender, $originalStatus): bool {
+                $keyedFixPlan = collect($fixPlan)->keyBy('field');
+
+                return $keyedFixPlan->get('gender') === [
+                    'action' => 'set_field',
+                    'field' => 'gender',
+                    'value' => $originalGender,
+                    'auto_apply_safe' => true,
+                ] && $keyedFixPlan->get('status') === [
+                    'action' => 'set_field',
+                    'field' => 'status',
+                    'value' => $originalStatus,
+                    'auto_apply_safe' => true,
+                ];
+            })
+            ->where('error.details.normalized_payload_preview.name', 'Retryable Admin MCP Speaker Updated')
+            ->where('error.details.normalized_payload_preview.gender', $originalGender)
+            ->where('error.details.normalized_payload_preview.status', $originalStatus)
+            ->has('error.details.remaining_blockers', 0)
+            ->where('error.details.can_retry', true)
+            ->etc());
 });
 
 it('registers admin write tools when the MCP actor is a normalized Passport user', function () {
@@ -691,6 +788,97 @@ it('surfaces admin event validation failures through MCP write tools', function 
             ]),
         ])
         ->assertHasErrors(['Sekurang-kurangnya seorang penceramah diperlukan untuk jenis majlis ini.']);
+});
+
+it('returns default autofill hints and conditional requirement feedback for admin MCP dry runs', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'validate_only' => true,
+            'apply_defaults' => true,
+            'payload' => [
+                'title' => 'AI Feedback Event Preview',
+                'event_date' => '2026-06-10',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.feedback.validate_only', true)
+            ->where('error.details.feedback.apply_defaults', true)
+            ->where('error.details.feedback.normalized_payload.timezone', 'Asia/Kuala_Lumpur')
+            ->where('error.details.feedback.normalized_payload.event_format', EventFormat::Physical->value)
+            ->where('error.details.feedback.normalized_payload.prayer_time', EventPrayerTime::LainWaktu->value)
+            ->where('error.details.feedback.issues.0.field', 'custom_time')
+            ->where('error.details.feedback.issues.0.severity', 'blocking_error')
+            ->where('error.details.feedback.issues.0.required_because.prayer_time', EventPrayerTime::LainWaktu->value)
+            ->etc());
+});
+
+it('returns enum suggestions for invalid admin MCP dry-run values', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'validate_only' => true,
+            'apply_defaults' => true,
+            'payload' => [
+                'title' => 'AI Feedback Invalid Enum Preview',
+                'event_date' => '2026-06-10',
+                'custom_time' => '8:30 PM',
+                'event_format' => 'physicl',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.feedback.issues.0.field', 'event_format')
+            ->where('error.details.feedback.issues.0.allowed_values.0', EventFormat::Physical->value)
+            ->where('error.details.feedback.issues.0.closest_valid_value', EventFormat::Physical->value)
+            ->where('error.details.feedback.issues.0.suggested', EventFormat::Physical->value)
+            ->where('error.details.feedback.issues.0.severity', 'blocking_error')
+            ->etc());
+});
+
+it('returns structured admin MCP validation feedback outside validate-only previews', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'payload' => adminMcpEventPayload([
+                'institution' => $institution,
+                'speaker' => $speaker,
+                'reference' => $reference,
+                'series' => $series,
+                'domain_tag' => $domainTag,
+                'discipline_tag' => $disciplineTag,
+            ], [
+                'event_format' => 'physicl',
+            ]),
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.feedback.validate_only', false)
+            ->where('error.details.feedback.apply_defaults', false)
+            ->where('error.details.feedback.issues.0.field', 'event_format')
+            ->where('error.details.feedback.issues.0.closest_valid_value', EventFormat::Physical->value)
+            ->etc());
 });
 
 it('rejects malformed MCP media descriptors through write tools', function () {

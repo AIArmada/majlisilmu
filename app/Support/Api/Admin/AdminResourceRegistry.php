@@ -461,6 +461,7 @@ class AdminResourceRegistry
                         'resource_key' => $key,
                         'payload' => 'object',
                         'validate_only' => false,
+                        'apply_defaults' => false,
                     ],
                 ]
                 : null,
@@ -472,6 +473,7 @@ class AdminResourceRegistry
                         'record_key' => 'record',
                         'payload' => 'object',
                         'validate_only' => false,
+                        'apply_defaults' => false,
                     ],
                 ]
                 : null,
