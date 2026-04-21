@@ -683,13 +683,15 @@ Current limitation:
 | `GET` | `/admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` | Required Filament admin-panel access | Return the update contract plus current defaults/media for one supported record |
 | `GET` | `/admin/{resourceKey}` | Required Filament admin-panel access | Paginated record listing for the selected resource. Supports search, date filters, and resource-specific `filter[...]` query parameters when available |
 | `GET` | `/admin/{resourceKey}/{recordKey}/relations/{relation}` | Required Filament admin-panel access | Paginated listing for a named relation on one admin record |
-| `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources, or add `?validate_only=1` to preview the normalized payload and warnings without persisting |
+| `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources, or add `?validate_only=1` to preview the normalized payload and warnings without persisting. Add `&apply_defaults=1` during previews to receive a server-side autofill candidate payload in validation feedback. Validate-only failures also return remediation details for one-retry recovery loops |
 | `GET` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
-| `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources, or add `?validate_only=1` to preview the current record snapshot, normalized payload, and warnings without persisting |
+| `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources, or add `?validate_only=1` to preview the current record snapshot, normalized payload, and warnings without persisting. Add `&apply_defaults=1` during previews to receive a server-side autofill candidate payload in validation feedback. Validate-only failures also return remediation details for one-retry recovery loops |
 
 ### Write preview mode
 
 The admin create and update endpoints accept `validate_only=true` as a query parameter. When present, the API validates and normalizes the request, then returns a preview envelope instead of mutating the database.
+
+If you also send `apply_defaults=true`, the server applies schema defaults before validating and returns the candidate autofilled payload inside the validation feedback envelope when the request is still invalid.
 
 Preview responses include:
 
@@ -697,6 +699,25 @@ Preview responses include:
 - `data.preview.normalized_payload`
 - `data.preview.warnings` for destructive clear-flags such as `clear_cover`
 - `data.preview.current_record` for updates so you can compare the existing state against the previewed payload
+
+Validation errors now include schema-driven `error.details.feedback` hints for both preview and non-preview writes, including:
+
+- `issues[].allowed_values`
+- `issues[].suggested`
+- `issues[].closest_valid_value`
+- `issues[].default`
+- `issues[].auto_fill_safe`
+- `issues[].required_because`
+- `normalized_payload` when `validate_only=true&apply_defaults=true`
+
+Validation failures in validate-only mode return machine-readable remediation details:
+
+- `error.details.fix_plan`
+- `error.details.remaining_blockers`
+- `error.details.normalized_payload_preview`
+- `error.details.can_retry`
+
+Safe defaults are surfaced as `set_field` actions, unresolved enums/catalog choices are surfaced as `choose_one` / `choose_many`, and `can_retry=true` means the client can retry immediately using the normalized preview without another schema round trip.
 
 > **Record-key format:** `{recordKey}` in GET and PUT admin record routes should use the `route_key` field returned by the admin collection or detail endpoints.
 

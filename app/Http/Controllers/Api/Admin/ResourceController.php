@@ -4,13 +4,16 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Api\Admin\AdminValidateOnlyRemediationPlanner;
 use App\Support\Api\Admin\AdminResourceService;
+use App\Support\Api\Admin\AdminWriteValidationFeedback;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\PathParameter;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 #[Group(
     'Admin Resource',
@@ -21,6 +24,7 @@ class ResourceController extends Controller
 {
     public function __construct(
         private readonly AdminResourceService $resourceService,
+        private readonly AdminWriteValidationFeedback $validationFeedback,
     ) {}
 
     #[PathParameter('resourceKey', 'Admin resource key from `GET /admin/manifest`, for example `events`, `institutions`, or `speakers`.', example: 'events')]
@@ -111,48 +115,116 @@ class ResourceController extends Controller
     }
 
     #[PathParameter('resourceKey', 'Writable admin resource key from `GET /admin/manifest`.', example: 'speakers')]
-    #[QueryParameter('validate_only', 'When true, validates and normalizes the payload without persisting changes. The response includes a preview envelope with destructive media clear-flag warnings.', required: false, type: 'boolean', infer: false, default: false, example: false)]
+    #[QueryParameter('validate_only', 'When true, validates and normalizes the payload without persisting changes. Successful responses return a preview envelope; validation failures return schema-driven `feedback` hints plus remediation details such as `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry`.', required: false, type: 'boolean', infer: false, default: false, example: false)]
+    #[QueryParameter('apply_defaults', 'When true together with `validate_only`, the server applies schema defaults before validating and returns the candidate normalized payload in validation feedback.', required: false, type: 'boolean', infer: false, default: false, example: false)]
     #[Endpoint(
         title: 'Create an admin resource record',
         description: 'Creates a record for a writable admin resource. '
             .'Set `validate_only=true` to preview the normalized payload and warning envelope without persisting the write. '
+            .'Add `apply_defaults=true` during previews when you want validation failures to include a server-side autofill candidate payload. '
+            .'If validation fails in validate-only mode, the API also returns remediation metadata so clients can auto-apply safe defaults and retry. '
             .'The request body is dynamic and depends on `resourceKey`, so fetch `GET /admin/{resourceKey}/schema?operation=create` first to obtain the canonical required and optional fields.',
     )]
     public function storeRecord(Request $request, string $resourceKey): JsonResponse
     {
+        $actor = $this->currentUser($request);
+        $payload = $request->all();
         $validateOnly = $request->boolean('validate_only');
+        $applyDefaults = $validateOnly && $request->boolean('apply_defaults');
+        $schemaResponse = null;
 
-        return response()->json(
-            $this->resourceService->storeRecord(
+        if ($applyDefaults) {
+            $schemaResponse = $this->resourceService->writeSchema(
                 resourceKey: $resourceKey,
-                payload: $request->all(),
-                actor: $this->currentUser($request),
+                operation: 'create',
+                actor: $actor,
+            );
+            $payload = $this->validationFeedback->payloadWithSchemaDefaults($payload, $schemaResponse);
+        }
+
+        try {
+            return response()->json(
+                $this->resourceService->storeRecord(
+                    resourceKey: $resourceKey,
+                    payload: $payload,
+                    actor: $actor,
+                    validateOnly: $validateOnly,
+                ),
+                $validateOnly ? 200 : 201,
+            );
+        } catch (ValidationException $exception) {
+            $schemaResponse ??= $this->resourceService->writeSchema(
+                resourceKey: $resourceKey,
+                operation: 'create',
+                actor: $actor,
+            );
+
+            return $this->validationErrorResponse(
+                exception: $exception,
+                payload: $payload,
+                schemaResponse: $schemaResponse,
+                operation: 'create',
                 validateOnly: $validateOnly,
-            ),
-            $validateOnly ? 200 : 201,
-        );
+                applyDefaults: $applyDefaults,
+            );
+        }
     }
 
     #[PathParameter('resourceKey', 'Writable admin resource key from `GET /admin/manifest`.', example: 'speakers')]
     #[PathParameter('recordKey', 'Existing admin record route key returned by the collection or record endpoints.', example: '0195b86a-3c15-73fa-a2d8-5a45f6a7f701')]
-    #[QueryParameter('validate_only', 'When true, validates and normalizes the payload without persisting changes. The response includes the current record snapshot and destructive media clear-flag warnings.', required: false, type: 'boolean', infer: false, default: false, example: false)]
+    #[QueryParameter('validate_only', 'When true, validates and normalizes the payload without persisting changes. Successful responses include the current record snapshot and destructive media clear-flag warnings; validation failures return schema-driven `feedback` hints plus remediation details such as `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry`.', required: false, type: 'boolean', infer: false, default: false, example: false)]
+    #[QueryParameter('apply_defaults', 'When true together with `validate_only`, the server applies schema defaults before validating and returns the candidate normalized payload in validation feedback.', required: false, type: 'boolean', infer: false, default: false, example: false)]
     #[Endpoint(
         title: 'Update an admin resource record',
         description: 'Updates a record for a writable admin resource. '
             .'Set `validate_only=true` to preview the normalized payload, current record snapshot, and warning envelope without persisting the write. '
+            .'Add `apply_defaults=true` during previews when you want validation failures to include a server-side autofill candidate payload. '
+            .'If validation fails in validate-only mode, the API also returns remediation metadata so clients can auto-apply safe defaults and retry. '
             .'The request body is dynamic and depends on both `resourceKey` and the existing record, so fetch `GET /admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` first.',
     )]
     public function updateRecord(Request $request, string $resourceKey, string $recordKey): JsonResponse
     {
+        $actor = $this->currentUser($request);
+        $payload = $request->all();
         $validateOnly = $request->boolean('validate_only');
+        $applyDefaults = $validateOnly && $request->boolean('apply_defaults');
+        $schemaResponse = null;
 
-        return response()->json($this->resourceService->updateRecord(
-            resourceKey: $resourceKey,
-            recordKey: $recordKey,
-            payload: $request->all(),
-            actor: $this->currentUser($request),
-            validateOnly: $validateOnly,
-        ));
+        if ($applyDefaults) {
+            $schemaResponse = $this->resourceService->writeSchema(
+                resourceKey: $resourceKey,
+                operation: 'update',
+                recordKey: $recordKey,
+                actor: $actor,
+            );
+            $payload = $this->validationFeedback->payloadWithSchemaDefaults($payload, $schemaResponse);
+        }
+
+        try {
+            return response()->json($this->resourceService->updateRecord(
+                resourceKey: $resourceKey,
+                recordKey: $recordKey,
+                payload: $payload,
+                actor: $actor,
+                validateOnly: $validateOnly,
+            ));
+        } catch (ValidationException $exception) {
+            $schemaResponse ??= $this->resourceService->writeSchema(
+                resourceKey: $resourceKey,
+                operation: 'update',
+                recordKey: $recordKey,
+                actor: $actor,
+            );
+
+            return $this->validationErrorResponse(
+                exception: $exception,
+                payload: $payload,
+                schemaResponse: $schemaResponse,
+                operation: 'update',
+                validateOnly: $validateOnly,
+                applyDefaults: $applyDefaults,
+            );
+        }
     }
 
     #[PathParameter('resourceKey', 'Admin resource key from `GET /admin/manifest`.', example: 'events')]
@@ -188,5 +260,54 @@ class ResourceController extends Controller
         $user = $request->user();
 
         return $user instanceof User ? $user : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     */
+    private function validationErrorResponse(
+        ValidationException $exception,
+        array $payload,
+        array $schemaResponse,
+        string $operation,
+        bool $validateOnly,
+        bool $applyDefaults,
+    ): JsonResponse {
+        $candidatePayload = $validateOnly && $applyDefaults
+            ? $payload
+            : null;
+
+        $details = [
+            'feedback' => $this->validationFeedback->feedback(
+                exception: $exception,
+                payload: $payload,
+                schemaResponse: $schemaResponse,
+                operation: $operation,
+                validateOnly: $validateOnly,
+                applyDefaults: $applyDefaults,
+                candidatePayload: $candidatePayload,
+            ),
+        ];
+
+        if ($validateOnly) {
+            $details = [
+                ...$details,
+                ...app(AdminValidateOnlyRemediationPlanner::class)->build(
+                    payload: $payload,
+                    schemaResponse: $schemaResponse,
+                    errors: $exception->errors(),
+                ),
+            ];
+        }
+
+        return response()->json([
+            'message' => $this->validationFeedback->message($exception),
+            'errors' => $exception->errors(),
+            'error' => [
+                'code' => 'validation_error',
+                'details' => $details,
+            ],
+        ], 422);
     }
 }
