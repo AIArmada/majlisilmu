@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Admin;
 
 use App\Models\User;
-use App\Support\Api\Admin\AdminValidateOnlyRemediationPlanner;
 use App\Support\Api\Admin\AdminResourceService;
+use App\Support\Api\Admin\AdminValidateOnlyRemediationPlanner;
 use App\Support\Api\Admin\AdminWriteValidationFeedback;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Mcp\McpAuthenticatedUserResolver;
@@ -21,6 +21,7 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
     /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $schemaResponse
+     * @return array<string, mixed>
      */
     protected function payloadWithSchemaDefaults(array $payload, array $schemaResponse): array
     {
@@ -183,5 +184,4 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             default => $value !== null,
         };
     }
-
 }

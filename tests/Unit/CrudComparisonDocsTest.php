@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Support\Api\Admin\AdminResourceMutationService;
 use App\Support\Api\Member\MemberResourceMutationService;
+use App\Support\Api\SurfaceSyncPolicy;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -70,6 +71,7 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
 
     expect($document['schema_version'])->toBe('2.2.0')
         ->and($document['markdown_companion'])->toBe('docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md')
+        ->and(data_get($document, 'surface_sync_contract'))->toEqual(SurfaceSyncPolicy::manifest())
         ->and(data_get($document, 'runtime_inventory.admin_panel.resource_count'))->toBe(count($runtimeAdminResources))
         ->and(data_get($document, 'runtime_inventory.ahli_panel.resource_count'))->toBe(count($runtimeAhliResources))
         ->and($documentedAdminResources)->toEqual($runtimeAdminResources)
@@ -106,7 +108,9 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
             'normalized_payload_preview',
             'can_retry',
         ])
-        ->and(data_get($document, 'transport_rules.member_mcp.validate_only'))->toBeFalse();
+        ->and(data_get($document, 'transport_rules.member_mcp.validate_only'))->toBeTrue()
+        ->and(data_get($document, 'transport_rules.member_mcp.related_records_tool'))->toBeTrue()
+        ->and($document['maintenance_rule'])->toContain('workflow API controllers or contracts');
 });
 
 it('keeps the markdown companion anchored to the verified runtime model', function () {
@@ -114,13 +118,23 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
 
     expect($markdown)
         ->toContain('Runtime panel registration wins.')
+        ->toContain('Surface sync operating model')
+        ->toContain('curated parity')
+        ->toContain('workflow-first capabilities')
         ->toContain('Runtime admin resource inventory (30 registered resources)')
         ->toContain('Runtime Ahli resource inventory (4 registered resources)')
         ->toContain('MCP media and preview semantics')
-        ->toContain('apply_defaults=1 is supported during preview requests')
-        ->toContain('apply_defaults is supported on admin preview tools')
+        ->toContain('`apply_defaults=1` is supported during preview requests')
+        ->toContain('`apply_defaults` is supported on admin preview tools')
         ->toContain('json_base64_descriptor')
         ->toContain('Validation failures in validate-only mode now return machine-readable remediation details')
         ->toContain('Validation failures now expose schema-driven `feedback`')
-        ->toContain('No `validate_only` preview path today.');
+        ->toContain('Supports `validate_only` preview for updates.')
+        ->toContain('Supports one-level related-record traversal.')
+        ->toContain('Event moderation:')
+        ->toContain('Report triage:')
+        ->toContain('Contribution-request review:')
+        ->toContain('Membership-claim review:')
+        ->toContain('Contribution-request queue tools:')
+        ->toContain('member-submit-membership-claim');
 });

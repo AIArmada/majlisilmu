@@ -113,9 +113,12 @@ it('exposes corrected frontend contract metadata', function () {
     $submitEventConditionalRules = collect($submitEvent['conditional_rules'] ?? []);
 
     expect($submitEvent['captcha_required_when_turnstile_enabled'])->toBeTrue()
-        ->and($manifest['version'] ?? null)->toBe('2026-04-20')
+        ->and($manifest['version'] ?? null)->toBe('2026-04-21')
         ->and($manifest['docs']['ui'] ?? null)->toBe('https://api.majlisilmu.test/docs')
         ->and($manifest['docs']['openapi'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
+        ->and($manifest['surface_sync']['strategy'] ?? null)->toBe('curated_parity')
+        ->and($manifest['surface_sync']['default_panel_only_operations'] ?? [])->toContain('delete', 'restore', 'replicate', 'reorder')
+        ->and($manifest['surface_sync']['maintenance_triggers'] ?? [])->toContain('Workflow API controller or contract changes')
         ->and($manifest['routing_surfaces']['public']['manifest_endpoint'] ?? null)->toContain('/api/v1/manifest')
         ->and($manifest['routing_surfaces']['admin']['manifest_endpoint'] ?? null)->toContain('/api/v1/admin/manifest')
         ->and($manifest['rules'] ?? [])->toContain('Use UTC timestamps, but send date-only filters in the user local calendar together with timezone context.')

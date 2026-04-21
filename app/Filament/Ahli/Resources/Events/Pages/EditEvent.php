@@ -19,6 +19,7 @@ use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
 use App\Support\Events\AdminEventTimeMapper;
+use App\Support\Moderation\EventModerationWorkflow;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Select;
@@ -394,17 +395,7 @@ class EditEvent extends EditRecord
      */
     protected static function getReasonCodeOptions(): array
     {
-        return [
-            'incomplete_info' => 'Incomplete Information',
-            'duplicate' => 'Duplicate Event',
-            'inappropriate' => 'Inappropriate Content',
-            'spam' => 'Spam',
-            'wrong_category' => 'Wrong Category',
-            'inaccurate_details' => 'Inaccurate Details',
-            'missing_speaker' => 'Missing Speaker Information',
-            'missing_venue' => 'Missing Venue Information',
-            'other' => 'Other',
-        ];
+        return EventModerationWorkflow::reasonOptions();
     }
 
     protected function eventRecord(): Event

@@ -2,11 +2,19 @@
 
 namespace App\Support\Api\Admin;
 
+use App\Actions\DonationChannels\SaveDonationChannelAction;
 use App\Actions\Events\SaveAdminEventAction;
+use App\Actions\Inspirations\SaveInspirationAction;
 use App\Actions\Institutions\SaveInstitutionAction;
 use App\Actions\References\SaveReferenceAction;
+use App\Actions\Reports\ResolveReportCategoryOptionsAction;
+use App\Actions\Reports\ResolveReportEntityMetadataAction;
+use App\Actions\Reports\SaveReportAction;
+use App\Actions\Series\SaveSeriesAction;
+use App\Actions\Spaces\SaveSpaceAction;
 use App\Actions\Speakers\SaveSpeakerAction;
 use App\Actions\Subdistricts\SaveSubdistrictAction;
+use App\Actions\Tags\SaveTagAction;
 use App\Actions\Venues\SaveVenueAction;
 use App\Enums\ContactCategory;
 use App\Enums\ContactType;
@@ -19,25 +27,39 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\Gender;
 use App\Enums\Honorific;
+use App\Enums\InspirationCategory;
 use App\Enums\InstitutionType;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
 use App\Enums\ReferenceType;
 use App\Enums\RegistrationMode;
 use App\Enums\SocialMediaPlatform;
+use App\Enums\TagType;
 use App\Enums\VenueType;
+use App\Filament\Resources\DonationChannels\DonationChannelResource;
 use App\Filament\Resources\Events\EventResource;
+use App\Filament\Resources\Inspirations\InspirationResource;
 use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Filament\Resources\References\ReferenceResource;
+use App\Filament\Resources\Reports\ReportResource;
+use App\Filament\Resources\Series\SeriesResource;
+use App\Filament\Resources\Spaces\SpaceResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Filament\Resources\Subdistricts\SubdistrictResource;
+use App\Filament\Resources\Tags\TagResource;
 use App\Filament\Resources\Venues\VenueResource;
 use App\Forms\SharedFormSchema;
+use App\Models\DonationChannel;
 use App\Models\Event;
+use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\Reference;
+use App\Models\Report;
+use App\Models\Series;
+use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\Subdistrict;
+use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
 use App\Services\ContributionEntityMutationService;
@@ -54,11 +76,19 @@ class AdminResourceMutationService
 {
     public function __construct(
         private readonly ContributionEntityMutationService $contributionEntityMutationService,
+        private readonly ResolveReportCategoryOptionsAction $resolveReportCategoryOptionsAction,
+        private readonly ResolveReportEntityMetadataAction $resolveReportEntityMetadataAction,
+        private readonly SaveDonationChannelAction $saveDonationChannelAction,
         private readonly SaveAdminEventAction $saveAdminEventAction,
+        private readonly SaveInspirationAction $saveInspirationAction,
         private readonly SaveInstitutionAction $saveInstitutionAction,
+        private readonly SaveReportAction $saveReportAction,
         private readonly SaveReferenceAction $saveReferenceAction,
+        private readonly SaveSeriesAction $saveSeriesAction,
         private readonly SaveSpeakerAction $saveSpeakerAction,
+        private readonly SaveSpaceAction $saveSpaceAction,
         private readonly SaveSubdistrictAction $saveSubdistrictAction,
+        private readonly SaveTagAction $saveTagAction,
         private readonly SaveVenueAction $saveVenueAction,
     ) {}
 
@@ -68,11 +98,17 @@ class AdminResourceMutationService
     public function supports(string $resourceClass): bool
     {
         return in_array($resourceClass, [
+            DonationChannelResource::class,
             EventResource::class,
+            InspirationResource::class,
             InstitutionResource::class,
             ReferenceResource::class,
+            ReportResource::class,
+            SeriesResource::class,
             SpeakerResource::class,
+            SpaceResource::class,
             SubdistrictResource::class,
+            TagResource::class,
             VenueResource::class,
         ], true);
     }
@@ -89,6 +125,27 @@ class AdminResourceMutationService
             : $this->defaultsForCreate($resourceClass);
 
         return match ($resourceClass) {
+            DonationChannelResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'multipart/form-data',
+                'slug_behavior' => 'not_applicable',
+                'defaults' => $defaults,
+                'current_media' => $record instanceof DonationChannel ? $this->mediaState($record, ['qr']) : null,
+                'fields' => $this->donationChannelFields(),
+                'catalogs' => [],
+                'conditional_rules' => [
+                    ['field' => 'bank_name', 'required_when' => ['method' => ['bank_account']]],
+                    ['field' => 'account_number', 'required_when' => ['method' => ['bank_account']]],
+                    ['field' => 'duitnow_type', 'required_when' => ['method' => ['duitnow']]],
+                    ['field' => 'duitnow_value', 'required_when' => ['method' => ['duitnow']]],
+                    ['field' => 'ewallet_provider', 'required_when' => ['method' => ['ewallet']]],
+                ],
+            ],
             EventResource::class => [
                 'resource_key' => $resourceKey,
                 'operation' => $operation,
@@ -106,6 +163,21 @@ class AdminResourceMutationService
                     ['field' => 'custom_time', 'required_when' => ['prayer_time' => [EventPrayerTime::LainWaktu->value]]],
                     ['field' => 'organizer_id', 'required_when' => ['organizer_type' => [Institution::class, Speaker::class]]],
                 ],
+            ],
+            InspirationResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'multipart/form-data',
+                'slug_behavior' => 'not_applicable',
+                'defaults' => $defaults,
+                'current_media' => $record instanceof Inspiration ? $this->mediaState($record, ['main']) : null,
+                'fields' => $this->inspirationFields(),
+                'catalogs' => [],
+                'conditional_rules' => [],
             ],
             InstitutionResource::class => [
                 'resource_key' => $resourceKey,
@@ -137,6 +209,38 @@ class AdminResourceMutationService
                 'catalogs' => [],
                 'conditional_rules' => [],
             ],
+            ReportResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'multipart/form-data',
+                'slug_behavior' => 'not_applicable',
+                'defaults' => $defaults,
+                'current_media' => $record instanceof Report ? $this->mediaState($record, ['evidence']) : null,
+                'fields' => $this->reportFields(),
+                'catalogs' => [],
+                'conditional_rules' => [
+                    ['field' => 'description', 'required_when' => ['category' => ['other']]],
+                ],
+            ],
+            SeriesResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'multipart/form-data',
+                'slug_behavior' => 'user_provided',
+                'defaults' => $defaults,
+                'current_media' => $record instanceof Series ? $this->mediaState($record, ['cover', 'gallery']) : null,
+                'fields' => $this->seriesFields(),
+                'catalogs' => [],
+                'conditional_rules' => [],
+            ],
             SpeakerResource::class => [
                 'resource_key' => $resourceKey,
                 'operation' => $operation,
@@ -153,6 +257,20 @@ class AdminResourceMutationService
                 'conditional_rules' => [
                     ['field' => 'job_title', 'required_when' => ['is_freelance' => [true]]],
                 ],
+            ],
+            SpaceResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'application/json',
+                'slug_behavior' => 'user_provided',
+                'defaults' => $defaults,
+                'fields' => $this->spaceFields(),
+                'catalogs' => [],
+                'conditional_rules' => [],
             ],
             VenueResource::class => [
                 'resource_key' => $resourceKey,
@@ -185,6 +303,20 @@ class AdminResourceMutationService
                     ['field' => 'district_id', 'required_unless' => ['state_id' => $this->federalTerritoryStateIds()]],
                 ],
             ],
+            TagResource::class => [
+                'resource_key' => $resourceKey,
+                'operation' => $operation,
+                'method' => $updating ? 'PUT' : 'POST',
+                'endpoint' => $updating && $record instanceof Model
+                    ? route('api.admin.resources.update', ['resourceKey' => $resourceKey, 'recordKey' => $this->recordKey($record)], false)
+                    : route('api.admin.resources.store', ['resourceKey' => $resourceKey], false),
+                'content_type' => 'application/json',
+                'slug_behavior' => 'auto_managed',
+                'defaults' => $defaults,
+                'fields' => $this->tagFields(),
+                'catalogs' => [],
+                'conditional_rules' => [],
+            ],
             default => throw new \RuntimeException('Unsupported admin write resource.'),
         };
     }
@@ -196,11 +328,17 @@ class AdminResourceMutationService
     public function rules(string $resourceClass, bool $updating = false): array
     {
         return match ($resourceClass) {
+            DonationChannelResource::class => $this->donationChannelRules($updating),
             EventResource::class => $this->eventRules($updating),
+            InspirationResource::class => $this->inspirationRules($updating),
             InstitutionResource::class => $this->institutionRules($updating),
             ReferenceResource::class => $this->referenceRules($updating),
+            ReportResource::class => $this->reportRules($updating),
+            SeriesResource::class => $this->seriesRules($updating),
             SpeakerResource::class => $this->speakerRules($updating),
+            SpaceResource::class => $this->spaceRules($updating),
             SubdistrictResource::class => $this->subdistrictRules($updating),
+            TagResource::class => $this->tagRules($updating),
             VenueResource::class => $this->venueRules($updating),
             default => [],
         };
@@ -213,6 +351,14 @@ class AdminResourceMutationService
      */
     public function normalizeValidatedPayload(string $resourceClass, array $validated, ?Model $record = null): array
     {
+        if ($resourceClass === DonationChannelResource::class) {
+            return $this->normalizeDonationChannelPayload($validated, $record);
+        }
+
+        if ($resourceClass === ReportResource::class) {
+            return $this->normalizeReportPayload($validated);
+        }
+
         if (! in_array($resourceClass, [InstitutionResource::class, SpeakerResource::class], true)) {
             return $validated;
         }
@@ -256,11 +402,17 @@ class AdminResourceMutationService
     public function store(string $resourceClass, array $validated, User $actor): Model
     {
         return match ($resourceClass) {
+            DonationChannelResource::class => $this->saveDonationChannelAction->handle($validated),
             EventResource::class => $this->saveAdminEventAction->handle($validated, $actor),
+            InspirationResource::class => $this->saveInspirationAction->handle($validated),
             InstitutionResource::class => $this->saveInstitutionAction->handle($validated, $actor),
             ReferenceResource::class => $this->saveReferenceAction->handle($validated),
+            ReportResource::class => $this->saveReportAction->handle($validated),
+            SeriesResource::class => $this->saveSeriesAction->handle($validated),
             SpeakerResource::class => $this->saveSpeakerAction->handle($validated, $actor),
+            SpaceResource::class => $this->saveSpaceAction->handle($validated),
             SubdistrictResource::class => $this->saveSubdistrictAction->handle($validated),
+            TagResource::class => $this->saveTagAction->handle($validated),
             VenueResource::class => $this->saveVenueAction->handle($validated),
             default => throw new \RuntimeException('Unsupported admin write resource.'),
         };
@@ -273,21 +425,39 @@ class AdminResourceMutationService
     public function update(string $resourceClass, Model $record, array $validated, User $actor): Model
     {
         return match ($resourceClass) {
+            DonationChannelResource::class => $record instanceof DonationChannel
+                ? $this->saveDonationChannelAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected donation channel record.'),
             EventResource::class => $record instanceof Event
                 ? $this->saveAdminEventAction->handle($validated, $actor, $record)
                 : throw new \RuntimeException('Expected event record.'),
+            InspirationResource::class => $record instanceof Inspiration
+                ? $this->saveInspirationAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected inspiration record.'),
             InstitutionResource::class => $record instanceof Institution
                 ? $this->saveInstitutionAction->handle($validated, $actor, $record)
                 : throw new \RuntimeException('Expected institution record.'),
             ReferenceResource::class => $record instanceof Reference
                 ? $this->saveReferenceAction->handle($validated, $record)
                 : throw new \RuntimeException('Expected reference record.'),
+            ReportResource::class => $record instanceof Report
+                ? $this->saveReportAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected report record.'),
+            SeriesResource::class => $record instanceof Series
+                ? $this->saveSeriesAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected series record.'),
             SpeakerResource::class => $record instanceof Speaker
                 ? $this->saveSpeakerAction->handle($validated, $actor, $record)
                 : throw new \RuntimeException('Expected speaker record.'),
+            SpaceResource::class => $record instanceof Space
+                ? $this->saveSpaceAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected space record.'),
             SubdistrictResource::class => $record instanceof Subdistrict
                 ? $this->saveSubdistrictAction->handle($validated, $record)
                 : throw new \RuntimeException('Expected subdistrict record.'),
+            TagResource::class => $record instanceof Tag
+                ? $this->saveTagAction->handle($validated, $record)
+                : throw new \RuntimeException('Expected tag record.'),
             VenueResource::class => $record instanceof Venue
                 ? $this->saveVenueAction->handle($validated, $record)
                 : throw new \RuntimeException('Expected venue record.'),
@@ -326,7 +496,35 @@ class AdminResourceMutationService
         $defaultCountryId = app(PreferredCountryResolver::class)->resolveId();
 
         return match ($resourceClass) {
+            DonationChannelResource::class => [
+                'donatable_type' => (string) (new Institution)->getMorphClass(),
+                'donatable_id' => null,
+                'label' => null,
+                'recipient' => '',
+                'method' => 'bank_account',
+                'bank_code' => null,
+                'bank_name' => null,
+                'account_number' => null,
+                'duitnow_type' => null,
+                'duitnow_value' => null,
+                'ewallet_provider' => null,
+                'ewallet_handle' => null,
+                'ewallet_qr_payload' => null,
+                'reference_note' => null,
+                'status' => 'unverified',
+                'is_default' => false,
+                'clear_qr' => false,
+            ],
             EventResource::class => $this->saveAdminEventAction->defaultsForCreate(),
+            InspirationResource::class => [
+                'category' => InspirationCategory::QuranQuote->value,
+                'locale' => $this->defaultSupportedLocale(),
+                'title' => '',
+                'content' => Inspiration::plainTextToRichContent(''),
+                'source' => null,
+                'is_active' => true,
+                'clear_main' => false,
+            ],
             InstitutionResource::class => [
                 'type' => InstitutionType::Masjid->value,
                 'is_active' => true,
@@ -345,6 +543,27 @@ class AdminResourceMutationService
                 'social_media' => [],
                 'clear_front_cover' => false,
                 'clear_back_cover' => false,
+                'clear_gallery' => false,
+            ],
+            ReportResource::class => [
+                'entity_type' => 'event',
+                'entity_id' => null,
+                'category' => 'wrong_info',
+                'description' => null,
+                'status' => 'open',
+                'reporter_id' => null,
+                'handled_by' => null,
+                'resolution_note' => null,
+                'clear_evidence' => false,
+            ],
+            SeriesResource::class => [
+                'title' => '',
+                'slug' => '',
+                'description' => null,
+                'visibility' => 'public',
+                'is_active' => true,
+                'languages' => [],
+                'clear_cover' => false,
                 'clear_gallery' => false,
             ],
             SpeakerResource::class => [
@@ -372,8 +591,24 @@ class AdminResourceMutationService
                 'clear_cover' => false,
                 'clear_gallery' => false,
             ],
+            SpaceResource::class => [
+                'name' => '',
+                'slug' => '',
+                'capacity' => null,
+                'is_active' => true,
+                'institutions' => [],
+            ],
             SubdistrictResource::class => [
                 'district_id' => null,
+            ],
+            TagResource::class => [
+                'name' => [
+                    'ms' => '',
+                    'en' => '',
+                ],
+                'type' => TagType::Domain->value,
+                'status' => 'verified',
+                'order_column' => null,
             ],
             default => [],
         };
@@ -384,9 +619,61 @@ class AdminResourceMutationService
      */
     private function defaultsForRecord(Model $record): array
     {
-        $defaults = $record instanceof Subdistrict
+        $defaults = $record instanceof DonationChannel || $record instanceof Inspiration || $record instanceof Report || $record instanceof Subdistrict || $record instanceof Tag || $record instanceof Series || $record instanceof Space
             ? []
             : $this->contributionEntityMutationService->stateFor($record);
+
+        if ($record instanceof Inspiration) {
+            $category = $record->category;
+
+            $defaults = [
+                'category' => $category instanceof InspirationCategory
+                    ? $category->value
+                    : (is_string($category) && $category !== '' ? $category : InspirationCategory::QuranQuote->value),
+                'locale' => (string) $record->locale,
+                'title' => $record->title,
+                'content' => $record->content,
+                'source' => $record->source,
+                'is_active' => (bool) $record->is_active,
+                'clear_main' => false,
+            ];
+        }
+
+        if ($record instanceof DonationChannel) {
+            $defaults = [
+                'donatable_type' => $this->normalizeDonationChannelOwnerType($record->donatable_type),
+                'donatable_id' => (string) $record->donatable_id,
+                'label' => $record->label,
+                'recipient' => $record->recipient,
+                'method' => (string) $record->method,
+                'bank_code' => $record->bank_code,
+                'bank_name' => $record->bank_name,
+                'account_number' => $record->account_number,
+                'duitnow_type' => $record->duitnow_type,
+                'duitnow_value' => $record->duitnow_value,
+                'ewallet_provider' => $record->ewallet_provider,
+                'ewallet_handle' => $record->ewallet_handle,
+                'ewallet_qr_payload' => $record->ewallet_qr_payload,
+                'reference_note' => $record->reference_note,
+                'status' => (string) $record->status,
+                'is_default' => (bool) $record->is_default,
+                'clear_qr' => false,
+            ];
+        }
+
+        if ($record instanceof Report) {
+            $defaults = [
+                'entity_type' => (string) $record->entity_type,
+                'entity_id' => (string) $record->entity_id,
+                'category' => (string) $record->category,
+                'description' => $record->description,
+                'status' => (string) $record->status,
+                'reporter_id' => $record->reporter_id !== null ? (string) $record->reporter_id : null,
+                'handled_by' => $record->handled_by !== null ? (string) $record->handled_by : null,
+                'resolution_note' => $record->resolution_note,
+                'clear_evidence' => false,
+            ];
+        }
 
         if ($record instanceof Institution) {
             $defaults['status'] = $record->status;
@@ -433,6 +720,19 @@ class AdminResourceMutationService
             $defaults['clear_gallery'] = false;
         }
 
+        if ($record instanceof Series) {
+            $defaults = [
+                'title' => $record->title,
+                'slug' => $record->slug,
+                'description' => $record->description,
+                'visibility' => (string) $record->visibility,
+                'is_active' => (bool) $record->is_active,
+                'languages' => $record->languages()->pluck('languages.id')->map(fn (mixed $id): int => (int) $id)->values()->all(),
+                'clear_cover' => false,
+                'clear_gallery' => false,
+            ];
+        }
+
         if ($record instanceof Event) {
             $defaults = $this->saveAdminEventAction->formStateForRecord($record);
         }
@@ -444,12 +744,34 @@ class AdminResourceMutationService
             $defaults['clear_gallery'] = false;
         }
 
+        if ($record instanceof Space) {
+            $defaults = [
+                'name' => $record->name,
+                'slug' => $record->slug,
+                'capacity' => $record->capacity,
+                'is_active' => (bool) $record->is_active,
+                'institutions' => $record->institutions()->pluck('institutions.id')->map(fn (mixed $id): string => (string) $id)->values()->all(),
+            ];
+        }
+
         if ($record instanceof Subdistrict) {
             $defaults = [
                 'country_id' => (int) $record->country_id,
                 'state_id' => (int) $record->state_id,
                 'district_id' => $record->district_id !== null ? (int) $record->district_id : null,
                 'name' => $record->name,
+            ];
+        }
+
+        if ($record instanceof Tag) {
+            $defaults = [
+                'name' => [
+                    'ms' => $record->getTranslation('name', 'ms', false) ?: $record->getTranslation('name', 'en', false) ?: '',
+                    'en' => $record->getTranslation('name', 'en', false) ?: $record->getTranslation('name', 'ms', false) ?: '',
+                ],
+                'type' => (string) $record->type,
+                'status' => (string) $record->status,
+                'order_column' => $record->order_column,
             ];
         }
 
@@ -523,11 +845,184 @@ class AdminResourceMutationService
     }
 
     /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function normalizeReportPayload(array $validated): array
+    {
+        $entityType = is_string($validated['entity_type'] ?? null)
+            ? trim((string) $validated['entity_type'])
+            : '';
+
+        if (! in_array($entityType, $this->resolveReportEntityMetadataAction->validKeys(), true)) {
+            throw ValidationException::withMessages([
+                'entity_type' => __('The selected report entity type is invalid.'),
+            ]);
+        }
+
+        $entityMetadata = $this->resolveReportEntityMetadataAction->handle($entityType);
+        $entityModelClass = $entityMetadata['model_class'];
+        $entityId = is_scalar($validated['entity_id'] ?? null)
+            ? trim((string) $validated['entity_id'])
+            : '';
+
+        if ($entityId === '' || ! $entityModelClass::query()->whereKey($entityId)->exists()) {
+            throw ValidationException::withMessages([
+                'entity_id' => __('The selected report entity is invalid.'),
+            ]);
+        }
+
+        $category = is_string($validated['category'] ?? null)
+            ? trim((string) $validated['category'])
+            : '';
+
+        if (! in_array($category, $this->resolveReportCategoryOptionsAction->validKeys($entityType), true)) {
+            throw ValidationException::withMessages([
+                'category' => __('The selected report category is invalid for this entity type.'),
+            ]);
+        }
+
+        $validated['entity_type'] = $entityType;
+        $validated['entity_id'] = $entityId;
+        $validated['category'] = $category;
+
+        foreach (['reporter_id', 'handled_by'] as $field) {
+            if (! array_key_exists($field, $validated)) {
+                continue;
+            }
+
+            $validated[$field] = $this->normalizeOptionalUserKey($validated[$field], $field);
+        }
+
+        return $validated;
+    }
+
+    private function normalizeOptionalUserKey(mixed $value, string $field): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = is_scalar($value) ? trim((string) $value) : '';
+
+        if ($normalized === '' || ! User::query()->whereKey($normalized)->exists()) {
+            throw ValidationException::withMessages([
+                $field => __('The selected user is invalid.'),
+            ]);
+        }
+
+        return $normalized;
+    }
+
+    /**
      * @return list<string>
      */
     private function imageMimeTypes(): array
     {
         return ['image/jpeg', 'image/png', 'image/webp'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function evidenceMimeTypes(): array
+    {
+        return ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function normalizeDonationChannelPayload(array $validated, ?Model $record = null): array
+    {
+        $ownerType = array_key_exists('donatable_type', $validated)
+            ? $this->normalizeDonationChannelOwnerType($validated['donatable_type'])
+            : ($record instanceof DonationChannel ? $this->normalizeDonationChannelOwnerType($record->donatable_type) : null);
+
+        $ownerId = array_key_exists('donatable_id', $validated)
+            ? trim((string) $validated['donatable_id'])
+            : ($record instanceof DonationChannel ? (string) $record->donatable_id : '');
+
+        if (! is_string($ownerType) || $ownerType === '') {
+            throw ValidationException::withMessages([
+                'donatable_type' => __('The selected donation channel owner type is invalid.'),
+            ]);
+        }
+
+        if ($ownerId === '') {
+            throw ValidationException::withMessages([
+                'donatable_id' => __('The selected donation channel owner is invalid.'),
+            ]);
+        }
+
+        $ownerModelClass = $this->donationChannelOwnerModelClass($ownerType);
+
+        if (! $ownerModelClass::query()->whereKey($ownerId)->exists()) {
+            throw ValidationException::withMessages([
+                'donatable_id' => __('The selected donation channel owner is invalid.'),
+            ]);
+        }
+
+        $validated['donatable_type'] = $ownerType;
+        $validated['donatable_id'] = $ownerId;
+
+        return $validated;
+    }
+
+    private function normalizeDonationChannelOwnerType(mixed $value): string
+    {
+        $normalized = is_scalar($value) ? trim((string) $value) : '';
+
+        return match ($normalized) {
+            'institution', 'institutions', Institution::class => (string) (new Institution)->getMorphClass(),
+            'speaker', 'speakers', Speaker::class => (string) (new Speaker)->getMorphClass(),
+            'event', 'events', Event::class => (string) (new Event)->getMorphClass(),
+            default => throw ValidationException::withMessages([
+                'donatable_type' => __('The selected donation channel owner type is invalid.'),
+            ]),
+        };
+    }
+
+    /**
+     * @return class-string<Model>
+     */
+    private function donationChannelOwnerModelClass(string $ownerType): string
+    {
+        return match ($ownerType) {
+            (string) (new Institution)->getMorphClass() => Institution::class,
+            (string) (new Speaker)->getMorphClass() => Speaker::class,
+            (string) (new Event)->getMorphClass() => Event::class,
+            default => throw new \RuntimeException('Unsupported donation channel owner type.'),
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function donationChannelOwnerTypeValues(): array
+    {
+        return [
+            (string) (new Institution)->getMorphClass(),
+            (string) (new Speaker)->getMorphClass(),
+            (string) (new Event)->getMorphClass(),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function donationChannelAcceptedOwnerTypes(): array
+    {
+        return array_values(array_unique([
+            ...$this->donationChannelOwnerTypeValues(),
+            Institution::class,
+            Speaker::class,
+            Event::class,
+            'institutions',
+            'speakers',
+            'events',
+        ]));
     }
 
     /**
@@ -572,6 +1067,52 @@ class AdminResourceMutationService
         }
 
         return $fields;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function donationChannelFields(): array
+    {
+        return [
+            $this->field('donatable_type', 'string', required: true, default: (string) (new Institution)->getMorphClass(), allowedValues: $this->donationChannelOwnerTypeValues()),
+            $this->field('donatable_id', 'string', required: true),
+            $this->field('label', 'string', required: false, maxLength: 255),
+            $this->field('recipient', 'string', required: true, maxLength: 255),
+            $this->field('method', 'string', required: true, default: 'bank_account', allowedValues: ['bank_account', 'duitnow', 'ewallet']),
+            $this->field('bank_code', 'string', required: false, maxLength: 32),
+            $this->field('bank_name', 'string', required: false, maxLength: 255),
+            $this->field('account_number', 'string', required: false, maxLength: 64),
+            $this->field('duitnow_type', 'string', required: false, maxLength: 64),
+            $this->field('duitnow_value', 'string', required: false, maxLength: 255),
+            $this->field('ewallet_provider', 'string', required: false, maxLength: 64),
+            $this->field('ewallet_handle', 'string', required: false, maxLength: 255),
+            $this->field('ewallet_qr_payload', 'string', required: false),
+            $this->field('reference_note', 'string', required: false),
+            $this->field('status', 'string', required: true, default: 'unverified', allowedValues: ['unverified', 'verified', 'rejected', 'inactive']),
+            $this->field('is_default', 'boolean', required: false, default: false),
+            $this->field('qr', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('clear_qr', 'boolean', required: false, default: false),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function reportFields(): array
+    {
+        return [
+            $this->field('entity_type', 'string', required: true, default: 'event', allowedValues: $this->resolveReportEntityMetadataAction->validKeys()),
+            $this->field('entity_id', 'string', required: true),
+            $this->field('category', 'string', required: true, default: 'wrong_info', allowedValues: $this->resolveReportCategoryOptionsAction->validKeys()),
+            $this->field('description', 'string', required: false, maxLength: 2000),
+            $this->field('status', 'string', required: true, default: 'open', allowedValues: ['open', 'triaged', 'resolved', 'dismissed']),
+            $this->field('reporter_id', 'string', required: false),
+            $this->field('handled_by', 'string', required: false),
+            $this->field('resolution_note', 'string', required: false, maxLength: 2000),
+            $this->field('evidence', 'array<file>', required: false, acceptedMimeTypes: $this->evidenceMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 8),
+            $this->field('clear_evidence', 'boolean', required: false, default: false),
+        ];
     }
 
     /**
@@ -639,6 +1180,56 @@ class AdminResourceMutationService
     /**
      * @return array<int, array<string, mixed>>
      */
+    private function seriesFields(): array
+    {
+        return [
+            $this->field('title', 'string', required: true, maxLength: 255),
+            $this->field('slug', 'string', required: true, maxLength: 255),
+            $this->field('description', 'string', required: false, maxLength: 5000),
+            $this->field('visibility', 'string', required: true, default: 'public', allowedValues: ['public', 'unlisted', 'private']),
+            $this->field('is_active', 'boolean', required: false, default: true),
+            $this->field('languages', 'array<int>', required: false),
+            $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('clear_cover', 'boolean', required: false, default: false),
+            $this->field('clear_gallery', 'boolean', required: false, default: false),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function inspirationFields(): array
+    {
+        return [
+            $this->field('category', 'string', required: true, default: InspirationCategory::QuranQuote->value, allowedValues: $this->enumValues(InspirationCategory::class)),
+            $this->field('locale', 'string', required: true, default: $this->defaultSupportedLocale(), allowedValues: $this->supportedLocaleValues()),
+            $this->field('title', 'string', required: true, maxLength: 255),
+            $this->field('content', 'rich_text', required: true),
+            $this->field('source', 'string', required: false, maxLength: 255),
+            $this->field('is_active', 'boolean', required: false, default: true),
+            $this->field('main', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+            $this->field('clear_main', 'boolean', required: false, default: false),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function spaceFields(): array
+    {
+        return [
+            $this->field('name', 'string', required: true, maxLength: 255),
+            $this->field('slug', 'string', required: true, maxLength: 255),
+            $this->field('capacity', 'integer', required: false),
+            $this->field('is_active', 'boolean', required: false, default: true),
+            $this->field('institutions', 'array<string>', required: false),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     private function venueFields(): array
     {
         return [
@@ -667,6 +1258,21 @@ class AdminResourceMutationService
             $this->field('state_id', 'integer', required: true),
             $this->field('district_id', 'integer', required: false),
             $this->field('name', 'string', required: true, maxLength: 255),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function tagFields(): array
+    {
+        return [
+            $this->field('name', 'object', required: true),
+            $this->field('name.ms', 'string', required: true, maxLength: 255),
+            $this->field('name.en', 'string', required: false, maxLength: 255),
+            $this->field('type', 'string', required: true, default: TagType::Domain->value, allowedValues: $this->enumValues(TagType::class)),
+            $this->field('status', 'string', required: true, default: 'verified', allowedValues: ['pending', 'verified']),
+            $this->field('order_column', 'integer', required: false),
         ];
     }
 
@@ -812,6 +1418,59 @@ class AdminResourceMutationService
     /**
      * @return array<string, mixed>
      */
+    private function donationChannelRules(bool $updating): array
+    {
+        $required = $updating ? 'required' : 'required';
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
+
+        return [
+            'donatable_type' => [$required, 'string', Rule::in($this->donationChannelAcceptedOwnerTypes())],
+            'donatable_id' => [$required, 'uuid'],
+            'label' => ['nullable', 'string', 'max:255'],
+            'recipient' => [$required, 'string', 'max:255'],
+            'method' => [$required, Rule::in(['bank_account', 'duitnow', 'ewallet'])],
+            'bank_code' => ['nullable', 'string', 'max:32'],
+            'bank_name' => ['nullable', 'string', 'max:255', 'required_if:method,bank_account'],
+            'account_number' => ['nullable', 'string', 'max:64', 'required_if:method,bank_account'],
+            'duitnow_type' => ['nullable', 'string', 'max:64', 'required_if:method,duitnow'],
+            'duitnow_value' => ['nullable', 'string', 'max:255', 'required_if:method,duitnow'],
+            'ewallet_provider' => ['nullable', 'string', 'max:64', 'required_if:method,ewallet'],
+            'ewallet_handle' => ['nullable', 'string', 'max:255'],
+            'ewallet_qr_payload' => ['nullable', 'string'],
+            'reference_note' => ['nullable', 'string'],
+            'status' => [$required, Rule::in(['unverified', 'verified', 'rejected', 'inactive'])],
+            'is_default' => ['sometimes', 'boolean'],
+            'qr' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
+            'clear_qr' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function reportRules(bool $updating): array
+    {
+        $required = $updating ? 'required' : 'required';
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
+
+        return [
+            'entity_type' => [$required, 'string', Rule::in($this->resolveReportEntityMetadataAction->validKeys())],
+            'entity_id' => [$required, 'uuid'],
+            'category' => [$required, 'string', Rule::in($this->resolveReportCategoryOptionsAction->validKeys())],
+            'description' => ['nullable', 'string', 'max:2000', 'required_if:category,other'],
+            'status' => [$required, Rule::in(['open', 'triaged', 'resolved', 'dismissed'])],
+            'reporter_id' => ['nullable', 'uuid', 'exists:users,id'],
+            'handled_by' => ['nullable', 'uuid', 'exists:users,id'],
+            'resolution_note' => ['nullable', 'string', 'max:2000'],
+            'evidence' => ['nullable', 'array', 'max:8'],
+            'evidence.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp,application/pdf', $maxUploadSize],
+            'clear_evidence' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function eventRules(bool $updating): array
     {
         $required = $updating ? 'sometimes' : 'required';
@@ -913,6 +1572,50 @@ class AdminResourceMutationService
     /**
      * @return array<string, mixed>
      */
+    private function seriesRules(bool $updating): array
+    {
+        $required = $updating ? 'required' : 'required';
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
+
+        return [
+            'title' => [$required, 'string', 'max:255'],
+            'slug' => [$required, 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'visibility' => [$required, Rule::in(['public', 'unlisted', 'private'])],
+            'is_active' => ['sometimes', 'boolean'],
+            'languages' => ['nullable', 'array'],
+            'languages.*' => ['integer', 'exists:languages,id'],
+            'cover' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
+            'gallery' => ['nullable', 'array'],
+            'gallery.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
+            'clear_cover' => ['sometimes', 'boolean'],
+            'clear_gallery' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function inspirationRules(bool $updating): array
+    {
+        $required = $updating ? 'required' : 'required';
+        $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
+
+        return [
+            'category' => [$required, Rule::enum(InspirationCategory::class)],
+            'locale' => [$required, 'string', Rule::in($this->supportedLocaleValues())],
+            'title' => [$required, 'string', 'max:255'],
+            'content' => [$required],
+            'source' => ['nullable', 'string', 'max:255'],
+            'is_active' => ['sometimes', 'boolean'],
+            'main' => ['nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp', $maxUploadSize],
+            'clear_main' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function speakerRules(bool $updating): array
     {
         $addressRule = $updating ? ['sometimes', 'array'] : ['present', 'array'];
@@ -975,6 +1678,23 @@ class AdminResourceMutationService
     /**
      * @return array<string, mixed>
      */
+    private function spaceRules(bool $updating): array
+    {
+        $required = $updating ? 'required' : 'required';
+
+        return [
+            'name' => [$required, 'string', 'max:255'],
+            'slug' => [$required, 'string', 'max:255'],
+            'capacity' => ['nullable', 'integer', 'min:1'],
+            'is_active' => ['sometimes', 'boolean'],
+            'institutions' => ['nullable', 'array'],
+            'institutions.*' => ['uuid', 'exists:institutions,id'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function subdistrictRules(bool $updating): array
     {
         $required = $updating ? 'required' : 'required';
@@ -984,6 +1704,23 @@ class AdminResourceMutationService
             'state_id' => [$required, 'integer', 'exists:states,id'],
             'district_id' => ['nullable', 'integer', 'exists:districts,id'],
             'name' => [$required, 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function tagRules(bool $updating): array
+    {
+        $required = $updating ? 'required' : 'required';
+
+        return [
+            'name' => [$required, 'array'],
+            'name.ms' => [$required, 'string', 'max:255'],
+            'name.en' => ['nullable', 'string', 'max:255'],
+            'type' => [$required, Rule::enum(TagType::class)],
+            'status' => [$required, Rule::in(['pending', 'verified'])],
+            'order_column' => ['nullable', 'integer', 'min:0'],
         ];
     }
 
@@ -1138,5 +1875,35 @@ class AdminResourceMutationService
             'women_section',
             'ablution_area',
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function supportedLocaleValues(): array
+    {
+        $locales = config('app.supported_locales', []);
+
+        if (! is_array($locales) || $locales === []) {
+            return [app()->getLocale() ?: 'ms'];
+        }
+
+        if (array_is_list($locales)) {
+            return array_values(array_filter($locales, static fn (mixed $locale): bool => is_string($locale) && $locale !== ''));
+        }
+
+        return array_values(array_filter(array_keys($locales), static fn (mixed $locale): bool => is_string($locale) && $locale !== ''));
+    }
+
+    private function defaultSupportedLocale(): string
+    {
+        $supportedLocales = $this->supportedLocaleValues();
+        $appLocale = app()->getLocale();
+
+        if (is_string($appLocale) && in_array($appLocale, $supportedLocales, true)) {
+            return $appLocale;
+        }
+
+        return $supportedLocales[0] ?? 'ms';
     }
 }

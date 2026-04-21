@@ -16,6 +16,10 @@ use App\Mcp\Tools\Admin\AdminGetWriteSchemaTool;
 use App\Mcp\Tools\Admin\AdminListRecordsTool;
 use App\Mcp\Tools\Admin\AdminListRelatedRecordsTool;
 use App\Mcp\Tools\Admin\AdminListResourcesTool;
+use App\Mcp\Tools\Admin\AdminModerateEventTool;
+use App\Mcp\Tools\Admin\AdminReviewContributionRequestTool;
+use App\Mcp\Tools\Admin\AdminReviewMembershipClaimTool;
+use App\Mcp\Tools\Admin\AdminTriageReportTool;
 use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
@@ -24,7 +28,7 @@ use Laravel\Mcp\Server\Attributes\Version;
 
 #[Name('majlisilmu-admin')]
 #[Version('1.0.0')]
-#[Instructions('Authenticated admin MCP server with parity to the Filament admin resource API for listing resources, reading records, traversing relations, discovering MCP write schemas, and writing supported fields for event, institution, speaker, venue, reference, and subdistrict records. Media fields use JSON base64 file descriptors when advertised by the schema. Entity-selection hint for record search: institution-type nouns (`masjid`, `surau`, `madrasah`, `maahad`, `pondok`, `sekolah`, `kolej`, `universiti`) should be searched as `institutions` first; venue-type nouns (`dewan`, `auditorium`, `stadium`, `perpustakaan`, `padang`, `hotel`) should be searched as `venues` first; `spaces` are finer-grained sublocations inside institutions and should not be the default first lookup for named mosques or surau. The server exposes one verified MCP guide as a raw markdown resource, read-only `search` / `fetch` documentation tools for tool-centric clients such as ChatGPT and the OpenAI Responses MCP integration, plus a `documentation-tool-routing` prompt that explains when to use the guide and the documentation tools.')]
+#[Instructions('Authenticated admin MCP server with parity to the Filament admin resource API for listing resources, reading records, traversing relations, discovering MCP write schemas, writing supported fields for donation-channel, event, inspiration, institution, report, speaker, venue, reference, subdistrict, tag, series, and space records, and running explicit workflow actions for event moderation, report triage, contribution-request review, and membership-claim review. Media fields use JSON base64 file descriptors when advertised by the schema. Entity-selection hint for record search: institution-type nouns (`masjid`, `surau`, `madrasah`, `maahad`, `pondok`, `sekolah`, `kolej`, `universiti`) should be searched as `institutions` first; venue-type nouns (`dewan`, `auditorium`, `stadium`, `perpustakaan`, `padang`, `hotel`) should be searched as `venues` first; `spaces` are finer-grained sublocations inside institutions and should not be the default first lookup for named mosques or surau. The server exposes one verified MCP guide as a raw markdown resource, read-only `search` / `fetch` documentation tools for tool-centric clients such as ChatGPT and the OpenAI Responses MCP integration, plus a `documentation-tool-routing` prompt that explains when to use the guide and the documentation tools.')]
 class AdminServer extends Server
 {
     protected array $resources = [
@@ -46,6 +50,10 @@ class AdminServer extends Server
         AdminGetWriteSchemaTool::class,
         AdminCreateRecordTool::class,
         AdminCreateGitHubIssueTool::class,
+        AdminModerateEventTool::class,
+        AdminTriageReportTool::class,
+        AdminReviewContributionRequestTool::class,
+        AdminReviewMembershipClaimTool::class,
         AdminUpdateRecordTool::class,
     ];
 }

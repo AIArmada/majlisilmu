@@ -32,7 +32,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
 
     public function handle(Request $request): ResponseFactory|Response
     {
-        return $this->safeResponse(function () use ($request): ResponseFactory|Response {
+        return $this->safeResponse(function () use ($request): ResponseFactory {
             $actor = $this->authorizeAdmin($request);
 
             $validated = $this->validateArguments($request, [
@@ -58,7 +58,6 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
                 actor: $actor,
             );
             $normalizedMediaPayload = $this->normalizeMcpMediaPayload($payload, $schemaResponse);
-            $validateOnly = (bool) ($validated['validate_only'] ?? false);
 
             try {
                 if ($validateOnly && $applyDefaults) {
