@@ -1,20 +1,35 @@
 <?php
 
 use App\Actions\Membership\AddMemberToSubject;
+use App\Enums\ContributionRequestStatus;
+use App\Enums\ContributionRequestType;
+use App\Enums\ContributionSubjectType;
+use App\Enums\EventStructure;
+use App\Enums\MemberSubjectType;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\MemberServer;
+use App\Mcp\Tools\Member\MemberApproveContributionRequestTool;
+use App\Mcp\Tools\Member\MemberCancelContributionRequestTool;
+use App\Mcp\Tools\Member\MemberCancelMembershipClaimTool;
 use App\Mcp\Tools\Member\MemberCreateGitHubIssueTool;
 use App\Mcp\Tools\Member\MemberDocumentationFetchTool;
 use App\Mcp\Tools\Member\MemberDocumentationSearchTool;
 use App\Mcp\Tools\Member\MemberGetRecordTool;
 use App\Mcp\Tools\Member\MemberGetResourceMetaTool;
 use App\Mcp\Tools\Member\MemberGetWriteSchemaTool;
+use App\Mcp\Tools\Member\MemberListContributionRequestsTool;
+use App\Mcp\Tools\Member\MemberListMembershipClaimsTool;
 use App\Mcp\Tools\Member\MemberListRecordsTool;
+use App\Mcp\Tools\Member\MemberListRelatedRecordsTool;
 use App\Mcp\Tools\Member\MemberListResourcesTool;
+use App\Mcp\Tools\Member\MemberRejectContributionRequestTool;
+use App\Mcp\Tools\Member\MemberSubmitMembershipClaimTool;
 use App\Mcp\Tools\Member\MemberUpdateRecordTool;
+use App\Models\ContributionRequest;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\MembershipClaim;
 use App\Models\PassportUser;
 use App\Models\Speaker;
 use App\Models\User;
@@ -176,6 +191,51 @@ it('lists related events for institution members through the member MCP server',
             ->etc());
 });
 
+it('lists related records through the member MCP server', function () {
+    [$member, $institution] = institutionMemberMcpContext(role: 'admin');
+
+    $parentEvent = Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'title' => 'Member MCP Parent Program',
+        'event_structure' => EventStructure::ParentProgram,
+        'status' => 'approved',
+    ]);
+
+    $childEvent = Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'parent_event_id' => $parentEvent->getKey(),
+        'title' => 'Member MCP Child Event',
+        'status' => 'approved',
+    ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberGetResourceMetaTool::class, [
+            'resource_key' => 'events',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.mcp_tools.list_related_records.tool', 'member-list-related-records')
+            ->where('data.resource.mcp_tools.list_related_records.arguments.resource_key', 'events')
+            ->etc());
+
+    MemberServer::actingAs($member)
+        ->tool(MemberListRelatedRecordsTool::class, [
+            'resource_key' => 'events',
+            'record_key' => $parentEvent->getKey(),
+            'relation' => 'child_events',
+            'search' => $childEvent->title,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.0.route_key', $childEvent->getRouteKey())
+            ->where('data.0.title', 'Member MCP Child Event')
+            ->where('meta.resource.key', 'events')
+            ->where('meta.parent_record.route_key', $parentEvent->getRouteKey())
+            ->where('meta.relation.name', 'child_events')
+            ->where('meta.relation.related_resource.key', 'events')
+            ->etc());
+});
+
 it('denies non-member users from member MCP tools', function () {
     $user = User::factory()->create();
 
@@ -218,6 +278,7 @@ it('returns member update schema and updates institutions through member MCP wri
             ->where('data.schema.tool_arguments.resource_key', 'institutions')
             ->where('data.schema.tool_arguments.record_key', $institution->getRouteKey())
             ->where('data.schema.tool_arguments.payload', 'object')
+            ->where('data.schema.tool_arguments.validate_only', false)
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
             ->where('data.schema.media_uploads_supported', true)
@@ -283,6 +344,199 @@ it('registers member write tools when the MCP actor is a normalized Passport use
         ])
         ->assertOk()
         ->assertHasNoErrors();
+});
+
+it('previews member institution updates without persisting the record', function () {
+    ensureMemberMcpMalaysiaCountryExists();
+
+    [$member, $institution] = institutionMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberUpdateRecordTool::class, [
+            'resource_key' => 'institutions',
+            'record_key' => $institution->getKey(),
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Previewed Member MCP Institution',
+                'nickname' => 'Previewed Masjid',
+                'type' => 'masjid',
+                'status' => 'pending',
+                'is_active' => true,
+                'allow_public_event_submission' => true,
+                'address' => [
+                    'country_id' => 132,
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'institutions')
+            ->where('data.preview.validate_only', true)
+            ->where('data.preview.operation', 'update')
+            ->where('data.preview.current_record.route_key', $institution->getRouteKey())
+            ->where('data.preview.normalized_payload.name', 'Previewed Member MCP Institution')
+            ->etc());
+
+    expect($institution->fresh()?->name)->not->toBe('Previewed Member MCP Institution');
+});
+
+it('lists and processes contribution requests through member MCP workflow tools', function () {
+    [$member, $institution] = institutionMemberMcpContext(role: 'admin');
+
+    $ownRequest = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Update,
+        'subject_type' => ContributionSubjectType::Institution,
+        'entity_type' => $institution->getMorphClass(),
+        'entity_id' => $institution->getKey(),
+        'proposer_id' => $member->getKey(),
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'description' => 'Own pending request.',
+        ],
+        'original_data' => [
+            'description' => (string) $institution->description,
+        ],
+    ]);
+
+    $reviewRequest = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Update,
+        'subject_type' => ContributionSubjectType::Institution,
+        'entity_type' => $institution->getMorphClass(),
+        'entity_id' => $institution->getKey(),
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'description' => 'Approved through member MCP.',
+        ],
+        'original_data' => [
+            'description' => (string) $institution->description,
+        ],
+    ]);
+
+    $rejectRequest = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Update,
+        'subject_type' => ContributionSubjectType::Institution,
+        'entity_type' => $institution->getMorphClass(),
+        'entity_id' => $institution->getKey(),
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'description' => 'Rejected through member MCP.',
+        ],
+        'original_data' => [
+            'description' => (string) $institution->description,
+        ],
+    ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberListContributionRequestsTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.my_requests', fn ($requests): bool => collect($requests)->pluck('id')->contains($ownRequest->getKey()))
+            ->where('data.pending_approvals', fn ($requests): bool => collect($requests)->pluck('id')->contains($reviewRequest->getKey())
+                && collect($requests)->pluck('id')->contains($rejectRequest->getKey()))
+            ->etc());
+
+    MemberServer::actingAs($member)
+        ->tool(MemberApproveContributionRequestTool::class, [
+            'request_id' => $reviewRequest->getKey(),
+            'reviewer_note' => 'Approved through member MCP.',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.request.id', $reviewRequest->getKey())
+            ->where('data.request.status', 'approved')
+            ->where('data.request.reviewer_note', 'Approved through member MCP.')
+            ->etc());
+
+    MemberServer::actingAs($member)
+        ->tool(MemberRejectContributionRequestTool::class, [
+            'request_id' => $rejectRequest->getKey(),
+            'reason_code' => 'needs_more_evidence',
+            'reviewer_note' => 'Need stronger evidence.',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.request.id', $rejectRequest->getKey())
+            ->where('data.request.status', 'rejected')
+            ->where('data.request.reason_code', 'needs_more_evidence')
+            ->etc());
+
+    MemberServer::actingAs($member)
+        ->tool(MemberCancelContributionRequestTool::class, [
+            'request_id' => $ownRequest->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.request.id', $ownRequest->getKey())
+            ->where('data.request.status', 'cancelled')
+            ->etc());
+
+    expect($reviewRequest->fresh()?->status)->toBe(ContributionRequestStatus::Approved)
+        ->and($rejectRequest->fresh()?->status)->toBe(ContributionRequestStatus::Rejected)
+        ->and($ownRequest->fresh()?->status)->toBe(ContributionRequestStatus::Cancelled)
+        ->and($institution->fresh()?->description)->toBe('Approved through member MCP.');
+});
+
+it('lists submits and cancels membership claims through member MCP workflow tools', function () {
+    [$member] = institutionMemberMcpContext(role: 'admin');
+
+    $listedInstitution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $claimTarget = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $listedClaim = MembershipClaim::factory()
+        ->forInstitution($listedInstitution)
+        ->create([
+            'claimant_id' => $member->getKey(),
+            'status' => 'pending',
+        ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberListMembershipClaimsTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data', fn ($claims): bool => collect($claims)->pluck('id')->contains($listedClaim->getKey()))
+            ->etc());
+
+    MemberServer::actingAs($member)
+        ->tool(MemberSubmitMembershipClaimTool::class, [
+            'subject_type' => MemberSubjectType::Institution->value,
+            'subject' => $claimTarget->getKey(),
+            'justification' => 'I help manage this institution.',
+            'evidence' => [
+                memberMcpImageDescriptor('member-mcp-claim-evidence.png'),
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.claim.subject_type', 'institution')
+            ->where('data.claim.status', 'pending')
+            ->where('data.claim.can_cancel', true)
+            ->etc());
+
+    $claim = MembershipClaim::query()
+        ->where('claimant_id', $member->getKey())
+        ->where('subject_id', $claimTarget->getKey())
+        ->latest('created_at')
+        ->firstOrFail();
+
+    expect($claim->getMedia('evidence'))->toHaveCount(1);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberCancelMembershipClaimTool::class, [
+            'claim_id' => $claim->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.claim.id', $claim->getKey())
+            ->where('data.claim.status', 'cancelled')
+            ->etc());
+
+    expect($claim->fresh()?->status->value)->toBe('cancelled');
 });
 
 it('creates plain github issues through the member MCP tool', function () {
@@ -420,7 +674,9 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'jsonrpc' => '2.0',
         'id' => 'list-tools-member-mcp-passport',
         'method' => 'tools/list',
-        'params' => [],
+        'params' => [
+            'per_page' => 50,
+        ],
     ])->assertOk();
 
     $tools = collect($listTools->json('result.tools'))->keyBy('name');
@@ -431,8 +687,16 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'member-list-resources',
         'member-get-resource-meta',
         'member-list-records',
+        'member-list-related-records',
         'member-get-record',
         'member-get-write-schema',
+        'member-list-contribution-requests',
+        'member-approve-contribution-request',
+        'member-reject-contribution-request',
+        'member-cancel-contribution-request',
+        'member-list-membership-claims',
+        'member-submit-membership-claim',
+        'member-cancel-membership-claim',
         'member-create-github-issue',
         'member-update-record',
     );
@@ -448,6 +712,11 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
     ]);
 
     expect($tools->get('member-list-resources')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => true,
+        'idempotentHint' => true,
+    ]);
+
+    expect($tools->get('member-list-related-records')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
         'idempotentHint' => true,
     ]);
@@ -556,7 +825,9 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'jsonrpc' => '2.0',
         'id' => 'list-tools-member-mcp',
         'method' => 'tools/list',
-        'params' => [],
+        'params' => [
+            'per_page' => 50,
+        ],
     ])->assertOk();
 
     $toolNames = collect($listTools->json('result.tools'))->pluck('name')->all();
@@ -567,8 +838,16 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'member-list-resources',
         'member-get-resource-meta',
         'member-list-records',
+        'member-list-related-records',
         'member-get-record',
         'member-get-write-schema',
+        'member-list-contribution-requests',
+        'member-approve-contribution-request',
+        'member-reject-contribution-request',
+        'member-cancel-contribution-request',
+        'member-list-membership-claims',
+        'member-submit-membership-claim',
+        'member-cancel-membership-claim',
         'member-create-github-issue',
         'member-update-record',
     );
@@ -701,7 +980,8 @@ it('lists and reads verified documentation resources through the member MCP serv
             '### Entity selection heuristics for record search',
             '### Quick search playbook',
             'Current member-write-capable resources include:',
-            '| `member-update-record` | Update a writable member record | `resource_key`, `record_key`, `payload` |',
+            '| `member-list-related-records` | Traverse a named relation on a member record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |',
+            '| `member-update-record` | Update or preview a writable member record | `resource_key`, `record_key`, `payload`, `validate_only?` |',
         ]);
 
     $token = $member->createToken('mcp-member-resource-list-test', [McpTokenManager::MEMBER_ABILITY])->plainTextToken;

@@ -1,6 +1,9 @@
 <?php
 
 use App\Actions\Membership\AddMemberToSubject;
+use App\Enums\ContributionRequestStatus;
+use App\Enums\ContributionRequestType;
+use App\Enums\ContributionSubjectType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -21,12 +24,23 @@ use App\Mcp\Tools\Admin\AdminGetWriteSchemaTool;
 use App\Mcp\Tools\Admin\AdminListRecordsTool;
 use App\Mcp\Tools\Admin\AdminListRelatedRecordsTool;
 use App\Mcp\Tools\Admin\AdminListResourcesTool;
+use App\Mcp\Tools\Admin\AdminModerateEventTool;
+use App\Mcp\Tools\Admin\AdminReviewContributionRequestTool;
+use App\Mcp\Tools\Admin\AdminReviewMembershipClaimTool;
+use App\Mcp\Tools\Admin\AdminTriageReportTool;
 use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
+use App\Models\ContributionRequest;
+use App\Models\DonationChannel;
 use App\Models\Event;
+use App\Models\Inspiration;
 use App\Models\Institution;
+use App\Models\MembershipClaim;
+use App\Models\ModerationReview;
 use App\Models\PassportUser;
 use App\Models\Reference;
+use App\Models\Report;
 use App\Models\Series;
+use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
@@ -45,7 +59,7 @@ it('lists accessible admin resources for admin users through the MCP server', fu
     AdminServer::actingAs($admin)
         ->tool(AdminListResourcesTool::class)
         ->assertOk()
-        ->assertSee(['speakers', 'events', 'institutions', 'references', 'subdistricts'])
+        ->assertSee(['speakers', 'events', 'institutions', 'references', 'reports', 'subdistricts', 'donation-channels'])
         ->assertStructuredContent(fn ($json) => $json
             ->has('data.resources')
             ->where('data.resources.0.key', fn (string $key): bool => filled($key))
@@ -63,7 +77,7 @@ it('can request verbose admin resource metadata through the MCP resource list to
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
-            ->has('data.resources', 6)
+            ->has('data.resources', 12)
             ->where('data.resources.0.resource_class', fn (string $resourceClass): bool => str_contains($resourceClass, 'Resource'))
             ->etc());
 });
@@ -86,6 +100,154 @@ it('hides write tools when the authenticated user has no writable admin access',
             'operation' => 'create',
         ])
         ->assertHasErrors(['Tool [admin-get-write-schema] not found.']);
+});
+
+it('reviews membership claims through the admin MCP workflow tool', function () {
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create();
+    $claimant = User::factory()->create();
+    $claim = MembershipClaim::factory()
+        ->forInstitution($institution)
+        ->create([
+            'claimant_id' => $claimant->getKey(),
+            'status' => 'pending',
+        ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminReviewMembershipClaimTool::class, [
+            'record_key' => $claim->getKey(),
+            'action' => 'approve',
+            'granted_role_slug' => 'admin',
+            'reviewer_note' => 'Approved through admin MCP.',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'membership-claims')
+            ->where('data.record.route_key', $claim->getRouteKey())
+            ->where('data.record.attributes.status', 'approved')
+            ->where('data.record.attributes.granted_role_slug', 'admin')
+            ->etc());
+
+    expect($claim->fresh()?->status->value)->toBe('approved')
+        ->and($claim->fresh()?->granted_role_slug)->toBe('admin')
+        ->and($claim->fresh()?->reviewer_id)->toBe($admin->getKey())
+        ->and($institution->fresh()->members()->whereKey($claimant->getKey())->exists())->toBeTrue();
+});
+
+it('triages reports through the admin MCP workflow tool', function () {
+    $admin = adminMcpUser('moderator');
+    $report = Report::factory()->create([
+        'status' => 'open',
+        'handled_by' => null,
+        'resolution_note' => null,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminTriageReportTool::class, [
+            'record_key' => $report->getKey(),
+            'action' => 'resolve',
+            'resolution_note' => 'Handled through admin MCP.',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'reports')
+            ->where('data.record.route_key', $report->getRouteKey())
+            ->where('data.record.attributes.status', 'resolved')
+            ->where('data.record.attributes.resolution_note', 'Handled through admin MCP.')
+            ->etc());
+
+    $report->refresh();
+
+    expect($report->status)->toBe('resolved')
+        ->and($report->handled_by)->toBe($admin->getKey())
+        ->and($report->resolution_note)->toBe('Handled through admin MCP.');
+});
+
+it('exposes report write schema and creates and updates reports through the admin MCP server', function () {
+    $admin = adminMcpUser('moderator');
+    $reporter = User::factory()->create();
+    $event = Event::factory()->create();
+    $reference = Reference::factory()->verified()->create();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'reports',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'reports')
+            ->where('data.schema.resource_key', 'reports')
+            ->where('data.schema.content_type', 'application/json')
+            ->where('data.schema.tool_arguments.resource_key', 'reports')
+            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'evidence'), 'mcp_upload.shape') === 'array<file_descriptor>'
+                && collect($fields)
+                    ->pluck('name')
+                    ->filter(fn (mixed $name): bool => is_string($name) && str_starts_with($name, 'clear_'))
+                    ->isEmpty())
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'reports',
+            'payload' => [
+                'entity_type' => 'event',
+                'entity_id' => (string) $event->getKey(),
+                'category' => 'wrong_info',
+                'description' => 'Created through admin MCP.',
+                'status' => 'open',
+                'reporter_id' => (string) $reporter->getKey(),
+                'evidence' => [
+                    adminMcpImageDescriptor('admin-mcp-report-evidence.png'),
+                ],
+            ],
+        ])
+        ->assertOk();
+
+    $report = Report::query()->where('description', 'Created through admin MCP.')->firstOrFail();
+    $reportRouteKey = (string) $report->getKey();
+
+    expect($report->entity_type)->toBe('event')
+        ->and($report->entity_id)->toBe($event->getKey())
+        ->and($report->category)->toBe('wrong_info')
+        ->and($report->reporter_id)->toBe($reporter->getKey())
+        ->and($report->getMedia('evidence'))->toHaveCount(1);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'reports',
+            'record_key' => $reportRouteKey,
+            'payload' => [
+                'entity_type' => 'reference',
+                'entity_id' => (string) $reference->getKey(),
+                'category' => 'fake_reference',
+                'description' => 'Updated through admin MCP.',
+                'status' => 'resolved',
+                'reporter_id' => (string) $reporter->getKey(),
+                'handled_by' => (string) $admin->getKey(),
+                'resolution_note' => 'Resolved through admin MCP.',
+                'evidence' => [
+                    adminMcpImageDescriptor('admin-mcp-report-evidence-updated.png'),
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.entity_type', 'reference')
+            ->where('data.record.attributes.category', 'fake_reference')
+            ->where('data.record.attributes.status', 'resolved')
+            ->where('data.record.attributes.resolution_note', 'Resolved through admin MCP.')
+            ->etc());
+
+    $report->refresh();
+
+    expect($report->entity_type)->toBe('reference')
+        ->and($report->entity_id)->toBe($reference->getKey())
+        ->and($report->category)->toBe('fake_reference')
+        ->and($report->status)->toBe('resolved')
+        ->and($report->handled_by)->toBe($admin->getKey())
+        ->and($report->resolution_note)->toBe('Resolved through admin MCP.')
+        ->and($report->getMedia('evidence'))->toHaveCount(1);
 });
 
 it('returns resource metadata, record listings, and record detail for speakers', function () {
@@ -274,6 +436,452 @@ it('filters admin event records by local date through the MCP server', function 
             ->etc());
 });
 
+it('exposes tag write schema and creates and updates tags through the admin MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'tags',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'tags')
+            ->where('data.schema.resource_key', 'tags')
+            ->where('data.schema.content_type', 'application/json')
+            ->where('data.schema.tool_arguments.resource_key', 'tags')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'tags',
+            'payload' => [
+                'name' => [
+                    'ms' => 'Tadabbur MCP',
+                    'en' => 'Reflection MCP',
+                ],
+                'type' => 'discipline',
+                'status' => 'verified',
+            ],
+        ])
+        ->assertOk();
+
+    $tagRouteKey = (string) Tag::query()
+        ->where('type', 'discipline')
+        ->where('name->ms', 'Tadabbur MCP')
+        ->value('id');
+
+    expect($tagRouteKey)->not->toBe('');
+
+    expect(Tag::query()->findOrFail($tagRouteKey)->type)->toBe('discipline');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'tags',
+            'record_key' => $tagRouteKey,
+            'payload' => [
+                'name' => [
+                    'ms' => 'Rasuah MCP',
+                    'en' => 'Corruption MCP',
+                ],
+                'type' => 'issue',
+                'status' => 'pending',
+                'order_column' => 7,
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.type', 'issue')
+            ->where('data.record.attributes.status', 'pending')
+            ->where('data.record.attributes.order_column', 7)
+            ->etc());
+
+    $tag = Tag::query()->findOrFail($tagRouteKey);
+
+    expect($tag->status)->toBe('pending')
+        ->and($tag->order_column)->toBe(7)
+        ->and($tag->getTranslation('slug', 'en'))->toBe('corruption-mcp');
+});
+
+it('moderates events through the admin MCP workflow tool', function () {
+    $admin = adminMcpUser('super_admin');
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'published_at' => now(),
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminModerateEventTool::class, [
+            'record_key' => $event->getKey(),
+            'action' => 'remoderate',
+            'note' => 'Content needs re-review.',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'events')
+            ->where('data.record.route_key', $event->getRouteKey())
+            ->where('data.record.attributes.status', 'pending')
+            ->etc());
+
+    $event->refresh();
+
+    expect((string) $event->status)->toBe('pending');
+
+    $review = ModerationReview::query()->where('event_id', $event->getKey())->latest()->first();
+
+    expect($review?->decision)->toBe('remoderated');
+});
+
+it('reviews contribution requests through the admin MCP workflow tool', function () {
+    $admin = adminMcpUser('super_admin');
+    $speaker = Speaker::factory()->create([
+        'name' => 'Pending MCP Speaker',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+    $request = ContributionRequest::factory()->create([
+        'type' => ContributionRequestType::Create,
+        'subject_type' => ContributionSubjectType::Speaker,
+        'entity_type' => $speaker->getMorphClass(),
+        'entity_id' => $speaker->getKey(),
+        'status' => ContributionRequestStatus::Pending,
+        'proposed_data' => [
+            'name' => $speaker->name,
+            'gender' => 'female',
+        ],
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminReviewContributionRequestTool::class, [
+            'record_key' => $request->getKey(),
+            'action' => 'reject',
+            'reason_code' => 'needs_more_evidence',
+            'reviewer_note' => 'Need stronger sourcing.',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'contribution-requests')
+            ->where('data.record.route_key', $request->getRouteKey())
+            ->where('data.record.attributes.status', 'rejected')
+            ->where('data.record.attributes.reason_code', 'needs_more_evidence')
+            ->etc());
+
+    expect($request->fresh()?->status)->toBe(ContributionRequestStatus::Rejected)
+        ->and($request->fresh()?->reason_code)->toBe('needs_more_evidence')
+        ->and($speaker->fresh()?->status)->toBe('rejected')
+        ->and($speaker->fresh()?->is_active)->toBeFalse();
+});
+
+it('exposes series write schema and creates and updates series through the admin MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $suffix = Str::lower((string) Str::ulid());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'series',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'series')
+            ->where('data.schema.resource_key', 'series')
+            ->where('data.schema.content_type', 'application/json')
+            ->where('data.schema.tool_arguments.resource_key', 'series')
+            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'cover'), 'mcp_upload.shape') === 'file_descriptor'
+                && data_get(collect($fields)->firstWhere('name', 'gallery'), 'mcp_upload.shape') === 'array<file_descriptor>')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'series',
+            'payload' => [
+                'title' => 'Admin MCP Series '.$suffix,
+                'slug' => 'admin-mcp-series-'.$suffix,
+                'description' => 'Series created through MCP.',
+                'visibility' => 'public',
+                'is_active' => true,
+                'cover' => adminMcpImageDescriptor('series-cover.png'),
+                'gallery' => [
+                    adminMcpImageDescriptor('series-gallery.png'),
+                ],
+            ],
+        ])
+        ->assertOk();
+
+    $seriesRouteKey = (string) Series::query()->where('slug', 'admin-mcp-series-'.$suffix)->value('id');
+
+    expect($seriesRouteKey)->not->toBe('');
+
+    $series = Series::query()->findOrFail($seriesRouteKey);
+
+    expect($series->getMedia('cover'))->toHaveCount(1)
+        ->and($series->getMedia('gallery'))->toHaveCount(1);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'series',
+            'record_key' => $seriesRouteKey,
+            'payload' => [
+                'title' => 'Admin MCP Series Updated '.$suffix,
+                'slug' => 'admin-mcp-series-updated-'.$suffix,
+                'description' => 'Series updated through MCP.',
+                'visibility' => 'private',
+                'is_active' => false,
+                'languages' => [],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.title', 'Admin MCP Series Updated '.$suffix)
+            ->where('data.record.attributes.slug', 'admin-mcp-series-updated-'.$suffix)
+            ->where('data.record.attributes.visibility', 'private')
+            ->where('data.record.attributes.is_active', false)
+            ->etc());
+
+    $series->refresh();
+
+    expect($series->title)->toBe('Admin MCP Series Updated '.$suffix)
+        ->and($series->slug)->toBe('admin-mcp-series-updated-'.$suffix)
+        ->and($series->visibility)->toBe('private')
+        ->and($series->is_active)->toBeFalse();
+});
+
+it('exposes space write schema and creates and updates spaces through the admin MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $suffix = Str::lower((string) Str::ulid());
+    $firstInstitution = Institution::factory()->create();
+    $secondInstitution = Institution::factory()->create();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'spaces',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'spaces')
+            ->where('data.schema.resource_key', 'spaces')
+            ->where('data.schema.content_type', 'application/json')
+            ->where('data.schema.tool_arguments.resource_key', 'spaces')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'spaces',
+            'payload' => [
+                'name' => 'Admin MCP Space '.$suffix,
+                'slug' => 'admin-mcp-space-'.$suffix,
+                'capacity' => 40,
+                'is_active' => true,
+                'institutions' => [(string) $firstInstitution->getKey()],
+            ],
+        ])
+        ->assertOk();
+
+    $spaceRouteKey = (string) Space::query()->where('slug', 'admin-mcp-space-'.$suffix)->value('id');
+
+    expect($spaceRouteKey)->not->toBe('');
+
+    $space = Space::query()->findOrFail($spaceRouteKey);
+
+    expect($space->institutions()->pluck('institutions.id')->all())->toContain($firstInstitution->getKey());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'spaces',
+            'record_key' => $spaceRouteKey,
+            'payload' => [
+                'name' => 'Admin MCP Space Updated '.$suffix,
+                'slug' => 'admin-mcp-space-updated-'.$suffix,
+                'capacity' => 65,
+                'is_active' => false,
+                'institutions' => [(string) $secondInstitution->getKey()],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.name', 'Admin MCP Space Updated '.$suffix)
+            ->where('data.record.attributes.slug', 'admin-mcp-space-updated-'.$suffix)
+            ->where('data.record.attributes.capacity', 65)
+            ->where('data.record.attributes.is_active', false)
+            ->etc());
+
+    $space->refresh();
+
+    expect($space->name)->toBe('Admin MCP Space Updated '.$suffix)
+        ->and($space->slug)->toBe('admin-mcp-space-updated-'.$suffix)
+        ->and($space->capacity)->toBe(65)
+        ->and($space->is_active)->toBeFalse()
+        ->and($space->institutions()->pluck('institutions.id')->all())->toContain($secondInstitution->getKey())
+        ->and($space->institutions()->pluck('institutions.id')->all())->not->toContain($firstInstitution->getKey());
+});
+
+it('exposes donation channel write schema and creates and updates donation channels through the admin MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'donation-channels',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'donation-channels')
+            ->where('data.schema.resource_key', 'donation-channels')
+            ->where('data.schema.content_type', 'application/json')
+            ->where('data.schema.tool_arguments.resource_key', 'donation-channels')
+            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'qr'), 'mcp_upload.shape') === 'file_descriptor'
+                && collect($fields)
+                    ->pluck('name')
+                    ->filter(fn (mixed $name): bool => is_string($name) && str_starts_with($name, 'clear_'))
+                    ->isEmpty())
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'donation-channels',
+            'payload' => [
+                'donatable_type' => 'institution',
+                'donatable_id' => (string) $institution->getKey(),
+                'label' => 'Tabung MCP',
+                'recipient' => 'Masjid MCP',
+                'method' => 'bank_account',
+                'bank_code' => 'CIMB',
+                'bank_name' => 'CIMB',
+                'account_number' => '9876543210',
+                'status' => 'verified',
+                'is_default' => true,
+                'qr' => adminMcpImageDescriptor('admin-mcp-donation-channel-qr.png'),
+            ],
+        ])
+        ->assertOk();
+
+    $donationChannelRouteKey = (string) DonationChannel::query()
+        ->where('recipient', 'Masjid MCP')
+        ->value('id');
+
+    expect($donationChannelRouteKey)->not->toBe('');
+
+    $donationChannel = DonationChannel::query()->findOrFail($donationChannelRouteKey);
+
+    expect($donationChannel->donatable_type)->toBe('institution')
+        ->and($donationChannel->donatable_id)->toBe($institution->getKey())
+        ->and($donationChannel->method)->toBe('bank_account')
+        ->and($donationChannel->bank_name)->toBe('CIMB')
+        ->and($donationChannel->duitnow_type)->toBeNull()
+        ->and($donationChannel->getMedia('qr'))->toHaveCount(1);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'donation-channels',
+            'record_key' => $donationChannelRouteKey,
+            'payload' => [
+                'donatable_type' => 'institution',
+                'donatable_id' => (string) $institution->getKey(),
+                'label' => 'Tabung MCP Updated',
+                'recipient' => 'Masjid MCP Updated',
+                'method' => 'duitnow',
+                'duitnow_type' => 'mobile',
+                'duitnow_value' => '60123456789',
+                'status' => 'inactive',
+                'is_default' => false,
+                'qr' => adminMcpImageDescriptor('admin-mcp-donation-channel-qr-updated.png'),
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.label', 'Tabung MCP Updated')
+            ->where('data.record.attributes.method', 'duitnow')
+            ->where('data.record.attributes.status', 'inactive')
+            ->etc());
+
+    $donationChannel->refresh();
+
+    expect($donationChannel->label)->toBe('Tabung MCP Updated')
+        ->and($donationChannel->recipient)->toBe('Masjid MCP Updated')
+        ->and($donationChannel->method)->toBe('duitnow')
+        ->and($donationChannel->bank_code)->toBeNull()
+        ->and($donationChannel->bank_name)->toBeNull()
+        ->and($donationChannel->account_number)->toBeNull()
+        ->and($donationChannel->duitnow_type)->toBe('mobile')
+        ->and($donationChannel->duitnow_value)->toBe('60123456789')
+        ->and($donationChannel->status)->toBe('inactive')
+        ->and($donationChannel->getMedia('qr'))->toHaveCount(1);
+});
+
+it('exposes inspiration write schema and creates and updates inspirations through the admin MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'inspirations',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'inspirations')
+            ->where('data.schema.resource_key', 'inspirations')
+            ->where('data.schema.content_type', 'application/json')
+            ->where('data.schema.tool_arguments.resource_key', 'inspirations')
+            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'main'), 'mcp_upload.shape') === 'file_descriptor')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'inspirations',
+            'payload' => [
+                'category' => 'quran_quote',
+                'locale' => 'ms',
+                'title' => 'Admin MCP Inspiration',
+                'content' => 'Inspiration created through MCP.',
+                'source' => 'MCP Source',
+                'is_active' => true,
+                'main' => adminMcpImageDescriptor('admin-mcp-inspiration-main.png'),
+            ],
+        ])
+        ->assertOk();
+
+    $inspirationRouteKey = (string) Inspiration::query()->where('title', 'Admin MCP Inspiration')->value('id');
+
+    expect($inspirationRouteKey)->not->toBe('');
+
+    $inspiration = Inspiration::query()->findOrFail($inspirationRouteKey);
+
+    expect($inspiration->getRawOriginal('category'))->toBe('quran_quote')
+        ->and($inspiration->locale)->toBe('ms')
+        ->and($inspiration->getMedia('main'))->toHaveCount(1);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'inspirations',
+            'record_key' => $inspirationRouteKey,
+            'payload' => [
+                'category' => 'hadith_quote',
+                'locale' => 'en',
+                'title' => 'Admin MCP Inspiration Updated',
+                'content' => 'Inspiration updated through MCP.',
+                'source' => 'Updated MCP Source',
+                'is_active' => false,
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.category', 'hadith_quote')
+            ->where('data.record.attributes.locale', 'en')
+            ->where('data.record.attributes.title', 'Admin MCP Inspiration Updated')
+            ->where('data.record.attributes.is_active', false)
+            ->etc());
+
+    $inspiration->refresh();
+
+    expect($inspiration->getRawOriginal('category'))->toBe('hadith_quote')
+        ->and($inspiration->locale)->toBe('en')
+        ->and($inspiration->title)->toBe('Admin MCP Inspiration Updated')
+        ->and($inspiration->source)->toBe('Updated MCP Source')
+        ->and($inspiration->is_active)->toBeFalse();
+});
+
 it('returns write schema for supported resources and rejects unknown resources', function () {
     $admin = adminMcpUser('super_admin');
 
@@ -455,7 +1063,7 @@ it('returns remediation details for validate-only admin create validation failur
         ])
         ->assertStructuredContent(fn ($json) => $json
             ->where('error.code', 'validation_error')
-            ->where('error.details.fix_plan', function (array $fixPlan): bool {
+            ->where('error.details.fix_plan', function ($fixPlan): bool {
                 $keyedFixPlan = collect($fixPlan)->keyBy('field');
 
                 return $keyedFixPlan->get('gender') === [
@@ -471,14 +1079,19 @@ it('returns remediation details for validate-only admin create validation failur
                 ] && $keyedFixPlan->get('address') === [
                     'action' => 'set_field',
                     'field' => 'address',
-                    'value' => ['country_id' => 132],
+                    'value' => [
+                        'country_id' => 132,
+                        'state_id' => null,
+                        'district_id' => null,
+                        'subdistrict_id' => null,
+                    ],
                     'auto_apply_safe' => true,
                 ];
             })
             ->where('error.details.normalized_payload_preview.name', 'Remediation Preview Speaker')
             ->where('error.details.normalized_payload_preview.gender', 'male')
             ->where('error.details.normalized_payload_preview.address.country_id', 132)
-            ->where('error.details.remaining_blockers', function (array $remainingBlockers): bool {
+            ->where('error.details.remaining_blockers', function ($remainingBlockers): bool {
                 $statusBlocker = collect($remainingBlockers)->keyBy('field')->get('status');
 
                 return is_array($statusBlocker)
@@ -513,7 +1126,7 @@ it('returns retryable remediation details for validate-only admin update validat
         ])
         ->assertStructuredContent(fn ($json) => $json
             ->where('error.code', 'validation_error')
-            ->where('error.details.fix_plan', function (array $fixPlan) use ($originalGender, $originalStatus): bool {
+            ->where('error.details.fix_plan', function ($fixPlan) use ($originalGender, $originalStatus): bool {
                 $keyedFixPlan = collect($fixPlan)->keyBy('field');
 
                 return $keyedFixPlan->get('gender') === [
@@ -1246,6 +1859,10 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-get-write-schema',
         'admin-create-record',
         'admin-create-github-issue',
+        'admin-moderate-event',
+        'admin-triage-report',
+        'admin-review-contribution-request',
+        'admin-review-membership-claim',
         'admin-update-record',
     );
 
@@ -1362,6 +1979,10 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-get-write-schema',
         'admin-create-record',
         'admin-create-github-issue',
+        'admin-moderate-event',
+        'admin-triage-report',
+        'admin-review-contribution-request',
+        'admin-review-membership-claim',
         'admin-update-record',
     );
 });

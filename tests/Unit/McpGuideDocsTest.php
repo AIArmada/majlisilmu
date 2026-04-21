@@ -42,7 +42,16 @@ it('keeps the MCP guide aligned with the verified admin and member write-capable
         ->toContain('optionally accept a `topic` hint such as `crud`, `auth`, `media uploads`, `runtime records`, `search`, or `fetch` for more targeted guidance')
         ->toContain('The broader internal cross-surface parity docs (`MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.*`) are intentionally not exposed through MCP.')
         ->toContain('### MCP capability matrix')
-        ->toContain('| Related-record traversal | `admin-list-related-records` | No generic related-record tool |')
+        ->toContain('| Related-record traversal | `admin-list-related-records` | `member-list-related-records` |')
+        ->toContain('| Event moderation | `admin-moderate-event` | Not exposed |')
+        ->toContain('| Report triage | `admin-triage-report` | Not exposed |')
+        ->toContain('| Contribution-request workflows | `admin-review-contribution-request` | `member-list-contribution-requests`, `member-approve-contribution-request`, `member-reject-contribution-request`, `member-cancel-contribution-request` |')
+        ->toContain('| Membership-claim workflows | `admin-review-membership-claim` | `member-list-membership-claims`, `member-submit-membership-claim`, `member-cancel-membership-claim` |')
+        ->toContain('| `donation-channels` | list/get/meta + schema + create + update + preview | Not exposed |')
+        ->toContain('| `inspirations` | list/get/meta + schema + create + update + preview | Not exposed |')
+        ->toContain('| `reports` | list/get/meta + schema + create + update + preview | Not exposed |')
+        ->toContain('| `series` | list/get/meta + schema + create + update + preview | Not exposed |')
+        ->toContain('| `spaces` | list/get/meta + schema + create + update + preview | Not exposed |')
         ->toContain('| `venues` | list/get/meta + schema + create + update + preview | Not exposed |')
         ->toContain('### Entity selection heuristics for record search')
         ->toContain('`spaces` as finer-grained sublocations inside an institution')
@@ -50,7 +59,12 @@ it('keeps the MCP guide aligned with the verified admin and member write-capable
         ->toContain('### Quick search playbook')
         ->toContain('Mosque, surau, school, campus, madrasah, maahad, pondok, or university-style names → search `institutions` first.')
         ->toContain('Standalone hall/dewan, auditorium, stadium, library, field, or hotel-style names → search `venues` first.')
-        ->toContain('resolve the parent `institution` first, then use `spaces` for the internal location when needed.');
+        ->toContain('resolve the parent `institution` first, then use `spaces` for the internal location when needed.')
+        ->toContain('| `admin-moderate-event` | Run one explicit moderation action on an event | `record_key`, `action`, `reason_code?`, `note?` |')
+        ->toContain('| `admin-triage-report` | Run one explicit triage action on a report | `record_key`, `action`, `resolution_note?` |')
+        ->toContain('| `admin-review-contribution-request` | Approve or reject one pending contribution request | `record_key`, `action`, `reason_code?`, `reviewer_note?` |')
+        ->toContain('| `member-list-contribution-requests` | List the authenticated member\'s contribution queue and pending approvals | none |')
+        ->toContain('| `member-submit-membership-claim` | Submit a membership claim with evidence uploads | `subject_type`, `subject`, `justification`, `evidence` |');
 
     foreach (InstitutionType::cases() as $type) {
         expect($markdown)->toContain('`'.$type->value.'`');
@@ -69,9 +83,9 @@ it('keeps the member update tool appendix aligned with the live member MCP schem
     expect($matches[1] ?? null)
         ->toBeString()
         ->toContain('payload')
-        ->not->toContain('validate_only')
-        ->and($markdown)->toContain('Member update tools do not support `validate_only`; there is no preview-only member write path today.')
-        ->toContain('When a write tool supports `validate_only=true` (currently admin create/update only), previews normalize descriptors into file summaries without persisting media.')
+        ->toContain('validate_only')
+        ->and($markdown)->toContain('Member update tools support `validate_only=true` for preview-only member writes.')
+        ->toContain('When a write tool supports `validate_only=true` (currently admin create/update and member update), previews normalize descriptors into file summaries without persisting media.')
         ->toContain('apply_defaults=true')
         ->toContain('schema-driven `feedback` issues with suggested values, defaults, and conditional `required_because` context.')
         ->toContain('Validation failures in validate-only mode now include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.');
