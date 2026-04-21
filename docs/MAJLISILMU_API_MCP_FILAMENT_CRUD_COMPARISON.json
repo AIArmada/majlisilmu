@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.1.0",
+  "schema_version": "2.2.0",
   "verified_at": "2026-04-21",
   "title": "API / MCP / Filament Capability Matrix",
   "markdown_companion": "docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md",
@@ -238,10 +238,11 @@
   "transport_rules": {
     "admin_api": {
       "schema_route_template": "GET /api/v1/admin/{resourceKey}/schema?operation=create|update&recordKey=...",
-      "preview_mechanism": "validate_only=1 query parameter on POST/PUT",
+      "preview_mechanism": "validate_only=1 query parameter on POST/PUT; validation failures also include schema-driven feedback plus fix_plan, remaining_blockers, normalized_payload_preview, and can_retry",
       "apply_defaults_preview": true,
       "validation_feedback": true,
-      "record_key_rule": "Use the admin record route_key returned by admin collection or detail payloads whenever available."
+      "record_key_rule": "Use the admin record route_key returned by admin collection or detail payloads whenever available.",
+      "validation_remediation_details": ["fix_plan", "remaining_blockers", "normalized_payload_preview", "can_retry"]
     },
     "admin_mcp": {
       "schema_tool": "admin-get-write-schema",
@@ -252,7 +253,8 @@
       "apply_defaults": true,
       "validation_feedback": true,
       "media_upload_transport": "json_base64_descriptor",
-      "destructive_clear_flags_supported": false
+      "destructive_clear_flags_supported": false,
+      "validation_remediation_details": ["fix_plan", "remaining_blockers", "normalized_payload_preview", "can_retry"]
     },
     "member_mcp": {
       "schema_tool": "member-get-write-schema",

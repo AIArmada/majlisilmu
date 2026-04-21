@@ -30,6 +30,7 @@ use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
+use App\Support\GitHub\GitHubIssueReportContract;
 use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -437,6 +438,102 @@ it('previews admin speaker updates through the MCP write tool without persisting
 
     expect(Speaker::query()->findOrFail($speaker->getKey())->name)->toBe('Previewable Admin MCP Speaker')
         ->and(Speaker::query()->findOrFail($speaker->getKey())->job_title)->toBeNull();
+});
+
+it('returns remediation details for validate-only admin create validation failures', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Remediation Preview Speaker',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.fix_plan', function (array $fixPlan): bool {
+                $keyedFixPlan = collect($fixPlan)->keyBy('field');
+
+                return $keyedFixPlan->get('gender') === [
+                    'action' => 'set_field',
+                    'field' => 'gender',
+                    'value' => 'male',
+                    'auto_apply_safe' => true,
+                ] && $keyedFixPlan->get('status') === [
+                    'action' => 'choose_one',
+                    'field' => 'status',
+                    'options' => ['pending', 'verified', 'rejected'],
+                    'auto_apply_safe' => false,
+                ] && $keyedFixPlan->get('address') === [
+                    'action' => 'set_field',
+                    'field' => 'address',
+                    'value' => ['country_id' => 132],
+                    'auto_apply_safe' => true,
+                ];
+            })
+            ->where('error.details.normalized_payload_preview.name', 'Remediation Preview Speaker')
+            ->where('error.details.normalized_payload_preview.gender', 'male')
+            ->where('error.details.normalized_payload_preview.address.country_id', 132)
+            ->where('error.details.remaining_blockers', function (array $remainingBlockers): bool {
+                $statusBlocker = collect($remainingBlockers)->keyBy('field')->get('status');
+
+                return is_array($statusBlocker)
+                    && ($statusBlocker['field'] ?? null) === 'status'
+                    && ($statusBlocker['type'] ?? null) === 'required_choice'
+                    && ($statusBlocker['options'] ?? null) === ['pending', 'verified', 'rejected'];
+            })
+            ->where('error.details.can_retry', false)
+            ->etc());
+});
+
+it('returns retryable remediation details for validate-only admin update validation failures', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $speaker = Speaker::factory()->create([
+        'name' => 'Retryable Admin MCP Speaker',
+        'gender' => 'male',
+        'status' => 'verified',
+    ]);
+    $originalGender = $speaker->gender;
+    $originalStatus = $speaker->status;
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => $speaker->getKey(),
+            'validate_only' => true,
+            'payload' => [
+                'name' => 'Retryable Admin MCP Speaker Updated',
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.fix_plan', function (array $fixPlan) use ($originalGender, $originalStatus): bool {
+                $keyedFixPlan = collect($fixPlan)->keyBy('field');
+
+                return $keyedFixPlan->get('gender') === [
+                    'action' => 'set_field',
+                    'field' => 'gender',
+                    'value' => $originalGender,
+                    'auto_apply_safe' => true,
+                ] && $keyedFixPlan->get('status') === [
+                    'action' => 'set_field',
+                    'field' => 'status',
+                    'value' => $originalStatus,
+                    'auto_apply_safe' => true,
+                ];
+            })
+            ->where('error.details.normalized_payload_preview.name', 'Retryable Admin MCP Speaker Updated')
+            ->where('error.details.normalized_payload_preview.gender', $originalGender)
+            ->where('error.details.normalized_payload_preview.status', $originalStatus)
+            ->has('error.details.remaining_blockers', 0)
+            ->where('error.details.can_retry', true)
+            ->etc());
 });
 
 it('registers admin write tools when the MCP actor is a normalized Passport user', function () {
@@ -932,6 +1029,51 @@ it('creates github issues through the admin MCP tool with Copilot model fallback
     Http::assertSent(fn ($request): bool => data_get($request->data(), 'assignees.0') === 'copilot-swe-agent[bot]');
 });
 
+it('creates github issues through the admin MCP tool without Copilot assignment when disabled', function () {
+    configureGithubIssueReportingForMcp([
+        'admin_copilot_assignment_enabled' => false,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://api.github.com/repos/AIArmada/majlisilmu/issues' => Http::response([
+            'number' => 322,
+            'title' => '[Bug] Admin MCP GitHub issue without Copilot',
+            'url' => 'https://api.github.com/repos/AIArmada/majlisilmu/issues/322',
+            'html_url' => 'https://github.com/AIArmada/majlisilmu/issues/322',
+        ], 201),
+    ]);
+
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateGitHubIssueTool::class, [
+            'category' => 'bug',
+            'title' => 'Admin MCP GitHub issue without Copilot',
+            'summary' => 'When Copilot assignment is disabled, the admin MCP issue tool should create a plain issue.',
+            'platform' => 'chatgpt',
+            'client_name' => 'ChatGPT',
+            'client_version' => 'GPT-5.4',
+            'tool_name' => 'admin-create-github-issue',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.issue.assigned_to_copilot', false)
+            ->where('data.issue.copilot_model', null)
+            ->where('data.issue.attempted_models', [])
+            ->etc());
+
+    Http::assertSentCount(1);
+    Http::assertSent(function ($request): bool {
+        $payload = $request->data();
+
+        return $request->method() === 'POST'
+            && (string) $request->url() === 'https://api.github.com/repos/AIArmada/majlisilmu/issues'
+            && data_get($payload, 'assignees') === null
+            && data_get($payload, 'agent_assignment') === null;
+    });
+});
+
 it('hides the admin github issue tool when github issue reporting is disabled', function () {
     configureGithubIssueReportingForMcp(['enabled' => false]);
 
@@ -1142,6 +1284,13 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'destructiveHint' => false,
         'openWorldHint' => true,
     ]);
+
+    $githubIssueCategorySchema = data_get($tools->get('admin-create-github-issue'), 'inputSchema.properties.category');
+
+    expect($githubIssueCategorySchema['enum'] ?? null)->toBe(GitHubIssueReportContract::categories())
+        ->and($githubIssueCategorySchema['default'] ?? null)->toBe(GitHubIssueReportContract::DEFAULT_CATEGORY)
+        ->and((string) ($githubIssueCategorySchema['description'] ?? ''))
+        ->toContain('bug', 'docs_mismatch', 'proposal', 'feature_request', 'parameter_change', 'other');
 });
 
 it('rejects Passport-authenticated users without admin access on the admin MCP stream endpoint', function () {
@@ -1465,6 +1614,7 @@ function configureGithubIssueReportingForMcp(array $overrides = []): void
         'custom_instructions' => 'Use repository tests and conventions when following up.',
         'admin_model' => 'GPT-5.4',
         'admin_model_fallbacks' => ['GPT-5.2-Codex', 'Auto'],
+        'admin_copilot_assignment_enabled' => true,
         'copilot_assignee' => 'copilot-swe-agent[bot]',
     ], $overrides));
 }

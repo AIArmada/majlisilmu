@@ -68,7 +68,7 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
         ->values()
         ->all();
 
-    expect($document['schema_version'])->toBe('2.1.0')
+    expect($document['schema_version'])->toBe('2.2.0')
         ->and($document['markdown_companion'])->toBe('docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md')
         ->and(data_get($document, 'runtime_inventory.admin_panel.resource_count'))->toBe(count($runtimeAdminResources))
         ->and(data_get($document, 'runtime_inventory.ahli_panel.resource_count'))->toBe(count($runtimeAhliResources))
@@ -94,6 +94,18 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
         ->and(data_get($document, 'transport_rules.admin_api.validation_feedback'))->toBeTrue()
         ->and(data_get($document, 'transport_rules.admin_mcp.apply_defaults'))->toBeTrue()
         ->and(data_get($document, 'transport_rules.admin_mcp.validation_feedback'))->toBeTrue()
+        ->and(data_get($document, 'transport_rules.admin_api.validation_remediation_details'))->toBe([
+            'fix_plan',
+            'remaining_blockers',
+            'normalized_payload_preview',
+            'can_retry',
+        ])
+        ->and(data_get($document, 'transport_rules.admin_mcp.validation_remediation_details'))->toBe([
+            'fix_plan',
+            'remaining_blockers',
+            'normalized_payload_preview',
+            'can_retry',
+        ])
         ->and(data_get($document, 'transport_rules.member_mcp.validate_only'))->toBeFalse();
 });
 
@@ -108,5 +120,7 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
         ->toContain('apply_defaults=1 is supported during preview requests')
         ->toContain('apply_defaults is supported on admin preview tools')
         ->toContain('json_base64_descriptor')
+        ->toContain('Validation failures in validate-only mode now return machine-readable remediation details')
+        ->toContain('Validation failures now expose schema-driven `feedback`')
         ->toContain('No `validate_only` preview path today.');
 });

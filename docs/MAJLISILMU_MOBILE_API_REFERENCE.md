@@ -565,7 +565,7 @@ Payload guidance:
 Assignment behavior:
 
 - Non-admin callers create a plain GitHub issue.
-- Admin callers create the issue and automatically assign Copilot.
+- Admin callers create the issue and automatically assign Copilot unless `GITHUB_ISSUE_REPORTING_ADMIN_COPILOT_ASSIGNMENT_ENABLED=false` is set on the server.
 - Copilot model selection is config-driven on the server and may fall back across multiple configured values before using `Auto`.
 
 ### Public contribution rules you must follow
@@ -683,9 +683,9 @@ Current limitation:
 | `GET` | `/admin/{resourceKey}/schema?operation=update&recordKey={recordKey}` | Required Filament admin-panel access | Return the update contract plus current defaults/media for one supported record |
 | `GET` | `/admin/{resourceKey}` | Required Filament admin-panel access | Paginated record listing for the selected resource. Supports search, date filters, and resource-specific `filter[...]` query parameters when available |
 | `GET` | `/admin/{resourceKey}/{recordKey}/relations/{relation}` | Required Filament admin-panel access | Paginated listing for a named relation on one admin record |
-| `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources, or add `?validate_only=1` to preview the normalized payload and warnings without persisting. Add `&apply_defaults=1` during previews to receive a server-side autofill candidate payload in validation feedback |
+| `POST` | `/admin/{resourceKey}` | Required Filament admin-panel access + resource create policy | Create a record for supported write resources, or add `?validate_only=1` to preview the normalized payload and warnings without persisting. Add `&apply_defaults=1` during previews to receive a server-side autofill candidate payload in validation feedback. Validate-only failures also return remediation details for one-retry recovery loops |
 | `GET` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access | Generic record detail and per-record abilities |
-| `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources, or add `?validate_only=1` to preview the current record snapshot, normalized payload, and warnings without persisting. Add `&apply_defaults=1` during previews to receive a server-side autofill candidate payload in validation feedback |
+| `PUT` | `/admin/{resourceKey}/{recordKey}` | Required Filament admin-panel access + record update policy | Update a record for supported write resources, or add `?validate_only=1` to preview the current record snapshot, normalized payload, and warnings without persisting. Add `&apply_defaults=1` during previews to receive a server-side autofill candidate payload in validation feedback. Validate-only failures also return remediation details for one-retry recovery loops |
 
 ### Write preview mode
 
@@ -709,6 +709,15 @@ Validation errors now include schema-driven `error.details.feedback` hints for b
 - `issues[].auto_fill_safe`
 - `issues[].required_because`
 - `normalized_payload` when `validate_only=true&apply_defaults=true`
+
+Validation failures in validate-only mode return machine-readable remediation details:
+
+- `error.details.fix_plan`
+- `error.details.remaining_blockers`
+- `error.details.normalized_payload_preview`
+- `error.details.can_retry`
+
+Safe defaults are surfaced as `set_field` actions, unresolved enums/catalog choices are surfaced as `choose_one` / `choose_many`, and `can_retry=true` means the client can retry immediately using the normalized preview without another schema round trip.
 
 > **Record-key format:** `{recordKey}` in GET and PUT admin record routes should use the `route_key` field returned by the admin collection or detail endpoints.
 

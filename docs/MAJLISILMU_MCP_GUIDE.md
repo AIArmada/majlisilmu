@@ -210,6 +210,8 @@ Use this section as the quick MCP-only capability summary.
 | Update | `admin-update-record` | `member-update-record` |
 | Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` | No |
 
+Admin GitHub issue reports can skip Copilot assignment entirely by setting `GITHUB_ISSUE_REPORTING_ADMIN_COPILOT_ASSIGNMENT_ENABLED=false` on the server.
+
 ### Writable resource matrix
 
 | Resource | Admin MCP | Member MCP | Notes |
@@ -369,6 +371,7 @@ Write-tool preview tip:
 - Add `apply_defaults=true` on preview calls when you want the server to apply schema defaults before validation and return a candidate autofilled payload in validation feedback.
 - Preview responses return the normalized payload plus warning metadata for supported write-side checks.
 - Validation failures return schema-driven `feedback` issues with suggested values, defaults, and conditional `required_because` context.
+- Validation failures in validate-only mode now include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.
 - MCP write schemas advertise supported media/file fields with JSON descriptor metadata, do not advertise destructive media clear-flags, and reject clear-flags if a client submits them anyway.
 - Update previews also include the current record snapshot so you can compare what would change before retrying without `validate_only`.
 
