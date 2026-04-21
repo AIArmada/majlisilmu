@@ -90,6 +90,18 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
         )
         ->and(data_get($document, 'transport_rules.admin_mcp.media_upload_transport'))->toBe('json_base64_descriptor')
         ->and(data_get($document, 'transport_rules.admin_mcp.destructive_clear_flags_supported'))->toBeFalse()
+        ->and(data_get($document, 'transport_rules.admin_api.validation_remediation_details'))->toBe([
+            'fix_plan',
+            'remaining_blockers',
+            'normalized_payload_preview',
+            'can_retry',
+        ])
+        ->and(data_get($document, 'transport_rules.admin_mcp.validation_remediation_details'))->toBe([
+            'fix_plan',
+            'remaining_blockers',
+            'normalized_payload_preview',
+            'can_retry',
+        ])
         ->and(data_get($document, 'transport_rules.member_mcp.validate_only'))->toBeFalse();
 });
 
@@ -102,5 +114,6 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
         ->toContain('Runtime Ahli resource inventory (4 registered resources)')
         ->toContain('MCP media and preview semantics')
         ->toContain('json_base64_descriptor')
+        ->toContain('Validation failures in validate-only mode now return machine-readable remediation details')
         ->toContain('No `validate_only` preview path today.');
 });
