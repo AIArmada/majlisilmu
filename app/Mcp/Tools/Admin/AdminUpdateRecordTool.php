@@ -58,7 +58,6 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
                 actor: $actor,
             );
             $normalizedMediaPayload = $this->normalizeMcpMediaPayload($payload, $schemaResponse);
-            $validateOnly = (bool) ($validated['validate_only'] ?? false);
 
             try {
                 if ($validateOnly && $applyDefaults) {

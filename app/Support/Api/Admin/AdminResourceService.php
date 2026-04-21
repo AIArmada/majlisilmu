@@ -14,6 +14,7 @@ use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\User;
 use App\Support\Api\ApiPagination;
+use App\Support\Api\SurfaceSyncPolicy;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
@@ -52,12 +53,13 @@ class AdminResourceService
 
         return [
             'data' => [
-                'version' => '2026-04-16',
+                'version' => '2026-04-21',
                 'docs' => [
                     'ui' => $this->urlResolver->docsUrl(),
                     'openapi' => $this->urlResolver->docsJsonUrl(),
                     'api_base' => $this->urlResolver->apiBaseUrl(),
                 ],
+                'surface_sync' => SurfaceSyncPolicy::manifest(),
                 'write_workflow' => [
                     'discover_resources' => route('api.admin.manifest'),
                     'fetch_create_schema_template' => route('api.admin.resources.schema', ['resourceKey' => 'resourceKey'], false).'?operation=create',
@@ -65,12 +67,35 @@ class AdminResourceService
                     'create_endpoint_template' => route('api.admin.resources.store', ['resourceKey' => 'resourceKey'], false),
                     'update_endpoint_template' => route('api.admin.resources.update', ['resourceKey' => 'resourceKey', 'recordKey' => 'recordKey'], false),
                 ],
+                'workflow_actions' => [
+                    'moderate_event' => [
+                        'schema_endpoint_template' => route('api.admin.events.moderation-schema', ['recordKey' => 'recordKey'], false),
+                        'endpoint_template' => route('api.admin.events.moderate', ['recordKey' => 'recordKey'], false),
+                        'mcp_tool' => 'admin-moderate-event',
+                    ],
+                    'triage_report' => [
+                        'schema_endpoint_template' => route('api.admin.reports.triage-schema', ['recordKey' => 'recordKey'], false),
+                        'endpoint_template' => route('api.admin.reports.triage', ['recordKey' => 'recordKey'], false),
+                        'mcp_tool' => 'admin-triage-report',
+                    ],
+                    'review_contribution_request' => [
+                        'schema_endpoint_template' => route('api.admin.contribution-requests.review-schema', ['recordKey' => 'recordKey'], false),
+                        'endpoint_template' => route('api.admin.contribution-requests.review', ['recordKey' => 'recordKey'], false),
+                        'mcp_tool' => 'admin-review-contribution-request',
+                    ],
+                    'review_membership_claim' => [
+                        'schema_endpoint_template' => route('api.admin.membership-claims.review-schema', ['recordKey' => 'recordKey'], false),
+                        'endpoint_template' => route('api.admin.membership-claims.review', ['recordKey' => 'recordKey'], false),
+                        'mcp_tool' => 'admin-review-membership-claim',
+                    ],
+                ],
                 'rules' => [
                     'Use resource keys returned by the manifest to select the correct admin schema and route family.',
                     'Use the admin record route_key returned by admin collection or detail payloads for record-specific paths.',
                     'Use the relation keys returned by admin resource metadata when traversing nested related records through the related-record route or MCP tool.',
                     'Fetch the exact schema before every create or update because required fields and catalogs are resource-specific.',
                     'Send validate_only=true to preview and normalize a write request without persisting it; inspect the returned warning envelope before retrying without the flag.',
+                    'Use workflow_actions for explicit admin review, moderation, and report-triage flows that are not part of generic CRUD.',
                     'Admin PUT requests are full schema-guided updates, not partial patches.',
                     'Use api_routes for HTTP API clients and mcp_tools for MCP clients; MCP tools take structured arguments instead of URL paths.',
                     'Use authenticated /admin/catalogs/* endpoints for dependent selectors referenced by schema catalog metadata.',

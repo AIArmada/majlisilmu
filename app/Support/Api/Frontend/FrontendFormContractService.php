@@ -19,6 +19,7 @@ use App\Enums\TagType;
 use App\Models\User;
 use App\Services\GitHub\GitHubIssueReporter;
 use App\Services\ShareTrackingService;
+use App\Support\Api\SurfaceSyncPolicy;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\GitHub\GitHubIssueReportContract;
 use App\Support\Location\GooglePlacesConfiguration;
@@ -42,12 +43,13 @@ class FrontendFormContractService
     public function manifest(?User $user): array
     {
         return [
-            'version' => '2026-04-20',
+            'version' => '2026-04-21',
             'docs' => [
                 'ui' => $this->urlResolver->docsUrl(),
                 'openapi' => $this->urlResolver->docsJsonUrl(),
                 'api_base' => $this->urlResolver->apiBaseUrl(),
             ],
+            'surface_sync' => SurfaceSyncPolicy::manifest(),
             'routing_surfaces' => [
                 'public' => [
                     'base_path' => '/api/v1',

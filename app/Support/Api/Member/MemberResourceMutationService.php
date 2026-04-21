@@ -78,6 +78,7 @@ class MemberResourceMutationService
             'resource_key' => $resourceKey,
             'record_key' => (string) $record->getRouteKey(),
             'payload' => 'object',
+            'validate_only' => false,
         ]);
     }
 
@@ -119,6 +120,15 @@ class MemberResourceMutationService
             $validated,
             $actor,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $normalizedPayload
+     * @return array{normalized_payload: array<string, mixed>, warnings: list<array<string, string>>, destructive_media_fields: list<string>}
+     */
+    public function previewNormalizedPayload(array $normalizedPayload): array
+    {
+        return $this->adminMutationService->previewNormalizedPayload($normalizedPayload);
     }
 
     /**

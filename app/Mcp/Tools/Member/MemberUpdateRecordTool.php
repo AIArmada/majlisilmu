@@ -38,6 +38,7 @@ class MemberUpdateRecordTool extends AbstractMemberWriteTool
                 'resource_key' => ['required', 'string'],
                 'record_key' => ['required', 'string'],
                 'payload' => ['required', 'array'],
+                'validate_only' => ['sometimes', 'boolean'],
             ]);
 
             /** @var array<string, mixed> $payload */
@@ -61,6 +62,7 @@ class MemberUpdateRecordTool extends AbstractMemberWriteTool
                     recordKey: $recordKey,
                     payload: $payload,
                     actor: $actor,
+                    validateOnly: (bool) ($validated['validate_only'] ?? false),
                 );
             } finally {
                 $this->cleanupMcpMediaPayload($normalizedMediaPayload);
@@ -78,6 +80,7 @@ class MemberUpdateRecordTool extends AbstractMemberWriteTool
             'resource_key' => $schema->string()->required()->min(1),
             'record_key' => $schema->string()->required()->min(1),
             'payload' => $schema->object()->required(),
+            'validate_only' => $schema->boolean()->default(false)->nullable(),
         ];
     }
 }

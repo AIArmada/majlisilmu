@@ -14,8 +14,7 @@ class ReportPolicy
      */
     public function viewAny(User $user): bool
     {
-        // Only moderators and admins can view reports list
-        return $user->hasAnyRole(['super_admin', 'moderator']);
+        return $user->hasAnyRole(['super_admin', 'admin', 'moderator']);
     }
 
     /**
@@ -23,12 +22,10 @@ class ReportPolicy
      */
     public function view(User $user, Report $report): bool
     {
-        // Moderators and admins can view any report
-        if ($user->hasAnyRole(['super_admin', 'moderator'])) {
+        if ($user->hasAnyRole(['super_admin', 'admin', 'moderator'])) {
             return true;
         }
 
-        // Reporter can view their own report
         return $report->reporter_id === $user->id;
     }
 
@@ -37,7 +34,16 @@ class ReportPolicy
      */
     public function create(?User $user): bool
     {
-        return $user instanceof User && $user->canSubmitDirectoryFeedback();
+        return $user instanceof User
+            && ($user->hasAnyRole(['super_admin', 'admin', 'moderator']) || $user->canSubmitDirectoryFeedback());
+    }
+
+    /**
+     * Determine whether the user can update the model.
+     */
+    public function update(User $user, Report $report): bool
+    {
+        return $user->hasAnyRole(['super_admin', 'admin', 'moderator']);
     }
 
     /**
@@ -45,7 +51,7 @@ class ReportPolicy
      */
     public function resolve(User $user, Report $report): bool
     {
-        return $user->hasAnyRole(['super_admin', 'moderator']);
+        return $user->hasAnyRole(['super_admin', 'admin', 'moderator']);
     }
 
     /**
