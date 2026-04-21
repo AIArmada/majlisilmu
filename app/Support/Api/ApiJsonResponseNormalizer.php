@@ -119,7 +119,14 @@ final class ApiJsonResponseNormalizer
                     errors: $validationErrors,
                 ),
             );
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            report($exception);
+
+            logger()->warning('Admin validate_only remediation enrichment failed.', [
+                'route_name' => $routeName,
+                'resource_key' => $resourceKey,
+            ]);
+
             return $details;
         }
     }
