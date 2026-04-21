@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 $githubIssueModelFallbacks = array_values(array_filter(array_map(
-    static fn (string $value): string => trim($value),
+    trim(...),
     explode(',', (string) env('GITHUB_ISSUE_REPORTING_ADMIN_MODEL_FALLBACKS', 'GPT-5.2-Codex,Auto')),
 ), static fn (string $value): bool => $value !== ''));
 

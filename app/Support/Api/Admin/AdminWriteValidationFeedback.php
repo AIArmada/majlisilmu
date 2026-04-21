@@ -57,7 +57,7 @@ final class AdminWriteValidationFeedback
         $fieldContracts = $this->fieldContracts($schema);
         $failedRules = $exception->validator !== null
             ? array_map(
-                static fn (array $rules): array => array_values(array_map('strtolower', array_keys($rules))),
+                static fn (array $rules): array => array_values(array_map(strtolower(...), array_keys($rules))),
                 $exception->validator->failed(),
             )
             : [];
@@ -224,7 +224,6 @@ final class AdminWriteValidationFeedback
 
     /**
      * @param  list<string|int>|null  $allowedValues
-     * @return string|int|null
      */
     private function closestValidValue(mixed $value, ?array $allowedValues): string|int|null
     {
@@ -341,7 +340,6 @@ final class AdminWriteValidationFeedback
 
     /**
      * @param  list<string|int>|null  $allowedValues
-     * @return string|int|null
      */
     private function firstAllowedValue(?array $allowedValues): string|int|null
     {

@@ -379,7 +379,7 @@ test('landing attributions preserve copy and native share channels', function (s
         ->assertOk()
         ->json();
 
-    $landingUrl = (string) $payload['url'].'&'.http_build_query([
+    $landingUrl = $payload['url'].'&'.http_build_query([
         (string) config('dawah-share.provider_query_parameter', 'channel') => $provider,
     ]);
 

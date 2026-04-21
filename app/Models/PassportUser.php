@@ -18,6 +18,7 @@ class PassportUser extends Authenticatable implements OAuthenticatable
 
     protected $keyType = 'string';
 
+    #[\Override]
     public function getMorphClass(): string
     {
         return (new User)->getMorphClass();
