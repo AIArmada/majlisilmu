@@ -7,6 +7,7 @@ namespace App\Mcp\Tools\Admin;
 use App\Models\User;
 use App\Support\Api\Admin\AdminValidateOnlyRemediationPlanner;
 use App\Support\Api\Admin\AdminResourceService;
+use App\Support\Api\Admin\AdminWriteValidationFeedback;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Mcp\McpAuthenticatedUserResolver;
 use App\Support\Mcp\McpFilePayloadNormalizer;
@@ -14,10 +15,67 @@ use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\ResponseFactory;
-use Laravel\Mcp\Support\ValidationMessages;
 
 abstract class AbstractAdminWriteTool extends AbstractAdminTool
 {
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     */
+    protected function payloadWithSchemaDefaults(array $payload, array $schemaResponse): array
+    {
+        return app(AdminWriteValidationFeedback::class)->payloadWithSchemaDefaults($payload, $schemaResponse);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     */
+    protected function writeValidationErrorResponse(
+        ValidationException $exception,
+        array $payload,
+        array $schemaResponse,
+        string $resourceKey,
+        string $operation,
+        bool $validateOnly,
+        bool $applyDefaults,
+    ): ResponseFactory {
+        $feedback = app(AdminWriteValidationFeedback::class);
+        $candidatePayload = $validateOnly && $applyDefaults
+            ? $payload
+            : null;
+
+        $details = [
+            'errors' => $exception->errors(),
+            'feedback' => $feedback->feedback(
+                $exception,
+                $payload,
+                $schemaResponse,
+                $operation,
+                $validateOnly,
+                $applyDefaults,
+                $candidatePayload,
+            ),
+        ];
+
+        if ($validateOnly) {
+            $details = [
+                ...$details,
+                ...app(AdminValidateOnlyRemediationPlanner::class)->build(
+                    payload: $payload,
+                    schemaResponse: $schemaResponse,
+                    errors: $exception->errors(),
+                ),
+            ];
+        }
+
+        return $this->errorResponse(
+            $feedback->message($exception),
+            'validation_error',
+            $details,
+        );
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -126,26 +184,4 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
         };
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, mixed>  $schemaResponse
-     */
-    protected function validateOnlyErrorResponse(
-        ValidationException $exception,
-        array $payload,
-        array $schemaResponse,
-    ): ResponseFactory {
-        return $this->errorResponse(
-            ValidationMessages::from($exception),
-            'validation_error',
-            [
-                'errors' => $exception->errors(),
-                ...app(AdminValidateOnlyRemediationPlanner::class)->build(
-                    payload: $payload,
-                    schemaResponse: $schemaResponse,
-                    errors: $exception->errors(),
-                ),
-            ],
-        );
-    }
 }

@@ -39,11 +39,14 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
                 'resource_key' => ['required', 'string'],
                 'payload' => ['required', 'array'],
                 'validate_only' => ['sometimes', 'boolean'],
+                'apply_defaults' => ['sometimes', 'boolean'],
             ]);
 
             /** @var array<string, mixed> $payload */
             $payload = $validated['payload'];
             $resourceKey = (string) $validated['resource_key'];
+            $validateOnly = (bool) ($validated['validate_only'] ?? false);
+            $applyDefaults = (bool) ($validated['apply_defaults'] ?? false);
 
             $this->ensureDestructiveMediaClearFlagsAreUnsupported($payload);
             $schemaResponse = $this->resourceService->writeSchema(
@@ -55,22 +58,28 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
             $validateOnly = (bool) ($validated['validate_only'] ?? false);
 
             try {
+                if ($validateOnly && $applyDefaults) {
+                    $normalizedMediaPayload['payload'] = $this->payloadWithSchemaDefaults($normalizedMediaPayload['payload'], $schemaResponse);
+                }
+
                 $payload = $this->normalizePayloadForWriteTool($resourceKey, $normalizedMediaPayload['payload']);
 
-                try {
-                    return Response::structured($this->resourceService->storeRecord(
-                        resourceKey: $resourceKey,
-                        payload: $payload,
-                        actor: $actor,
-                        validateOnly: $validateOnly,
-                    ));
-                } catch (ValidationException $exception) {
-                    if ($validateOnly) {
-                        return $this->validateOnlyErrorResponse($exception, $payload, $schemaResponse);
-                    }
-
-                    throw $exception;
-                }
+                return Response::structured($this->resourceService->storeRecord(
+                    resourceKey: $resourceKey,
+                    payload: $payload,
+                    actor: $actor,
+                    validateOnly: $validateOnly,
+                ));
+            } catch (ValidationException $exception) {
+                return $this->writeValidationErrorResponse(
+                    exception: $exception,
+                    payload: $payload,
+                    schemaResponse: $schemaResponse,
+                    resourceKey: $resourceKey,
+                    operation: 'create',
+                    validateOnly: $validateOnly,
+                    applyDefaults: $applyDefaults,
+                );
             } finally {
                 $this->cleanupMcpMediaPayload($normalizedMediaPayload);
             }
@@ -87,6 +96,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
             'resource_key' => $schema->string()->required()->min(1),
             'payload' => $schema->object()->required(),
             'validate_only' => $schema->boolean()->default(false),
+            'apply_defaults' => $schema->boolean()->default(false),
         ];
     }
 }
