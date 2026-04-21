@@ -15,6 +15,7 @@ use App\Support\Submission\PublicSubmissionUiEvents;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\ScopedMemberRolesSeeder;
+use Filament\Forms\Components\RichEditor;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
@@ -40,6 +41,21 @@ function normalizeInstitutionContactsForAdminForm(Institution $institution): voi
         ->where('category', 'phone')
         ->update(['value' => '+60112223344']);
 }
+
+it('uses a rich editor for institution description on the admin edit form', function () {
+    $admin = User::factory()->create();
+    assignGlobalRole($admin, 'super_admin');
+
+    $institution = Institution::factory()->create([
+        'description' => '<p>Existing description</p>',
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(EditInstitution::class, ['record' => $institution->id])
+        ->assertFormFieldExists('description', function (RichEditor $editor): bool {
+            return true;
+        });
+});
 
 it('disables turning off institution public submission when credible precondition fails', function () {
     $admin = User::factory()->create();

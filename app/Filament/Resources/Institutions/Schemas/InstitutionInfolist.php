@@ -58,6 +58,7 @@ class InstitutionInfolist
                                                 TextEntry::make('description')
                                                     ->label('Penerangan')
                                                     ->columnSpanFull()
+                                                    ->html()
                                                     ->placeholder('-'),
                                             ]),
                                     ])

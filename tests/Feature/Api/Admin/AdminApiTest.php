@@ -6,6 +6,7 @@ use App\Enums\ContributionSubjectType;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
+use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -30,6 +31,7 @@ use App\Support\Location\FederalTerritoryLocation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Nnjeim\World\Models\Language;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -56,9 +58,13 @@ it('lists accessible admin resources for privileged users', function () {
         ->and($response->json('data.surface_sync.strategy'))->toBe('curated_parity')
         ->and($response->json('data.surface_sync.default_panel_only_operations'))->toContain('delete', 'restore', 'replicate', 'reorder')
         ->and($response->json('data.surface_sync.workflow_first_capabilities'))->toContain('event moderation', 'contribution review')
+        ->and($response->json('data.workflow_actions.moderate_event.mcp_schema_tool'))->toBe('admin-get-event-moderation-schema')
         ->and($response->json('data.workflow_actions.moderate_event.mcp_tool'))->toBe('admin-moderate-event')
+        ->and($response->json('data.workflow_actions.triage_report.mcp_schema_tool'))->toBe('admin-get-report-triage-schema')
         ->and($response->json('data.workflow_actions.triage_report.mcp_tool'))->toBe('admin-triage-report')
+        ->and($response->json('data.workflow_actions.review_contribution_request.mcp_schema_tool'))->toBe('admin-get-contribution-request-review-schema')
         ->and($response->json('data.workflow_actions.review_contribution_request.mcp_tool'))->toBe('admin-review-contribution-request')
+        ->and($response->json('data.workflow_actions.review_membership_claim.mcp_schema_tool'))->toBe('admin-get-membership-claim-review-schema')
         ->and($response->json('data.workflow_actions.review_membership_claim.mcp_tool'))->toBe('admin-review-membership-claim')
         ->and($response->json('data.write_workflow.discover_resources'))->toContain('/api/v1/admin/manifest')
         ->and($response->json('data.rules'))->toContain('Use the admin record route_key returned by admin collection or detail payloads for record-specific paths.');
@@ -165,6 +171,7 @@ it('returns admin speaker resource metadata and records', function () {
         ->assertJsonPath('data.resource.filters.0.options.verified', 'Verified')
         ->assertJsonPath('data.resource.filters.1.key', 'is_active')
         ->assertJsonPath('data.resource.filters.2.key', 'has_events')
+        ->assertJsonPath('data.resource.mcp_tools.get_record_actions.tool', 'admin-get-record-actions')
         ->assertJsonPath('data.resource.mcp_tools.create.arguments.validate_only', false)
         ->assertJsonPath('data.resource.mcp_tools.update.arguments.validate_only', false);
 
@@ -609,6 +616,62 @@ it('exposes tag write schema and can create and update tags through the api', fu
         ->and($tag->getTranslation('slug', 'en'))->toBe('corruption');
 });
 
+it('surfaces tag update semantics through the admin api schema', function () {
+    $admin = adminApiUser('super_admin');
+    $tag = Tag::factory()->discipline()->verified()->create();
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/tags/schema?operation=update&recordKey='.(string) $tag->getKey())
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('name'), 'translation_fallback.en'))->toBe('name.ms')
+        ->and(data_get($fields->get('name.en'), 'clear_semantics.explicit_null'))->toBe('fallback_to_name.ms')
+        ->and(data_get($fields->get('name.en'), 'normalization.empty_string_at_mutation_layer'))->toBe('fallback_to_name.ms')
+        ->and(data_get($fields->get('order_column'), 'clear_semantics.explicit_null'))->toBe('recompute_with_sortable_scope')
+        ->and(data_get($fields->get('order_column'), 'normalization.empty_string_at_mutation_layer'))->toBe('recompute_with_sortable_scope');
+});
+
+it('normalizes tag translation fallback and clears sort order through the admin api', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/tags', [
+        'name' => [
+            'ms' => 'Tadabbur API Fallback',
+            'en' => '',
+        ],
+        'type' => 'discipline',
+        'status' => 'verified',
+        'order_column' => 3,
+    ])->assertCreated();
+
+    $tagRouteKey = (string) $createResponse->json('data.record.route_key');
+    $tag = Tag::query()->findOrFail($tagRouteKey);
+
+    expect($tag->getTranslation('name', 'en'))->toBe('Tadabbur API Fallback');
+
+    $this->putJson('/api/v1/admin/tags/'.$tagRouteKey, [
+        'name' => [
+            'ms' => 'Rasuah API Fallback',
+            'en' => '',
+        ],
+        'type' => 'issue',
+        'status' => 'pending',
+        'order_column' => '',
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.order_column', 1);
+
+    $tag->refresh();
+
+    expect($tag->getTranslation('name', 'en'))->toBe('Rasuah API Fallback')
+        ->and($tag->order_column)->toBe(1);
+});
+
 it('exposes event moderation schema and can request changes through the admin workflow endpoints', function () {
     $admin = adminApiUser('super_admin');
     $submitter = User::factory()->create();
@@ -814,6 +877,81 @@ it('exposes report write schema and can create and update reports through the ap
         ->and($report->getMedia('evidence'))->toHaveCount(0);
 });
 
+it('surfaces report update semantics through the admin api schema', function () {
+    $admin = adminApiUser('moderator');
+    $report = Report::factory()->create([
+        'status' => 'open',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/reports/schema?operation=update&recordKey='.(string) $report->getRouteKey())
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('entity_type'), 'paired_with'))->toBe('entity_id')
+        ->and(data_get($fields->get('category'), 'allowed_values_resolved_from'))->toBe('entity_type')
+        ->and(data_get($fields->get('description'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('reporter_id'), 'relation'))->toBe('users')
+        ->and(data_get($fields->get('handled_by'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('resolution_note'), 'normalization.empty_string_at_mutation_layer'))->toBe('null')
+        ->and(data_get($fields->get('evidence'), 'collection_semantics.explicit_null'))->toBe('preserve_existing_collection')
+        ->and(data_get($fields->get('evidence'), 'collection_semantics.empty_array'))->toBe('clear_collection')
+        ->and(data_get($fields->get('evidence'), 'raw_http_clear_flag'))->toBe('clear_evidence');
+});
+
+it('clears report optional scalars and evidence through the admin api', function () {
+    $admin = adminApiUser('moderator');
+    $reporter = User::factory()->create();
+    $handler = User::factory()->create();
+    $event = Event::factory()->create();
+
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->withHeaders(['Accept' => 'application/json'])->post('/api/v1/admin/reports', [
+        'entity_type' => 'event',
+        'entity_id' => (string) $event->getKey(),
+        'category' => 'wrong_info',
+        'description' => 'Legacy report description.',
+        'status' => 'triaged',
+        'reporter_id' => (string) $reporter->getKey(),
+        'handled_by' => (string) $handler->getKey(),
+        'resolution_note' => 'Legacy resolution note.',
+        'evidence' => [
+            fakeGeneratedImageUpload('admin-api-report-evidence-reset.png', 640, 640),
+        ],
+    ])->assertCreated();
+
+    $reportRouteKey = (string) $createResponse->json('data.record.route_key');
+    $report = Report::query()->findOrFail($reportRouteKey);
+
+    $this->putJson('/api/v1/admin/reports/'.$reportRouteKey, [
+        'entity_type' => 'event',
+        'entity_id' => (string) $event->getKey(),
+        'category' => 'wrong_info',
+        'description' => '',
+        'status' => 'open',
+        'reporter_id' => null,
+        'handled_by' => null,
+        'resolution_note' => '',
+        'evidence' => [],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.description', null)
+        ->assertJsonPath('data.record.attributes.reporter_id', null)
+        ->assertJsonPath('data.record.attributes.handled_by', null)
+        ->assertJsonPath('data.record.attributes.resolution_note', null);
+
+    $report->refresh();
+
+    expect($report->description)->toBeNull()
+        ->and($report->reporter_id)->toBeNull()
+        ->and($report->handled_by)->toBeNull()
+        ->and($report->resolution_note)->toBeNull()
+        ->and($report->getMedia('evidence'))->toHaveCount(0);
+});
+
 it('exposes inspiration write schema and can create and update inspirations through the api', function () {
     $admin = adminApiUser('super_admin');
 
@@ -883,6 +1021,62 @@ it('exposes inspiration write schema and can create and update inspirations thro
         ->and($inspiration->getMedia('main'))->toHaveCount(0);
 });
 
+it('surfaces inspiration update semantics through the admin api schema', function () {
+    $admin = adminApiUser('super_admin');
+    $inspiration = Inspiration::factory()->create([
+        'source' => 'Schema Source',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/inspirations/schema?operation=update&recordKey='.(string) $inspiration->getRouteKey())
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('content'), 'input_normalization.kind'))->toBe('rich_text_document')
+        ->and(data_get($fields->get('content'), 'input_normalization.accepts_plain_string'))->toBeTrue()
+        ->and(data_get($fields->get('source'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('main'), 'mutation_semantics'))->toBe('replace_single_media_collection')
+        ->and(data_get($fields->get('main'), 'clear_semantics.explicit_null'))->toBe('preserve_existing_collection')
+        ->and(data_get($fields->get('main'), 'raw_http_clear_flag'))->toBe('clear_main');
+});
+
+it('clears inspiration source while preserving existing main media through the admin api', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->withHeaders(['Accept' => 'application/json'])->post('/api/v1/admin/inspirations', [
+        'category' => 'quran_quote',
+        'locale' => 'ms',
+        'title' => 'Admin API Inspiration Preserve Main',
+        'content' => 'Original inspiration content.',
+        'source' => 'Original inspiration source.',
+        'is_active' => true,
+        'main' => fakeGeneratedImageUpload('admin-api-inspiration-preserve-main.png', 1280, 720),
+    ])->assertCreated();
+
+    $inspirationRouteKey = (string) $createResponse->json('data.record.route_key');
+    $inspiration = Inspiration::query()->findOrFail($inspirationRouteKey);
+
+    $this->putJson('/api/v1/admin/inspirations/'.$inspirationRouteKey, [
+        'category' => 'quran_quote',
+        'locale' => 'ms',
+        'title' => 'Admin API Inspiration Preserve Main',
+        'content' => 'Updated inspiration content.',
+        'source' => '',
+        'is_active' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.source', null);
+
+    $inspiration->refresh();
+
+    expect($inspiration->source)->toBeNull()
+        ->and($inspiration->getMedia('main'))->toHaveCount(1);
+});
+
 it('exposes series write schema and can create and update series through the api', function () {
     $admin = adminApiUser('super_admin');
     $suffix = Str::lower((string) Str::ulid());
@@ -946,6 +1140,60 @@ it('exposes series write schema and can create and update series through the api
         ->and($series->getMedia('gallery'))->toHaveCount(0);
 });
 
+it('surfaces series update semantics through the admin api schema', function () {
+    $admin = adminApiUser('super_admin');
+    $series = Series::factory()->create([
+        'description' => 'Series schema surface',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/series/schema?operation=update&recordKey='.(string) $series->getKey())
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('title'), 'required'))->toBeTrue()
+        ->and(data_get($fields->get('slug'), 'uniqueness_scope'))->toBe('series.slug')
+        ->and(data_get($fields->get('description'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('languages'), 'relation'))->toBe('languages')
+        ->and(data_get($fields->get('languages'), 'collection_semantics.explicit_null'))->toBe('clear_collection')
+        ->and(data_get($fields->get('languages'), 'collection_semantics.submitted_array'))->toBe('replace_relation_sync');
+});
+
+it('clears series description and languages through the admin api', function () {
+    $languageMalay = Language::where('code', 'ms')->first() ?? Language::query()->create([
+        'code' => 'ms',
+        'name' => 'Malay',
+        'name_native' => 'Bahasa Melayu',
+        'dir' => 'ltr',
+    ]);
+
+    $admin = adminApiUser('super_admin');
+    $series = Series::factory()->create([
+        'description' => 'Series with languages',
+        'visibility' => 'public',
+    ]);
+    $series->languages()->sync([$languageMalay->id]);
+
+    Sanctum::actingAs($admin);
+
+    $this->putJson('/api/v1/admin/series/'.$series->getRouteKey(), [
+        'title' => $series->title,
+        'slug' => $series->slug,
+        'visibility' => 'public',
+        'description' => '',
+        'languages' => null,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.description', null);
+
+    $series->refresh()->load('languages');
+
+    expect($series->description)->toBeNull()
+        ->and($series->languages)->toHaveCount(0);
+});
+
 it('exposes space write schema and can create and update spaces through the api', function () {
     $admin = adminApiUser('super_admin');
     $suffix = Str::lower((string) Str::ulid());
@@ -1002,6 +1250,52 @@ it('exposes space write schema and can create and update spaces through the api'
         ->and($space->is_active)->toBeFalse()
         ->and($space->institutions()->pluck('institutions.id')->all())->toContain($secondInstitution->getKey())
         ->and($space->institutions()->pluck('institutions.id')->all())->not->toContain($firstInstitution->getKey());
+});
+
+it('surfaces space update semantics through the admin api schema', function () {
+    $admin = adminApiUser('super_admin');
+    $space = Space::factory()->create([
+        'capacity' => 40,
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/spaces/schema?operation=update&recordKey='.(string) $space->getKey())
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('slug'), 'uniqueness_scope'))->toBe('spaces.slug')
+        ->and(data_get($fields->get('capacity'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('capacity'), 'normalization.empty_string_at_mutation_layer'))->toBe('null')
+        ->and(data_get($fields->get('institutions'), 'relation'))->toBe('institutions')
+        ->and(data_get($fields->get('institutions'), 'collection_semantics.explicit_null'))->toBe('clear_collection')
+        ->and(data_get($fields->get('institutions'), 'collection_semantics.submitted_array'))->toBe('replace_relation_sync');
+});
+
+it('clears space capacity and institutions through the admin api', function () {
+    $admin = adminApiUser('super_admin');
+    $institution = Institution::factory()->create();
+    $space = Space::factory()->create([
+        'capacity' => 80,
+    ]);
+    $space->institutions()->attach($institution);
+
+    Sanctum::actingAs($admin);
+
+    $this->putJson('/api/v1/admin/spaces/'.$space->getRouteKey(), [
+        'name' => $space->name,
+        'slug' => $space->slug,
+        'capacity' => null,
+        'institutions' => null,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.capacity', null);
+
+    $space->refresh()->load('institutions');
+
+    expect($space->capacity)->toBeNull()
+        ->and($space->institutions)->toHaveCount(0);
 });
 
 it('exposes donation channel write schema and can create and update donation channels through the api', function () {
@@ -1092,6 +1386,83 @@ it('exposes donation channel write schema and can create and update donation cha
         ->and($donationChannel->status)->toBe('inactive')
         ->and($donationChannel->is_default)->toBeFalse()
         ->and($donationChannel->getMedia('qr'))->toHaveCount(0);
+});
+
+it('surfaces donation channel update semantics through the admin api schema', function () {
+    $admin = adminApiUser('super_admin');
+    $institution = Institution::factory()->create();
+    $donationChannel = DonationChannel::factory()->create([
+        'donatable_type' => (string) (new Institution)->getMorphClass(),
+        'donatable_id' => (string) $institution->getKey(),
+        'recipient' => 'Schema Donation Channel',
+        'method' => 'bank_account',
+        'bank_name' => 'Maybank',
+        'account_number' => '1234567890',
+        'status' => 'verified',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/donation-channels/schema?operation=update&recordKey='.(string) $donationChannel->getKey())
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('donatable_type'), 'accepted_aliases.speakers'))->toBe((string) (new Speaker)->getMorphClass())
+        ->and(data_get($fields->get('method'), 'mutation_semantics'))->toBe('replace_scalar_with_method_partition_reset')
+        ->and(data_get($fields->get('method'), 'switch_clears_fields.duitnow'))->toContain('bank_name', 'account_number')
+        ->and(data_get($fields->get('label'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('reference_note'), 'normalization.empty_string_at_mutation_layer'))->toBe('null');
+});
+
+it('normalizes donation channel owner aliases and clears method-specific strings through the admin api', function () {
+    $admin = adminApiUser('super_admin');
+    $institution = Institution::factory()->create();
+
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/donation-channels', [
+        'donatable_type' => 'institution',
+        'donatable_id' => (string) $institution->getKey(),
+        'label' => 'Alias Donation Channel',
+        'recipient' => 'Alias Recipient',
+        'method' => 'bank_account',
+        'bank_code' => 'MBB',
+        'bank_name' => 'Maybank',
+        'account_number' => '1234567890',
+        'reference_note' => 'Alias note',
+        'status' => 'verified',
+    ])->assertCreated();
+
+    $donationChannelRouteKey = (string) $createResponse->json('data.record.route_key');
+
+    $this->putJson('/api/v1/admin/donation-channels/'.$donationChannelRouteKey, [
+        'donatable_type' => Institution::class,
+        'donatable_id' => (string) $institution->getKey(),
+        'label' => '',
+        'recipient' => 'Alias Recipient',
+        'method' => 'duitnow',
+        'duitnow_type' => 'mobile',
+        'duitnow_value' => '60112233445',
+        'reference_note' => '',
+        'status' => 'verified',
+        'is_default' => false,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.label', null)
+        ->assertJsonPath('data.record.attributes.reference_note', null)
+        ->assertJsonPath('data.record.attributes.method', 'duitnow');
+
+    $donationChannel = DonationChannel::query()->findOrFail($donationChannelRouteKey);
+
+    expect($donationChannel->donatable_type)->toBe((string) (new Institution)->getMorphClass())
+        ->and($donationChannel->label)->toBeNull()
+        ->and($donationChannel->reference_note)->toBeNull()
+        ->and($donationChannel->bank_code)->toBeNull()
+        ->and($donationChannel->bank_name)->toBeNull()
+        ->and($donationChannel->account_number)->toBeNull()
+        ->and($donationChannel->duitnow_type)->toBe('mobile')
+        ->and($donationChannel->duitnow_value)->toBe('60112233445');
 });
 
 it('exposes membership claim review schema and can approve claims through the admin workflow endpoints', function () {
@@ -1292,6 +1663,178 @@ it('returns fresh speaker address data on admin GET requests after updates', fun
         ->assertJsonPath('data.0.attributes.address.district_id', $secondFixtures['district_id']);
 });
 
+it('surfaces speaker update semantics and collection rules through the admin api schema', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/speakers', [
+        'name' => 'Admin API Speaker Schema Surface',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => false,
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+    ])->assertCreated();
+
+    $schema = $this->getJson('/api/v1/admin/speakers/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+    $qualificationItemFields = collect(data_get($fields->get('qualifications'), 'item_schema.fields', []))->keyBy('name');
+
+    expect(data_get($fields->get('address'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('address'), 'mutation_semantics'))->toBe('deep_merge_when_present_visible_fields_only')
+        ->and(data_get($fields->get('address'), 'clear_semantics.empty_object'))->toBe('invalid_without_country')
+        ->and(data_get($fields->get('address'), 'prohibited_nested_fields'))->toContain('line1', 'google_maps_url')
+        ->and(data_get($fields->get('address.country_id'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('address.country_id'), 'required_when_parent_present_on_update'))->toBeTrue()
+        ->and(data_get($fields->get('honorific'), 'collection_semantics.submitted_array'))->toBe('replace_collection')
+        ->and(data_get($fields->get('qualifications'), 'collection_semantics.empty_array'))->toBe('clear_collection')
+        ->and($qualificationItemFields->keys()->all())->toContain('institution', 'degree', 'field', 'year')
+        ->and(data_get($fields->get('language_ids'), 'collection_semantics.submitted_array'))->toBe('replace_relation_sync')
+        ->and(data_get($fields->get('contacts'), 'collection_semantics.explicit_null'))->toBe('clear_collection')
+        ->and(data_get($fields->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to'))->toBe('twitter')
+        ->and(data_get($fields->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation'))->toBeFalse();
+});
+
+it('replaces speaker collections and still requires an explicit country when mutating address data through the admin api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $languageMalay = Language::where('code', 'ms')->first() ?? Language::query()->create([
+        'code' => 'ms',
+        'name' => 'Malay',
+        'name_native' => 'Bahasa Melayu',
+        'dir' => 'ltr',
+    ]);
+
+    $languageEnglish = Language::where('code', 'en')->first() ?? Language::query()->create([
+        'code' => 'en',
+        'name' => 'English',
+        'name_native' => 'English',
+        'dir' => 'ltr',
+    ]);
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/speakers', [
+        'name' => 'Admin API Speaker Collections',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => true,
+        'job_title' => 'Imam',
+        'honorific' => ['dato'],
+        'qualifications' => [[
+            'institution' => 'Universiti Lama',
+            'degree' => 'BA',
+            'field' => 'Fiqh',
+            'year' => '2010',
+        ]],
+        'language_ids' => [$languageMalay->id],
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+        'contacts' => [[
+            'category' => 'phone',
+            'value' => '0311111111',
+            'type' => 'main',
+            'is_public' => true,
+        ]],
+        'social_media' => [[
+            'platform' => 'website',
+            'url' => 'https://example.test/speakers/admin-api-speaker-collections',
+        ], [
+            'platform' => 'instagram',
+            'username' => 'asal_penceramah',
+        ]],
+    ])->assertCreated();
+
+    $speakerRouteKey = (string) $createResponse->json('data.record.route_key');
+    $speaker = Speaker::query()->with(['contacts', 'socialMedia', 'languages'])->findOrFail($speakerRouteKey);
+    $originalContactIds = $speaker->contacts->modelKeys();
+    $originalSocialMediaIds = $speaker->socialMedia->modelKeys();
+
+    $this->putJson('/api/v1/admin/speakers/'.$speakerRouteKey, [
+        'name' => 'Admin API Speaker Collections',
+        'gender' => 'male',
+        'status' => 'verified',
+        'address' => [],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['address.country_id']);
+
+    $this->putJson('/api/v1/admin/speakers/'.$speakerRouteKey, [
+        'name' => 'Admin API Speaker Collections Updated',
+        'gender' => 'male',
+        'status' => 'verified',
+        'is_freelance' => false,
+        'honorific' => ['datuk'],
+        'qualifications' => [[
+            'institution' => 'Universiti Baharu',
+            'degree' => 'PhD',
+            'field' => 'Aqidah',
+            'year' => '2024',
+        ]],
+        'language_ids' => [$languageEnglish->id],
+        'contacts' => [[
+            'category' => 'whatsapp',
+            'value' => '+60123456789',
+            'type' => 'work',
+            'is_public' => false,
+        ]],
+        'social_media' => [[
+            'platform' => 'facebook',
+            'url' => 'https://facebook.com/admin-api-speaker-collections-updated',
+        ]],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.name', 'Admin API Speaker Collections Updated')
+        ->assertJsonPath('data.record.attributes.honorific.0', 'datuk')
+        ->assertJsonPath('data.record.attributes.contacts.0.category', 'whatsapp')
+        ->assertJsonPath('data.record.attributes.social_media.0.platform', 'facebook')
+        ->assertJsonPath('data.record.attributes.social_media.0.username', 'admin-api-speaker-collections-updated')
+        ->assertJsonPath('data.record.attributes.social_media.0.url', null);
+
+    $speaker->refresh()->load(['contacts', 'socialMedia', 'languages']);
+
+    expect($speaker->honorific)->toBe(['datuk'])
+        ->and($speaker->job_title)->toBeNull()
+        ->and($speaker->qualifications)->toHaveCount(1)
+        ->and(data_get($speaker->qualifications, '0.degree'))->toBe('PhD')
+        ->and($speaker->languages->pluck('id')->all())->toEqual([(int) $languageEnglish->id])
+        ->and($speaker->contacts)->toHaveCount(1)
+        ->and($speaker->contacts->first()?->getRawOriginal('category'))->toBe('whatsapp')
+        ->and(collect($speaker->contacts->modelKeys())->intersect($originalContactIds)->all())->toBe([])
+        ->and($speaker->socialMedia)->toHaveCount(1)
+        ->and($speaker->socialMedia->first()?->getRawOriginal('platform'))->toBe('facebook')
+        ->and($speaker->socialMedia->first()?->username)->toBe('admin-api-speaker-collections-updated')
+        ->and($speaker->socialMedia->first()?->url)->toBeNull()
+        ->and(collect($speaker->socialMedia->modelKeys())->intersect($originalSocialMediaIds)->all())->toBe([]);
+
+    $this->putJson('/api/v1/admin/speakers/'.$speakerRouteKey, [
+        'name' => 'Admin API Speaker Collections Updated',
+        'gender' => 'male',
+        'status' => 'verified',
+        'honorific' => [],
+        'qualifications' => [],
+        'language_ids' => null,
+        'contacts' => null,
+        'social_media' => [],
+    ])->assertOk();
+
+    $speaker->refresh()->load(['contacts', 'socialMedia', 'languages']);
+
+    expect($speaker->honorific)->toBe([])
+        ->and($speaker->qualifications)->toBe([])
+        ->and($speaker->languages)->toHaveCount(0)
+        ->and($speaker->contacts)->toHaveCount(0)
+        ->and($speaker->socialMedia)->toHaveCount(0);
+});
+
 it('allows sparse venue address updates without resending the existing country through the admin api', function () {
     ensureAdminApiMalaysiaCountryExists();
 
@@ -1419,6 +1962,231 @@ it('preserves institution address line1 when sparse map fields are updated throu
         ->and($institution->addressModel?->google_maps_url)->toContain('google.com/maps/search')
         ->and($institution->addressModel?->lat)->toBe(3.123456)
         ->and($institution->addressModel?->lng)->toBe(101.654321);
+});
+
+it('surfaces institution update semantics and nested item schemas through the admin api schema', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/institutions', [
+        'name' => 'Admin API Institution Schema Surface',
+        'nickname' => 'Schema Surface',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+    ])->assertCreated();
+
+    $schema = $this->getJson('/api/v1/admin/institutions/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+    $contactItemFields = collect(data_get($fields->get('contacts'), 'item_schema.fields', []))->keyBy('name');
+    $socialMediaItemFields = collect(data_get($fields->get('social_media'), 'item_schema.fields', []))->keyBy('name');
+
+    expect(data_get($fields->get('address'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('address'), 'mutation_semantics'))->toBe('deep_merge_when_present')
+        ->and(data_get($fields->get('address'), 'clear_semantics.empty_object'))->toBe('preserve_existing_when_record_has_address')
+        ->and(data_get($fields->get('address.country_id'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('address.country_id'), 'required_on_update'))->toBeFalse()
+        ->and(data_get($fields->get('nickname'), 'clear_semantics.explicit_null'))->toBe('preserve_existing')
+        ->and(data_get($fields->get('nickname'), 'normalization.empty_string_at_mutation_layer'))->toBe('null')
+        ->and(data_get($fields->get('contacts'), 'collection_semantics.explicit_null'))->toBe('clear_collection')
+        ->and(data_get($fields->get('contacts'), 'collection_semantics.submitted_array'))->toBe('replace_collection')
+        ->and($contactItemFields->keys()->all())->toContain('category', 'value', 'type', 'is_public', 'order_column')
+        ->and(data_get($contactItemFields->get('value'), 'used_for_categories'))->toContain('phone', 'whatsapp', 'email')
+        ->and(data_get($fields->get('social_media'), 'collection_semantics.empty_array'))->toBe('clear_collection')
+        ->and(data_get($fields->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to'))->toBe('twitter')
+        ->and(data_get($fields->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation'))->toBeFalse()
+        ->and(data_get($fields->get('social_media'), 'input_normalization.canonical_storage.identifier_field'))->toBe('username')
+        ->and($socialMediaItemFields->keys()->all())->toContain('platform', 'username', 'url', 'order_column')
+        ->and(data_get($fields->get('social_media'), 'item_schema.at_least_one_of'))->toBe(['username', 'url']);
+});
+
+it('preserves institution nickname on null-like input through the admin api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/institutions', [
+        'name' => 'Admin API Institution Nickname',
+        'nickname' => 'API Surau',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+    ])->assertCreated();
+
+    $institutionRouteKey = (string) $createResponse->json('data.record.route_key');
+
+    $this->putJson('/api/v1/admin/institutions/'.$institutionRouteKey, [
+        'name' => 'Admin API Institution Nickname',
+        'nickname' => null,
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.nickname', 'API Surau');
+
+    expect(Institution::query()->findOrFail($institutionRouteKey)->nickname)->toBe('API Surau');
+
+    $this->putJson('/api/v1/admin/institutions/'.$institutionRouteKey, [
+        'name' => 'Admin API Institution Nickname',
+        'nickname' => '',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.nickname', 'API Surau');
+
+    expect(Institution::query()->findOrFail($institutionRouteKey)->nickname)->toBe('API Surau');
+});
+
+it('treats empty institution address objects as a no-op when the record already has an address', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/institutions', [
+        'name' => 'Admin API Institution Empty Address',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Alamat Tidak Patut Hilang',
+        ],
+    ])->assertCreated();
+
+    $institutionRouteKey = (string) $createResponse->json('data.record.route_key');
+
+    $this->putJson('/api/v1/admin/institutions/'.$institutionRouteKey, [
+        'name' => 'Admin API Institution Empty Address',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.address.country_id', 132)
+        ->assertJsonPath('data.record.attributes.address.line1', 'Alamat Tidak Patut Hilang');
+
+    expect(Institution::query()->findOrFail($institutionRouteKey)->addressModel?->line1)->toBe('Alamat Tidak Patut Hilang');
+});
+
+it('replaces institution contacts and social media collections and canonicalizes handle urls through the admin api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/institutions', [
+        'name' => 'Admin API Institution Collections',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+        'contacts' => [
+            [
+                'category' => 'phone',
+                'value' => '0311111111',
+                'type' => 'main',
+                'is_public' => true,
+            ],
+            [
+                'category' => 'email',
+                'value' => 'asal@example.test',
+                'type' => 'work',
+                'is_public' => false,
+            ],
+        ],
+        'social_media' => [
+            [
+                'platform' => 'website',
+                'url' => 'https://example.test/institutions/admin-api-institution-collections',
+            ],
+            [
+                'platform' => 'instagram',
+                'username' => 'asal_handle',
+            ],
+        ],
+    ])->assertCreated();
+
+    $institutionRouteKey = (string) $createResponse->json('data.record.route_key');
+    $institution = Institution::query()->with(['contacts', 'socialMedia'])->findOrFail($institutionRouteKey);
+    $originalContactIds = $institution->contacts->modelKeys();
+    $originalSocialMediaIds = $institution->socialMedia->modelKeys();
+
+    $this->putJson('/api/v1/admin/institutions/'.$institutionRouteKey, [
+        'name' => 'Admin API Institution Collections Updated',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+        'contacts' => [
+            [
+                'category' => 'whatsapp',
+                'value' => '+60123456789',
+                'type' => 'work',
+                'is_public' => false,
+            ],
+        ],
+        'social_media' => [
+            [
+                'platform' => 'facebook',
+                'url' => 'https://facebook.com/admin-api-institution-collections-updated',
+            ],
+        ],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.name', 'Admin API Institution Collections Updated')
+        ->assertJsonPath('data.record.attributes.contacts.0.category', 'whatsapp')
+        ->assertJsonPath('data.record.attributes.social_media.0.platform', 'facebook')
+        ->assertJsonPath('data.record.attributes.social_media.0.username', 'admin-api-institution-collections-updated')
+        ->assertJsonPath('data.record.attributes.social_media.0.url', null);
+
+    $institution->refresh()->load(['contacts', 'socialMedia']);
+
+    $replacedContactIds = $institution->contacts->modelKeys();
+    $replacedSocialMediaIds = $institution->socialMedia->modelKeys();
+
+    expect($institution->contacts)->toHaveCount(1)
+        ->and($institution->contacts->first()?->getRawOriginal('category'))->toBe('whatsapp')
+        ->and($institution->contacts->first()?->getRawOriginal('type'))->toBe('work')
+        ->and(collect($replacedContactIds)->intersect($originalContactIds)->all())->toBe([])
+        ->and($institution->socialMedia)->toHaveCount(1)
+        ->and($institution->socialMedia->first()?->getRawOriginal('platform'))->toBe('facebook')
+        ->and($institution->socialMedia->first()?->username)->toBe('admin-api-institution-collections-updated')
+        ->and($institution->socialMedia->first()?->url)->toBeNull()
+        ->and(collect($replacedSocialMediaIds)->intersect($originalSocialMediaIds)->all())->toBe([]);
+
+    $this->putJson('/api/v1/admin/institutions/'.$institutionRouteKey, [
+        'name' => 'Admin API Institution Collections Updated',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+        ],
+        'contacts' => null,
+        'social_media' => [],
+    ])->assertOk();
+
+    $institution->refresh()->load(['contacts', 'socialMedia']);
+
+    expect($institution->contacts)->toHaveCount(0)
+        ->and($institution->socialMedia)->toHaveCount(0);
 });
 
 it('requires a record key when requesting an admin update schema', function () {
@@ -1562,6 +2330,125 @@ it('exposes admin venue write schema and can create and update venues through th
         ->assertJsonPath('data.record.attributes.address.google_maps_url', fn (string $url): bool => str_contains($url, 'google.com/maps/search'))
         ->assertJsonPath('data.record.attributes.address.lat', 3.147)
         ->assertJsonPath('data.record.attributes.address.lng', 101.694);
+});
+
+it('surfaces venue update semantics and destructive empty-address behavior through the admin api schema', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/venues', [
+        'name' => 'Admin API Venue Schema Surface',
+        'type' => 'dewan',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Dewan Schema',
+        ],
+    ])->assertCreated();
+
+    $schema = $this->getJson('/api/v1/admin/venues/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('name'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('type'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('status'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('address'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('address'), 'clear_semantics.empty_object'))->toBe('delete_existing_address')
+        ->and(data_get($fields->get('address.country_id'), 'required_on_update'))->toBeFalse()
+        ->and(data_get($fields->get('facilities'), 'collection_semantics.explicit_null'))->toBe('clear_collection')
+        ->and(data_get($fields->get('facilities'), 'input_normalization.kind'))->toBe('facility_list_to_boolean_map')
+        ->and(data_get($fields->get('contacts'), 'collection_semantics.submitted_array'))->toBe('replace_collection')
+        ->and(data_get($fields->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to'))->toBe('twitter')
+        ->and(data_get($fields->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation'))->toBeFalse();
+});
+
+it('replaces venue collections and deletes the address on an empty object through the admin api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/venues', [
+        'name' => 'Admin API Venue Collections',
+        'type' => 'dewan',
+        'status' => 'verified',
+        'is_active' => true,
+        'facilities' => ['parking', 'oku'],
+        'address' => [
+            'country_id' => 132,
+            'line1' => 'Dewan Koleksi',
+        ],
+        'contacts' => [[
+            'category' => 'phone',
+            'value' => '0312345678',
+            'type' => 'main',
+            'is_public' => true,
+        ]],
+        'social_media' => [[
+            'platform' => 'website',
+            'url' => 'https://example.com/venues/admin-api-venue-collections',
+        ], [
+            'platform' => 'instagram',
+            'username' => 'asal_venue',
+        ]],
+    ])->assertCreated();
+
+    $venueRouteKey = (string) $createResponse->json('data.record.route_key');
+    $venue = Venue::query()->with(['contacts', 'socialMedia'])->findOrFail($venueRouteKey);
+    $originalContactIds = $venue->contacts->modelKeys();
+    $originalSocialMediaIds = $venue->socialMedia->modelKeys();
+
+    $this->putJson('/api/v1/admin/venues/'.$venueRouteKey, [
+        'facilities' => ['women_section'],
+        'contacts' => [[
+            'category' => 'whatsapp',
+            'value' => '+60123456789',
+            'type' => 'work',
+            'is_public' => false,
+        ]],
+        'social_media' => [[
+            'platform' => 'facebook',
+            'url' => 'https://facebook.com/admin-api-venue-collections-updated',
+        ]],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.contacts.0.category', 'whatsapp')
+        ->assertJsonPath('data.record.attributes.social_media.0.platform', 'facebook')
+        ->assertJsonPath('data.record.attributes.social_media.0.username', 'admin-api-venue-collections-updated')
+        ->assertJsonPath('data.record.attributes.social_media.0.url', null);
+
+    $venue->refresh()->load(['contacts', 'socialMedia']);
+
+    expect($venue->facilities)->toBe([
+        'women_section' => true,
+    ])
+        ->and($venue->contacts)->toHaveCount(1)
+        ->and($venue->contacts->first()?->getRawOriginal('category'))->toBe('whatsapp')
+        ->and(collect($venue->contacts->modelKeys())->intersect($originalContactIds)->all())->toBe([])
+        ->and($venue->socialMedia)->toHaveCount(1)
+        ->and($venue->socialMedia->first()?->getRawOriginal('platform'))->toBe('facebook')
+        ->and($venue->socialMedia->first()?->username)->toBe('admin-api-venue-collections-updated')
+        ->and($venue->socialMedia->first()?->url)->toBeNull()
+        ->and(collect($venue->socialMedia->modelKeys())->intersect($originalSocialMediaIds)->all())->toBe([]);
+
+    $this->putJson('/api/v1/admin/venues/'.$venueRouteKey, [
+        'address' => [],
+        'facilities' => null,
+        'contacts' => null,
+        'social_media' => [],
+    ])->assertOk();
+
+    $venue->refresh()->load(['contacts', 'socialMedia']);
+
+    expect($venue->addressModel)->toBeNull()
+        ->and($venue->facilities)->toBe([])
+        ->and($venue->contacts)->toHaveCount(0)
+        ->and($venue->socialMedia)->toHaveCount(0);
 });
 
 it('lists admin geography catalogs and exposes catalog metadata through admin write schemas', function () {
@@ -1732,6 +2619,101 @@ it('exposes admin reference write schema and can create and update references th
         ->assertJsonPath('data.record.attributes.slug', 'admin-api-reference-updated');
 });
 
+it('surfaces reference update semantics and social-media normalization rules through the admin api schema', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/references', [
+        'title' => 'Admin API Reference Schema Surface',
+        'type' => 'book',
+        'status' => 'verified',
+    ])->assertCreated();
+
+    $schema = $this->getJson('/api/v1/admin/references/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('author'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('author'), 'normalization.empty_string_at_mutation_layer'))->toBe('null')
+        ->and(data_get($fields->get('publication_year'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('publisher'), 'clear_semantics.explicit_null'))->toBe('clear_to_null')
+        ->and(data_get($fields->get('social_media'), 'collection_semantics.explicit_null'))->toBe('clear_collection')
+        ->and(data_get($fields->get('social_media'), 'collection_semantics.submitted_array'))->toBe('replace_collection')
+        ->and(data_get($fields->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to'))->toBe('twitter')
+        ->and(data_get($fields->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation'))->toBeFalse();
+});
+
+it('clears normalized reference scalars and replaces canonicalized social media through the admin api', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/references', [
+        'title' => 'Admin API Reference Collections',
+        'author' => 'Penulis Lama',
+        'type' => 'book',
+        'publication_year' => '2024',
+        'publisher' => 'Penerbit Lama',
+        'status' => 'verified',
+        'is_active' => true,
+        'social_media' => [[
+            'platform' => 'website',
+            'url' => 'https://example.com/references/admin-api-reference-collections',
+        ], [
+            'platform' => 'instagram',
+            'username' => 'asal_reference',
+        ]],
+    ])->assertCreated();
+
+    $referenceRouteKey = (string) $createResponse->json('data.record.route_key');
+    $reference = Reference::query()->with('socialMedia')->where('slug', $referenceRouteKey)->firstOrFail();
+    $originalSocialMediaIds = $reference->socialMedia->modelKeys();
+
+    $this->putJson('/api/v1/admin/references/'.$referenceRouteKey, [
+        'title' => 'Admin API Reference Collections Updated',
+        'author' => null,
+        'type' => 'book',
+        'publication_year' => '',
+        'publisher' => '',
+        'status' => 'verified',
+        'is_active' => true,
+        'social_media' => [[
+            'platform' => 'youtube',
+            'url' => 'https://youtube.com/@admin-api-reference-collections-updated',
+        ]],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.title', 'Admin API Reference Collections Updated')
+        ->assertJsonPath('data.record.attributes.author', null)
+        ->assertJsonPath('data.record.attributes.publication_year', null)
+        ->assertJsonPath('data.record.attributes.publisher', null)
+        ->assertJsonPath('data.record.attributes.social_media.0.platform', 'youtube')
+        ->assertJsonPath('data.record.attributes.social_media.0.username', 'admin-api-reference-collections-updated')
+        ->assertJsonPath('data.record.attributes.social_media.0.url', null);
+
+    $reference->refresh()->load('socialMedia');
+
+    $updatedReferenceRouteKey = (string) $reference->getRouteKey();
+
+    expect($reference->author)->toBeNull()
+        ->and($reference->publication_year)->toBeNull()
+        ->and($reference->publisher)->toBeNull()
+        ->and($reference->socialMedia)->toHaveCount(1)
+        ->and($reference->socialMedia->first()?->getRawOriginal('platform'))->toBe('youtube')
+        ->and($reference->socialMedia->first()?->username)->toBe('admin-api-reference-collections-updated')
+        ->and($reference->socialMedia->first()?->url)->toBeNull()
+        ->and(collect($reference->socialMedia->modelKeys())->intersect($originalSocialMediaIds)->all())->toBe([]);
+
+    $this->putJson('/api/v1/admin/references/'.$updatedReferenceRouteKey, [
+        'title' => 'Admin API Reference Collections Updated',
+        'type' => 'book',
+        'status' => 'verified',
+        'social_media' => null,
+    ])->assertOk();
+
+    expect($reference->fresh()->socialMedia)->toHaveCount(0);
+});
+
 it('exposes admin subdistrict write schema and can create and update subdistricts through the api', function () {
     $admin = adminApiUser('super_admin');
     Sanctum::actingAs($admin);
@@ -1793,6 +2775,64 @@ it('exposes admin subdistrict write schema and can create and update subdistrict
     expect((int) $subdistrict->state_id)->toBe($fixtures['state_id'])
         ->and((int) $subdistrict->district_id)->toBe($fixtures['district_id'])
         ->and($subdistrict->name)->toBe('Admin API Updated Subdistrict');
+});
+
+it('surfaces subdistrict update semantics through the admin api schema', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $fixtures = ensureAdminApiSubdistrictFixtures();
+
+    $createResponse = $this->postJson('/api/v1/admin/subdistricts', [
+        'country_id' => $fixtures['country_id'],
+        'state_id' => $fixtures['federal_state_id'],
+        'district_id' => null,
+        'name' => 'Admin API Schema Subdistrict',
+    ])->assertCreated();
+
+    $schema = $this->getJson('/api/v1/admin/subdistricts/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+
+    expect(data_get($fields->get('country_id'), 'relation'))->toBe('countries')
+        ->and(data_get($fields->get('state_id'), 'must_match'))->toBe(['country_id'])
+        ->and(data_get($fields->get('district_id'), 'clear_semantics.explicit_null'))->toBe('allowed_only_for_federal_territory_state')
+        ->and(data_get($fields->get('district_id'), 'must_match'))->toBe(['country_id', 'state_id'])
+        ->and(data_get($fields->get('name'), 'normalization.trim'))->toBeTrue();
+});
+
+it('trims subdistrict names and allows null districts for federal territory updates through the admin api', function () {
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $fixtures = ensureAdminApiSubdistrictFixtures();
+
+    $createResponse = $this->postJson('/api/v1/admin/subdistricts', [
+        'country_id' => $fixtures['country_id'],
+        'state_id' => $fixtures['federal_state_id'],
+        'district_id' => null,
+        'name' => '  Admin API Trimmed Federal Territory Subdistrict  ',
+    ])->assertCreated()
+        ->assertJsonPath('data.record.attributes.name', 'Admin API Trimmed Federal Territory Subdistrict');
+
+    $subdistrictRouteKey = (string) $createResponse->json('data.record.route_key');
+    $subdistrict = Subdistrict::query()->findOrFail($subdistrictRouteKey);
+
+    $this->putJson('/api/v1/admin/subdistricts/'.$subdistrictRouteKey, [
+        'country_id' => $fixtures['country_id'],
+        'state_id' => $fixtures['federal_state_id'],
+        'district_id' => null,
+        'name' => '  Admin API Updated Federal Territory Subdistrict  ',
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.name', 'Admin API Updated Federal Territory Subdistrict')
+        ->assertJsonPath('data.record.attributes.district_id', null);
+
+    $subdistrict->refresh();
+
+    expect($subdistrict->name)->toBe('Admin API Updated Federal Territory Subdistrict')
+        ->and($subdistrict->district_id)->toBeNull();
 });
 
 it('clamps admin collection per_page values to the supported maximum', function () {
@@ -1928,6 +2968,134 @@ it('exposes admin event write schema and can create and update events through th
         ->and($event->tags->pluck('id')->all())->not->toContain($domainTag->getKey(), $disciplineTag->getKey())
         ->and($event->keyPeople)->toHaveCount(0)
         ->and($event->slug)->toContain($speaker->slug);
+});
+
+it('surfaces event update semantics and sparse relation rules through the admin api schema', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+
+    $createResponse = $this->postJson('/api/v1/admin/events', adminApiEventPayload([
+        'institution' => $institution,
+        'speaker' => $speaker,
+        'reference' => $reference,
+        'series' => $series,
+        'domain_tag' => $domainTag,
+        'discipline_tag' => $disciplineTag,
+    ]))->assertCreated();
+
+    $schema = $this->getJson('/api/v1/admin/events/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+        ->assertOk()
+        ->json('data.schema');
+
+    $fields = collect($schema['fields'] ?? [])->keyBy('name');
+    $otherKeyPeopleFields = collect(data_get($fields->get('other_key_people'), 'item_schema.fields', []))->keyBy('name');
+
+    expect(data_get($fields->get('title'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('event_date'), 'required'))->toBeFalse()
+        ->and(data_get($fields->get('event_type'), 'collection_semantics.empty_array'))->toBe('invalid_minimum_size')
+        ->and(data_get($fields->get('languages'), 'collection_semantics.submitted_array'))->toBe('replace_relation_sync')
+        ->and(data_get($fields->get('references'), 'collection_semantics.explicit_null'))->toBe('clear_collection')
+        ->and(data_get($fields->get('domain_tags'), 'tag_type'))->toBe('domain')
+        ->and(data_get($fields->get('organizer_type'), 'accepted_aliases.institution'))->toBe(Institution::class)
+        ->and(data_get($fields->get('speakers'), 'collection_semantics.submitted_array'))->toBe('replace_speaker_subset_and_rebuild_key_people')
+        ->and(data_get($fields->get('speakers'), 'collection_semantics.item_ids_preserved'))->toBeFalse()
+        ->and(data_get($fields->get('other_key_people'), 'collection_semantics.ordering'))->toBe('payload_order_sets_order_column_after_speakers')
+        ->and($otherKeyPeopleFields->keys()->all())->toContain('role', 'speaker_id', 'name', 'is_public', 'notes')
+        ->and(data_get($fields->get('registration_mode'), 'lock_behavior.when_event_has_registrations'))->toBe('retain_current_value');
+});
+
+it('supports sparse event updates while replacing submitted relation collections through the admin api', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $languageMalay = Language::where('code', 'ms')->first() ?? Language::query()->create([
+        'code' => 'ms',
+        'name' => 'Malay',
+        'name_native' => 'Bahasa Melayu',
+        'dir' => 'ltr',
+    ]);
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $secondSpeaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $reference = Reference::factory()->verified()->create();
+    $series = Series::factory()->create();
+    $domainTag = Tag::factory()->domain()->verified()->create();
+    $disciplineTag = Tag::factory()->discipline()->verified()->create();
+    $sourceTag = Tag::factory()->source()->verified()->create();
+
+    $createResponse = $this->postJson('/api/v1/admin/events', adminApiEventPayload([
+        'institution' => $institution,
+        'speaker' => $speaker,
+        'reference' => $reference,
+        'series' => $series,
+        'domain_tag' => $domainTag,
+        'discipline_tag' => $disciplineTag,
+    ], [
+        'languages' => [$languageMalay->id],
+        'source_tags' => [(string) $sourceTag->getKey()],
+    ]))->assertCreated();
+
+    $eventRouteKey = (string) $createResponse->json('data.record.route_key');
+    $event = Event::query()
+        ->with(['references', 'series', 'tags', 'keyPeople', 'languages'])
+        ->findOrFail($eventRouteKey);
+    $originalKeyPeopleIds = $event->keyPeople->modelKeys();
+
+    $this->putJson('/api/v1/admin/events/'.$eventRouteKey, [
+        'live_url' => null,
+        'references' => null,
+        'series' => [],
+        'languages' => [],
+        'domain_tags' => [],
+        'speakers' => [(string) $speaker->getKey(), (string) $secondSpeaker->getKey()],
+    ])->assertOk()
+        ->assertJsonPath('data.record.attributes.title', 'Admin API Event Created')
+        ->assertJsonPath('data.record.attributes.live_url', null);
+
+    $event->refresh()->load(['references', 'series', 'tags', 'keyPeople', 'languages']);
+
+    expect($event->title)->toBe('Admin API Event Created')
+        ->and($event->live_url)->toBeNull()
+        ->and($event->organizer_type)->toBe(Institution::class)
+        ->and($event->references)->toHaveCount(0)
+        ->and($event->series)->toHaveCount(0)
+        ->and($event->languages)->toHaveCount(0)
+        ->and($event->tags->pluck('id')->all())->toContain($disciplineTag->getKey(), $sourceTag->getKey())
+        ->and($event->tags->pluck('id')->all())->not->toContain($domainTag->getKey())
+        ->and($event->keyPeople)->toHaveCount(3)
+        ->and($event->keyPeople->where('role', EventKeyPersonRole::Speaker)->pluck('speaker_id')->all())->toEqualCanonicalizing([
+            (string) $speaker->getKey(),
+            (string) $secondSpeaker->getKey(),
+        ])
+        ->and($event->keyPeople->where('role', EventKeyPersonRole::Moderator)->count())->toBe(1)
+        ->and(collect($event->keyPeople->modelKeys())->intersect($originalKeyPeopleIds)->all())->toBe([]);
 });
 
 it('rejects admin event writes that omit required speakers for speaker-led event types', function () {

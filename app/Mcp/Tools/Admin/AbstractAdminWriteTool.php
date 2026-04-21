@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Support\Api\Admin\AdminResourceService;
 use App\Support\Api\Admin\AdminValidateOnlyRemediationPlanner;
 use App\Support\Api\Admin\AdminWriteValidationFeedback;
-use App\Support\Location\PreferredCountryResolver;
 use App\Support\Mcp\McpAuthenticatedUserResolver;
 use App\Support\Mcp\McpFilePayloadNormalizer;
 use Illuminate\Support\Arr;
@@ -103,14 +102,6 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
      */
     protected function normalizePayloadForWriteTool(string $resourceKey, array $payload): array
     {
-        if ($resourceKey !== 'speakers' || ! is_array($payload['address'] ?? null) || $payload['address'] !== []) {
-            return $payload;
-        }
-
-        $payload['address'] = [
-            'country_id' => app(PreferredCountryResolver::class)->resolveId(),
-        ];
-
         return $payload;
     }
 
