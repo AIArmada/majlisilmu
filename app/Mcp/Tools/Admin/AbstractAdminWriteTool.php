@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Admin;
 
 use App\Models\User;
+use App\Support\Api\Admin\AdminValidateOnlyRemediationPlanner;
 use App\Support\Api\Admin\AdminResourceService;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Mcp\McpAuthenticatedUserResolver;
@@ -12,6 +13,8 @@ use App\Support\Mcp\McpFilePayloadNormalizer;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
+use Laravel\Mcp\ResponseFactory;
+use Laravel\Mcp\Support\ValidationMessages;
 
 abstract class AbstractAdminWriteTool extends AbstractAdminTool
 {
@@ -121,5 +124,28 @@ abstract class AbstractAdminWriteTool extends AbstractAdminTool
             is_bool($value) => $value,
             default => $value !== null,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $schemaResponse
+     */
+    protected function validateOnlyErrorResponse(
+        ValidationException $exception,
+        array $payload,
+        array $schemaResponse,
+    ): ResponseFactory {
+        return $this->errorResponse(
+            ValidationMessages::from($exception),
+            'validation_error',
+            [
+                'errors' => $exception->errors(),
+                ...app(AdminValidateOnlyRemediationPlanner::class)->build(
+                    payload: $payload,
+                    schemaResponse: $schemaResponse,
+                    errors: $exception->errors(),
+                ),
+            ],
+        );
     }
 }
