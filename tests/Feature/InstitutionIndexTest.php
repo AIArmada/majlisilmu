@@ -47,6 +47,13 @@ it('renders translated hero and search copy on institution index', function () {
         ->assertSee(__('Search institutions...'));
 });
 
+it('shows an icon clear button when the institution search has a query', function () {
+    get('/institusi?search='.urlencode('bitu'))
+        ->assertSuccessful()
+        ->assertSee('aria-label="Clear search"', false)
+        ->assertSee('M6 6l8 8M14 6l-8 8', false);
+});
+
 it('renders translated no-result copy on institution index', function () {
     app()->setLocale('ms');
 

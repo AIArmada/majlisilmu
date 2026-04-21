@@ -15,6 +15,7 @@ use App\Mcp\Tools\Member\MemberCancelMembershipClaimTool;
 use App\Mcp\Tools\Member\MemberCreateGitHubIssueTool;
 use App\Mcp\Tools\Member\MemberDocumentationFetchTool;
 use App\Mcp\Tools\Member\MemberDocumentationSearchTool;
+use App\Mcp\Tools\Member\MemberGetRecordActionsTool;
 use App\Mcp\Tools\Member\MemberGetRecordTool;
 use App\Mcp\Tools\Member\MemberGetResourceMetaTool;
 use App\Mcp\Tools\Member\MemberGetWriteSchemaTool;
@@ -31,6 +32,7 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\MembershipClaim;
 use App\Models\PassportUser;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Support\GitHub\GitHubIssueReportContract;
@@ -86,6 +88,7 @@ it('returns member resource metadata, record listings, and record detail for ins
         ->assertStructuredContent(fn ($json) => $json
             ->where('data.resource.key', 'institutions')
             ->where('data.resource.write_support.update', true)
+            ->where('data.resource.mcp_tools.get_record_actions.tool', 'member-get-record-actions')
             ->etc());
 
     MemberServer::actingAs($member)
@@ -114,6 +117,28 @@ it('returns member resource metadata, record listings, and record detail for ins
             ->etc());
 });
 
+it('returns focused next-step actions for member records through the MCP server', function () {
+    [$member, $institution] = institutionMemberMcpContext(role: 'admin', status: 'verified');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberGetRecordActionsTool::class, [
+            'resource_key' => 'institutions',
+            'record_key' => $institution->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'institutions')
+            ->where('data.record.route_key', $institution->getRouteKey())
+            ->where('data.focus_actions.recommended_keys.0', 'get_update_schema')
+            ->where('data.focus_actions.actions', fn ($actions): bool => empty(array_diff(
+                ['get_record', 'get_update_schema', 'update_record'],
+                collect($actions)->pluck('key')->all(),
+            )))
+            ->where('data.focus_actions.actions', fn ($actions): bool => data_get(collect($actions)->firstWhere('key', 'update_record'), 'tool') === 'member-update-record')
+            ->where('data.focus_actions.actions', fn ($actions): bool => data_get(collect($actions)->firstWhere('key', 'update_record'), 'arguments.validate_only', false) === true)
+            ->etc());
+});
+
 it('exposes timezone-aware metadata for member event resources', function () {
     [$member] = institutionMemberMcpContext();
 
@@ -130,6 +155,7 @@ it('exposes timezone-aware metadata for member event resources', function () {
             ->where('data.resource.mcp_tools.list_records.arguments.starts_before', null)
             ->where('data.resource.mcp_tools.list_records.arguments.starts_on_local_date', null)
             ->where('data.resource.mcp_tools.list_records.tool', 'member-list-records')
+            ->where('data.resource.mcp_tools.get_record_actions.tool', 'member-get-record-actions')
             ->where('data.resource.mcp_tools.list_records.arguments.resource_key', 'events')
             ->etc());
 });
@@ -284,8 +310,20 @@ it('returns member update schema and updates institutions through member MCP wri
             ->where('data.schema.media_uploads_supported', true)
             ->where('data.schema.media_upload_transport', 'json_base64_descriptor')
             ->where('data.schema.unsupported_fields', [])
-            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'logo'), 'mcp_upload.shape') === 'file_descriptor'
-                && data_get(collect($fields)->firstWhere('name', 'gallery'), 'mcp_upload.shape') === 'array<file_descriptor>')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+                $contactItemFields = collect(data_get($fieldMap->get('contacts'), 'item_schema.fields', []))->keyBy('name');
+
+                return data_get($fieldMap->get('logo'), 'mcp_upload.shape') === 'file_descriptor'
+                    && data_get($fieldMap->get('gallery'), 'mcp_upload.shape') === 'array<file_descriptor>'
+                    && data_get($fieldMap->get('address'), 'required') === false
+                    && data_get($fieldMap->get('nickname'), 'normalization.empty_string_at_mutation_layer') === 'null'
+                    && data_get($fieldMap->get('contacts'), 'collection_semantics.explicit_null') === 'clear_collection'
+                    && $contactItemFields->has('type')
+                    && $contactItemFields->has('value')
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to') === 'twitter'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation') === false;
+            })
             ->etc());
 
     MemberServer::actingAs($member)
@@ -332,6 +370,116 @@ it('returns member update schema and updates institutions through member MCP wri
             ],
         ])
         ->assertHasErrors(['Destructive media clear flags are not supported through MCP. Upload a replacement file or array when the schema advertises that media field.']);
+});
+
+it('returns member update schema for speakers with surfaced mutation semantics', function () {
+    [$member, $speaker] = speakerMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberGetWriteSchemaTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => $speaker->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'speakers')
+            ->where('data.schema.resource_key', 'speakers')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+                $qualificationItemFields = collect(data_get($fieldMap->get('qualifications'), 'item_schema.fields', []))->keyBy('name');
+
+                return data_get($fieldMap->get('avatar'), 'mcp_upload.shape') === 'file_descriptor'
+                    && data_get($fieldMap->get('gallery'), 'mcp_upload.shape') === 'array<file_descriptor>'
+                    && data_get($fieldMap->get('address'), 'required') === false
+                    && data_get($fieldMap->get('address'), 'clear_semantics.empty_object') === 'invalid_without_country'
+                    && data_get($fieldMap->get('address.country_id'), 'required_when_parent_present_on_update') === true
+                    && data_get($fieldMap->get('language_ids'), 'collection_semantics.submitted_array') === 'replace_relation_sync'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to') === 'twitter'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation') === false
+                    && $qualificationItemFields->has('institution')
+                    && $qualificationItemFields->has('degree');
+            })
+            ->etc());
+});
+
+it('requires an explicit speaker country when the address is mutated through member MCP write tools', function () {
+    [$member, $speaker] = speakerMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberUpdateRecordTool::class, [
+            'resource_key' => 'speakers',
+            'record_key' => $speaker->getKey(),
+            'payload' => [
+                'name' => $speaker->name,
+                'gender' => 'male',
+                'status' => 'verified',
+                'address' => [],
+            ],
+        ])
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('error.code', 'validation_error')
+            ->where('error.details.errors', function ($errors): bool {
+                return (collect($errors)->get('address.country_id')[0] ?? null) === 'The address country is required.';
+            })
+            ->etc());
+});
+
+it('returns member update schema for references with surfaced mutation semantics', function () {
+    [$member, $reference] = referenceMemberMcpContext(role: 'admin');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberGetWriteSchemaTool::class, [
+            'resource_key' => 'references',
+            'record_key' => $reference->getRouteKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'references')
+            ->where('data.schema.resource_key', 'references')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+
+                return data_get($fieldMap->get('front_cover'), 'mcp_upload.shape') === 'file_descriptor'
+                    && data_get($fieldMap->get('gallery'), 'mcp_upload.shape') === 'array<file_descriptor>'
+                    && data_get($fieldMap->get('author'), 'clear_semantics.explicit_null') === 'clear_to_null'
+                    && data_get($fieldMap->get('publication_year'), 'normalization.empty_string_at_mutation_layer') === 'null'
+                    && data_get($fieldMap->get('social_media'), 'collection_semantics.submitted_array') === 'replace_collection'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.normalizes_to') === 'twitter'
+                    && data_get($fieldMap->get('social_media'), 'input_normalization.platform_aliases.x.accepted_by_write_validation') === false;
+            })
+            ->etc());
+});
+
+it('returns member update schema for events with surfaced mutation semantics', function () {
+    [$member, $institution] = institutionMemberMcpContext(role: 'admin');
+
+    $event = Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'status' => 'approved',
+    ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberGetWriteSchemaTool::class, [
+            'resource_key' => 'events',
+            'record_key' => $event->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'events')
+            ->where('data.schema.resource_key', 'events')
+            ->where('data.schema.fields', function ($fields): bool {
+                $fieldMap = collect($fields)->keyBy('name');
+                $otherKeyPeopleFields = collect(data_get($fieldMap->get('other_key_people'), 'item_schema.fields', []))->keyBy('name');
+
+                return data_get($fieldMap->get('title'), 'required') === false
+                    && data_get($fieldMap->get('references'), 'collection_semantics.explicit_null') === 'clear_collection'
+                    && data_get($fieldMap->get('speakers'), 'collection_semantics.submitted_array') === 'replace_speaker_subset_and_rebuild_key_people'
+                    && data_get($fieldMap->get('organizer_type'), 'accepted_aliases.speaker') === Speaker::class
+                    && data_get($fieldMap->get('registration_mode'), 'lock_behavior.when_event_has_registrations') === 'retain_current_value'
+                    && $otherKeyPeopleFields->has('role')
+                    && $otherKeyPeopleFields->has('name');
+            })
+            ->etc());
 });
 
 it('registers member write tools when the MCP actor is a normalized Passport user', function () {
@@ -689,6 +837,7 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'member-list-records',
         'member-list-related-records',
         'member-get-record',
+        'member-get-record-actions',
         'member-get-write-schema',
         'member-list-contribution-requests',
         'member-approve-contribution-request',
@@ -840,6 +989,7 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'member-list-records',
         'member-list-related-records',
         'member-get-record',
+        'member-get-record-actions',
         'member-get-write-schema',
         'member-list-contribution-requests',
         'member-approve-contribution-request',
@@ -1063,6 +1213,25 @@ function speakerMemberMcpContext(string $role = 'viewer', string $status = 'veri
     app(AddMemberToSubject::class)->handle($speaker, $member, $role);
 
     return [$member, $speaker];
+}
+
+/**
+ * @return array{0: User, 1: Reference}
+ */
+function referenceMemberMcpContext(string $role = 'viewer', string $status = 'verified'): array
+{
+    $reference = Reference::factory()->create([
+        'status' => $status,
+        'is_active' => $status === 'verified',
+    ]);
+    $member = User::factory()->create([
+        'phone' => '+60112223344',
+        'phone_verified_at' => now(),
+    ]);
+
+    app(AddMemberToSubject::class)->handle($reference, $member, $role);
+
+    return [$member, $reference];
 }
 
 function globalRoleMcpUser(string $role): User

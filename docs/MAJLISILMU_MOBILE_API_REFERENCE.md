@@ -765,16 +765,128 @@ The `bio`, `qualifications`, `honorific`, `pre_nominal`, `post_nominal`, `langua
 
 To avoid unexpected `422` errors, always fetch the schema first and mirror the `required: true` fields verbatim.
 
+Speaker-specific update rules:
+
+- `address` is optional on update, but if you send it you must also send `address.country_id`.
+- `address = {}` returns HTTP `422` for speakers. Omit the `address` key entirely when you intend “no address change”.
+- Omitted speaker address region keys preserve the existing visible address values.
+- Hidden speaker address fields (`line1`, `line2`, `postcode`, `lat`, `lng`, `google_maps_url`, `google_place_id`, `waze_url`) remain prohibited on admin writes and are preserved only by omission.
+- The array-style speaker fields `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media` all use replacement semantics when present: omit to preserve, send `null` or `[]` to clear where the schema allows it, and resend the full array/list when editing.
+- `language_ids` syncs the exact set of selected languages; it is not patchable item-by-item.
+- `contacts` and `social_media` recreate rows rather than patching item ids in place. Payload order controls `order_column` when it is omitted.
+- For social media platform values, use the canonical enum values from the schema. For Twitter / X, the accepted raw HTTP write value is `twitter`, not `x`.
+
 ### Always-required fields for admin institution write operations
 
-Institution `PUT` is also a full-replacement PUT for core identity fields. The following are always required:
+Institution `PUT` is schema-guided: the core identity fields below are always required, but nested `address`, `contacts`, and `social_media` rules vary by field type.
 
 | Field | Type | Notes |
 |---|---|---|
 | `name` | `string` | Required on both create and update |
 | `type` | `string` | Required on both create and update |
 | `status` | `string` | `unverified`, `pending`, `verified`, or `rejected`. Required on both create and update |
-| `address.country_id` | `integer` | Required country field |
+
+Institution-specific update rules:
+
+- `address` is **optional on update**. If you send it, omitted nested keys preserve the existing institution address values.
+- `address.country_id` is **required on create**, but on update it may be omitted when the institution already has an address with a stored country.
+- For institutions that already have an address, `address = {}` is effectively a no-op because the existing country is reused during normalization before persistence.
+- `nickname` is merge-preserving on update: omitting it or sending `null` preserves the current stored nickname. On the raw HTTP admin API, empty strings may also be normalized to `null` before validation, so do not rely on `null` or `""` as a top-level clear operation.
+- `contacts` and `social_media` are destructive replacement collections on institution writes: omit the field to preserve the existing collection, send `null` or `[]` to clear it, and send the **full modified array** when you want to keep some existing items.
+- Submitted `contacts` and `social_media` arrays recreate rows rather than patching items in place, so item ids are not stable across updates.
+- When `order_column` is omitted, contact/social ordering follows payload order.
+
+Nested collection item contracts for institutions:
+
+- `contacts[]`
+  - `category` + `value` are the paired identity fields.
+  - `type` is a valid write field and defaults to `main` when omitted.
+  - `is_public` is optional.
+  - `order_column` is optional.
+  - Use `value` for all categories, including `phone` and `whatsapp`.
+- `social_media[]`
+  - `platform` is required when the row has identity data.
+  - At least one of `username` or `url` must be present.
+  - `order_column` is optional.
+  - Handle-style platforms (`facebook`, `twitter`, `instagram`, `youtube`, `tiktok`, `telegram`, `whatsapp`, `linkedin`, `threads`) may canonicalize a submitted URL or handle into stored `username`, and the persisted `url` may become `null` after normalization.
+  - Use `twitter` as the raw HTTP write value for Twitter / X; do not submit `x`.
+
+### Venue-specific update rules
+
+- Venue `PUT` is sparse. `name`, `type`, and `status` are required on create, but they are not required on update.
+- `address` is optional on update. If you send a non-empty address object, omitted nested keys preserve the existing stored address values.
+- `address.country_id` is required on create, but on update it may be omitted when the venue already has a stored country.
+- `address = {}` is destructive for venues: it deletes the existing stored address. Omit `address` entirely when you intend no address change.
+- `facilities` is a replacement set, not a patchable map: omit to preserve, send `null` or `[]` to clear, and send the full enabled facility list when updating. The save layer normalizes list input into the stored boolean map.
+- `contacts` and `social_media` use destructive replacement semantics exactly like institutions.
+- For social media platform values, use `twitter` as the raw HTTP write value for Twitter / X.
+
+### Reference-specific update rules
+
+- Reference `PUT` still requires `title`, `type`, and `status`.
+- `author`, `publication_year`, and `publisher` are normalized string scalars: omit to preserve, send `null` to clear, and raw HTTP empty strings also clear because request middleware normalizes them to `null` before persistence.
+- `social_media` uses destructive replacement semantics: omit to preserve, send `null` or `[]` to clear, and resend the full collection when editing.
+- Handle-style social platforms may canonicalize submitted URLs or handles into stored `username`, with persisted `url` returned as `null` after normalization.
+- For Twitter / X, use the canonical write value `twitter`.
+
+### Event-specific update rules
+
+- Event `PUT` is sparse on the raw admin API. Core fields such as `title`, `event_date`, `prayer_time`, `timezone`, `event_format`, `visibility`, `gender`, `age_group`, and `event_type` are required on create, but they may be omitted on update.
+- Optional URL scalars like `event_url`, `live_url`, and `recording_url` preserve the current value when omitted and clear to `null` when you send `null` or `""`.
+- The relation arrays `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, and `issue_tags` use server-merged replacement semantics on update: omit to preserve the current set, send `null` or `[]` to clear, and send the full replacement list when changing them.
+- `speakers` and `other_key_people` also preserve on omission, but any submitted array rebuilds the underlying `key_people` rows. Stable item ids are not preserved, and payload order becomes the new `order_column` sequence (speaker rows first, then `other_key_people`).
+- `organizer_type` accepts the canonical class names plus the raw HTTP aliases `institution` and `speaker`.
+- `registration_mode` may remain locked to the current stored value when the event already has registrations.
+
+### Series-specific update rules
+
+- Series `PUT` still requires `title`, `slug`, and `visibility`.
+- `description` preserves on omission and clears to `null` when you send `null` or `""`.
+- `languages` is a replacement relation: omit to preserve, send `null` or `[]` to clear, and send the full list when changing it.
+- `slug` is trimmed before persistence and must remain unique across `series` records.
+
+### Donation-channel-specific update rules
+
+- Donation channel `PUT` still requires `donatable_type`, `donatable_id`, `recipient`, `method`, and `status`.
+- `donatable_type` is normalized to the canonical owner morph value. The raw HTTP admin API accepts alias inputs like `institutions`, `speakers`, `events`, and the model class names, but stored output is canonicalized.
+- `label`, `reference_note`, `bank_code`, `ewallet_handle`, and `ewallet_qr_payload` are trimmed optional scalars: omit to preserve, send `null` or `""` to clear.
+- Switching `method` clears unrelated method-specific fields. Example: changing from `bank_account` to `duitnow` clears the bank and ewallet fields before persisting the DuitNow payload.
+- `clear_qr=true` is supported on the raw HTTP admin API when you need to remove the stored QR media without uploading a replacement.
+
+### Inspiration-specific update rules
+
+- Inspiration `PUT` still requires `category`, `locale`, `title`, and `content`.
+- `content` is normalized as rich text and can accept either a plain string or a rich-text document payload.
+- `source` is a normalized optional scalar: omit to preserve, send `null` or `""` to clear.
+- `main` is a single-file media collection: omitting it preserves the current media, uploading a new file replaces the collection, and raw HTTP `clear_main=true` removes the stored file without uploading a replacement.
+
+### Space-specific update rules
+
+- Space `PUT` still requires `name` and `slug`.
+- `slug` is trimmed before persistence and must remain unique across `spaces` records.
+- `capacity` preserves on omission and clears to `null` when you send `null` or `""`; non-null values must still be integers greater than or equal to `1`.
+- `institutions` is a replacement relation: omit to preserve, send `null` or `[]` to clear, and send the full institution id list when updating it.
+
+### Report-specific update rules
+
+- Report `PUT` still requires `entity_type`, `entity_id`, `category`, and `status`.
+- `category` values are resolved from `entity_type`, so changing the entity type can also change which categories are valid.
+- `description` and `resolution_note` are normalized optional scalars: omit to preserve, send `null` or `""` to clear.
+- `reporter_id` and `handled_by` are optional user references: omit to preserve, send `null` to clear, and otherwise send a valid user id.
+- `evidence` is a replacement file collection on raw HTTP writes: omit or send `null` to preserve, send `[]` to clear, and send the full file array when replacing it. The raw HTTP `clear_evidence=true` flag also clears the collection.
+
+### Tag-specific update rules
+
+- Tag `PUT` still requires `name.ms`, `type`, and `status`.
+- `name.en` is optional and falls back to `name.ms` when it is omitted, `null`, or `""`.
+- `order_column` preserves on omission. Sending `null` or `""` does not clear it to `null`; it hands ordering back to the sortable scope and the server recomputes the stored order value.
+
+### Subdistrict-specific update rules
+
+- Subdistrict `PUT` still requires `country_id`, `state_id`, and `name`.
+- `name` is trimmed before persistence.
+- `state_id` must match the selected `country_id`.
+- `district_id` is required for non-federal-territory states, may be `null` only for federal-territory states, and when present it must match both the selected `country_id` and `state_id`.
 
 ### Admin write-contract rules you must follow
 
@@ -793,6 +905,18 @@ Institution `PUT` is also a full-replacement PUT for core identity fields. The f
   - `address.waze_url`
 - Admin speaker clients should send the explicit country field plus regional location keys such as `address.state_id`, `address.district_id`, and `address.subdistrict_id`.
 - The `allow_public_event_submission` field is only accepted on `PUT` (update), not on `POST` (create). Sending it on create returns `422`.
+- For events, sparse `PUT` updates are supported. Omitted scalar fields and relation arrays preserve the current stored value; you only need to send the arrays that should actually change.
+- For events, submitted `speakers` or `other_key_people` arrays rebuild the combined `key_people` rows. Do not rely on row ids surviving an update.
+- For institutions, speakers, venues, and references, fetch the current record before editing `contacts` or `social_media`, modify the collection locally, then resend the **full** array. Generic patch-style array updates are not supported.
+- For speakers, apply the same fetch-modify-resend rule to `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, and `language_ids` whenever you want to preserve existing entries.
+- For venues, never send `address = {}` as a no-op placeholder. On the shared save path it removes the stored address.
+- For series, `languages` follows omit-preserve / null-clear / array-replace semantics, but `title`, `slug`, and `visibility` remain required on update.
+- For donation channels, remember that switching `method` intentionally wipes the unrelated bank / DuitNow / ewallet fields before saving the new method-specific payload.
+- For inspirations, raw HTTP `clear_main=true` is the explicit clear operation for the single `main` media collection.
+- For spaces, `institutions` is an exact replacement sync, not an append-only relation update.
+- For reports, remember that `evidence: []` clears the media collection while `evidence: null` preserves the current uploads.
+- For tags, treat `name.en` as optional display sugar: if you omit it, the server falls back to `name.ms`, and blank / null `order_column` values trigger sortable reordering instead of storing `null`.
+- For subdistricts, `district_id=null` is only valid for federal-territory states; for all other states it remains a validation error.
 
 ### Example: full admin speaker create/update flow
 
@@ -1200,6 +1324,13 @@ This section summarizes the non-obvious rules that AI agents must internalize be
 | Event | `title`, `event_date`, `prayer_time`, `timezone`, `event_format`, `visibility`, `gender`, `age_group`, `event_type` | — |
 
 > Admin PUT is a full-field replacement for required fields. Always send all `required: true` fields from the schema even when updating.
+
+Important exceptions and mixed-semantic reminders:
+
+- Speaker updates still require `name`, `gender`, and `status`, but `address` remains optional; if you send it, include `address.country_id`, and never use `address = {}` as a no-op.
+- Venue updates are sparse; `name`, `type`, and `status` are not required on update. `address = {}` deletes the stored venue address.
+- Reference updates still require `title`, `type`, and `status`, while optional normalized scalars like `author` and `publisher` clear to `null` when you send `null`.
+- For social-media writes across institutions, speakers, venues, and references, use `twitter` as the canonical write value for Twitter / X.
 
 ### Search result scope
 

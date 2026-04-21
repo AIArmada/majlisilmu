@@ -10717,3 +10717,41 @@
   - locale JSON validation => **json ok**
   - database rule checks => **no SoftDeletes matches** and **packages directory not present for package migration constraint scan**
   - `git diff --check -- ...` on touched files => **clean**
+
+  ---
+
+  # Institutions Search Clear Icon Parity
+
+  - [x] Inspect `/institusi` and `/penceramah` search controls
+  - [x] Replace institutions clear-text action with speaker-style X icon button
+  - [x] Add a regression test for the icon clear button markup
+  - [x] Run formatting and focused verification
+
+  ## Review
+
+  - Updated `resources/views/components/pages/institutions/⚡index.blade.php` so the search clear control now matches `/penceramah`:
+    - icon-only red pill button
+    - `aria-label` and sr-only text for accessibility
+    - same X SVG path as the speaker page
+  - Added `tests/Feature/InstitutionIndexTest.php` coverage to confirm the clear icon button renders when `search=bitu`.
+  - Verification:
+    - `vendor/bin/pint --dirty --format agent` => **pass**
+    - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **24 passed (97 assertions)**
+
+---
+
+# Institution Admin Description Rich Editor
+
+- [x] Switch institution admin description field to rich editor
+- [x] Render institution description HTML in admin infolist
+- [x] Add regression coverage for the admin edit form field type
+- [x] Run formatting and focused verification
+
+## Review
+
+- Updated `app/Filament/Resources/Institutions/Schemas/InstitutionForm.php` so the admin edit/create description field now uses `RichEditor` instead of `Textarea`.
+- Updated `app/Filament/Resources/Institutions/Schemas/InstitutionInfolist.php` to render the description as HTML on the view page, matching rich-text storage.
+- Added `tests/Feature/PublicSubmissionLockActionsTest.php` coverage to assert the admin institution edit form exposes `description` as a `RichEditor`.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => **fixed**
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicSubmissionLockActionsTest.php` => **11 passed (84 assertions)**

@@ -204,6 +204,8 @@ Use this section as the quick MCP-only capability summary.
 | Resource metadata | `admin-get-resource-meta` | `member-get-resource-meta` |
 | Record list | `admin-list-records` | `member-list-records` |
 | Record read | `admin-get-record` | `member-get-record` |
+| Record action guidance | `admin-get-record-actions` | `member-get-record-actions` |
+| Explicit workflow schema discovery | `admin-get-event-moderation-schema`, `admin-get-report-triage-schema`, `admin-get-contribution-request-review-schema`, `admin-get-membership-claim-review-schema` | Not exposed |
 | Related-record traversal | `admin-list-related-records` | `member-list-related-records` |
 | Write schema discovery | `admin-get-write-schema` | `member-get-write-schema` |
 | GitHub issue reporting | `admin-create-github-issue` | `member-create-github-issue` |
@@ -239,6 +241,19 @@ Admin GitHub issue reports can skip Copilot assignment entirely by setting `GITH
 - Admin only: use `admin-get-resource-meta` to discover whether a relation is exposed, then call `admin-list-related-records` with that relation name.
 - Member MCP: use `member-get-resource-meta` to discover whether a relation is exposed, then call `member-list-related-records` with that relation name.
 - Do not assume every admin resource has a relation you can traverse; rely on metadata returned by the live tool.
+
+### Record action guidance
+
+- Use `admin-get-record-actions` or `member-get-record-actions` when you already have a specific record and want the shortest model-visible list of next MCP calls.
+- These read-only tools return focused next-step actions such as refreshing record detail, traversing exposed relations, fetching update schemas, previewing updates, and any explicit workflow tools that are currently valid for that record.
+- On the admin surface, workflow-bearing records such as events, reports, contribution requests, and membership claims include both dedicated workflow-schema tool hints and the action-specific defaults, fields, conditional rules, and currently available workflow actions in the same response.
+- These tools do not execute mutations; they only point the client at the correct next MCP tool call.
+
+### Explicit workflow schema tools
+
+- Use the dedicated admin workflow-schema tools when you want the canonical read-only workflow contract for one record before calling the matching mutation tool.
+- These tools return the same workflow payload shape used by the HTTP admin schema endpoints: defaults, available actions, fields, and conditional rules.
+- Current explicit workflow schema tools are `admin-get-event-moderation-schema`, `admin-get-report-triage-schema`, `admin-get-contribution-request-review-schema`, and `admin-get-membership-claim-review-schema`.
 
 ### Entity selection heuristics for record search
 
@@ -276,6 +291,37 @@ When the user asks you to “look for” a named place, start with the most like
 
 - Use `record_key` values from prior MCP results; prefer returned route-key-style identifiers when the record payload exposes them.
 - Treat live write schemas as the field-level source of truth for payload structure, required fields, and media support.
+- Institution write schemas now expose additional field semantics for `nickname`, `address`, `contacts`, and `social_media`.
+- For institutions, `address` updates deep-merge omitted nested keys, and `address: {}` is effectively a no-op when the record already has an address with a stored country.
+- For institutions, omitted `contacts` / `social_media` preserve the existing collection, `null` or `[]` clear it, and any submitted array replaces the stored collection. Safe MCP clients should fetch the current record, modify the collection locally, then resend the full array.
+- On direct MCP institution writes, `nickname: null` preserves the current stored nickname while `nickname: ""` reaches the mutation layer and clears the stored nickname to `null`.
+- Speaker write schemas now expose additional field semantics for `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media`.
+- For speakers, omit `address` entirely when you mean “no address change”. If you send `address`, include `address.country_id`; `address: {}` is invalid on the MCP write path just like the raw admin HTTP API.
+- For speakers, the visible region fields deep-merge when present, the hidden map fields (`line1`, `line2`, `postcode`, `lat`, `lng`, `google_maps_url`, `google_place_id`, `waze_url`) remain prohibited, and the array-style fields (`honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, `social_media`) replace when present. Omit them to preserve, and use fetch-modify-resend when you want to keep existing entries.
+- Venue write schemas now expose additional field semantics for `address`, `facilities`, `contacts`, and `social_media`.
+- For venues, omitted address keys preserve the existing nested values, but `address: {}` deletes the stored venue address on the shared save path. Omit the `address` key entirely when you want a no-op.
+- For venues, `facilities`, `contacts`, and `social_media` are replacement collections. `facilities` input is normalized into the stored boolean facility map, so safe clients should resend the full enabled facility set.
+- Reference write schemas now expose additional field semantics for `author`, `publication_year`, `publisher`, and `social_media`.
+- For references, omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `social_media` follows the same replacement and canonicalization rules as the other write-capable directory resources.
+- Event write schemas now expose additional field semantics for `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`.
+- For events, update schemas are sparse: omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear the supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values.
+- Member event update schemas inherit the same event semantics because the member MCP surface delegates to the shared admin write service.
+- Series write schemas now expose additional field semantics for `description`, `languages`, and `slug`.
+- For series, `title`, `slug`, and `visibility` remain required on update; `description` clears on `null` / trimmed empty input and `languages` follows omit-preserve / null-clear / array-replace semantics.
+- Donation channel write schemas now expose additional field semantics for `donatable_type`, `method`, `label`, `reference_note`, and the method-specific bank / DuitNow / ewallet fields.
+- For donation channels, owner-type aliases normalize to canonical stored morph values, method switches clear unrelated field groups, and destructive QR clear flags remain unsupported through MCP.
+- Inspiration write schemas now expose additional field semantics for `content`, `source`, and `main`.
+- For inspirations, `category`, `locale`, `title`, and `content` remain required on update; `source` clears on `null` / trimmed empty input, and the single `main` media field can only be replaced through MCP, not directly cleared through a destructive flag.
+- Space write schemas now expose additional field semantics for `slug`, `capacity`, and `institutions`.
+- For spaces, `name` and `slug` remain required on update, `capacity` clears to `null`, and `institutions` follows omit-preserve / null-clear / array-replace relation sync semantics.
+- Report write schemas now expose additional field semantics for `entity_type`, `entity_id`, `category`, `description`, `reporter_id`, `handled_by`, `resolution_note`, and `evidence`.
+- For reports, `entity_type`, `entity_id`, `category`, and `status` remain required on update, `category` depends on `entity_type`, the optional text / user-reference fields clear on `null`, and `evidence` preserves on omission or `null` but clears on `[]`. The destructive raw-HTTP `clear_evidence` flag is still not available through MCP.
+- Tag write schemas now expose additional field semantics for `name`, `name.ms`, `name.en`, and `order_column`.
+- For tags, `name.en` falls back to `name.ms` when it is omitted, `null`, or trimmed empty input, and blank / null `order_column` values trigger sortable recomputation instead of storing `null`.
+- Subdistrict write schemas now expose additional field semantics for `country_id`, `state_id`, `district_id`, and `name`.
+- For subdistricts, `country_id`, `state_id`, and `name` remain required on update, `name` is trimmed, `state_id` must match `country_id`, and `district_id=null` is valid only for federal-territory states.
+- Handle-style social platforms (`facebook`, `twitter`, `instagram`, `youtube`, `tiktok`, `telegram`, `whatsapp`, `linkedin`, `threads`) may canonicalize a submitted URL into stored `username`, so persisted `url` can come back as `null` after normalization.
+- Even though the schema advertises model-layer normalization notes for Twitter / X, validated MCP payloads should still use the canonical platform value `twitter`, not `x`.
 - This guide summarizes server-level capability only; actor-specific authorization still applies at runtime.
 
 ### Non-goals
@@ -297,7 +343,12 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-list-records` | List records for one admin resource with optional search and pagination | `GET /api/v1/admin/{resourceKey}` |
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
+| `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | MCP-only next-step action guidance tool |
 | `admin-get-write-schema` | Discover the create/update contract for a writable admin record | `GET /api/v1/admin/{resourceKey}/schema` |
+| `admin-get-event-moderation-schema` | Read the explicit moderation schema for one event | `GET /api/v1/admin/events/{recordKey}/moderation-schema` |
+| `admin-get-report-triage-schema` | Read the explicit triage schema for one report | `GET /api/v1/admin/reports/{recordKey}/triage-schema` |
+| `admin-get-contribution-request-review-schema` | Read the explicit review schema for one contribution request | `GET /api/v1/admin/contribution-requests/{recordKey}/review-schema` |
+| `admin-get-membership-claim-review-schema` | Read the explicit review schema for one membership claim | `GET /api/v1/admin/membership-claims/{recordKey}/review-schema` |
 | `admin-create-github-issue` | Create a GitHub issue in the configured repository and auto-assign Copilot | `POST /api/v1/github-issues` (admin caller path) |
 | `admin-moderate-event` | Run one explicit moderation action on an event | `POST /api/v1/admin/events/{recordKey}/moderate` |
 | `admin-triage-report` | Run one explicit triage action on a report | `POST /api/v1/admin/reports/{recordKey}/triage` |
@@ -310,6 +361,8 @@ Admin tool behavior notes:
 
 - `validate_only=true` is supported for create/update preview flows.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
+- `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
+- The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
 - Media/file upload fields accept JSON base64 descriptors only when the matching write schema advertises them.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain.
@@ -329,6 +382,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-records` | List records for one member resource with optional search and pagination |
 | `member-list-related-records` | List related records for one member record |
 | `member-get-record` | Read one member record by resource key and record key |
+| `member-get-record-actions` | Get focused next-step MCP actions for one member record |
 | `member-get-write-schema` | Discover the writable update schema for one member record |
 | `member-list-contribution-requests` | List the authenticated member's own contribution requests plus any pending approvals |
 | `member-approve-contribution-request` | Approve one reviewable contribution request |
@@ -343,6 +397,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 Member tool behavior notes:
 
 - Member tools are constrained to the Ahli workspace boundary and live membership relationships.
+- `member-get-record-actions` is read-only and returns record-specific next-step MCP tools for the Ahli surface, including update-schema and relation traversal follow-ups when they are available.
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
 - Member update tools support `validate_only=true` for preview-only member writes.
 - Member related-record traversal is limited to one level and only for relations exposed by member resource metadata.
@@ -472,7 +527,12 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `admin-list-records` | Search and paginate records for one admin resource | `resource_key`, `search?`, `page?`, `per_page?` |
 | `admin-list-related-records` | Traverse a named relation on a record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `admin-get-record` | Read one admin record and its permissions | `resource_key`, `record_key` |
+| `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | `resource_key`, `record_key` |
 | `admin-get-write-schema` | Fetch the create/update contract for a writable admin record | `resource_key`, `operation`, `record_key?` |
+| `admin-get-event-moderation-schema` | Fetch the explicit moderation schema for one event | `record_key` |
+| `admin-get-report-triage-schema` | Fetch the explicit triage schema for one report | `record_key` |
+| `admin-get-contribution-request-review-schema` | Fetch the explicit review schema for one contribution request | `record_key` |
+| `admin-get-membership-claim-review-schema` | Fetch the explicit review schema for one membership claim | `record_key` |
 | `admin-moderate-event` | Run one explicit moderation action on an event | `record_key`, `action`, `reason_code?`, `note?` |
 | `admin-triage-report` | Run one explicit triage action on a report | `record_key`, `action`, `resolution_note?` |
 | `admin-review-contribution-request` | Approve or reject one pending contribution request | `record_key`, `action`, `reason_code?`, `reviewer_note?` |
@@ -491,6 +551,7 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `member-list-records` | Search and paginate records for one member resource | `resource_key`, `search?`, `page?`, `per_page?` |
 | `member-list-related-records` | Traverse a named relation on a member record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `member-get-record` | Read one member record | `resource_key`, `record_key` |
+| `member-get-record-actions` | Get focused next-step MCP actions for one member record | `resource_key`, `record_key` |
 | `member-get-write-schema` | Fetch the writable update contract for one member record | `resource_key`, `record_key` |
 | `member-list-contribution-requests` | List the authenticated member's contribution queue and pending approvals | none |
 | `member-approve-contribution-request` | Approve one reviewable contribution request | `request_id`, `reviewer_note?` |
