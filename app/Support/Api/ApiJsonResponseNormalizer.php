@@ -71,7 +71,7 @@ final class ApiJsonResponseNormalizer
         if ($validationErrors !== null) {
             $details = is_array($error['details'] ?? null) ? $error['details'] : [];
             $details['fields'] = $validationErrors;
-            $details = $this->appendAdminValidateOnlyRemediation($request, $details, $validationErrors);
+            $details = $this->withAdminValidateOnlyRemediation($request, $details, $validationErrors);
             $error['details'] = $details;
         }
 
@@ -86,7 +86,7 @@ final class ApiJsonResponseNormalizer
      * @param  array<string, mixed>  $validationErrors
      * @return array<string, mixed>
      */
-    private function appendAdminValidateOnlyRemediation(Request $request, array $details, array $validationErrors): array
+    private function withAdminValidateOnlyRemediation(Request $request, array $details, array $validationErrors): array
     {
         $routeName = $request->route()?->getName();
 
