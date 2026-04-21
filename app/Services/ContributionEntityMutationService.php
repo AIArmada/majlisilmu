@@ -820,7 +820,9 @@ class ContributionEntityMutationService
         }
 
         if (array_key_exists('language_ids', $payload)) {
-            $speaker->syncLanguages($this->normalizeIntegerArray($payload['language_ids']));
+            $speaker->syncLanguages($this->normalizeIntegerArray(
+                is_iterable($payload['language_ids']) ? $payload['language_ids'] : [],
+            ));
         }
 
         $this->syncSpeakerAffiliation($speaker, $payload);
