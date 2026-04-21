@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\Diagnostics\NetworkDiagnosticsService;
+use App\Support\Diagnostics\NetworkDiagnosticsEnvironment;
 use Mockery\MockInterface;
 
 const NETWORK_DIAGNOSTICS_ENV_KEYS = [
@@ -26,6 +27,8 @@ afterEach(function (): void {
         putenv($key);
         unset($_ENV[$key], $_SERVER[$key]);
     }
+
+    app()->forgetInstance(NetworkDiagnosticsEnvironment::class);
 });
 
 it('renders a database-to-database diagnostics report directly on the page', function (): void {
@@ -64,6 +67,33 @@ it('is accessible when diagnostics token is not configured', function (): void {
         ->assertSee('Target database');
 });
 
+it('reads target database credentials from the raw env file when runtime env values are unavailable', function (): void {
+    config()->set('database.default', 'sqlite');
+    config()->set('database.connections.sqlite', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => false,
+    ]);
+
+    $environmentFilePath = bindNetworkDiagnosticsEnvironmentFile(<<<'ENV'
+NETWORK_DIAGNOSTICS_ENABLED=true
+NETWORK_DIAGNOSTICS_TARGET_DB_LABEL="Production candidate database"
+NETWORK_DIAGNOSTICS_TARGET_DB_DRIVER=sqlite
+NETWORK_DIAGNOSTICS_TARGET_DB_DATABASE=:memory:
+ENV
+    );
+
+    try {
+        $this->get(route('network-diagnostics'))
+            ->assertSuccessful()
+            ->assertSee('Production candidate database')
+            ->assertDontSee('Target database credentials are not configured yet.');
+    } finally {
+        @unlink($environmentFilePath);
+    }
+});
+
 it('shows env-based setup guidance when the target database is not configured yet', function (): void {
     setNetworkDiagnosticsEnv([
         'NETWORK_DIAGNOSTICS_ENABLED' => 'true',
@@ -93,6 +123,30 @@ it('requires the configured token when diagnostics are protected', function (): 
     $this->get(route('network-diagnostics'))->assertForbidden();
 });
 
+it('reads token protection from the raw env file when runtime env values are unavailable', function (): void {
+    $environmentFilePath = bindNetworkDiagnosticsEnvironmentFile(<<<'ENV'
+NETWORK_DIAGNOSTICS_ENABLED=true
+NETWORK_DIAGNOSTICS_TOKEN=secret-network-token
+ENV
+    );
+
+    try {
+        $this->mock(NetworkDiagnosticsService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('run')
+                ->once()
+                ->withNoArgs()
+                ->andReturn(fakeDatabaseDiagnosticsReport());
+        });
+
+        $this->get(route('network-diagnostics'))->assertForbidden();
+        $this->get(route('network-diagnostics', ['token' => 'secret-network-token']))
+            ->assertSuccessful()
+            ->assertSee('Current environment database');
+    } finally {
+        @unlink($environmentFilePath);
+    }
+});
+
 function setNetworkDiagnosticsEnv(array $values): void
 {
     foreach ($values as $key => $value) {
@@ -107,6 +161,21 @@ function setNetworkDiagnosticsEnv(array $values): void
         $_ENV[$key] = $value;
         $_SERVER[$key] = $value;
     }
+}
+
+function bindNetworkDiagnosticsEnvironmentFile(string $contents): string
+{
+    $environmentFilePath = tempnam(sys_get_temp_dir(), 'network-diagnostics-env-');
+
+    if (! is_string($environmentFilePath)) {
+        throw new RuntimeException('Unable to create a temporary diagnostics env file.');
+    }
+
+    file_put_contents($environmentFilePath, $contents.PHP_EOL);
+
+    app()->instance(NetworkDiagnosticsEnvironment::class, new NetworkDiagnosticsEnvironment($environmentFilePath));
+
+    return $environmentFilePath;
 }
 
 function fakeDatabaseDiagnosticsReport(bool $targetConfigured = true): array
