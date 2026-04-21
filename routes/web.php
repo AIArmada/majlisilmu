@@ -5,10 +5,12 @@ use App\Enums\MemberSubjectType;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\DawahShareController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\NetworkDiagnosticsController;
 use App\Http\Controllers\Public\EventsController;
 use App\Http\Controllers\PublicCountryController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Middleware\ResolvePublicSlugRedirect;
+use App\Http\Middleware\SetLocale;
 use App\Livewire\Pages\About\Show as AboutPage;
 use App\Livewire\Pages\Contributions\Index as ContributionsIndex;
 use App\Livewire\Pages\Contributions\SubmitInstitution;
@@ -27,7 +29,10 @@ use App\Livewire\Pages\MembershipClaims\Index as MembershipClaimsIndex;
 use App\Livewire\Pages\Reports\Create as CreateReportPage;
 use App\Livewire\Pages\SavedSearches\Index;
 use App\Livewire\Pages\Search\Index as SearchIndex;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::livewire('/', 'pages.⚡home')->name('home');
 Route::livewire('/tentang-kami', AboutPage::class)->name('about');
@@ -73,6 +78,15 @@ Route::get('/majlis/{event:slug}/kalendar.ics', [EventsController::class, 'calen
 Route::livewire('/hantar-majlis', 'pages.submit-event.create')
     ->name('submit-event.create');
 Route::livewire('/hantar-majlis/berjaya', 'pages.submit-event.success')->name('submit-event.success');
+
+Route::get('/ops/network-diagnostics', NetworkDiagnosticsController::class)
+    ->withoutMiddleware([
+        PreventRequestForgery::class,
+        SetLocale::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+    ])
+    ->name('network-diagnostics');
 
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard', UserDashboard::class)->name('dashboard');
