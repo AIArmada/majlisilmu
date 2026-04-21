@@ -479,7 +479,7 @@ class EventController extends Controller
 
         $this->abortUnlessPublicEvent($event);
 
-        $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media', 'references']))
+        $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media', 'references.media']))
             ->allowedIncludes(...$allowedIncludes)
             ->whereKey($event->getKey())
             ->firstOrFail();
