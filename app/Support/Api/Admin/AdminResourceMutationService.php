@@ -516,7 +516,7 @@ class AdminResourceMutationService
         }
 
         if (is_array($value)) {
-            return array_map(fn (mixed $item): mixed => $this->previewValue($item), $value);
+            return array_map($this->previewValue(...), $value);
         }
 
         return $value;

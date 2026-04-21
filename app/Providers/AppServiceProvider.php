@@ -116,21 +116,13 @@ class AppServiceProvider extends ServiceProvider
 
         Passport::authorizationView('mcp.authorize');
 
-        RateLimiter::for('api-auth-login', static function (Request $request): Limit {
-            return Limit::perMinute(5)->by(sprintf('%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('login')))));
-        });
+        RateLimiter::for('api-auth-login', static fn (Request $request): Limit => Limit::perMinute(5)->by(sprintf('%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('login'))))));
 
-        RateLimiter::for('api-auth-register', static function (Request $request): Limit {
-            return Limit::perMinute(5)->by(sprintf('%s|%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('email'))), strtolower(trim((string) $request->input('phone')))));
-        });
+        RateLimiter::for('api-auth-register', static fn (Request $request): Limit => Limit::perMinute(5)->by(sprintf('%s|%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('email'))), strtolower(trim((string) $request->input('phone'))))));
 
-        RateLimiter::for('api-auth-social', static function (Request $request): Limit {
-            return Limit::perMinute(5)->by(sprintf('%s|%s', $request->ip(), $request->path()));
-        });
+        RateLimiter::for('api-auth-social', static fn (Request $request): Limit => Limit::perMinute(5)->by(sprintf('%s|%s', $request->ip(), $request->path())));
 
-        RateLimiter::for('api-auth-password', static function (Request $request): Limit {
-            return Limit::perMinute(5)->by(sprintf('%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('email')))));
-        });
+        RateLimiter::for('api-auth-password', static fn (Request $request): Limit => Limit::perMinute(5)->by(sprintf('%s|%s|%s', $request->ip(), $request->path(), strtolower(trim((string) $request->input('email'))))));
 
         $signalsRoutes = base_path('../commerce/packages/signals/routes/api.php');
 

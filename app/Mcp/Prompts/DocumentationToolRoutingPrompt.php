@@ -27,7 +27,7 @@ class DocumentationToolRoutingPrompt extends Prompt
         ]);
 
         $topic = is_string($validated['topic'] ?? null)
-            ? trim((string) $validated['topic'])
+            ? trim($validated['topic'])
             : '';
 
         return Response::text($this->buildPromptText($topic))->asAssistant();
@@ -36,6 +36,7 @@ class DocumentationToolRoutingPrompt extends Prompt
     /**
      * @return array<int, Argument>
      */
+    #[\Override]
     public function arguments(): array
     {
         return [
@@ -196,12 +197,6 @@ TEXT,
      */
     private function matchesAny(string $haystack, array $needles): bool
     {
-        foreach ($needles as $needle) {
-            if (str_contains($haystack, $needle)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($needles, fn ($needle) => str_contains($haystack, (string) $needle));
     }
 }

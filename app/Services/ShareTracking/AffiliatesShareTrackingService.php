@@ -35,7 +35,7 @@ use Throwable;
 
 final readonly class AffiliatesShareTrackingService
 {
-    private const SHARE_TOKEN_LENGTH = 16;
+    private const int SHARE_TOKEN_LENGTH = 16;
 
     public function __construct(
         private ShareTrackingUrlService $shareTrackingUrlService,
@@ -74,33 +74,29 @@ final readonly class AffiliatesShareTrackingService
         $resolvedOrigin = $this->resolveShareOrigin($origin);
 
         if ($user instanceof User) {
-            return OwnerContext::withOwner($user, function () use ($user, $url, $fallbackTitle, $resolvedOrigin, $shareText): array {
-                return $this->buildTrackedSharePayload(
-                    $this->createOrReuseAffiliateLinkForAffiliate(
-                        $this->ensureAffiliateForUser($user),
-                        $url,
-                        $fallbackTitle,
-                        $resolvedOrigin,
-                    ),
-                    $shareText,
+            return OwnerContext::withOwner($user, fn (): array => $this->buildTrackedSharePayload(
+                $this->createOrReuseAffiliateLinkForAffiliate(
+                    $this->ensureAffiliateForUser($user),
+                    $url,
                     $fallbackTitle,
-                );
-            });
+                    $resolvedOrigin,
+                ),
+                $shareText,
+                $fallbackTitle,
+            ));
         }
 
         if ($request instanceof Request) {
-            return OwnerContext::withOwner(null, function () use ($request, $url, $fallbackTitle, $resolvedOrigin, $shareText): array {
-                return $this->buildTrackedSharePayload(
-                    $this->createOrReuseGuestAffiliateLink(
-                        $request,
-                        $url,
-                        $fallbackTitle,
-                        $resolvedOrigin,
-                    ),
-                    $shareText,
+            return OwnerContext::withOwner(null, fn (): array => $this->buildTrackedSharePayload(
+                $this->createOrReuseGuestAffiliateLink(
+                    $request,
+                    $url,
                     $fallbackTitle,
-                );
-            });
+                    $resolvedOrigin,
+                ),
+                $shareText,
+                $fallbackTitle,
+            ));
         }
 
         $shareUrl = $this->shareTrackingUrlService->normalizeAbsoluteInternalUrl($url);
@@ -526,19 +522,17 @@ final readonly class AffiliatesShareTrackingService
             return $affiliate;
         }
 
-        return OwnerContext::withOwner(null, function () use ($guestIdentifier): Affiliate {
-            return Affiliate::query()->create([
-                'code' => $this->generateGuestAffiliateCode($guestIdentifier),
-                'name' => 'Anonymous Share Profile',
-                'description' => 'MajlisIlmu anonymous share-tracking profile',
-                'status' => Active::class,
-                'commission_type' => CommissionType::Percentage,
-                'commission_rate' => 0,
-                'currency' => (string) config('affiliates.currency.default', 'MYR'),
-                'metadata' => $this->guestMetadata($guestIdentifier),
-                'activated_at' => now(),
-            ]);
-        });
+        return OwnerContext::withOwner(null, fn (): Affiliate => Affiliate::query()->create([
+            'code' => $this->generateGuestAffiliateCode($guestIdentifier),
+            'name' => 'Anonymous Share Profile',
+            'description' => 'MajlisIlmu anonymous share-tracking profile',
+            'status' => Active::class,
+            'commission_type' => CommissionType::Percentage,
+            'commission_rate' => 0,
+            'currency' => (string) config('affiliates.currency.default', 'MYR'),
+            'metadata' => $this->guestMetadata($guestIdentifier),
+            'activated_at' => now(),
+        ]));
     }
 
     private function findAffiliateForGuest(string $guestIdentifier): ?Affiliate
@@ -1219,7 +1213,7 @@ final readonly class AffiliatesShareTrackingService
      */
     private function nativeSharePayload(string $url, string $shareText, ?string $fallbackTitle = null): array
     {
-        $resolvedTitle = filled($fallbackTitle) ? (string) $fallbackTitle : $shareText;
+        $resolvedTitle = filled($fallbackTitle) ? $fallbackTitle : $shareText;
         $resolvedMessage = trim($shareText."\n".$url);
 
         return [

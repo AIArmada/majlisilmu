@@ -422,9 +422,9 @@ class NetworkDiagnosticsService
 
         $segments = [
             'host='.$connection['host'],
-            'port='.(string) ($connection['port'] ?? 5432),
-            'dbname='.(string) ($connection['database'] ?? ''),
-            'connect_timeout='.(string) max(1, (int) ceil($timeoutMs / 1000)),
+            'port='.($connection['port'] ?? 5432),
+            'dbname='.($connection['database'] ?? ''),
+            'connect_timeout='.max(1, (int) ceil($timeoutMs / 1000)),
         ];
 
         if (is_string($connection['sslmode']) && $connection['sslmode'] !== '') {
@@ -451,8 +451,8 @@ class NetworkDiagnosticsService
 
         $segments = [
             'Server='.$server,
-            'Database='.(string) ($connection['database'] ?? ''),
-            'LoginTimeout='.(string) max(1, (int) ceil($timeoutMs / 1000)),
+            'Database='.($connection['database'] ?? ''),
+            'LoginTimeout='.max(1, (int) ceil($timeoutMs / 1000)),
         ];
 
         return 'sqlsrv:'.implode(';', $segments);
@@ -537,8 +537,8 @@ class NetworkDiagnosticsService
 
         return [
             'latency_ms' => null,
-            'error' => trim($errorMessage) !== ''
-                ? trim($errorMessage)
+            'error' => trim((string) $errorMessage) !== ''
+                ? trim((string) $errorMessage)
                 : sprintf('Connection failed (%d).', $errorNumber),
         ];
     }
@@ -654,16 +654,7 @@ class NetworkDiagnosticsService
             'charset' => $this->envString('NETWORK_DIAGNOSTICS_TARGET_DB_CHARSET'),
             'sslmode' => $this->envString('NETWORK_DIAGNOSTICS_TARGET_DB_SSLMODE'),
         ];
-
-        $hasAnyValue = false;
-
-        foreach ($rawConfig as $value) {
-            if ($value !== null && $value !== '') {
-                $hasAnyValue = true;
-
-                break;
-            }
-        }
+        $hasAnyValue = array_any($rawConfig, fn ($value) => $value !== null && $value !== '');
 
         if (! $hasAnyValue) {
             return null;
@@ -737,12 +728,12 @@ class NetworkDiagnosticsService
             parse_str($parts['query'], $query);
         }
 
-        $driver = $this->normalizeDriver(isset($parts['scheme']) ? (string) $parts['scheme'] : null);
+        $driver = $this->normalizeDriver($parts['scheme'] ?? null);
 
         $database = null;
 
         if ($driver === 'sqlite') {
-            $database = isset($parts['path']) ? rawurldecode((string) $parts['path']) : null;
+            $database = isset($parts['path']) ? rawurldecode($parts['path']) : null;
         } elseif (isset($parts['path']) && is_string($parts['path'])) {
             $trimmedPath = ltrim($parts['path'], '/');
             $database = $trimmedPath !== '' ? rawurldecode($trimmedPath) : null;
@@ -750,11 +741,11 @@ class NetworkDiagnosticsService
 
         return array_filter([
             'driver' => $driver,
-            'host' => isset($parts['host']) ? (string) $parts['host'] : null,
-            'port' => isset($parts['port']) ? (int) $parts['port'] : null,
+            'host' => $parts['host'] ?? null,
+            'port' => $parts['port'] ?? null,
             'database' => $database,
-            'username' => isset($parts['user']) ? rawurldecode((string) $parts['user']) : null,
-            'password' => isset($parts['pass']) ? rawurldecode((string) $parts['pass']) : null,
+            'username' => isset($parts['user']) ? rawurldecode($parts['user']) : null,
+            'password' => isset($parts['pass']) ? rawurldecode($parts['pass']) : null,
             'socket' => is_string($query['socket'] ?? null) ? trim($query['socket']) : null,
             'charset' => is_string($query['charset'] ?? null) ? trim($query['charset']) : null,
             'sslmode' => is_string($query['sslmode'] ?? null) ? trim($query['sslmode']) : null,

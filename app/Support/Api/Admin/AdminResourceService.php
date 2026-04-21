@@ -263,7 +263,7 @@ class AdminResourceService
                 ]);
             }
 
-            $record = $this->registry->resolveRecord($resourceClass, trim((string) $recordKey));
+            $record = $this->registry->resolveRecord($resourceClass, trim($recordKey));
             abort_unless($actor->can('update', $record), 403);
         }
 
