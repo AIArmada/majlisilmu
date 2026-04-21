@@ -238,8 +238,9 @@
   "transport_rules": {
     "admin_api": {
       "schema_route_template": "GET /api/v1/admin/{resourceKey}/schema?operation=create|update&recordKey=...",
-      "preview_mechanism": "validate_only=1 query parameter on POST/PUT",
-      "record_key_rule": "Use the admin record route_key returned by admin collection or detail payloads whenever available."
+      "preview_mechanism": "validate_only=1 query parameter on POST/PUT; validation failures also include fix_plan, remaining_blockers, normalized_payload_preview, and can_retry",
+      "record_key_rule": "Use the admin record route_key returned by admin collection or detail payloads whenever available.",
+      "validation_remediation_details": ["fix_plan", "remaining_blockers", "normalized_payload_preview", "can_retry"]
     },
     "admin_mcp": {
       "schema_tool": "admin-get-write-schema",
@@ -248,7 +249,8 @@
       "content_type": "application/json",
       "validate_only": true,
       "media_upload_transport": "json_base64_descriptor",
-      "destructive_clear_flags_supported": false
+      "destructive_clear_flags_supported": false,
+      "validation_remediation_details": ["fix_plan", "remaining_blockers", "normalized_payload_preview", "can_retry"]
     },
     "member_mcp": {
       "schema_tool": "member-get-write-schema",

@@ -71,7 +71,8 @@ it('keeps the member update tool appendix aligned with the live member MCP schem
         ->toContain('payload')
         ->not->toContain('validate_only')
         ->and($markdown)->toContain('Member update tools do not support `validate_only`; there is no preview-only member write path today.')
-        ->toContain('When a write tool supports `validate_only=true` (currently admin create/update only), previews normalize descriptors into file summaries without persisting media.');
+        ->toContain('When a write tool supports `validate_only=true` (currently admin create/update only), previews normalize descriptors into file summaries without persisting media.')
+        ->toContain('Validation failures in validate-only mode now include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.');
 });
 
 /**
