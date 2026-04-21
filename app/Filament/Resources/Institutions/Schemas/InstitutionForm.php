@@ -13,9 +13,9 @@ use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Submission\PublicSubmissionLockService;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -45,7 +45,7 @@ class InstitutionForm
                             ->hidden(fn (string $operation): bool => $operation === 'create')
                             ->maxLength(255)
                             ->unique(ignoreRecord: true),
-                        Textarea::make('description')
+                        RichEditor::make('description')
                             ->columnSpanFull()
                             ->maxLength(5000),
                     ])
