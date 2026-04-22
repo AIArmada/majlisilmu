@@ -122,6 +122,7 @@ class EditEvent extends EditRecord
     protected function afterSave(): void
     {
         $event = $this->eventRecord();
+
         $syncResult = app(SyncEventResourceRelationsAction::class)->handle(
             $event,
             $this->form->getState(),

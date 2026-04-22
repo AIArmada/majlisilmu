@@ -5,9 +5,12 @@ namespace App\Observers;
 use App\Actions\References\GenerateReferenceSlugAction;
 use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Models\Reference;
+use App\Observers\Concerns\SyncsCurrentAndPreviousValues;
 
 class ReferenceObserver
 {
+    use SyncsCurrentAndPreviousValues;
+
     public function __construct(
         protected GenerateReferenceSlugAction $generateReferenceSlugAction,
         protected SyncSlugRedirectAction $syncSlugRedirectAction,
@@ -19,13 +22,11 @@ class ReferenceObserver
             return;
         }
 
-        $previousTitle = trim((string) ($reference->getPrevious()['title'] ?? ''));
-
-        $this->generateReferenceSlugAction->syncReferenceSlugsForTitle($reference->title);
-
-        if ($previousTitle !== '' && $previousTitle !== $reference->title) {
-            $this->generateReferenceSlugAction->syncReferenceSlugsForTitle($previousTitle);
-        }
+        $this->syncCurrentAndPreviousString(
+            $reference->title,
+            $reference->getPrevious()['title'] ?? null,
+            fn (string $title): bool => $this->generateReferenceSlugAction->syncReferenceSlugsForTitle($title),
+        );
     }
 
     public function deleted(Reference $reference): void

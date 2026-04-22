@@ -25,7 +25,11 @@ abstract class AbstractAdminTool extends Tool
     {
         $tool = parent::toArray();
         $securitySchemes = $this->securitySchemes();
+        $annotations = $this->normalizedAnnotations(
+            is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [],
+        );
 
+        $tool['annotations'] = $annotations === [] ? (object) [] : $annotations;
         $tool['securitySchemes'] = $securitySchemes;
         $tool['_meta'] = array_merge(
             is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
@@ -162,5 +166,19 @@ abstract class AbstractAdminTool extends Tool
                 'scopes' => ['mcp:use'],
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $annotations
+     * @return array<string, mixed>
+     */
+    private function normalizedAnnotations(array $annotations): array
+    {
+        if (($annotations['readOnlyHint'] ?? false) === true) {
+            $annotations['destructiveHint'] = false;
+            $annotations['openWorldHint'] = false;
+        }
+
+        return $annotations;
     }
 }

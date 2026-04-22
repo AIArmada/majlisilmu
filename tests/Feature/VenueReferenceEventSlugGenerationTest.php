@@ -349,6 +349,28 @@ it('renumbers remaining reference duplicates when a peer is renamed out of the g
         ->and($second->fresh()?->slug)->toBe('bulughul-maram');
 });
 
+it('preserves the existing duplicate reference sequence when regenerating a canonical slug', function () {
+    $first = Reference::query()->create([
+        'title' => 'Adab Mufrad',
+        'type' => 'book',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $second = Reference::query()->create([
+        'title' => 'Adab Mufrad',
+        'type' => 'book',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $didChange = app(GenerateReferenceSlugAction::class)->syncReferenceSlug($second);
+
+    expect($first->slug)->toBe('adab-mufrad')
+        ->and($second->fresh()?->slug)->toBe('adab-mufrad-2')
+        ->and($didChange)->toBeFalse();
+});
+
 it('uses the generated sequential slug when admins create references in filament', function () {
     $administrator = createSlugAdminUser();
 

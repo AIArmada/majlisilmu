@@ -1,5 +1,6 @@
 <?php
 
+use AIArmada\Signals\Models\SignalEvent;
 use App\Actions\Membership\AddMemberToSubject;
 use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
@@ -50,6 +51,7 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
+use App\Services\Signals\SignalsTracker;
 use App\Support\GitHub\GitHubIssueReportContract;
 use App\Support\Mcp\McpTokenManager;
 use Illuminate\Support\Carbon;
@@ -1834,6 +1836,24 @@ it('creates and updates events through MCP write tools', function () {
 
     $event = Event::query()->where('title', 'Admin MCP Event Created')->with(['settings', 'references', 'series', 'tags', 'keyPeople'])->firstOrFail();
     $eventId = (string) $event->getKey();
+    $oldPath = route('events.show', $event, false);
+
+    $trackedProperty = app(SignalsTracker::class)->defaultTrackedProperty();
+
+    expect($trackedProperty)->not->toBeNull();
+
+    SignalEvent::query()
+        ->withoutOwnerScope()
+        ->create([
+            'tracked_property_id' => (string) $trackedProperty?->getKey(),
+            'occurred_at' => now(),
+            'event_name' => (string) config('signals.defaults.page_view_event_name', 'page_view'),
+            'event_category' => 'page_view',
+            'path' => $oldPath,
+            'url' => url($oldPath),
+            'currency' => 'MYR',
+            'revenue_minor' => 0,
+        ]);
 
     expect($event->live_url)->toBeNull()
         ->and($event->organizer_type)->toBe(Institution::class)
@@ -1890,6 +1910,9 @@ it('creates and updates events through MCP write tools', function () {
         ->and($event->tags->pluck('id')->all())->toContain($sourceTag->getKey())
         ->and($event->tags->pluck('id')->all())->not->toContain($domainTag->getKey(), $disciplineTag->getKey())
         ->and($event->keyPeople)->toHaveCount(0);
+
+    $this->get($oldPath)
+        ->assertRedirect(route('events.show', $event));
 });
 
 it('surfaces admin event validation failures through MCP write tools', function () {
@@ -2412,16 +2435,26 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'idempotentHint' => true,
     ]);
 
+    $readOnlyTools = $tools->filter(fn (array $tool): bool => data_get($tool, 'annotations.readOnlyHint') === true);
+
+    expect($readOnlyTools->isNotEmpty())->toBeTrue()
+        ->and($readOnlyTools->every(fn (array $tool): bool => data_get($tool, 'annotations.destructiveHint') === false))->toBeTrue()
+        ->and($readOnlyTools->every(fn (array $tool): bool => data_get($tool, 'annotations.openWorldHint') === false))->toBeTrue();
+
     expect(collect((array) data_get($tools->get('admin-list-records'), 'inputSchema.properties.filters.type'))->contains('object'))->toBeTrue();
 
     expect($tools->get('admin-get-write-schema')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
         'idempotentHint' => true,
+        'destructiveHint' => false,
+        'openWorldHint' => false,
     ]);
 
     expect($tools->get('admin-get-event-moderation-schema')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
         'idempotentHint' => true,
+        'destructiveHint' => false,
+        'openWorldHint' => false,
     ]);
 
     expect($tools->get('admin-create-record')['annotations'] ?? [])->toMatchArray([

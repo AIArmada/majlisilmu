@@ -19,7 +19,9 @@ class MemberGetWriteSchemaTool extends AbstractMemberWriteTool
 {
     protected string $name = 'member-get-write-schema';
 
-    protected string $description = 'Get the update schema for one writable Ahli-scoped member resource record.';
+    protected string $title = 'Inspect Member Write Schema';
+
+    protected string $description = 'Read-only: inspect the supported update schema for one writable Ahli-scoped member resource record without applying changes.';
 
     public function __construct(
         private readonly MemberResourceService $resourceService,

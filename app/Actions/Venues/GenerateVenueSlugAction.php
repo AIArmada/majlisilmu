@@ -2,22 +2,23 @@
 
 namespace App\Actions\Venues;
 
-use App\Actions\Slugs\SyncSlugRedirectAction;
+use App\Actions\Slugs\Concerns\InteractsWithOrderedSlugModels;
+use App\Actions\Slugs\SyncCanonicalSlugAction;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Venue;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GenerateVenueSlugAction
 {
     use AsAction;
+    use InteractsWithOrderedSlugModels;
 
     public function __construct(
-        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+        private readonly SyncCanonicalSlugAction $syncCanonicalSlugAction,
     ) {}
 
     public function syncVenueSlugsForName(string $name): bool
@@ -38,34 +39,14 @@ class GenerateVenueSlugAction
             ])
             ->get();
 
-        $didChange = false;
-
-        foreach ($this->orderedVenues($venues) as $venue) {
-            $didChange = $this->syncVenueSlug($venue) || $didChange;
-        }
-
-        return $didChange;
+        return $this->syncOrderedModels($venues, fn (Venue $venue): bool => $this->syncVenueSlug($venue));
     }
 
     public function syncVenueSlug(Venue $venue): bool
     {
         $slug = $this->forVenue($venue);
 
-        if ($venue->slug === $slug) {
-            return false;
-        }
-
-        $previousSlug = is_string($venue->slug) ? $venue->slug : null;
-
-        Venue::withoutTimestamps(function () use ($venue, $slug): void {
-            $venue->forceFill([
-                'slug' => $slug,
-            ])->saveQuietly();
-        });
-
-        $this->syncSlugRedirectAction->handle($venue, $previousSlug);
-
-        return true;
+        return $this->syncCanonicalSlugAction->persist($venue, $slug);
     }
 
     /**
@@ -146,7 +127,7 @@ class GenerateVenueSlugAction
             ->filter(fn (Venue $venue): bool => $this->locationSuffixForVenue($venue) === $locationSuffix);
 
         if ($ignoreVenueId !== null && $ignoreVenueId !== '') {
-            $existingSequence = $this->existingVenueSequence($matchingVenues, $ignoreVenueId);
+            $existingSequence = $this->existingModelSequence($matchingVenues, $ignoreVenueId);
 
             if ($existingSequence !== null) {
                 return $existingSequence;
@@ -160,44 +141,6 @@ class GenerateVenueSlugAction
         $matchingCount = $matchingVenues->count();
 
         return $matchingCount > 0 ? $matchingCount + 1 : 1;
-    }
-
-    /**
-     * @param  Collection<int, Venue>  $matchingVenues
-     */
-    private function existingVenueSequence(Collection $matchingVenues, string $venueId): ?int
-    {
-        $orderedVenues = $this->orderedVenues($matchingVenues);
-
-        $existingIndex = $orderedVenues->search(
-            fn (Venue $venue): bool => (string) $venue->getKey() === $venueId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
-        }
-
-        return $existingIndex + 1;
-    }
-
-    /**
-     * @param  Collection<int, Venue>  $venues
-     * @return Collection<int, Venue>
-     */
-    private function orderedVenues(Collection $venues): Collection
-    {
-        return $venues
-            ->sort(function (Venue $left, Venue $right): int {
-                $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
-                $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
-
-                if ($leftCreatedAt !== $rightCreatedAt) {
-                    return $leftCreatedAt <=> $rightCreatedAt;
-                }
-
-                return strcmp((string) $left->getKey(), (string) $right->getKey());
-            })
-            ->values();
     }
 
     /**

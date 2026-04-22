@@ -1,6 +1,9 @@
 <?php
 
 use AIArmada\Signals\Models\SignalEvent;
+use App\Actions\Slugs\SyncCanonicalSlugAction;
+use App\Enums\EventPrayerTime;
+use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\SlugRedirects\Pages\CreateSlugRedirect;
 use App\Filament\Resources\SlugRedirects\Pages\EditSlugRedirect;
 use App\Filament\Resources\SlugRedirects\Pages\ListSlugRedirects;
@@ -109,6 +112,29 @@ it('creates a reference slug redirect when a visited title slug changes', functi
         ->and($redirect->destination_path)->toBe(route('references.show', $reference->fresh(), false));
 });
 
+it('persists canonical slug changes through the shared slug synchronizer', function () {
+    $reference = Reference::query()->create([
+        'title' => 'Kitab Sinkron Lama',
+        'type' => 'book',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $oldPath = route('references.show', $reference, false);
+    recordVisitedPath($oldPath);
+
+    $didChange = app(SyncCanonicalSlugAction::class)->persist($reference, 'kitab-sinkron-baru');
+
+    $reference->refresh();
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
+
+    expect($didChange)->toBeTrue()
+        ->and($reference->slug)->toBe('kitab-sinkron-baru')
+        ->and($redirect->source_slug)->toBe('kitab-sinkron-lama')
+        ->and($redirect->destination_slug)->toBe('kitab-sinkron-baru')
+        ->and($redirect->destination_path)->toBe(route('references.show', $reference, false));
+});
+
 it('creates an event slug redirect when a visited dated slug changes', function () {
     $event = createSlugRedirectEvent(
         id: '00000000-0000-0000-0000-000000000071',
@@ -153,6 +179,43 @@ it('does not create an event slug redirect when the old slug was never visited',
 
     $this->get($oldPath)
         ->assertNotFound();
+});
+
+it('redirects old event slugs when administrators change the event date', function () {
+    $administrator = slugRedirectAdministrator();
+
+    $event = createSlugRedirectEvent(
+        id: '00000000-0000-0000-0000-000000000075',
+        title: 'Majlis Tukar Tarikh Admin',
+        slug: 'majlis-tukar-tarikh-admin-12-4-26',
+        startsAt: Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+    );
+
+    $oldPath = route('events.show', $event, false);
+    recordVisitedPath($oldPath);
+
+    Livewire::actingAs($administrator)
+        ->test(EditEvent::class, ['record' => $event->id])
+        ->fillForm([
+            'event_date' => '2026-04-15',
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => '20:00',
+            'end_time' => '22:00',
+        ])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $event->refresh();
+
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
+
+    expect($event->slug)->toBe('majlis-tukar-tarikh-admin-15-4-26')
+        ->and($redirect->source_slug)->toBe('majlis-tukar-tarikh-admin-12-4-26')
+        ->and($redirect->destination_slug)->toBe($event->slug)
+        ->and($redirect->destination_path)->toBe(route('events.show', $event, false));
+
+    $this->get($oldPath)
+        ->assertRedirect(route('events.show', $event));
 });
 
 it('redirects old event slugs when a related speaker slug changes', function () {

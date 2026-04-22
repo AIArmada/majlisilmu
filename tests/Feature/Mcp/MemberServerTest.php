@@ -865,14 +865,24 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'idempotentHint' => true,
     ]);
 
+    $readOnlyTools = $tools->filter(fn (array $tool): bool => data_get($tool, 'annotations.readOnlyHint') === true);
+
+    expect($readOnlyTools->isNotEmpty())->toBeTrue()
+        ->and($readOnlyTools->every(fn (array $tool): bool => data_get($tool, 'annotations.destructiveHint') === false))->toBeTrue()
+        ->and($readOnlyTools->every(fn (array $tool): bool => data_get($tool, 'annotations.openWorldHint') === false))->toBeTrue();
+
     expect($tools->get('member-list-related-records')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
         'idempotentHint' => true,
+        'destructiveHint' => false,
+        'openWorldHint' => false,
     ]);
 
     expect($tools->get('member-get-write-schema')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
         'idempotentHint' => true,
+        'destructiveHint' => false,
+        'openWorldHint' => false,
     ]);
 
     expect($tools->get('member-update-record')['annotations'] ?? [])->toMatchArray([

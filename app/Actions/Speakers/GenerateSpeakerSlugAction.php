@@ -2,20 +2,21 @@
 
 namespace App\Actions\Speakers;
 
-use App\Actions\Slugs\SyncSlugRedirectAction;
+use App\Actions\Slugs\Concerns\InteractsWithOrderedSlugModels;
+use App\Actions\Slugs\SyncCanonicalSlugAction;
 use App\Models\Speaker;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Location\PublicCountryRegistry;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GenerateSpeakerSlugAction
 {
     use AsAction;
+    use InteractsWithOrderedSlugModels;
 
     public function __construct(
-        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+        private readonly SyncCanonicalSlugAction $syncCanonicalSlugAction,
     ) {}
 
     public function syncSpeakerSlugsForName(string $name): bool
@@ -33,34 +34,14 @@ class GenerateSpeakerSlugAction
             ])
             ->get();
 
-        $didChange = false;
-
-        foreach ($this->orderedSpeakers($speakers) as $speaker) {
-            $didChange = $this->syncSpeakerSlug($speaker) || $didChange;
-        }
-
-        return $didChange;
+        return $this->syncOrderedModels($speakers, fn (Speaker $speaker): bool => $this->syncSpeakerSlug($speaker));
     }
 
     public function syncSpeakerSlug(Speaker $speaker): bool
     {
         $slug = $this->forSpeaker($speaker);
 
-        if ($speaker->slug === $slug) {
-            return false;
-        }
-
-        $previousSlug = is_string($speaker->slug) ? $speaker->slug : null;
-
-        Speaker::withoutTimestamps(function () use ($speaker, $slug): void {
-            $speaker->forceFill([
-                'slug' => $slug,
-            ])->saveQuietly();
-        });
-
-        $this->syncSlugRedirectAction->handle($speaker, $previousSlug);
-
-        return true;
+        return $this->syncCanonicalSlugAction->persist($speaker, $slug);
     }
 
     /**
@@ -130,7 +111,7 @@ class GenerateSpeakerSlugAction
                 && $this->displayNameForSpeaker($speaker) === $displayName);
 
         if ($ignoreSpeakerId !== null && $ignoreSpeakerId !== '') {
-            $existingSequence = $this->existingSpeakerSequence($matchingSpeakers, $ignoreSpeakerId);
+            $existingSequence = $this->existingModelSequence($matchingSpeakers, $ignoreSpeakerId);
 
             if ($existingSequence !== null) {
                 return $existingSequence;
@@ -144,44 +125,6 @@ class GenerateSpeakerSlugAction
         $matchingCount = $matchingSpeakers->count();
 
         return $matchingCount > 0 ? $matchingCount + 1 : 1;
-    }
-
-    /**
-     * @param  Collection<int, Speaker>  $matchingSpeakers
-     */
-    private function existingSpeakerSequence(Collection $matchingSpeakers, string $speakerId): ?int
-    {
-        $orderedSpeakers = $this->orderedSpeakers($matchingSpeakers);
-
-        $existingIndex = $orderedSpeakers->search(
-            fn (Speaker $speaker): bool => (string) $speaker->getKey() === $speakerId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
-        }
-
-        return $existingIndex + 1;
-    }
-
-    /**
-     * @param  Collection<int, Speaker>  $speakers
-     * @return Collection<int, Speaker>
-     */
-    private function orderedSpeakers(Collection $speakers): Collection
-    {
-        return $speakers
-            ->sort(function (Speaker $left, Speaker $right): int {
-                $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
-                $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
-
-                if ($leftCreatedAt !== $rightCreatedAt) {
-                    return $leftCreatedAt <=> $rightCreatedAt;
-                }
-
-                return strcmp((string) $left->getKey(), (string) $right->getKey());
-            })
-            ->values();
     }
 
     /**

@@ -2,7 +2,8 @@
 
 namespace App\Actions\Events;
 
-use App\Actions\Slugs\SyncSlugRedirectAction;
+use App\Actions\Slugs\Concerns\InteractsWithOrderedSlugModels;
+use App\Actions\Slugs\SyncCanonicalSlugAction;
 use App\Enums\EventKeyPersonRole;
 use App\Models\Event;
 use App\Models\Speaker;
@@ -15,9 +16,10 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class GenerateEventSlugAction
 {
     use AsAction;
+    use InteractsWithOrderedSlugModels;
 
     public function __construct(
-        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+        private readonly SyncCanonicalSlugAction $syncCanonicalSlugAction,
     ) {}
 
     public function syncEventSlugsForTitle(string $title): bool
@@ -33,13 +35,7 @@ class GenerateEventSlugAction
             ->with(['speakers:id,slug'])
             ->get();
 
-        $didChange = false;
-
-        foreach ($this->orderedEvents($events) as $event) {
-            $didChange = $this->syncEventSlug($event) || $didChange;
-        }
-
-        return $didChange;
+        return $this->syncOrderedModels($events, fn (Event $event): bool => $this->syncEventSlug($event));
     }
 
     public function syncEventSlugsForSpeakerName(string $speakerName): bool
@@ -98,21 +94,7 @@ class GenerateEventSlugAction
     {
         $slug = $this->forEvent($event);
 
-        if ($event->slug === $slug) {
-            return false;
-        }
-
-        $previousSlug = is_string($event->slug) ? $event->slug : null;
-
-        Event::withoutTimestamps(function () use ($event, $slug): void {
-            $event->forceFill([
-                'slug' => $slug,
-            ])->saveQuietly();
-        });
-
-        $this->syncSlugRedirectAction->handle($event, $previousSlug);
-
-        return true;
+        return $this->syncCanonicalSlugAction->persist($event, $slug);
     }
 
     /**
@@ -211,26 +193,6 @@ class GenerateEventSlugAction
                 && $this->speakerSlugSegmentsForEvent($event) === $speakerSlugs);
 
         return $matchingEvents->count() + 1;
-    }
-
-    /**
-     * @param  Collection<int, Event>  $events
-     * @return Collection<int, Event>
-     */
-    private function orderedEvents(Collection $events): Collection
-    {
-        return $events
-            ->sort(function (Event $left, Event $right): int {
-                $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
-                $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
-
-                if ($leftCreatedAt !== $rightCreatedAt) {
-                    return $leftCreatedAt <=> $rightCreatedAt;
-                }
-
-                return strcmp((string) $left->getKey(), (string) $right->getKey());
-            })
-            ->values();
     }
 
     private function dateSuffix(CarbonInterface|string|null $date, ?string $timezone): string
