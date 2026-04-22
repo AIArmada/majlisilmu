@@ -33,8 +33,8 @@ it('registers octane commands', function () {
         ->toContain('octane:status');
 });
 
-it('uses the package plugin with static config to exclude the signals dashboard from admin', function () {
-    expect(config('filament-signals.features.dashboard'))->toBeFalse();
+it('uses the package plugin with static config to include the signals dashboard in admin', function () {
+    expect(config('filament-signals.features.dashboard'))->toBeTrue();
 
     $provider = new AdminPanelProvider(app());
     $panel = $provider->panel(new Panel);
@@ -43,7 +43,7 @@ it('uses the package plugin with static config to exclude the signals dashboard 
         static fn (mixed $plugin): bool => $plugin instanceof FilamentSignalsPlugin
     ))->toBeTrue()
         ->and($panel->getPages())->toContain(PageViewsReport::class)
-        ->and($panel->getPages())->not->toContain(SignalsDashboard::class);
+        ->and($panel->getPages())->toContain(SignalsDashboard::class);
 });
 
 it('does not globally share blaze runtime state in the view factory', function () {
