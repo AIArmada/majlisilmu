@@ -242,7 +242,7 @@ final readonly class SaveAdminEventAction
         );
         $this->syncMedia($event, $data);
 
-        return $event->fresh([
+        $event = $event->fresh([
             'settings',
             'references',
             'series',
@@ -254,6 +254,8 @@ final readonly class SaveAdminEventAction
             'venue',
             'space',
         ]) ?? $event;
+
+        return $event;
     }
 
     /**

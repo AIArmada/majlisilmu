@@ -4,13 +4,18 @@
         "copilot",
         "opencode"
     ],
-    "editors": [
-        "codex",
-        "opencode",
-        "vscode"
-    ],
     "guidelines": true,
-    "herd_mcp": true,
+    "mcp": true,
+    "nightwatch_mcp": false,
+    "packages": [
+        "filament/filament",
+        "filament/blueprint",
+        "spatie/guidelines-skills",
+        "livewire/blaze",
+        "lorisleiva/laravel-actions",
+        "spatie/laravel-query-builder"
+    ],
+    "sail": false,
     "skills": [
         "ai-sdk-development",
         "fortify-development",
@@ -23,6 +28,13 @@
         "fluxui-development",
         "pest-testing",
         "tailwindcss-development",
+        "blaze-optimize",
+        "laravel-actions",
+        "laravel-query-builder",
+        "spatie-javascript",
+        "spatie-laravel-php",
+        "spatie-security",
+        "spatie-version-control",
         "laravel-specialist"
     ]
 }

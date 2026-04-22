@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Actions\Events\GenerateEventSlugAction;
+use App\Actions\Slugs\SyncCanonicalSlugAction;
 use App\Actions\Slugs\SyncSlugRedirectAction;
 use App\Enums\EventPrayerTime;
 use App\Enums\PrayerOffset;
@@ -11,6 +12,7 @@ use App\Enums\TimingMode;
 use App\Models\Address;
 use App\Models\Event;
 use App\Models\Speaker;
+use App\Observers\Concerns\SyncsCurrentAndPreviousValues;
 use App\Services\Notifications\EventNotificationService;
 use App\Services\PrayerTimeService;
 use App\Support\Cache\PublicDirectoryCacheVersion;
@@ -21,8 +23,11 @@ use Illuminate\Support\Facades\Log;
 
 class EventObserver
 {
+    use SyncsCurrentAndPreviousValues;
+
     public function __construct(
         protected GenerateEventSlugAction $generateEventSlugAction,
+        protected SyncCanonicalSlugAction $syncCanonicalSlugAction,
         protected SyncSlugRedirectAction $syncSlugRedirectAction,
         protected PrayerTimeService $prayerTimeService,
         protected PublicDirectoryCacheVersion $publicDirectoryCacheVersion,
@@ -81,14 +86,24 @@ class EventObserver
         $this->publicListingsCache->bustMajlisListing();
         $this->publicDirectoryCacheVersion->bumpForEvent($event);
 
+        if ($event->wasChanged('slug')) {
+            /**
+             * Direct event write paths can persist the canonical slug before the
+             * observer runs, so redirects are synchronized here from the model's
+             * previous persisted slug snapshot.
+             */
+            $this->syncCanonicalSlugAction->syncChanged(
+                $event,
+                $event->getPrevious()['slug'] ?? null,
+            );
+        }
+
         if ($event->wasChanged(['title', 'starts_at', 'timezone', 'organizer_type', 'organizer_id'])) {
-            $previousTitle = trim((string) ($event->getPrevious()['title'] ?? ''));
-
-            $this->generateEventSlugAction->syncEventSlugsForTitle($event->title);
-
-            if ($previousTitle !== '' && $previousTitle !== $event->title) {
-                $this->generateEventSlugAction->syncEventSlugsForTitle($previousTitle);
-            }
+            $this->syncCurrentAndPreviousString(
+                $event->title,
+                $event->getPrevious()['title'] ?? null,
+                fn (string $title): bool => $this->generateEventSlugAction->syncEventSlugsForTitle($title),
+            );
         }
 
         $changedFields = collect(array_keys($event->getChanges()))

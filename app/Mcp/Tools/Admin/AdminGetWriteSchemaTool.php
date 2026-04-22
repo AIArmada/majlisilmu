@@ -20,7 +20,9 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
 {
     protected string $name = 'admin-get-write-schema';
 
-    protected string $description = 'Get the supported write schema for a writable admin resource.';
+    protected string $title = 'Inspect Admin Write Schema';
+
+    protected string $description = 'Read-only: inspect the supported create or update schema for a writable admin resource without mutating any records.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,

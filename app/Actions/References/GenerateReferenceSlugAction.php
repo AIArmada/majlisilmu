@@ -2,18 +2,19 @@
 
 namespace App\Actions\References;
 
-use App\Actions\Slugs\SyncSlugRedirectAction;
+use App\Actions\Slugs\Concerns\InteractsWithOrderedSlugModels;
+use App\Actions\Slugs\SyncCanonicalSlugAction;
 use App\Models\Reference;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GenerateReferenceSlugAction
 {
     use AsAction;
+    use InteractsWithOrderedSlugModels;
 
     public function __construct(
-        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+        private readonly SyncCanonicalSlugAction $syncCanonicalSlugAction,
     ) {}
 
     public function syncReferenceSlugsForTitle(string $title): bool
@@ -28,34 +29,14 @@ class GenerateReferenceSlugAction
             ->where('references.title', $normalizedTitle)
             ->get();
 
-        $didChange = false;
-
-        foreach ($this->orderedReferences($references) as $reference) {
-            $didChange = $this->syncReferenceSlug($reference) || $didChange;
-        }
-
-        return $didChange;
+        return $this->syncOrderedModels($references, fn (Reference $reference): bool => $this->syncReferenceSlug($reference));
     }
 
     public function syncReferenceSlug(Reference $reference): bool
     {
         $slug = $this->forReference($reference);
 
-        if ($reference->slug === $slug) {
-            return false;
-        }
-
-        $previousSlug = is_string($reference->slug) ? $reference->slug : null;
-
-        Reference::withoutTimestamps(function () use ($reference, $slug): void {
-            $reference->forceFill([
-                'slug' => $slug,
-            ])->saveQuietly();
-        });
-
-        $this->syncSlugRedirectAction->handle($reference, $previousSlug);
-
-        return true;
+        return $this->syncCanonicalSlugAction->persist($reference, $slug);
     }
 
     public function handle(?string $title, ?string $ignoreReferenceId = null): string
@@ -94,7 +75,7 @@ class GenerateReferenceSlugAction
             ->get();
 
         if ($ignoreReferenceId !== null && $ignoreReferenceId !== '') {
-            $existingSequence = $this->existingReferenceSequence($matchingReferences, $ignoreReferenceId);
+            $existingSequence = $this->existingModelSequence($matchingReferences, $ignoreReferenceId);
 
             if ($existingSequence !== null) {
                 return $existingSequence;
@@ -108,44 +89,6 @@ class GenerateReferenceSlugAction
         $matchingCount = $matchingReferences->count();
 
         return $matchingCount > 0 ? $matchingCount + 1 : 1;
-    }
-
-    /**
-     * @param  Collection<int, Reference>  $matchingReferences
-     */
-    private function existingReferenceSequence(Collection $matchingReferences, string $referenceId): ?int
-    {
-        $orderedReferences = $this->orderedReferences($matchingReferences);
-
-        $existingIndex = $orderedReferences->search(
-            fn (Reference $reference): bool => (string) $reference->getKey() === $referenceId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
-        }
-
-        return $existingIndex + 1;
-    }
-
-    /**
-     * @param  Collection<int, Reference>  $references
-     * @return Collection<int, Reference>
-     */
-    private function orderedReferences(Collection $references): Collection
-    {
-        return $references
-            ->sort(function (Reference $left, Reference $right): int {
-                $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
-                $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
-
-                if ($leftCreatedAt !== $rightCreatedAt) {
-                    return $leftCreatedAt <=> $rightCreatedAt;
-                }
-
-                return strcmp((string) $left->getKey(), (string) $right->getKey());
-            })
-            ->values();
     }
 
     private function slugExists(string $slug, ?string $ignoreReferenceId): bool

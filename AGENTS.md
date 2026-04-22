@@ -933,6 +933,13 @@ This project has domain-specific skills available. You MUST activate the relevan
 - `fluxui-development` — Use this skill for Flux UI development in Livewire applications only. Trigger when working with <flux:*> components, building or customizing Livewire component UIs, creating forms, modals, tables, or other interactive elements. Covers: flux: components (buttons, inputs, modals, forms, tables, date-pickers, kanban, badges, tooltips, etc.), component composition, Tailwind CSS styling, Heroicons/Lucide icon integration, validation patterns, responsive design, and theming. Do not use for non-Livewire frameworks or non-component styling.
 - `pest-testing` — Use this skill for Pest PHP testing in Laravel projects only. Trigger whenever any test is being written, edited, fixed, or refactored — including fixing tests that broke after a code change, adding assertions, converting PHPUnit to Pest, adding datasets, and TDD workflows. Always activate when the user asks how to write something in Pest, mentions test files or directories (tests/Feature, tests/Unit, tests/Browser), or needs browser testing, smoke testing multiple pages for JS errors, or architecture tests. Covers: test()/it()/expect() syntax, datasets, mocking, browser testing (visit/click/fill), smoke testing, arch(), Livewire component tests, RefreshDatabase, and all Pest 4 features. Do not use for factories, seeders, migrations, controllers, models, or non-test PHP code.
 - `tailwindcss-development` — Always invoke when the user's message includes 'tailwind' in any form. Also invoke for: building responsive grid layouts (multi-column card grids, product grids), flex/grid page structures (dashboards with sidebars, fixed topbars, mobile-toggle navs), styling UI components (cards, tables, navbars, pricing sections, forms, inputs, badges), adding dark mode variants, fixing spacing or typography, and Tailwind v3/v4 work. The core use case: writing or fixing Tailwind utility classes in HTML templates (Blade, JSX, Vue). Skip for backend PHP logic, database queries, API routes, JavaScript with no HTML/CSS component, CSS file audits, build tool configuration, and vanilla CSS.
+- `blaze-optimize` — Set up and optimize Blade component rendering with Blaze. Use when installing Blaze, optimizing components, or configuring @blaze directives and strategies.
+- `laravel-actions` — Build, refactor, and troubleshoot Laravel Actions using lorisleiva/laravel-actions. Use when implementing reusable action classes (object/controller/job/listener/command), converting service classes/controllers/jobs into actions, orchestrating workflows via faked actions, or debugging action entrypoints and wiring.
+- `laravel-query-builder` — Build filtered, sorted, and included API endpoints using spatie/laravel-query-builder. Activates when working with QueryBuilder, AllowedFilter, AllowedSort, AllowedInclude, or when the user mentions query parameters, API filtering, sorting, includes, or spatie/laravel-query-builder.
+- `spatie-javascript` — Apply Spatie's JavaScript coding standards for any task that creates, edits, reviews, refactors, or formats JavaScript or TypeScript code; use for variable declarations, comparisons, functions, destructuring, and Prettier configuration to align with Spatie's JS conventions.
+- `spatie-laravel-php` — Apply Spatie's Laravel and PHP coding standards for any task that creates, edits, reviews, refactors, or formats Laravel/PHP code or Blade templates; use for controllers, Eloquent models, routes, config, validation, migrations, tests, and related files to align with Laravel conventions and PSR-12.
+- `spatie-security` — Apply Spatie's security guidelines when configuring applications, databases, or servers, or when reviewing code for security concerns; use for SSL setup, CSRF protection, password hashing, database permissions, and server hardening.
+- `spatie-version-control` — Apply Spatie's version control conventions when creating commits, branches, pull requests, or managing Git repositories; use for naming repos, writing commit messages, choosing branch strategies, and merging code.
 - `laravel-specialist` — Build and configure Laravel 10+ applications, including creating Eloquent models and relationships, implementing Sanctum authentication, configuring Horizon queues, designing RESTful APIs with API resources, and building reactive interfaces with Livewire. Use when creating Laravel models, setting up queue workers, implementing Sanctum auth flows, building Livewire components, optimising Eloquent queries, or writing Pest/PHPUnit tests for Laravel features.
 
 ## Conventions
@@ -965,6 +972,28 @@ This project has domain-specific skills available. You MUST activate the relevan
 === boost rules ===
 
 # Laravel Boost
+
+## Tools
+
+- Laravel Boost is an MCP server with tools designed specifically for this application. Prefer Boost tools over manual alternatives like shell commands or file reads.
+- Use `database-query` to run read-only queries against the database instead of writing raw SQL in tinker.
+- Use `database-schema` to inspect table structure before writing migrations or models.
+- Use `get-absolute-url` to resolve the correct scheme, domain, and port for project URLs. Always use this before sharing a URL with the user.
+- Use `browser-logs` to read browser logs, errors, and exceptions. Only recent logs are useful, ignore old entries.
+
+## Searching Documentation (IMPORTANT)
+
+- Always use `search-docs` before making code changes. Do not skip this step. It returns version-specific docs based on installed packages automatically.
+- Pass a `packages` array to scope results when you know which packages are relevant.
+- Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
+- Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
+
+### Search Syntax
+
+1. Use words for auto-stemmed AND logic: `rate limit` matches both "rate" AND "limit".
+2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
+3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
+4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
 
 ## Artisan
 
@@ -1002,6 +1031,13 @@ This project has domain-specific skills available. You MUST activate the relevan
 
 - The application is served by Laravel Herd at `https?://[kebab-case-project-dir].test`. Use the `get-absolute-url` tool to generate valid URLs. Never run commands to serve the site. It is always available.
 - Use the `herd` CLI to manage services, PHP versions, and sites (e.g. `herd sites`, `herd services:start <service>`, `herd php:list`). Run `herd list` to discover all available commands.
+
+=== tests rules ===
+
+# Test Enforcement
+
+- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
+- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
 
 === ai/core rules ===
 
@@ -1072,5 +1108,262 @@ $this->app->singleton(Service::class, fn () => new Service(fn () => request()));
 - This project uses Pest for testing. Create tests: `php artisan make:test --pest {name}`.
 - Run tests: `php artisan test --compact` or filter: `php artisan test --compact --filter=testName`.
 - Do NOT delete tests without approval.
+
+=== filament/filament rules ===
+
+## Filament
+
+- Filament is a Laravel UI framework built on Livewire, Alpine.js, and Tailwind CSS. UIs are defined in PHP via fluent, chainable components. Follow existing conventions in this app.
+- Use the `search-docs` tool for official documentation on Artisan commands, code examples, testing, relationships, and idiomatic practices. If `search-docs` is unavailable, refer to https://filamentphp.com/docs.
+
+### Artisan
+
+- Always use Filament-specific Artisan commands to create files. Find available commands with the `list-artisan-commands` tool, or run `php artisan --help`.
+- Inspect required options before running, and always pass `--no-interaction`.
+
+### Patterns
+
+Always use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values.
+
+Use `Get $get` to read other form field values for conditional logic:
+
+<code-snippet name="Conditional form field visibility" lang="php">
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
+
+Select::make('type')
+    ->options(CompanyType::class)
+    ->required()
+    ->live(),
+
+TextInput::make('company_name')
+    ->required()
+    ->visible(fn (Get $get): bool => $get('type') === 'business'),
+
+</code-snippet>
+
+Use `Set $set` inside `->afterStateUpdated()` on a `->live()` field to mutate another field reactively. Prefer `->live(onBlur: true)` on text inputs to avoid per-keystroke updates:
+
+<code-snippet name="Reactive field update" lang="php">
+use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Support\Str;
+
+TextInput::make('title')
+    ->required()
+    ->live(onBlur: true)
+    ->afterStateUpdated(fn (Set $set, ?string $state) => $set(
+        'slug',
+        Str::slug($state ?? ''),
+    )),
+
+TextInput::make('slug')
+    ->required(),
+
+</code-snippet>
+
+Compose layout by nesting `Section` and `Grid`. Children need explicit `->columnSpan()` or `->columnSpanFull()`:
+
+<code-snippet name="Section and Grid layout" lang="php">
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+
+Section::make('Details')
+    ->schema([
+        Grid::make(2)->schema([
+            TextInput::make('first_name')
+                ->columnSpan(1),
+            TextInput::make('last_name')
+                ->columnSpan(1),
+            TextInput::make('bio')
+                ->columnSpanFull(),
+        ]),
+    ]),
+
+</code-snippet>
+
+Use `Repeater` for inline `HasMany` management. `->relationship()` with no args binds to the relationship matching the field name:
+
+<code-snippet name="Repeater for HasMany" lang="php">
+use Filament\Forms\Components\Repeater;
+
+Repeater::make('qualifications')
+    ->relationship()
+    ->schema([
+        TextInput::make('institution')
+            ->required(),
+        TextInput::make('qualification')
+            ->required(),
+    ])
+    ->columns(2),
+
+</code-snippet>
+
+Use `state()` with a `Closure` to compute derived column values:
+
+<code-snippet name="Computed table column value" lang="php">
+use Filament\Tables\Columns\TextColumn;
+
+TextColumn::make('full_name')
+    ->state(fn (User $record): string => "{$record->first_name} {$record->last_name}"),
+
+</code-snippet>
+
+Use `SelectFilter` for enum or relationship filters, and `Filter` with a `->query()` closure for custom logic:
+
+<code-snippet name="Table filters" lang="php">
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Eloquent\Builder;
+
+SelectFilter::make('status')
+    ->options(UserStatus::class),
+
+SelectFilter::make('author')
+    ->relationship('author', 'name'),
+
+Filter::make('verified')
+    ->query(fn (Builder $query) => $query->whereNotNull('email_verified_at')),
+
+</code-snippet>
+
+Actions are buttons that encapsulate optional modal forms and behavior:
+
+<code-snippet name="Action with modal form" lang="php">
+use Filament\Actions\Action;
+
+Action::make('updateEmail')
+    ->schema([
+        TextInput::make('email')
+            ->email()
+            ->required(),
+    ])
+    ->action(fn (array $data, User $record) => $record->update($data)),
+
+</code-snippet>
+
+### Testing
+
+Testing setup (requires `pestphp/pest-plugin-livewire` in `composer.json`):
+
+- Always call `$this->actingAs(User::factory()->create())` before testing panel functionality.
+- For edit pages, pass `['record' => $user->id]`, use `->call('save')` (not `->call('create')`), and do not assert `->assertRedirect()` (edit pages do not redirect after save).
+
+<code-snippet name="Table test" lang="php">
+use function Pest\Livewire\livewire;
+
+livewire(ListUsers::class)
+    ->assertCanSeeTableRecords($users)
+    ->searchTable($users->first()->name)
+    ->assertCanSeeTableRecords($users->take(1))
+    ->assertCanNotSeeTableRecords($users->skip(1));
+
+</code-snippet>
+
+<code-snippet name="Create resource test" lang="php">
+use function Pest\Laravel\assertDatabaseHas;
+
+livewire(CreateUser::class)
+    ->fillForm([
+        'name' => 'Test',
+        'email' => 'test@example.com',
+    ])
+    ->call('create')
+    ->assertNotified()
+    ->assertHasNoFormErrors()
+    ->assertRedirect();
+
+assertDatabaseHas(User::class, [
+    'name' => 'Test',
+    'email' => 'test@example.com',
+]);
+
+</code-snippet>
+
+<code-snippet name="Edit resource test" lang="php">
+livewire(EditUser::class, ['record' => $user->id])
+    ->fillForm(['name' => 'Updated'])
+    ->call('save')
+    ->assertNotified()
+    ->assertHasNoFormErrors();
+
+assertDatabaseHas(User::class, [
+    'id' => $user->id,
+    'name' => 'Updated',
+]);
+
+</code-snippet>
+
+<code-snippet name="Testing validation" lang="php">
+livewire(CreateUser::class)
+    ->fillForm([
+        'name' => null,
+        'email' => 'invalid-email',
+    ])
+    ->call('create')
+    ->assertHasFormErrors([
+        'name' => 'required',
+        'email' => 'email',
+    ])
+    ->assertNotNotified();
+
+</code-snippet>
+
+Use `->callAction(DeleteAction::class)` for page actions, or `->callAction(TestAction::make('name')->table($record))` for table actions:
+
+<code-snippet name="Calling actions" lang="php">
+use Filament\Actions\Testing\TestAction;
+
+livewire(ListUsers::class)
+    ->callAction(TestAction::make('promote')->table($user), [
+        'role' => 'admin',
+    ])
+    ->assertNotified();
+
+</code-snippet>
+
+### Correct Namespaces
+
+- Form fields (`TextInput`, `Select`, `Repeater`, etc.): `Filament\Forms\Components\`
+- Infolist entries (`TextEntry`, `IconEntry`, etc.): `Filament\Infolists\Components\`
+- Layout components (`Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.): `Filament\Schemas\Components\`
+- Schema utilities (`Get`, `Set`, etc.): `Filament\Schemas\Components\Utilities\`
+- Table columns (`TextColumn`, `IconColumn`, etc.): `Filament\Tables\Columns\`
+- Table filters (`SelectFilter`, `Filter`, etc.): `Filament\Tables\Filters\`
+- Actions (`DeleteAction`, `CreateAction`, etc.): `Filament\Actions\`. Never use `Filament\Tables\Actions\`, `Filament\Forms\Actions\`, or any other sub-namespace for actions.
+- Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
+
+### Common Mistakes
+
+- **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed.
+- **Never assume full-width layout.** `Grid`, `Section`, `Fieldset`, and `Repeater` do not span all columns by default.
+- **Use `Select::make('author_id')->relationship('author', 'name')` for BelongsTo fields.** `BelongsToSelect` does not exist in v4.
+- **`Repeater` uses `->schema()`, not `->fields()`.**
+- **Never add `->dehydrated(false)` to fields that need to be saved.** It strips the value from form state before `->action()` or the save handler runs. Only use it for helper/UI-only fields.
+- **Use correct property types when overriding `Page`, `Resource`, and `Widget` properties.** These properties have union types or changed modifiers that must be preserved:
+  - `$navigationIcon`: `protected static string | BackedEnum | null` (not `?string`)
+  - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
+  - `$view`: `protected string` (not `protected static string`) on `Page` and `Widget` classes
+
+=== filament/blueprint rules ===
+
+## Filament Blueprint
+
+You are writing Filament v5 implementation plans. Plans must be specific enough
+that an implementing agent can write code without making decisions.
+
+**Start here**: Read
+`/vendor/filament/blueprint/resources/markdown/planning/overview.md` for plan format,
+required sections, and what to clarify with the user before planning.
+
+=== spatie/guidelines-skills rules ===
+
+# Project Coding Guidelines
+
+- This codebase follows Spatie's coding guidelines.
+- Always activate the `spatie-laravel-php` skill when writing, editing, reviewing, or formatting Laravel or PHP code.
+- Always activate the `spatie-javascript` skill when writing, editing, reviewing, or formatting JavaScript or TypeScript code.
+- Always activate the `spatie-version-control` skill when creating commits, branches, or managing Git operations.
+- Always activate the `spatie-security` skill when configuring security, reviewing authentication, or setting up servers and databases.
 
 </laravel-boost-guidelines>

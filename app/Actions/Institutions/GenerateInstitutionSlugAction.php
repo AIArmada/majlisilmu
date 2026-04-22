@@ -2,22 +2,23 @@
 
 namespace App\Actions\Institutions;
 
-use App\Actions\Slugs\SyncSlugRedirectAction;
+use App\Actions\Slugs\Concerns\InteractsWithOrderedSlugModels;
+use App\Actions\Slugs\SyncCanonicalSlugAction;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\Institution;
 use App\Models\State;
 use App\Models\Subdistrict;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GenerateInstitutionSlugAction
 {
     use AsAction;
+    use InteractsWithOrderedSlugModels;
 
     public function __construct(
-        private readonly SyncSlugRedirectAction $syncSlugRedirectAction,
+        private readonly SyncCanonicalSlugAction $syncCanonicalSlugAction,
     ) {}
 
     public function syncInstitutionSlugsForName(string $name): bool
@@ -38,34 +39,14 @@ class GenerateInstitutionSlugAction
             ])
             ->get();
 
-        $didChange = false;
-
-        foreach ($this->orderedInstitutions($institutions) as $institution) {
-            $didChange = $this->syncInstitutionSlug($institution) || $didChange;
-        }
-
-        return $didChange;
+        return $this->syncOrderedModels($institutions, fn (Institution $institution): bool => $this->syncInstitutionSlug($institution));
     }
 
     public function syncInstitutionSlug(Institution $institution): bool
     {
         $slug = $this->forInstitution($institution);
 
-        if ($institution->slug === $slug) {
-            return false;
-        }
-
-        $previousSlug = is_string($institution->slug) ? $institution->slug : null;
-
-        Institution::withoutTimestamps(function () use ($institution, $slug): void {
-            $institution->forceFill([
-                'slug' => $slug,
-            ])->saveQuietly();
-        });
-
-        $this->syncSlugRedirectAction->handle($institution, $previousSlug);
-
-        return true;
+        return $this->syncCanonicalSlugAction->persist($institution, $slug);
     }
 
     /**
@@ -149,7 +130,7 @@ class GenerateInstitutionSlugAction
             ->filter(fn (Institution $institution): bool => $this->locationSuffixForInstitution($institution) === $locationSuffix);
 
         if ($ignoreInstitutionId !== null && $ignoreInstitutionId !== '') {
-            $existingSequence = $this->existingInstitutionSequence($matchingInstitutions, $ignoreInstitutionId);
+            $existingSequence = $this->existingModelSequence($matchingInstitutions, $ignoreInstitutionId);
 
             if ($existingSequence !== null) {
                 return $existingSequence;
@@ -163,44 +144,6 @@ class GenerateInstitutionSlugAction
         $matchingCount = $matchingInstitutions->count();
 
         return $matchingCount > 0 ? $matchingCount + 1 : 1;
-    }
-
-    /**
-     * @param  Collection<int, Institution>  $matchingInstitutions
-     */
-    private function existingInstitutionSequence(Collection $matchingInstitutions, string $institutionId): ?int
-    {
-        $orderedInstitutions = $this->orderedInstitutions($matchingInstitutions);
-
-        $existingIndex = $orderedInstitutions->search(
-            fn (Institution $institution): bool => (string) $institution->getKey() === $institutionId,
-        );
-
-        if (! is_int($existingIndex)) {
-            return null;
-        }
-
-        return $existingIndex + 1;
-    }
-
-    /**
-     * @param  Collection<int, Institution>  $institutions
-     * @return Collection<int, Institution>
-     */
-    private function orderedInstitutions(Collection $institutions): Collection
-    {
-        return $institutions
-            ->sort(function (Institution $left, Institution $right): int {
-                $leftCreatedAt = $left->created_at?->getTimestamp() ?? 0;
-                $rightCreatedAt = $right->created_at?->getTimestamp() ?? 0;
-
-                if ($leftCreatedAt !== $rightCreatedAt) {
-                    return $leftCreatedAt <=> $rightCreatedAt;
-                }
-
-                return strcmp((string) $left->getKey(), (string) $right->getKey());
-            })
-            ->values();
     }
 
     /**
