@@ -1025,8 +1025,11 @@
                                         <p class="mt-1 text-sm leading-6 text-slate-600">
                                             {{ $changeAnnouncement->public_message ?: __('Maklumat majlis ini telah dikemas kini.') }}
                                         </p>
-                                        @if($changeAnnouncement->replacementEvent)
-                                            <a href="{{ route('events.show', $changeAnnouncement->replacementEvent) }}" wire:navigate
+                                        @php
+                                            $replacementTarget = $this->replacementLinkTargetForAnnouncement($changeAnnouncement);
+                                        @endphp
+                                        @if($replacementTarget)
+                                            <a href="{{ route('events.show', $replacementTarget) }}" wire:navigate
                                                 class="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700 hover:text-emerald-800">
                                                 {{ __('Lihat majlis pengganti') }}
                                                 <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
