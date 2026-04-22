@@ -212,6 +212,14 @@ return [
             'label' => 'Event venue changed',
             'description' => 'Alert me when a tracked event moves venue or space.',
         ],
+        'event_details_changed' => [
+            'label' => 'Event details changed',
+            'description' => 'Alert me when a tracked event has a speaker, topic, reference, organizer, or other important detail change.',
+        ],
+        'event_replacement_linked' => [
+            'label' => 'Replacement event linked',
+            'description' => 'Alert me when a tracked event points to a replacement event.',
+        ],
         'reminder_24_hours' => [
             'label' => '24-hour reminder',
             'description' => 'Send a reminder about going or registered events a day before they start.',
@@ -282,11 +290,20 @@ return [
         'event_update' => [
             'title' => ':title has been updated',
         ],
+        'event_change' => [
+            'body' => ':summary',
+        ],
         'event_schedule_changed' => [
             'body' => 'The schedule changed. :timing.',
         ],
         'event_venue_changed' => [
             'body' => 'The venue or space changed. :timing.',
+        ],
+        'event_details_changed' => [
+            'body' => ':summary',
+        ],
+        'event_replacement_linked' => [
+            'body' => ':summary',
         ],
         'registration_confirmed' => [
             'title' => 'Registration confirmed for :title',

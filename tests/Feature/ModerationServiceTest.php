@@ -291,7 +291,7 @@ describe('Event Cancellation', function () {
 });
 
 describe('Sensitive Change Handling', function () {
-    it('sets approved event back to pending on sensitive change', function () {
+    it('keeps approved events approved when sensitive changes are saved without an announcement', function () {
         $moderator = User::factory()->create();
         $moderator->assignRole('moderator');
 
@@ -304,12 +304,12 @@ describe('Sensitive Change Handling', function () {
             'venue_id' => 'new-venue-id',
         ]);
 
-        expect((string) $event->fresh()->status)->toBe('pending');
+        expect((string) $event->fresh()->status)->toBe('approved');
 
-        Notification::assertSentTo($moderator, EventSubmittedNotification::class);
+        Notification::assertNotSentTo($moderator, EventSubmittedNotification::class);
     });
 
-    it('creates review record for sensitive changes', function () {
+    it('does not create remoderation review records for sensitive ordinary saves', function () {
         $event = Event::factory()->create([
             'status' => 'approved',
         ]);
@@ -320,9 +320,7 @@ describe('Sensitive Change Handling', function () {
 
         $review = ModerationReview::where('event_id', $event->id)->latest()->first();
 
-        expect($review)->not->toBeNull();
-        expect($review->decision)->toBe('remoderated');
-        expect($review->note)->toContain('starts_at');
+        expect($review)->toBeNull();
     });
 
     it('ignores non-sensitive changes', function () {

@@ -3,6 +3,7 @@
 namespace App\Actions\Events;
 
 use App\Enums\EventVisibility;
+use App\Enums\ScheduleState;
 use App\Models\Event;
 use App\Models\Registration;
 use App\Models\User;
@@ -27,6 +28,15 @@ final class ResolveEventCheckInStateAction
             return [
                 'available' => false,
                 'reason' => __('Majlis ini tidak tersedia untuk check-in.'),
+                'method' => 'self_reported',
+                'registration_id' => null,
+            ];
+        }
+
+        if ($event->schedule_state === ScheduleState::Postponed) {
+            return [
+                'available' => false,
+                'reason' => __('Tarikh majlis belum disahkan untuk check-in.'),
                 'method' => 'self_reported',
                 'registration_id' => null,
             ];

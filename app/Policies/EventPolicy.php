@@ -4,8 +4,10 @@ namespace App\Policies;
 
 use App\Enums\EventVisibility;
 use App\Models\Event;
+use App\Models\Speaker;
 use App\Models\User;
 use App\States\EventStatus\Draft;
+use App\Support\Authz\MemberPermissionGate;
 
 class EventPolicy
 {
@@ -150,5 +152,23 @@ class EventPolicy
         }
 
         return $event->userHasScopedEventPermission($user, 'event.manage-members');
+    }
+
+    public function publishChange(User $user, Event $event): bool
+    {
+        if ($user->hasAnyRole(['super_admin', 'moderator'])) {
+            return true;
+        }
+
+        if ($event->userCanManage($user)) {
+            return true;
+        }
+
+        $event->loadMissing('speakers');
+        $memberPermissionGate = app(MemberPermissionGate::class);
+
+        return $event->speakers->contains(
+            fn (Speaker $speaker): bool => $memberPermissionGate->canSpeaker($user, 'event.update', $speaker)
+        );
     }
 }

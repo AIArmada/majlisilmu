@@ -10,6 +10,7 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Filament\Ahli\Resources\Events\Pages\EditEvent as AhliEditEvent;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\References\Pages\CreateReference;
@@ -684,6 +685,44 @@ it('regenerates the canonical dated slug when admins edit events in filament', f
         ->assertHasNoErrors();
 
     expect($event->fresh()?->slug)->toBe("forum-ramadan-dikemas-kini-{$expectedSuffix}");
+});
+
+it('regenerates the canonical dated slug when ahli members edit events in filament', function () {
+    $member = createSlugAdminUser();
+    $startsAt = Carbon::parse('2026-04-12 20:00:00', 'Asia/Kuala_Lumpur')->utc();
+    $expectedSuffix = Carbon::parse('2026-04-13', 'Asia/Kuala_Lumpur')->format('j-n-y');
+
+    $event = Event::factory()->create([
+        'user_id' => $member->id,
+        'title' => 'Forum Ahli Ramadan',
+        'slug' => 'legacy-ahli-event-slug',
+        'starts_at' => $startsAt,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_type' => [EventType::Other->value],
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($member)
+        ->test(AhliEditEvent::class, ['record' => $event->id])
+        ->fillForm([
+            'title' => 'Forum Ahli Dikemas Kini',
+            'slug' => 'manually-tampered-ahli-slug',
+            'event_date' => '2026-04-13',
+            'prayer_time' => EventPrayerTime::LainWaktu->value,
+            'custom_time' => '20:00',
+            'end_time' => '22:00',
+            'timezone' => 'Asia/Kuala_Lumpur',
+        ])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($event->fresh()?->slug)->toBe("forum-ahli-dikemas-kini-{$expectedSuffix}");
 });
 
 it('previews the speaker-aware slug when admins edit event speakers', function () {

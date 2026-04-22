@@ -7,6 +7,7 @@ use App\Actions\Events\RemoveEventGoingAction;
 use App\Data\Api\EventEngagement\EventEngagementListItemData;
 use App\Data\Api\EventGoing\EventGoingStateData;
 use App\Enums\EventVisibility;
+use App\Enums\ScheduleState;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
@@ -52,7 +53,10 @@ class EventGoingController extends Controller
     )]
     public function store(Request $request, Event $event, MarkEventGoingAction $markEventGoingAction): JsonResponse
     {
-        if (! $event->is_active || ! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true) || $event->visibility !== EventVisibility::Public) {
+        if (! $event->is_active
+            || ! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true)
+            || $event->visibility !== EventVisibility::Public
+            || $event->schedule_state === ScheduleState::Postponed) {
             return response()->json([
                 'error' => [
                     'code' => 'forbidden',

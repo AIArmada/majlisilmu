@@ -159,7 +159,7 @@ it('creates an event slug redirect when a visited dated slug changes', function 
         ->and($redirect->destination_path)->toBe(route('events.show', $event->fresh(), false));
 });
 
-it('does not create an event slug redirect when the old slug was never visited', function () {
+it('creates an event slug redirect even when the old slug was never visited', function () {
     $event = createSlugRedirectEvent(
         id: '00000000-0000-0000-0000-000000000074',
         title: 'Majlis Tanpa Lawatan',
@@ -174,11 +174,15 @@ it('does not create an event slug redirect when the old slug was never visited',
         'title' => 'Majlis Tanpa Lawatan Baru',
     ]);
 
+    $redirect = SlugRedirect::query()->where('source_path', $oldPath)->firstOrFail();
+
     expect($oldSlug)->not->toBe($event->fresh()->slug)
-        ->and(SlugRedirect::query()->where('source_path', $oldPath)->exists())->toBeFalse();
+        ->and($redirect->source_slug)->toBe($oldSlug)
+        ->and($redirect->destination_slug)->toBe($event->fresh()->slug)
+        ->and($redirect->destination_path)->toBe(route('events.show', $event->fresh(), false));
 
     $this->get($oldPath)
-        ->assertNotFound();
+        ->assertRedirect(route('events.show', $event->fresh()));
 });
 
 it('redirects old event slugs when administrators change the event date', function () {

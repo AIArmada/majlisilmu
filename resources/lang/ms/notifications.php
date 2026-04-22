@@ -212,6 +212,14 @@ return [
             'label' => 'Lokasi majlis berubah',
             'description' => 'Maklumkan apabila lokasi atau ruang majlis bertukar.',
         ],
+        'event_details_changed' => [
+            'label' => 'Butiran majlis berubah',
+            'description' => 'Maklumkan apabila penceramah, topik, rujukan, penganjur, atau butiran penting lain berubah.',
+        ],
+        'event_replacement_linked' => [
+            'label' => 'Majlis ganti dipautkan',
+            'description' => 'Maklumkan apabila majlis yang dijejak mempunyai majlis ganti.',
+        ],
         'reminder_24_hours' => [
             'label' => 'Peringatan 24 jam',
             'description' => 'Hantar peringatan sehari sebelum majlis bermula.',
@@ -282,11 +290,20 @@ return [
         'event_update' => [
             'title' => ':title telah dikemas kini',
         ],
+        'event_change' => [
+            'body' => ':summary',
+        ],
         'event_schedule_changed' => [
             'body' => 'Jadual majlis telah berubah. :timing.',
         ],
         'event_venue_changed' => [
             'body' => 'Lokasi atau ruang majlis telah berubah. :timing.',
+        ],
+        'event_details_changed' => [
+            'body' => ':summary',
+        ],
+        'event_replacement_linked' => [
+            'body' => ':summary',
         ],
         'registration_confirmed' => [
             'title' => 'Pendaftaran berjaya untuk :title',

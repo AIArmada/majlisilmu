@@ -2,14 +2,20 @@
 
 namespace App\Services\Notifications;
 
+use App\Enums\EventChangeSeverity;
+use App\Enums\EventChangeType;
 use App\Enums\EventVisibility;
 use App\Enums\NotificationCadence;
 use App\Enums\NotificationPriority;
 use App\Enums\NotificationTrigger;
+use App\Enums\ScheduleState;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\EventCheckin;
+use App\Models\Institution;
 use App\Models\Registration;
 use App\Models\SavedSearch;
+use App\Models\Speaker;
 use App\Models\User;
 use App\Services\EventSearchService;
 use App\Support\Authz\MemberPermissionGate;
@@ -241,6 +247,49 @@ class EventNotificationService
         ));
     }
 
+    public function notifyEventChangeAnnouncement(EventChangeAnnouncement $announcement): void
+    {
+        $announcement->loadMissing(['event', 'replacementEvent']);
+        $event = $announcement->event;
+        $recipients = $this->changeAnnouncementRecipients($event);
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        $trigger = $this->announcementTrigger($announcement);
+        $priority = $this->announcementPriority($announcement);
+        $summary = trim((string) $announcement->public_message);
+
+        if ($summary === '') {
+            $summary = $announcement->type->label();
+        }
+
+        $this->dispatchForUsers($recipients, fn (User $user): NotificationDispatchData => $this->buildDispatchData(
+            user: $user,
+            trigger: $trigger,
+            titleKey: $announcement->type === EventChangeType::Cancelled
+                ? 'notifications.messages.event_cancelled.title'
+                : 'notifications.messages.event_update.title',
+            titleParams: ['title' => $event->title],
+            bodyKey: 'notifications.messages.event_change.body',
+            bodyParams: ['summary' => $summary],
+            actionUrl: route('events.show', $event),
+            entityType: Event::class,
+            entityId: $event->id,
+            priority: $priority,
+            fingerprint: 'event-change:'.$announcement->id,
+            meta: [
+                'event_change_announcement_id' => $announcement->id,
+                'event_change_type' => $announcement->type->value,
+                'changed_fields' => $announcement->changed_fields ?? [],
+                'old_new_summary' => $this->announcementOldNewSummary($announcement),
+                'replacement_event_id' => $announcement->replacement_event_id,
+            ],
+            bypassQuietHours: $priority === NotificationPriority::Urgent,
+        ));
+    }
+
     /**
      * @param  array<int, string>  $changedFields
      */
@@ -374,6 +423,49 @@ class EventNotificationService
             $institutionAdmins = $this->memberPermissionGate
                 ->institutionMembersWithPermission($event->institution, 'event.update');
             $recipients = $recipients->merge($institutionAdmins);
+        }
+
+        return $recipients
+            ->filter(fn (mixed $user): bool => $user instanceof User)
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    protected function changeAnnouncementRecipients(Event $event): Collection
+    {
+        $event->loadMissing(['institution', 'organizer', 'speakers']);
+
+        $recipients = collect()
+            ->merge($this->trackedUsers($event))
+            ->merge($this->submissionRecipients($event))
+            ->merge($this->memberPermissionGate->eventMembersWithPermission($event, 'event.update'))
+            ->merge(User::role(['moderator', 'super_admin'])->get());
+
+        if ($event->institution instanceof Institution) {
+            $recipients = $recipients->merge(
+                $this->memberPermissionGate->institutionMembersWithPermission($event->institution, 'event.update')
+            );
+        }
+
+        if ($event->organizer instanceof Institution) {
+            $recipients = $recipients->merge(
+                $this->memberPermissionGate->institutionMembersWithPermission($event->organizer, 'event.update')
+            );
+        }
+
+        if ($event->organizer instanceof Speaker) {
+            $recipients = $recipients->merge(
+                $this->memberPermissionGate->speakerMembersWithPermission($event->organizer, 'event.update')
+            );
+        }
+
+        foreach ($event->speakers as $speaker) {
+            $recipients = $recipients->merge(
+                $this->memberPermissionGate->speakerMembersWithPermission($speaker, 'event.update')
+            );
         }
 
         return $recipients
@@ -683,6 +775,44 @@ class EventNotificationService
             : NotificationPriority::High;
     }
 
+    protected function announcementTrigger(EventChangeAnnouncement $announcement): NotificationTrigger
+    {
+        return match ($announcement->type) {
+            EventChangeType::Cancelled => NotificationTrigger::EventCancelled,
+            EventChangeType::Postponed,
+            EventChangeType::RescheduledEarlier,
+            EventChangeType::RescheduledLater,
+            EventChangeType::ScheduleChanged => NotificationTrigger::EventScheduleChanged,
+            EventChangeType::LocationChanged => NotificationTrigger::EventVenueChanged,
+            EventChangeType::ReplacementLinked => NotificationTrigger::EventReplacementLinked,
+            default => NotificationTrigger::EventDetailsChanged,
+        };
+    }
+
+    protected function announcementPriority(EventChangeAnnouncement $announcement): NotificationPriority
+    {
+        if ($announcement->severity === EventChangeSeverity::Urgent) {
+            return NotificationPriority::Urgent;
+        }
+
+        if ($announcement->severity === EventChangeSeverity::High) {
+            return NotificationPriority::High;
+        }
+
+        return NotificationPriority::Medium;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function announcementOldNewSummary(EventChangeAnnouncement $announcement): array
+    {
+        return [
+            'before' => $announcement->before_snapshot,
+            'after' => $announcement->after_snapshot,
+        ];
+    }
+
     protected function dispatchReminderWindow(
         CarbonImmutable $now,
         NotificationTrigger $trigger,
@@ -694,6 +824,9 @@ class EventNotificationService
             ->where('is_active', true)
             ->whereIn('status', Event::ENGAGEABLE_STATUSES)
             ->where('visibility', EventVisibility::Public)
+            ->where(fn ($query) => $query
+                ->whereNull('schedule_state')
+                ->orWhere('schedule_state', '!=', ScheduleState::Postponed->value))
             ->whereBetween('starts_at', [
                 $windowStart->utc()->toDateTimeString(),
                 $windowEnd->utc()->toDateTimeString(),

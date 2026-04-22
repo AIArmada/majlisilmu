@@ -1,3 +1,82 @@
+# Hybrid Event Change Second Audit
+
+- [x] Re-review the changed event-change persistence, URL, authorization, notification, Filament, public UI, and test surfaces
+- [x] Patch any confirmed second-pass findings with focused regression coverage
+- [x] Re-run targeted verification plus static analysis, formatting, database policy scans, and diff checks
+- [x] Record the final second-audit review outcome
+
+## Review
+
+- Fixed default event-change severity so same-event schedule announcements become urgent when the new start time is earlier than the previous time or lands within the next 24 hours.
+- Added replacement-event validation to reject private/inactive/unreachable replacement targets and replacement chains that would loop back to the original event.
+- Tightened the Filament replacement selector to offer only active, publicly reachable event targets.
+- Excluded unknown-postponed events from reminder/check-in-open notification windows so their last known historical time does not trigger attendance reminders.
+- Aligned the authenticated going API with the web UI by rejecting "going" mutations for unknown-postponed events.
+- Added regression coverage for replacement loop rejection, unreachable replacement rejection, urgent near-term schedule changes, postponed reminder suppression, and postponed going API rejection.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventChangeAnnouncementTest.php` => 12 passed, 44 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/EventGoingApiTest.php` => 10 passed, 55 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/NotificationCenterTriggersTest.php` => 5 passed, 10 assertions
+  - `vendor/bin/pest --parallel` => 1832 passed, 11675 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --test` => pass
+  - `rg -n -- "constrained\\(|cascadeOnDelete\\(" database packages/*/database` => no matches
+  - `rg -n -- "softDeletes\\(\\)|SoftDeletes" database app/Models` => no matches
+  - `git diff --check` => pass
+
+# Hybrid Event Change Source Of Truth
+
+- [x] Add event change announcement schema, enums, model, and event relations
+- [x] Implement explicit publish action, authorization, notifications, and ordinary-edit behavior changes
+- [x] Make event slug aliases permanent for public slug changes without requiring prior visits
+- [x] Add Filament Admin/Ahli publish-change actions and table indicators
+- [x] Add public event notices, replacement CTA, timeline, disabled engagement/calendar behavior, and JSON-LD state mapping
+- [x] Add focused regression coverage for announcements, notifications, slug aliases, authorization, and public UI
+- [x] Run formatter, focused tests, PHPStan, and database policy scans
+
+## Review
+
+- Added `event_change_announcements` with UUID IDs, indexed foreign UUID columns, enum-backed type/status/severity, snapshots, replacement links, and published/retracted timestamps.
+- Added `PublishEventChangeAnnouncement` as the explicit state-change path. Ordinary saves still audit/cache/search and sync slugs, but no longer auto-remoderate, create announcements, or fan out notifications.
+- Implemented the hybrid URL policy: same-event slug changes create permanent public aliases even when the old URL was never visited; replacement events keep their own event IDs and the original URL remains a notice page with a replacement CTA.
+- Added Admin and Ahli `Publish Change` actions, table indicators, public source-of-truth banners, change timelines, concise listing/search badges, disabled engagement/calendar behavior for cancelled/postponed events, and JSON-LD status mapping.
+- Routed v1 committed-user notifications through `EventChangeAnnouncement` with announcement fingerprints, urgent quiet-hours bypass rules, replacement metadata, and follower exclusion.
+- Verification:
+  - `vendor/bin/pest --parallel` => 1823 passed, 11656 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --test` => pass
+  - `rg -n -- "constrained\\(|cascadeOnDelete\\(" database packages/*/database` => no matches
+  - `rg -n -- "softDeletes\\(\\)|SoftDeletes" database app/Models` => no matches
+  - `git diff --check` => pass
+
+# Hybrid Event Change End To End Audit
+
+- [x] Review persistence, action, authorization, and notification logic
+- [x] Review URL policy, public UI, Filament UI, and disabled behaviors
+- [x] Patch confirmed findings with regression coverage
+- [x] Run focused tests, full suite/static analysis/formatter/policy scans as needed
+
+## Review
+
+- Fixed replacement notice handling so a later non-replacement announcement no longer hides the replacement CTA, and replacement chains resolve to the latest reachable target while preserving the original notice page.
+- Added self-replacement validation in `PublishEventChangeAnnouncement` so an event cannot link to itself as its replacement.
+- Tightened scoped authorization and visibility for listed event speaker members by granting speaker-scoped event update permissions, allowing `EventPolicy::publishChange`, and including listed-speaker events in the Ahli event query.
+- Regenerated canonical dated slugs from Ahli event edits to match Admin behavior when title, speaker, or date-driving fields change.
+- Fixed the sensitive-edit prompt to capture model changes before relation sync and to detect relation-only speaker/reference changes.
+- Added regression coverage for replacement CTA persistence, replacement chain resolution, self-replacement rejection, listed-speaker member publishing, and Ahli canonical slug regeneration.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventChangeAnnouncementTest.php` => 8 passed, 38 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/VenueReferenceEventSlugGenerationTest.php --filter='ahli members edit events|admins edit events in filament'` => 2 passed, 6 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliEventApprovalTest.php` => 9 passed, 74 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AhliPanelInstitutionEditingTest.php` => 21 passed, 75 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/FilamentPanelAccessTest.php` => 8 passed, 8 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php` => 34 passed, 422 assertions
+  - `vendor/bin/pest --parallel` => 1827 passed, 11669 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --test` => pass
+  - `rg -n -- "constrained\\(|cascadeOnDelete\\(" database packages/*/database` => no matches
+  - `rg -n -- "softDeletes\\(\\)|SoftDeletes" database app/Models` => no matches
+
 # Documentation Alignment for Account Delete and Engagement Pagination
 
 - [x] Audit mobile-facing docs against the current authenticated account and event-engagement behavior

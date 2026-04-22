@@ -254,6 +254,7 @@
                             @foreach($eventMatches as $event)
                                 @php
                                     $eventHasPoster = $event->hasMedia('poster');
+                                    $eventChangeBadgeLabel = $event->public_change_badge_label;
                                     $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
                                     $eventPosterAspectClass = match ($eventPosterAspectRatio) {
                                         '4:5' => 'aspect-[4/5]',
@@ -278,6 +279,12 @@
                                                 <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}</p>
                                                 <p class="mt-1 font-heading text-2xl font-bold leading-none text-slate-900">{{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}</p>
                                             </div>
+
+                                            @if($eventChangeBadgeLabel)
+                                                <div class="absolute bottom-4 left-4 rounded-full {{ $event->schedule_state === \App\Enums\ScheduleState::Postponed ? 'bg-amber-600/92' : ($event->status instanceof \App\States\EventStatus\Cancelled ? 'bg-rose-600/92' : 'bg-sky-600/92') }} px-3 py-1 text-xs font-bold text-white shadow-lg">
+                                                    {{ $eventChangeBadgeLabel }}
+                                                </div>
+                                            @endif
 
                                             @if(isset($event->distance_km))
                                                 <div class="absolute right-4 top-4 rounded-full bg-emerald-600/90 px-3 py-1 text-xs font-semibold text-white shadow-lg">

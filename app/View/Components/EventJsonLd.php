@@ -2,8 +2,11 @@
 
 namespace App\View\Components;
 
+use App\Enums\EventChangeType;
+use App\Enums\ScheduleState;
 use App\Models\Address;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\EventSettings;
 use App\Models\Institution;
 use App\Models\Speaker;
@@ -147,6 +150,21 @@ class EventJsonLd extends Component
             return 'https://schema.org/EventCancelled';
         }
 
+        if ($this->event->schedule_state === ScheduleState::Postponed) {
+            return 'https://schema.org/EventPostponed';
+        }
+
+        $notice = $this->event->latestPublishedChangeAnnouncement;
+
+        if ($notice instanceof EventChangeAnnouncement
+            && in_array($notice->type, [
+                EventChangeType::RescheduledEarlier,
+                EventChangeType::RescheduledLater,
+                EventChangeType::ScheduleChanged,
+            ], true)) {
+            return 'https://schema.org/EventRescheduled';
+        }
+
         return 'https://schema.org/EventScheduled';
     }
 
@@ -171,6 +189,10 @@ class EventJsonLd extends Component
         $settings = $event->settings;
 
         if (in_array((string) $event->status, ['rejected', 'cancelled'], true)) {
+            return 'https://schema.org/Discontinued';
+        }
+
+        if ($event->schedule_state === ScheduleState::Postponed) {
             return 'https://schema.org/Discontinued';
         }
 

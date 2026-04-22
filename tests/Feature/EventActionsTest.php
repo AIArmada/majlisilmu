@@ -8,6 +8,7 @@ use App\Actions\Events\SyncEventResourceRelationsAction;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\EventSettings;
 use App\Models\Institution;
 use App\Models\Speaker;
@@ -117,7 +118,7 @@ it('uses a safe database default when creating event settings without an explici
         ->and($settings->fresh()?->registration_mode)->toBe(RegistrationMode::Event);
 });
 
-it('applies direct contribution edits and re-moderates approved events for sensitive changes', function () {
+it('applies direct contribution edits without changing approved event state for sensitive ordinary saves', function () {
     $institution = Institution::factory()->create(['status' => 'verified']);
     $event = Event::factory()->for($institution)->create([
         'status' => 'approved',
@@ -129,5 +130,6 @@ it('applies direct contribution edits and re-moderates approved events for sensi
         'starts_at' => now()->addDays(8)->toDateTimeString(),
     ]);
 
-    expect((string) $event->fresh()->status)->toBe('pending');
+    expect((string) $event->fresh()->status)->toBe('approved')
+        ->and(EventChangeAnnouncement::query()->where('event_id', $event->id)->exists())->toBeFalse();
 });

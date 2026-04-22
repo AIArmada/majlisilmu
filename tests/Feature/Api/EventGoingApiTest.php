@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ScheduleState;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Speaker;
@@ -173,6 +174,22 @@ it('rejects marking going for inactive events', function () {
     ]);
 
     $this->putJson(route('api.events.going.update', $inactiveEvent))
+        ->assertForbidden()
+        ->assertJsonPath('error.message', 'This event cannot be marked as going.');
+});
+
+it('rejects marking going for unknown postponed events', function () {
+    Sanctum::actingAs($this->user);
+
+    $postponedEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => 'public',
+        'is_active' => true,
+        'schedule_state' => ScheduleState::Postponed,
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $this->putJson(route('api.events.going.update', $postponedEvent))
         ->assertForbidden()
         ->assertJsonPath('error.message', 'This event cannot be marked as going.');
 });

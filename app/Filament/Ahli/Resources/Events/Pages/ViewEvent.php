@@ -3,6 +3,7 @@
 namespace App\Filament\Ahli\Resources\Events\Pages;
 
 use App\Filament\Ahli\Resources\Events\EventResource;
+use App\Filament\Resources\Events\Concerns\PublishesEventChanges;
 use App\Models\Event;
 use App\Models\Institution;
 use App\Models\User;
@@ -15,6 +16,8 @@ use Filament\Support\Icons\Heroicon;
 
 class ViewEvent extends ViewRecord
 {
+    use PublishesEventChanges;
+
     protected static string $resource = EventResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -32,6 +35,7 @@ class ViewEvent extends ViewRecord
                 ->label('Duplicate Event')
                 ->url(fn (): string => $this->duplicateEventUrl())
                 ->visible(fn (): bool => auth()->user()?->can('update', $this->eventRecord()) ?? false),
+            $this->getPublishChangeAction(),
             EditAction::make(),
             Action::make('view_public')
                 ->label('View Public Page')

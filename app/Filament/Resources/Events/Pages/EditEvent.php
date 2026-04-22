@@ -8,6 +8,7 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\RegistrationMode;
 use App\Enums\TagType;
 use App\Filament\Pages\Concerns\AuditsRelatedStateChanges;
+use App\Filament\Resources\Events\Concerns\PublishesEventChanges;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
@@ -34,6 +35,7 @@ use Illuminate\Database\Eloquent\Model;
 class EditEvent extends EditRecord
 {
     use AuditsRelatedStateChanges;
+    use PublishesEventChanges;
 
     protected static string $resource = EventResource::class;
 
@@ -122,6 +124,7 @@ class EditEvent extends EditRecord
     protected function afterSave(): void
     {
         $event = $this->eventRecord();
+        $changedFields = array_keys($event->getChanges());
 
         $syncResult = app(SyncEventResourceRelationsAction::class)->handle(
             $event,
@@ -138,6 +141,11 @@ class EditEvent extends EditRecord
                 ->send();
         }
 
+        $this->notifySensitiveEditsMayNeedAnnouncement([
+            ...$changedFields,
+            ...$this->sensitiveRelatedChangeFields($event),
+        ]);
+
         $this->auditRelatedStateChanges($event, 'relations_updated');
     }
 
@@ -151,6 +159,16 @@ class EditEvent extends EditRecord
         }
 
         return [
+            'speakers' => $record->speakerKeyPeople()
+                ->with('speaker:id,name')
+                ->orderBy('order_column')
+                ->get()
+                ->map(fn (EventKeyPerson $keyPerson): array => [
+                    'id' => (string) ($keyPerson->speaker_id ?? $keyPerson->getKey()),
+                    'title' => $keyPerson->speaker instanceof Speaker ? $keyPerson->speaker->name : ($keyPerson->name ?? ''),
+                ])
+                ->values()
+                ->all(),
             'references' => $record->references()
                 ->orderBy('references.title')
                 ->get(['references.id', 'references.title'])
@@ -170,6 +188,22 @@ class EditEvent extends EditRecord
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function previousRelatedSnapshotForSensitiveChangePrompt(): array
+    {
+        return $this->relatedAuditSnapshot;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function currentRelatedSnapshotForSensitiveChangePrompt(Event $event): array
+    {
+        return $this->getRelatedAuditSnapshot($event);
     }
 
     /**
@@ -210,6 +244,7 @@ class EditEvent extends EditRecord
             $this->getReconsiderAction(),
             $this->getRemoderateAction(),
             $this->getRevertToDraftAction(),
+            $this->getPublishChangeAction(),
             Action::make('view')
                 ->label('View')
                 ->icon(Heroicon::OutlinedEye)

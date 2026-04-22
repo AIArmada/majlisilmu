@@ -150,13 +150,7 @@ class ModerationService
             return;
         }
 
-        $note = 'Sensitive change detected: '.implode(', ', array_keys($changes));
-
-        // Use the remoderate transition which handles review creation,
-        // search de-indexing, and moderator notifications.
-        $this->remoderate($event, null, $note);
-
-        Log::info('Sensitive change requires re-moderation', [
+        Log::info('Sensitive event change detected; explicit announcement required for public notification', [
             'event_id' => $event->id,
             'changed_fields' => array_keys($changes),
         ]);

@@ -70,6 +70,7 @@ class EventResource extends Resource
                 'institution.media',
                 'settings',
                 'submitter',
+                'latestPublishedChangeAnnouncement',
             ]);
     }
 
