@@ -53,7 +53,7 @@ class Show extends Component
 
     public function mount(Event $event): void
     {
-        $isViewable = $event->is_active && $this->isPubliclyVisibleStatus($event);
+        $isViewable = $event->isPubliclyReachable();
         $isOwner = $this->isEventOwner($event);
 
         // Owners can always view their own events (drafts, pending, approved, etc)
@@ -191,42 +191,14 @@ class Show extends Component
     #[Computed]
     public function replacementEvent(): ?Event
     {
-        $notice = $this->event->latestPublishedReplacementAnnouncement;
-        $replacement = $notice?->replacementEvent;
+        return $this->resolveLatestReachableReplacementEvent(
+            $this->event->latestPublishedReplacementAnnouncement?->replacementEvent,
+        );
+    }
 
-        if (! $replacement instanceof Event) {
-            return null;
-        }
-
-        /** @var array<string, true> $visited */
-        $visited = [(string) $this->event->getKey() => true];
-
-        while (! isset($visited[(string) $replacement->getKey()])) {
-            $visited[(string) $replacement->getKey()] = true;
-            $replacement->loadMissing([
-                'media',
-                'institution.media',
-                'speakers.media',
-                'latestPublishedReplacementAnnouncement.replacementEvent.media',
-                'latestPublishedReplacementAnnouncement.replacementEvent.institution.media',
-                'latestPublishedReplacementAnnouncement.replacementEvent.speakers.media',
-            ]);
-
-            $nextNotice = $replacement->latestPublishedReplacementAnnouncement;
-            $nextReplacement = $nextNotice?->replacementEvent;
-
-            if (! $nextNotice instanceof EventChangeAnnouncement || ! $nextReplacement instanceof Event) {
-                break;
-            }
-
-            if (isset($visited[(string) $nextReplacement->getKey()])) {
-                break;
-            }
-
-            $replacement = $nextReplacement;
-        }
-
-        return $replacement;
+    public function replacementLinkTargetForAnnouncement(EventChangeAnnouncement $announcement): ?Event
+    {
+        return $this->resolveLatestReachableReplacementEvent($announcement->replacementEvent);
     }
 
     #[Computed]
@@ -590,6 +562,39 @@ class Show extends Component
             'thumb' => $thumbnailUrl !== '' ? $thumbnailUrl : ($fullImageUrl !== '' ? $fullImageUrl : $media->getUrl()),
             'alt' => filled($media->name) ? (string) $media->name : $fallbackAlt,
         ];
+    }
+
+    protected function resolveLatestReachableReplacementEvent(?Event $event): ?Event
+    {
+        if (! $event instanceof Event) {
+            return null;
+        }
+
+        /** @var array<string, true> $visited */
+        $visited = [(string) $this->event->getKey() => true];
+        $current = $event;
+        $latestReachable = null;
+
+        while (! isset($visited[(string) $current->getKey()])) {
+            $visited[(string) $current->getKey()] = true;
+
+            if ($current->isPubliclyReachable()) {
+                $latestReachable = $current;
+            }
+
+            $current->loadMissing('latestPublishedReplacementAnnouncement.replacementEvent');
+
+            $nextAnnouncement = $current->latestPublishedReplacementAnnouncement;
+            $nextReplacement = $nextAnnouncement?->replacementEvent;
+
+            if (! $nextAnnouncement instanceof EventChangeAnnouncement || ! $nextReplacement instanceof Event) {
+                break;
+            }
+
+            $current = $nextReplacement;
+        }
+
+        return $latestReachable;
     }
 
     public function render(): View

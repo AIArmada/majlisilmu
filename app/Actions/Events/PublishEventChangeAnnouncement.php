@@ -5,7 +5,6 @@ namespace App\Actions\Events;
 use App\Enums\EventChangeSeverity;
 use App\Enums\EventChangeStatus;
 use App\Enums\EventChangeType;
-use App\Enums\EventVisibility;
 use App\Enums\ScheduleState;
 use App\Models\Event;
 use App\Models\EventChangeAnnouncement;
@@ -65,10 +64,6 @@ class PublishEventChangeAnnouncement
 
             $beforeSnapshot = $this->snapshot($event);
             $changedFields = $this->applyEventMutations($event, $type, $replacementEvent, $changes);
-
-            if ($replacementEvent instanceof Event) {
-                $changedFields[] = 'replacement_event_id';
-            }
 
             $event->save();
             $event->refresh();
@@ -142,14 +137,7 @@ class PublishEventChangeAnnouncement
 
     private function isReplacementEventPubliclyReachable(Event $event): bool
     {
-        $visibility = $event->visibility;
-        $visibleByLink = $visibility instanceof EventVisibility
-            ? in_array($visibility, [EventVisibility::Public, EventVisibility::Unlisted], true)
-            : in_array((string) $visibility, [EventVisibility::Public->value, EventVisibility::Unlisted->value], true);
-
-        return $event->is_active
-            && $visibleByLink
-            && in_array((string) $event->status, Event::PUBLIC_STATUSES, true);
+        return $event->isPubliclyReachable();
     }
 
     private function replacementChainContains(Event $replacementEvent, string $eventId): bool
@@ -165,12 +153,7 @@ class PublishEventChangeAnnouncement
 
             $visited[(string) $current->getKey()] = true;
 
-            $nextAnnouncement = EventChangeAnnouncement::query()
-                ->published()
-                ->where('event_id', $current->getKey())
-                ->whereNotNull('replacement_event_id')
-                ->orderByDesc('published_at')
-                ->orderByDesc('created_at')
+            $nextAnnouncement = $current->latestPublishedReplacementAnnouncement()
                 ->with('replacementEvent')
                 ->first();
 
@@ -222,10 +205,6 @@ class PublishEventChangeAnnouncement
         ], true)) {
             $event->schedule_state = ScheduleState::Active;
             $changedFields[] = 'schedule_state';
-        }
-
-        if ($replacementEvent instanceof Event) {
-            $changedFields[] = 'replacement_event_id';
         }
 
         return $changedFields;

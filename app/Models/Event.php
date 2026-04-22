@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EventAgeGroup;
+use App\Enums\EventChangeStatus;
 use App\Enums\EventChangeType;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -302,6 +303,18 @@ class Event extends Model implements AuditableContract, HasMedia
             && in_array((string) $this->status, self::PUBLIC_STATUSES, true)
             && $this->eventStructure()->isDiscoverable()
             && $this->visibility === EventVisibility::Public;
+    }
+
+    public function isPubliclyReachable(): bool
+    {
+        $visibility = $this->visibility;
+        $visibleByLink = $visibility instanceof EventVisibility
+            ? in_array($visibility, [EventVisibility::Public, EventVisibility::Unlisted], true)
+            : in_array((string) $visibility, [EventVisibility::Public->value, EventVisibility::Unlisted->value], true);
+
+        return $this->is_active
+            && $visibleByLink
+            && in_array((string) $this->status, self::PUBLIC_STATUSES, true);
     }
 
     public function searchIndexShouldBeUpdated(): bool
@@ -821,7 +834,8 @@ class Event extends Model implements AuditableContract, HasMedia
         return $this->changeAnnouncements()
             ->published()
             ->orderByDesc('published_at')
-            ->orderByDesc('created_at');
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     /**
@@ -830,8 +844,15 @@ class Event extends Model implements AuditableContract, HasMedia
     public function latestPublishedChangeAnnouncement(): HasOne
     {
         return $this->hasOne(EventChangeAnnouncement::class)
-            ->published()
-            ->latestOfMany('published_at');
+            ->ofMany([
+                'published_at' => 'max',
+                'created_at' => 'max',
+                'id' => 'max',
+            ], function (Builder $query): void {
+                $query
+                    ->where('status', EventChangeStatus::Published->value)
+                    ->whereNull('retracted_at');
+            });
     }
 
     /**
@@ -840,10 +861,16 @@ class Event extends Model implements AuditableContract, HasMedia
     public function latestPublishedReplacementAnnouncement(): HasOne
     {
         return $this->hasOne(EventChangeAnnouncement::class)
-            ->published()
-            ->whereNotNull('replacement_event_id')
-            ->orderByDesc('published_at')
-            ->orderByDesc('created_at');
+            ->ofMany([
+                'published_at' => 'max',
+                'created_at' => 'max',
+                'id' => 'max',
+            ], function (Builder $query): void {
+                $query
+                    ->where('status', EventChangeStatus::Published->value)
+                    ->whereNull('retracted_at')
+                    ->whereNotNull('replacement_event_id');
+            });
     }
 
     /**
@@ -860,8 +887,15 @@ class Event extends Model implements AuditableContract, HasMedia
     public function latestIncomingReplacementAnnouncement(): HasOne
     {
         return $this->hasOne(EventChangeAnnouncement::class, 'replacement_event_id')
-            ->published()
-            ->latestOfMany('published_at');
+            ->ofMany([
+                'published_at' => 'max',
+                'created_at' => 'max',
+                'id' => 'max',
+            ], function (Builder $query): void {
+                $query
+                    ->where('status', EventChangeStatus::Published->value)
+                    ->whereNull('retracted_at');
+            });
     }
 
     /**

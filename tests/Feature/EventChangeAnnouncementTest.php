@@ -24,6 +24,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\ScopedMemberRolesSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
@@ -153,7 +154,7 @@ it('keeps replacement event URLs separate from the original source of truth noti
         'ends_at' => now()->addDays(8)->addHours(2),
     ]);
 
-    app(PublishEventChangeAnnouncement::class)->handle(
+    $announcement = app(PublishEventChangeAnnouncement::class)->handle(
         event: $original,
         actor: $administrator,
         type: EventChangeType::ReplacementLinked,
@@ -161,6 +162,8 @@ it('keeps replacement event URLs separate from the original source of truth noti
         replacementEvent: $replacement,
         notify: false,
     );
+
+    expect($announcement->changed_fields ?? [])->not->toContain('replacement_event_id');
 
     $this->get(route('events.show', $original))
         ->assertOk()
@@ -220,6 +223,78 @@ it('keeps replacement CTAs after later notices and resolves replacement chains',
         ->assertSee('Nota terkini untuk pautan lama.')
         ->assertSee('Lihat Majlis Pengganti')
         ->assertSee(route('events.show', $finalReplacement), false);
+});
+
+it('keeps the latest reachable replacement CTA when later chain targets become unreachable', function () {
+    $administrator = eventChangeAdministrator();
+    $original = eventChangeApprovedEvent([
+        'title' => 'Kuliah Asal Ganti Boleh Capai',
+        'slug' => 'kuliah-asal-ganti-boleh-capai',
+    ]);
+    $firstReplacement = eventChangeApprovedEvent([
+        'title' => 'Kuliah Ganti Masih Boleh Capai',
+        'slug' => 'kuliah-ganti-masih-boleh-capai',
+    ]);
+    $finalReplacement = eventChangeApprovedEvent([
+        'title' => 'Kuliah Ganti Tidak Boleh Capai',
+        'slug' => 'kuliah-ganti-tidak-boleh-capai',
+    ]);
+
+    app(PublishEventChangeAnnouncement::class)->handle(
+        event: $original,
+        actor: $administrator,
+        type: EventChangeType::ReplacementLinked,
+        publicMessage: 'Sila rujuk majlis pengganti pertama.',
+        replacementEvent: $firstReplacement,
+        notify: false,
+    );
+
+    app(PublishEventChangeAnnouncement::class)->handle(
+        event: $firstReplacement,
+        actor: $administrator,
+        type: EventChangeType::ReplacementLinked,
+        publicMessage: 'Majlis pengganti pertama diganti pula.',
+        replacementEvent: $finalReplacement,
+        notify: false,
+    );
+
+    $finalReplacement->update([
+        'visibility' => 'private',
+    ]);
+
+    $this->get(route('events.show', $original))
+        ->assertOk()
+        ->assertSee(route('events.show', $firstReplacement), false)
+        ->assertDontSee(route('events.show', $finalReplacement), false);
+});
+
+it('hides replacement links when the linked replacement event is no longer publicly reachable', function () {
+    $administrator = eventChangeAdministrator();
+    $original = eventChangeApprovedEvent([
+        'title' => 'Kuliah Asal Pautan Pengganti',
+        'slug' => 'kuliah-asal-pautan-pengganti',
+    ]);
+    $replacement = eventChangeApprovedEvent([
+        'title' => 'Kuliah Pengganti Tidak Lagi Umum',
+        'slug' => 'kuliah-pengganti-tidak-lagi-umum',
+    ]);
+
+    app(PublishEventChangeAnnouncement::class)->handle(
+        event: $original,
+        actor: $administrator,
+        type: EventChangeType::ReplacementLinked,
+        publicMessage: 'Sila rujuk majlis pengganti.',
+        replacementEvent: $replacement,
+        notify: false,
+    );
+
+    $replacement->update([
+        'visibility' => 'private',
+    ]);
+
+    $this->get(route('events.show', $original))
+        ->assertOk()
+        ->assertDontSee(route('events.show', $replacement), false);
 });
 
 it('rejects self replacement announcements', function () {
@@ -322,6 +397,72 @@ it('allows speaker members for listed event speakers to publish change announcem
 
     expect($announcement->event_id)->toBe($event->id)
         ->and($announcement->type)->toBe(EventChangeType::TopicChanged);
+});
+
+it('rejects unauthorized actors from publishing change announcements', function () {
+    eventChangeSeedScopedRoles();
+
+    $actor = User::factory()->create();
+    $event = eventChangeApprovedEvent([
+        'title' => 'Kuliah Tanpa Kebenaran',
+    ]);
+
+    expect(fn () => app(PublishEventChangeAnnouncement::class)->handle(
+        event: $event,
+        actor: $actor,
+        type: EventChangeType::TopicChanged,
+        publicMessage: 'Perubahan tanpa kebenaran.',
+        notify: false,
+    ))->toThrow(AuthorizationException::class);
+
+    expect(EventChangeAnnouncement::query()->where('event_id', $event->id)->exists())->toBeFalse();
+});
+
+it('prefers the newest replacement announcement when published timestamps tie', function () {
+    $administrator = eventChangeAdministrator();
+    $event = eventChangeApprovedEvent([
+        'title' => 'Kuliah Ikatan Masa Sama',
+    ]);
+    $firstReplacement = eventChangeApprovedEvent([
+        'title' => 'Kuliah Ganti Pertama Ikatan Masa',
+    ]);
+    $secondReplacement = eventChangeApprovedEvent([
+        'title' => 'Kuliah Ganti Kedua Ikatan Masa',
+    ]);
+    $publishedAt = CarbonImmutable::parse('2026-05-05 12:00:00', 'UTC');
+
+    EventChangeAnnouncement::unguarded(function () use ($administrator, $event, $firstReplacement, $secondReplacement, $publishedAt): void {
+        EventChangeAnnouncement::query()->create([
+            'id' => '00000000-0000-0000-0000-000000000101',
+            'event_id' => $event->id,
+            'replacement_event_id' => $firstReplacement->id,
+            'actor_id' => $administrator->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Pengganti pertama.',
+            'published_at' => $publishedAt,
+            'created_at' => $publishedAt,
+            'updated_at' => $publishedAt,
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'id' => '00000000-0000-0000-0000-000000000102',
+            'event_id' => $event->id,
+            'replacement_event_id' => $secondReplacement->id,
+            'actor_id' => $administrator->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Pengganti kedua.',
+            'published_at' => $publishedAt,
+            'created_at' => $publishedAt,
+            'updated_at' => $publishedAt,
+        ]);
+    });
+
+    expect($event->fresh()->latestPublishedReplacementAnnouncement?->replacement_event_id)
+        ->toBe($secondReplacement->id);
 });
 
 it('creates same-event slug aliases when a published change mutates the schedule', function () {
