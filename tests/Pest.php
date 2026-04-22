@@ -170,25 +170,47 @@ function fakeGeneratedImageUpload(string $name = 'image.png', int $width = 1200,
         $overlay,
     );
 
-    $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION)) ?: 'png';
+    $temporaryPath = tempnam(sys_get_temp_dir(), 'majlisilmu-test-image-');
 
-    ob_start();
+    if ($temporaryPath === false) {
+        imagedestroy($image);
+
+        throw new RuntimeException('Unable to allocate temporary image fixture path.');
+    }
+
+    $imagePath = $temporaryPath.'.'.$extension;
+
+    if (! @rename($temporaryPath, $imagePath)) {
+        @unlink($temporaryPath);
+        imagedestroy($image);
+
+        throw new RuntimeException('Unable to prepare temporary image fixture path.');
+    }
 
     $encoded = match ($extension) {
-        'jpg', 'jpeg' => imagejpeg($image, null, 90),
-        'gif' => imagegif($image),
-        'webp' => function_exists('imagewebp') && imagewebp($image, null, 90),
-        default => imagepng($image),
+        'jpg', 'jpeg' => imagejpeg($image, $imagePath, 90),
+        'gif' => imagegif($image, $imagePath),
+        'webp' => function_exists('imagewebp') && imagewebp($image, $imagePath, 90),
+        default => imagepng($image, $imagePath),
     };
 
-    $contents = ob_get_clean();
     imagedestroy($image);
 
-    if (! $encoded || ! is_string($contents) || $contents === '') {
+    if (! $encoded || ! is_file($imagePath) || filesize($imagePath) === 0) {
+        @unlink($imagePath);
+
         throw new RuntimeException('Unable to encode image fixture.');
     }
 
-    return UploadedFile::fake()->createWithContent($name, $contents);
+    $mimeType = match ($extension) {
+        'jpg', 'jpeg' => 'image/jpeg',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        default => 'image/png',
+    };
+
+    return new UploadedFile($imagePath, $name, $mimeType, null, true);
 }
 
 function fakePrayerTimesApi(): void

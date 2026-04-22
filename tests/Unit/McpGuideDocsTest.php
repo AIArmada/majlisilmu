@@ -35,6 +35,7 @@ it('keeps the MCP guide aligned with the verified admin and member write-capable
         ->toEqual($memberWriteKeys)
         ->and($markdown)->toContain('file://docs/MAJLISILMU_MCP_GUIDE.md')
         ->toContain('Tool-centric clients like ChatGPT and the OpenAI Responses MCP integration import tools from `tools/list`, not raw resources from `resources/list`.')
+        ->toContain('the public `GET /api/v1/references` directory now exists for native reference browsing, but MCP still uses the existing generic `admin-list-records` and `member-list-records` flows for the `references` resource')
         ->toContain('| `search` | Search the verified MCP/docs pages exposed by this server | `query` |')
         ->toContain('| `fetch` | Fetch the full text of one verified docs page | `id` |')
         ->toContain('| `documentation-tool-routing` | Short guidance for deciding when to use `search` vs `fetch` for the verified docs pages | `topic?` |')

@@ -8,6 +8,7 @@ use App\Data\Api\Frontend\Search\InstitutionDetailData;
 use App\Data\Api\Frontend\Search\InstitutionDonationChannelData;
 use App\Data\Api\Frontend\Search\InstitutionListData;
 use App\Data\Api\Frontend\Search\ReferenceDetailData;
+use App\Data\Api\Frontend\Search\ReferenceListData;
 use App\Data\Api\Frontend\Search\SeriesDetailData;
 use App\Data\Api\Frontend\Search\SpeakerDetailData;
 use App\Data\Api\Frontend\Search\SpeakerDetailMediaData;
@@ -39,12 +40,14 @@ use App\Services\EventSearchService;
 use App\Support\Api\ApiPagination;
 use App\Support\ApiDocumentation\Schemas\InstitutionDetailResponse;
 use App\Support\ApiDocumentation\Schemas\InstitutionDirectoryResponse;
+use App\Support\ApiDocumentation\Schemas\ReferenceDirectoryResponse;
 use App\Support\ApiDocumentation\Schemas\SpeakerDetailResponse;
 use App\Support\ApiDocumentation\Schemas\SpeakerDirectoryResponse;
 use App\Support\Cache\PublicDirectoryCacheVersion;
 use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Location\PublicCountryRegistry;
 use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\ReferenceSearchService;
 use App\Support\Search\SpeakerSearchService;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
@@ -84,6 +87,21 @@ class SearchController extends FrontendController
     ];
 
     /** @var list<string> */
+    private const array REFERENCE_LIST_FIELDS = [
+        'id',
+        'slug',
+        'title',
+        'author',
+        'type',
+        'publisher',
+        'publication_year',
+        'is_active',
+        'events_count',
+        'front_cover_url',
+        'is_following',
+    ];
+
+    /** @var list<string> */
     private const array SPEAKER_LIST_FIELDS = [
         'id',
         'slug',
@@ -101,6 +119,7 @@ class SearchController extends FrontendController
     public function __construct(
         private readonly EventSearchService $eventSearchService,
         private readonly InstitutionSearchService $institutionSearchService,
+        private readonly ReferenceSearchService $referenceSearchService,
         private readonly SpeakerSearchService $speakerSearchService,
         private readonly PublicDirectoryCacheVersion $publicDirectoryCacheVersion,
     ) {}
@@ -706,7 +725,69 @@ class SearchController extends FrontendController
         ]);
     }
 
-    #[Group('Reference', 'Public reference detail endpoints for active references and their related events.')]
+    #[Group('Reference', 'Public reference directory and detail endpoints.')]
+    #[Endpoint(
+        title: 'List public references',
+        description: 'Returns a paginated directory of active, verified references. Supports search by title, author, or publisher, and a following filter.',
+    )]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, title, author, type, publisher, publication_year, is_active, events_count, front_cover_url, is_following.', required: false, type: 'string', infer: false, example: 'id,title,author,front_cover_url')]
+    #[QueryParameter('search', 'Optional free-text search across public reference titles, authors, and publishers.', required: false, type: 'string', infer: false, example: 'Riyadus Solihin')]
+    #[QueryParameter('following', 'When authenticated, restrict results to references followed by the current user.', required: false, type: 'boolean', infer: false, example: false)]
+    #[QueryParameter('page', 'Pagination page number.', required: false, type: 'integer', infer: false, default: 1, example: 1)]
+    #[QueryParameter('per_page', 'Pagination page size. Values are clamped to the server-supported maximum.', required: false, type: 'integer', infer: false, default: 12, example: 12)]
+    #[Response(
+        status: 200,
+        description: 'Reference directory response.',
+        type: ReferenceDirectoryResponse::class,
+    )]
+    public function references(Request $request): JsonResponse
+    {
+        $user = $this->currentUser($request);
+        $search = $this->normalizedString($request->query('search'));
+        $followingOnly = $request->boolean('following');
+        $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
+        $requestedFields = $this->requestedFields($request, self::REFERENCE_LIST_FIELDS, 'reference');
+        $followingTotal = 0;
+
+        $baseQuery = $this->baseReferenceQuery($user);
+
+        if ($followingOnly) {
+            $this->applyReferenceFollowingScope($baseQuery, $user);
+        } elseif ($user instanceof User) {
+            $followedReferenceQuery = clone $baseQuery;
+
+            $this->applyReferenceFollowingScope($followedReferenceQuery, $user);
+
+            $followingTotal = $this->referenceDirectoryTotalWithBase($request, $search, $followedReferenceQuery);
+        }
+
+        $paginator = $search === null
+            ? $baseQuery
+                ->orderBy('references.title')
+                ->paginate($perPage)
+            : $this->referenceDirectorySearchPaginator($request, $search, $perPage, $baseQuery);
+
+        if ($followingOnly) {
+            $followingTotal = $paginator->total();
+        }
+
+        return response()->json([
+            'data' => $paginator
+                ->getCollection()
+                ->map(fn (Reference $reference): array => $this->sparsePayload($this->referenceListData($reference, $user), $requestedFields))
+                ->all(),
+            'meta' => [
+                'pagination' => [
+                    'page' => $paginator->currentPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+                'following' => ['total' => $followingTotal],
+            ],
+        ]);
+    }
+
+    #[Group('Reference', 'Public reference directory and detail endpoints.')]
     #[Endpoint(
         title: 'Get a public reference',
         description: 'Returns the public reference detail payload by slug or UUID, including upcoming and past events linked to that reference.',
@@ -727,7 +808,7 @@ class SearchController extends FrontendController
             })
             ->firstOrFail();
 
-        abort_unless($record->is_active, 404);
+        abort_unless($user instanceof User ? $user->can('view', $record) : ($record->is_active && $record->status === 'verified'), 404);
 
         $upcomingPerPage = max(1, min($request->integer('upcoming_per_page', 10), 50));
         $upcomingEvents = $this->limitedEventPayloadWithTotal(
@@ -736,9 +817,11 @@ class SearchController extends FrontendController
                 ->where('starts_at', '>=', $now)
                 ->with([
                     'institution',
+                    'institution.media',
                     'institution.address.state',
                     'institution.address.district',
                     'institution.address.subdistrict',
+                    'speakers.media',
                     'venue.address.state',
                     'venue.address.district',
                     'venue.address.subdistrict',
@@ -755,9 +838,11 @@ class SearchController extends FrontendController
                 ->where('starts_at', '<', $now)
                 ->with([
                     'institution',
+                    'institution.media',
                     'institution.address.state',
                     'institution.address.district',
                     'institution.address.subdistrict',
+                    'speakers.media',
                     'venue.address.state',
                     'venue.address.district',
                     'venue.address.subdistrict',
@@ -1408,6 +1493,201 @@ class SearchController extends FrontendController
             user: $user,
             socialMedia: $this->socialMediaData($reference->socialMedia),
         )->toArray();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function referenceListData(Reference $reference, ?User $user = null): array
+    {
+        return ReferenceListData::fromModel($reference, $user)->toArray();
+    }
+
+    /**
+     * @return Builder<Reference>
+     */
+    private function baseReferenceQuery(?User $user = null): Builder
+    {
+        $query = Reference::query();
+
+        if ($user instanceof User) {
+            $referenceIdColumn = $query->getQuery()->getGrammar()->wrap((new Reference)->qualifyColumn('id'));
+
+            $query->select('references.*')
+                ->selectRaw(
+                    'exists(select 1 from followings where followings.user_id = ? and followings.followable_id = '.$referenceIdColumn.' and followings.followable_type = ?) as is_following',
+                    [$user->id, (new Reference)->getMorphClass()],
+                );
+        }
+
+        return $query->active()
+            ->where('status', 'verified')
+            ->withCount(['events' => function (Builder $query): void {
+                $query
+                    ->where('events.is_active', true)
+                    ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                    ->where('events.visibility', EventVisibility::Public)
+                    ->where('events.event_structure', '!=', EventStructure::ParentProgram->value);
+            }])
+            ->with(['media']);
+    }
+
+    /**
+     * @param  Builder<Reference>  $base
+     * @return LengthAwarePaginator<int, Reference>
+     */
+    private function referenceDirectorySearchPaginator(Request $request, string $search, int $perPage, Builder $base): LengthAwarePaginator
+    {
+        $matchingIds = $this->referenceSearchService->publicSearchIds($search);
+
+        if ($matchingIds !== []) {
+            $directMatches = (clone $base)
+                ->whereIn('references.id', $matchingIds)
+                ->get()
+                ->sortBy(static function (Reference $reference) use ($matchingIds): int {
+                    $position = array_search((string) $reference->id, $matchingIds, true);
+
+                    return is_int($position) ? $position : PHP_INT_MAX;
+                })
+                ->values();
+
+            $currentPage = max(1, $request->integer('page', 1));
+            $items = $directMatches->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+            if ($directMatches->count() > 0 || mb_strlen($search) < 3) {
+                return new LengthAwarePaginator(
+                    $items,
+                    $directMatches->count(),
+                    $perPage,
+                    $currentPage,
+                    $this->referencePaginatorOptions($request),
+                );
+            }
+        } elseif (mb_strlen($search) < 3) {
+            return $this->emptyReferencePaginator($request, $perPage);
+        }
+
+        $orderedIds = $this->filterReferenceSearchIds($base, $this->referenceSearchService->publicFuzzySearchIds($search));
+
+        if ($orderedIds === []) {
+            return $this->emptyReferencePaginator($request, $perPage);
+        }
+
+        $currentPage = max(1, $request->integer('page', 1));
+        $paginatedIds = array_slice($orderedIds, ($currentPage - 1) * $perPage, $perPage);
+
+        if ($paginatedIds === []) {
+            return new LengthAwarePaginator(
+                collect(),
+                count($orderedIds),
+                $perPage,
+                $currentPage,
+                $this->referencePaginatorOptions($request),
+            );
+        }
+
+        $references = (clone $base)
+            ->whereIn('references.id', $paginatedIds)
+            ->get()
+            ->sortBy(static function (Reference $reference) use ($paginatedIds): int {
+                $position = array_search((string) $reference->id, $paginatedIds, true);
+
+                return is_int($position) ? $position : PHP_INT_MAX;
+            })
+            ->values();
+
+        return new LengthAwarePaginator(
+            $references,
+            count($orderedIds),
+            $perPage,
+            $currentPage,
+            $this->referencePaginatorOptions($request),
+        );
+    }
+
+    /**
+     * @param  Builder<Reference>  $base
+     * @param  list<string>  $orderedIds
+     * @return list<string>
+     */
+    private function filterReferenceSearchIds(Builder $base, array $orderedIds): array
+    {
+        if ($orderedIds === []) {
+            return [];
+        }
+
+        $scopedIds = (clone $base)
+            ->whereIn('references.id', $orderedIds)
+            ->pluck('references.id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+
+        return collect($scopedIds)
+            ->sortBy(static function (string $id) use ($orderedIds): int {
+                $position = array_search($id, $orderedIds, true);
+
+                return is_int($position) ? $position : PHP_INT_MAX;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Reference>  $base
+     */
+    private function referenceDirectoryTotalWithBase(Request $request, ?string $search, Builder $base): int
+    {
+        if ($search === null) {
+            return (clone $base)->count();
+        }
+
+        return $this->referenceDirectorySearchPaginator($request, $search, 1, $base)->total();
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Reference>
+     */
+    private function emptyReferencePaginator(Request $request, int $perPage): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            collect(),
+            0,
+            $perPage,
+            max(1, $request->integer('page', 1)),
+            $this->referencePaginatorOptions($request),
+        );
+    }
+
+    /**
+     * @return array{path: string, query: array<string, mixed>}
+     */
+    private function referencePaginatorOptions(Request $request): array
+    {
+        return [
+            'path' => $request->url(),
+            'query' => $request->query(),
+        ];
+    }
+
+    /**
+     * @param  Builder<Reference>  $query
+     */
+    private function applyReferenceFollowingScope(Builder $query, ?User $user): void
+    {
+        if (! $user instanceof User) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereExists(function ($followingQuery) use ($user): void {
+            $followingQuery
+                ->selectRaw('1')
+                ->from('followings')
+                ->where('followings.user_id', $user->id)
+                ->where('followings.followable_type', (new Reference)->getMorphClass())
+                ->whereColumn('followings.followable_id', 'references.id');
+        });
     }
 
     /**

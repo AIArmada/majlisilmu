@@ -90,6 +90,7 @@ class EventController extends Controller
      * /api/v1/events?filter[status]=approved
      * /api/v1/events?filter[event_format]=online
      * /api/v1/events?filter[starts_after]=2026-02-01
+     * /api/v1/events?filter[starts_at_after]=2026-02-01T08:00:00Z
      * /api/v1/events?filter[starts_on_local_date]=2026-02-01
      * /api/v1/events?include=venue,speakers
      * /api/v1/events?sort=-starts_at
@@ -140,6 +141,20 @@ class EventController extends Controller
                 $startsBefore = $this->parseDate($value, true);
                 if ($startsBefore instanceof Carbon) {
                     $query->where('starts_at', '<=', $startsBefore);
+                }
+            }),
+            AllowedFilter::callback('starts_at_after', function (Builder $query, mixed $value) use ($request): void {
+                $startsAtAfter = $this->parseDateTime($value, $request);
+
+                if ($startsAtAfter instanceof Carbon) {
+                    $query->where('starts_at', '>=', $startsAtAfter);
+                }
+            }),
+            AllowedFilter::callback('starts_at_before', function (Builder $query, mixed $value) use ($request): void {
+                $startsAtBefore = $this->parseDateTime($value, $request);
+
+                if ($startsAtBefore instanceof Carbon) {
+                    $query->where('starts_at', '<=', $startsAtBefore);
                 }
             }),
             AllowedFilter::callback('starts_on_local_date', function (Builder $query, mixed $value): void {
@@ -319,6 +334,17 @@ class EventController extends Controller
 
                 $query->whereHas('series', function (Builder $seriesQuery) use ($seriesIds): void {
                     $seriesQuery->whereIn('series.id', $seriesIds);
+                });
+            }),
+            AllowedFilter::callback('reference_ids', function (Builder $query, mixed $value): void {
+                $referenceIds = $this->normalizeArrayFilter($value);
+
+                if ($referenceIds === []) {
+                    return;
+                }
+
+                $query->whereHas('references', function (Builder $referenceQuery) use ($referenceIds): void {
+                    $referenceQuery->whereIn('references.id', $referenceIds);
                 });
             }),
             AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
@@ -650,6 +676,26 @@ class EventController extends Controller
         $date = UserDateTimeFormatter::parseUserDateToUtc($value, $endOfDay);
 
         return $date instanceof Carbon ? $date : null;
+    }
+
+    private function parseDateTime(mixed $value, ?Request $request = null): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $normalized = trim($value);
+        $hasExplicitTimezone = preg_match('/(?:Z|[+\-]\d{2}:?\d{2})$/', $normalized) === 1;
+
+        try {
+            $parsed = $hasExplicitTimezone
+                ? Carbon::parse($normalized)
+                : Carbon::parse($normalized, UserDateTimeFormatter::resolveTimezone($request));
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $parsed->utc();
     }
 
     private function resolvePrayerReference(string $prayerTime): ?string

@@ -103,6 +103,37 @@ it('filters events by json event_type values', function () {
         ->not()->toContain($forum->id);
 });
 
+it('filters events by linked reference ids', function () {
+    $reference = Reference::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $matchingEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $otherEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $reference->events()->attach($matchingEvent, ['order_column' => 1]);
+
+    $response = $this->getJson('/api/v1/events?filter[reference_ids][]='.$reference->id);
+
+    $response->assertOk();
+
+    $eventIds = collect($response->json('data'))->pluck('id')->all();
+
+    expect($eventIds)
+        ->toContain($matchingEvent->id)
+        ->not()->toContain($otherEvent->id);
+});
+
 it('clamps public event index per_page values to the supported maximum', function () {
     Event::factory()->count(60)->create([
         'status' => 'approved',
@@ -302,6 +333,53 @@ it('filters events by starts_on_local_date in the user timezone', function () {
     expect($eventIds)
         ->toContain($included->id)
         ->not()->toContain($excluded->id);
+});
+
+it('filters events by exact starts_at timestamps', function () {
+    $cutoff = Carbon::parse('2026-04-22 08:30:00', 'UTC');
+
+    $before = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => $cutoff->copy()->subMinute(),
+    ]);
+
+    $atCutoff = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => $cutoff->copy(),
+    ]);
+
+    $after = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'starts_at' => $cutoff->copy()->addMinute(),
+    ]);
+
+    $afterResponse = $this->getJson('/api/v1/events?filter[starts_at_after]='.urlencode($cutoff->toIso8601String()));
+
+    $afterResponse->assertOk();
+
+    $afterEventIds = collect($afterResponse->json('data'))->pluck('id')->all();
+
+    expect($afterEventIds)
+        ->toContain($atCutoff->id)
+        ->toContain($after->id)
+        ->not()->toContain($before->id);
+
+    $beforeResponse = $this->getJson('/api/v1/events?filter[starts_at_before]='.urlencode($cutoff->toIso8601String()));
+
+    $beforeResponse->assertOk();
+
+    $beforeEventIds = collect($beforeResponse->json('data'))->pluck('id')->all();
+
+    expect($beforeEventIds)
+        ->toContain($before->id)
+        ->toContain($atCutoff->id)
+        ->not()->toContain($after->id);
 });
 
 it('keeps raw utc event timestamps stable while localizing helper fields from request timezone context', function () {

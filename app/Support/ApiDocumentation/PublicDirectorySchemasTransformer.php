@@ -33,12 +33,16 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         $this->putSchema($components, 'EventParticipation', $this->eventParticipationSchema($components));
         $this->putSchema($components, 'InstitutionListItem', $this->institutionListItemSchema($components));
         $this->putSchema($components, 'InstitutionDirectoryItem', $this->institutionListItemSchema($components, sparse: true));
+        $this->putSchema($components, 'ReferenceListItem', $this->referenceListItemSchema());
+        $this->putSchema($components, 'ReferenceDirectoryItem', $this->referenceListItemSchema(sparse: true));
         $this->putSchema($components, 'SpeakerListItem', $this->speakerListItemSchema($components));
         $this->putSchema($components, 'SpeakerDirectoryItem', $this->speakerListItemSchema($components, sparse: true));
         $this->putSchema($components, 'Institution', $this->institutionSchema($components));
         $this->putSchema($components, 'Speaker', $this->speakerSchema($components));
         $this->putSchema($components, 'InstitutionDirectoryResponse', $this->institutionDirectoryResponseSchema($components));
         $this->putSchema($components, 'InstitutionDirectorySparseResponse', $this->institutionDirectoryResponseSchema($components, 'InstitutionDirectoryItem'));
+        $this->putSchema($components, 'ReferenceDirectoryResponse', $this->referenceDirectoryResponseSchema($components));
+        $this->putSchema($components, 'ReferenceDirectorySparseResponse', $this->referenceDirectoryResponseSchema($components, 'ReferenceDirectoryItem'));
         $this->putSchema($components, 'SpeakerDirectoryResponse', $this->speakerDirectoryResponseSchema($components));
         $this->putSchema($components, 'SpeakerDirectorySparseResponse', $this->speakerDirectoryResponseSchema($components, 'SpeakerDirectoryItem'));
         $this->putSchema($components, 'EventIndexResponse', $this->eventIndexResponseSchema($components));
@@ -138,6 +142,40 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
 
         if (! $sparse) {
             $type->setRequired(['id', 'slug', 'name', 'gender', 'formatted_name', 'status', 'is_active', 'events_count', 'avatar_url', 'country', 'is_following']);
+        }
+
+        return Schema::fromType($type);
+    }
+
+    private function referenceListItemSchema(bool $sparse = false): Schema
+    {
+        $type = (new ObjectType)
+            ->addProperty('id', new StringType)
+            ->addProperty('slug', new StringType)
+            ->addProperty('title', new StringType)
+            ->addProperty('author', (new StringType)->nullable(true))
+            ->addProperty('type', (new StringType)->nullable(true))
+            ->addProperty('publisher', (new StringType)->nullable(true))
+            ->addProperty('publication_year', (new StringType)->nullable(true))
+            ->addProperty('is_active', new BooleanType)
+            ->addProperty('events_count', new IntegerType)
+            ->addProperty('front_cover_url', (new StringType)->nullable(true))
+            ->addProperty('is_following', new BooleanType);
+
+        if (! $sparse) {
+            $type->setRequired([
+                'id',
+                'slug',
+                'title',
+                'author',
+                'type',
+                'publisher',
+                'publication_year',
+                'is_active',
+                'events_count',
+                'front_cover_url',
+                'is_following',
+            ]);
         }
 
         return Schema::fromType($type);
@@ -350,6 +388,16 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
         );
     }
 
+    private function referenceDirectoryResponseSchema(Components $components, string $itemSchema = 'ReferenceListItem'): Schema
+    {
+        return Schema::fromType(
+            (new ObjectType)
+                ->addProperty('data', (new ArrayType)->setItems($components->getSchemaReference($itemSchema)))
+                ->addProperty('meta', $this->referenceDirectoryMetaType())
+                ->setRequired(['data', 'meta']),
+        );
+    }
+
     private function eventIndexResponseSchema(Components $components): Schema
     {
         return Schema::fromType(
@@ -466,6 +514,26 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                     ->setRequired(['active', 'lat', 'lng', 'radius_km']),
             )
             ->addProperty('types', (new ArrayType)->setItems($this->directoryFilterOptionType()));
+    }
+
+    private function referenceDirectoryMetaType(): ObjectType
+    {
+        return (new ObjectType)
+            ->addProperty(
+                'pagination',
+                (new ObjectType)
+                    ->addProperty('page', new IntegerType)
+                    ->addProperty('per_page', new IntegerType)
+                    ->addProperty('total', new IntegerType)
+                    ->setRequired(['page', 'per_page', 'total']),
+            )
+            ->addProperty(
+                'following',
+                (new ObjectType)
+                    ->addProperty('total', new IntegerType)
+                    ->setRequired(['total']),
+            )
+            ->setRequired(['pagination', 'following']);
     }
 
     private function directoryFilterOptionType(): ObjectType
@@ -637,6 +705,7 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
     {
         $this->replaceOperationResponseSchema($document, 'institutions', 'get', $components->getSchemaReference('InstitutionDirectorySparseResponse'));
         $this->replaceOperationResponseSchema($document, 'institutions/near', 'get', $components->getSchemaReference('InstitutionDirectorySparseResponse'));
+        $this->replaceOperationResponseSchema($document, 'references', 'get', $components->getSchemaReference('ReferenceDirectorySparseResponse'));
         $this->replaceOperationResponseSchema($document, 'speakers', 'get', $components->getSchemaReference('SpeakerDirectorySparseResponse'));
         $this->replaceOperationResponseSchema($document, 'events', 'get', $components->getSchemaReference('EventIndexResponse'));
 

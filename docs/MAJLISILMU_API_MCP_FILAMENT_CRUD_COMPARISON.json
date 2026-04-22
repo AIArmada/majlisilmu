@@ -1,6 +1,6 @@
 {
   "schema_version": "2.2.0",
-  "verified_at": "2026-04-21",
+  "verified_at": "2026-04-22",
   "title": "API / MCP / Filament Capability Matrix",
   "markdown_companion": "docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md",
   "purpose": "Canonical parity map for public workflow API, generic admin HTTP API, admin/member MCP, and the Filament admin/Ahli panels.",
@@ -99,7 +99,7 @@
       "GET /api/v1/institutions*",
       "GET /api/v1/speakers*",
       "GET /api/v1/venues/{venueKey}",
-      "GET /api/v1/references/{referenceKey}",
+      "GET /api/v1/references*",
       "GET /api/v1/series/{series}",
       "GET /api/v1/events*"
     ],
@@ -307,7 +307,7 @@
         "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
         "member_mcp": {"visible": true, "schema": true, "update": true, "validate_only": true},
         "panel_pages": {"admin": ["index", "create", "edit"], "ahli": ["index", "edit"]},
-        "workflow_overlap": ["public read/detail", "authenticated suggest update", "follows"]
+        "workflow_overlap": ["public read/list/detail", "authenticated suggest update", "follows"]
       },
       "reports": {
         "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "schema_content_type": "multipart/form-data", "related_records": true},

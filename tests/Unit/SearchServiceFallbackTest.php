@@ -1,8 +1,10 @@
 <?php
 
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\ReferenceSearchService;
 use App\Support\Search\SpeakerSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -386,4 +388,57 @@ it('keeps local fuzzy institution search when the database driver is configured'
 
     expect($service->publicFuzzySearchIds('Hidayh'))->toContain((string) $institution->id)
         ->not->toContain((string) $hiddenInstitution->id);
+});
+
+it('falls back to database reference search when typesense lookup fails', function () {
+    $reference = Reference::factory()->create([
+        'title' => 'Riyadus Solihin',
+        'author' => 'Imam Nawawi',
+        'description' => 'Himpunan hadith',
+        'slug' => 'riyadus-solihin',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $service = new class extends ReferenceSearchService
+    {
+        protected function shouldUseTypesenseSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    };
+
+    expect($service->publicSearchIds('himpunan hadith'))->toContain((string) $reference->id);
+});
+
+it('falls back to database reference fuzzy search when typesense lookup fails', function () {
+    $reference = Reference::factory()->create([
+        'title' => 'Bulugh al-Maram',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $service = new class extends ReferenceSearchService
+    {
+        protected function shouldUseTypesenseSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    };
+
+    expect($service->publicFuzzySearchIds('Bulugh al Mram'))->toContain((string) $reference->id);
 });

@@ -35,12 +35,15 @@ use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\Support\Location\PublicCountryPreference;
 use App\Support\Location\PublicCountryRegistry;
 use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\ReferenceSearchService;
 use App\Support\Search\SpeakerSearchService;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
@@ -314,6 +317,25 @@ it('supports sparse fields on the public speaker directory', function () {
         ->assertOk();
 
     expect(array_keys($response->json('data.0')))->toBe(['id', 'name', 'status', 'is_active', 'avatar_url', 'gender']);
+});
+
+it('supports sparse fields on the public reference directory', function () {
+    Reference::factory()->create([
+        'title' => 'Sparse Reference',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson('/api/v1/references?fields=id,title,front_cover_url,is_following')
+        ->assertOk();
+
+    expect(array_keys($response->json('data.0')))->toBe(['id', 'title', 'front_cover_url', 'is_following']);
+});
+
+it('rejects unsupported public reference sparse fields', function () {
+    $this->getJson('/api/v1/references?fields=id,unknown_field')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('fields');
 });
 
 it('exposes authenticated contribution update contracts and permission-gated direct edit media support', function () {
@@ -2163,6 +2185,225 @@ it('supports server-side filtering to only followed speakers in the frontend spe
         ->assertJsonPath('data.0.is_following', true)
         ->assertJsonPath('meta.pagination.total', 1)
         ->assertJsonPath('meta.following.total', 1);
+});
+
+it('returns the total followed reference count for the filtered reference query, not just the current page', function () {
+    $user = User::factory()->create();
+
+    $followedReferences = Reference::factory()->count(2)->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'author' => 'Imam Nawawi',
+    ]);
+
+    Reference::factory()->create([
+        'title' => 'Unfollowed Reference',
+        'author' => 'Imam Nawawi',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Reference::factory()->create([
+        'title' => 'Outside Search Scope',
+        'author' => 'Ibn Hajar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    foreach ($followedReferences as $reference) {
+        $user->follow($reference);
+    }
+
+    Sanctum::actingAs($user);
+
+    $this->getJson('/api/v1/references?search='.urlencode('Imam Nawawi').'&per_page=1')
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.total', 3)
+        ->assertJsonPath('meta.following.total', 2);
+});
+
+it('supports server-side filtering to only followed references in the frontend reference api', function () {
+    $user = User::factory()->create();
+
+    $followedReference = Reference::factory()->create([
+        'title' => 'Followed Reference Only',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Reference::factory()->create([
+        'title' => 'Not Followed Reference',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $user->follow($followedReference);
+
+    Sanctum::actingAs($user);
+
+    $this->getJson('/api/v1/references?following=1')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', $followedReference->slug)
+        ->assertJsonPath('data.0.is_following', true)
+        ->assertJsonPath('meta.pagination.total', 1)
+        ->assertJsonPath('meta.following.total', 1);
+});
+
+it('falls back to the original front cover url in reference directory serialization when the thumb conversion is not ready', function () {
+    $reference = new class extends Reference
+    {
+        public function __construct()
+        {
+            parent::__construct();
+
+            $this->forceFill([
+                'id' => 'reference-fallback-id',
+                'slug' => 'reference-cover-fallback',
+                'title' => 'Reference Cover Fallback',
+                'author' => null,
+                'type' => null,
+                'publisher' => null,
+                'publication_year' => null,
+                'status' => 'verified',
+                'is_active' => true,
+            ]);
+            $this->exists = true;
+            $this->setAttribute('events_count', 0);
+        }
+
+        public function getFirstMediaUrl(string $collectionName = 'default', string $conversionName = ''): string
+        {
+            if ($collectionName !== 'front_cover') {
+                return '';
+            }
+
+            if ($conversionName === 'thumb') {
+                return '';
+            }
+
+            return 'https://cdn.example.test/reference-original.webp';
+        }
+    };
+
+    $item = Closure::bind(
+        fn (): array => $this->referenceListData($reference),
+        app(SearchController::class),
+        SearchController::class,
+    )();
+
+    expect(data_get($item, 'front_cover_url'))->toBe('https://cdn.example.test/reference-original.webp');
+});
+
+it('counts all public linked events on the reference directory cards', function () {
+    $reference = Reference::factory()->create([
+        'title' => 'Reference Event Count Coverage',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $upcomingEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'event_structure' => EventStructure::Standalone,
+        'is_active' => true,
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $pastEvent = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'event_structure' => EventStructure::Standalone,
+        'is_active' => true,
+        'starts_at' => now()->subDays(2),
+    ]);
+
+    $reference->events()->attach($upcomingEvent, ['order_column' => 1]);
+    $reference->events()->attach($pastEvent, ['order_column' => 2]);
+
+    $this->getJson('/api/v1/references?search='.urlencode('Reference Event Count Coverage'))
+        ->assertOk()
+        ->assertJsonPath('data.0.events_count', 2);
+});
+
+it('does not expose pending references on the public detail route', function () {
+    $reference = Reference::factory()->create([
+        'title' => 'Pending Public Reference',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    $this->getJson(route('api.client.references.show', ['referenceKey' => $reference->slug]))
+        ->assertNotFound();
+});
+
+it('allows authorized users to view pending references on the frontend detail route', function () {
+    $reference = Reference::factory()->create([
+        'title' => 'Pending Moderator Reference',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    $moderator = User::factory()->create();
+
+    if (! Role::query()->where('name', 'moderator')->where('guard_name', 'web')->exists()) {
+        $role = new Role;
+        $role->forceFill([
+            'id' => (string) Str::uuid(),
+            'name' => 'moderator',
+            'guard_name' => 'web',
+        ])->save();
+    }
+
+    $moderator->assignRole('moderator');
+
+    Sanctum::actingAs($moderator);
+
+    $this->getJson(route('api.client.references.show', ['referenceKey' => $reference->slug]))
+        ->assertOk()
+        ->assertJsonPath('data.reference.id', (string) $reference->id)
+        ->assertJsonPath('data.reference.title', 'Pending Moderator Reference');
+});
+
+it('falls back to indexed reference search when typesense fails', function () {
+    $matchingReference = Reference::factory()->create([
+        'title' => 'Rujukan Fallback',
+        'slug' => 'rujukan-fallback-agama',
+        'author' => 'Imam Contoh',
+        'description' => 'Syarahan tajwid dan adab',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $otherReference = Reference::factory()->create([
+        'title' => 'Rujukan Lain',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    config()->set('scout.driver', 'typesense');
+
+    $this->app->bind(ReferenceSearchService::class, fn (): ReferenceSearchService => new class extends ReferenceSearchService
+    {
+        protected function shouldUseTypesenseSearch(): bool
+        {
+            return true;
+        }
+
+        protected function searchIdsWithScout(string $search, array $options = []): array
+        {
+            throw new RuntimeException('Typesense unavailable');
+        }
+
+        protected function logScoutFallback(string $message, Throwable $exception, string $search): void {}
+    });
+
+    $response = $this->getJson('/api/v1/references?search='.urlencode('tajwid adab'))
+        ->assertOk();
+
+    expect(collect($response->json('data'))->pluck('id')->all())
+        ->toContain((string) $matchingReference->id)
+        ->not->toContain((string) $otherReference->id);
 });
 
 it('serializes speaker directory payloads with country and follow metadata for mobile clients', function () {
