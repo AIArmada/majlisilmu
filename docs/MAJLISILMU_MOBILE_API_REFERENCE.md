@@ -485,6 +485,7 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 | `GET` | `/institutions/{institutionKey}` | Public institution detail by slug or UUID |
 | `GET` | `/speakers` | Public speaker listing filters; speaker directory items include `status` and `is_active` in the default payload |
 | `GET` | `/speakers/{speakerKey}` | Public speaker detail by slug or UUID |
+| `GET` | `/references` | Public reference listing filters; reference directory items include `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` in the default payload |
 | `GET` | `/inspirations/random` | Random active inspiration payload with category and media metadata |
 | `GET` | `/venues/{venueKey}` | Public venue detail by slug or UUID |
 | `GET` | `/references/{referenceKey}` | Public reference detail by slug or UUID |
@@ -492,13 +493,16 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 
 Notes:
 
-- **Visibility rule:** `/speakers` and `/institutions` return **only** records where `is_active = true` AND `status = 'verified'`. Inactive or unverified records are invisible on the public surface. To access all records including drafts, use the admin surface.
+- **Visibility rule:** `/speakers`, `/institutions`, and `/references` return **only** records where `is_active = true` AND `status = 'verified'`. Inactive or unverified records are invisible on the public surface. To access all records including drafts, use the admin surface.
 - Public speaker directory list items expose `status` and `is_active` alongside the existing summary fields. Keep client logic aligned with those canonical fields instead of inferring alternate aliases.
+- Public reference directory list items expose `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` by default. `events_count` represents all linked public events, not just upcoming ones. Use `fields=` when the client only needs a smaller card payload.
+- The public event index supports `filter[reference_ids][]=<reference-uuid>` so native clients can paginate all public events for a given reference without relying on the capped preview lists from `GET /references/{referenceKey}`.
+- When clients need an exact timeline split around the current moment (for example, separating `Majlis Akan Datang` from `Majlis Terdahulu` on reference event screens), the public event index also accepts ISO 8601 timestamp filters through `filter[starts_at_after]` and `filter[starts_at_before]`.
 - These detail payloads now mirror the web client media collections and public-contact visibility rules.
 - Institution payloads expose `public_image_url` as the canonical cover -> logo -> placeholder image. Use that for cards and previews. Use `logo_url` or `cover_url` only when you need those explicit assets.
 - Public event detail payloads now serialize linked references with a normalized image contract for mobile cards and previews: `media.front_cover_url`, `media.back_cover_url`, plus top-level aliases `front_cover_url`, `back_cover_url`, `cover_url`, and `thumb_url`.
 - Institution directory requests can filter by the device's current location: `GET /api/v1/institutions?lat=3.1390&lng=101.6869&radius_km=15` or `GET /api/v1/institutions/near?near=3.1390,101.6869&radius_km=15`. `radius_km` defaults to 15, is clamped between 1 and 100, and is always expressed in kilometers. Nearby results are sorted nearest-first and include `distance_km`; non-nearby requests return `distance_km: null`.
-- Public `/events`, `/institutions`, `/institutions/near`, and `/speakers` list endpoints accept `fields=` for sparse top-level responses when mobile clients need smaller pagination payloads.
+- Public `/events`, `/institutions`, `/institutions/near`, `/speakers`, and `/references` list endpoints accept `fields=` for sparse top-level responses when mobile clients need smaller pagination payloads.
 - The inspiration endpoint returns `title`, plain-text `content`, `content_html`, `preview_text`, `source`, category metadata, and both thumb/full media URLs when an image exists.
 - `speakerKey`, `venueKey`, `institutionKey`, and `referenceKey` intentionally bypass the app-wide public-slug route binders so the API can safely resolve slug or UUID itself.
 - `GET /catalogs/spaces` returns only global spaces when `institution_id` is omitted. When `institution_id` is provided, the response includes those global spaces plus spaces linked to the selected institution.

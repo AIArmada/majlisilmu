@@ -180,12 +180,13 @@ it('groups other public directory endpoints under dedicated entity tags in scram
 
     expect($paths['/institutions']['get']['tags'] ?? null)->toContain('Institution')
         ->and($paths['/institutions/{institutionKey}']['get']['tags'] ?? null)->toContain('Institution')
+        ->and($paths['/references']['get']['tags'] ?? null)->toContain('Reference')
         ->and($paths['/venues/{venueKey}']['get']['tags'] ?? null)->toContain('Venue')
         ->and($paths['/references/{referenceKey}']['get']['tags'] ?? null)->toContain('Reference')
         ->and($paths['/series/{series}']['get']['tags'] ?? null)->toContain('Series');
 });
 
-it('publishes named speaker and institution schemas for the public directory endpoints', function () {
+it('publishes named speaker institution and reference schemas for the public directory endpoints', function () {
     $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
         'Host' => 'api.majlisilmu.test',
     ])->assertOk();
@@ -201,6 +202,8 @@ it('publishes named speaker and institution schemas for the public directory end
         'Institution',
         'InstitutionListItem',
         'InstitutionDirectoryItem',
+        'ReferenceListItem',
+        'ReferenceDirectoryItem',
     ])
         ->and(data_get($schemas, 'Speaker.properties.gender'))->not->toBeNull()
         ->and(data_get($schemas, 'SpeakerListItem.properties.status.type'))->toBe('string')
@@ -213,16 +216,21 @@ it('publishes named speaker and institution schemas for the public directory end
         ->and(data_get($schemas, 'InstitutionListItem.properties.distance_km'))->not->toBeNull()
         ->and(data_get($schemas, 'InstitutionListItem.properties.type'))->not->toBeNull()
         ->and(data_get($schemas, 'InstitutionDirectoryItem.properties.type'))->not->toBeNull()
+        ->and(data_get($schemas, 'ReferenceListItem.properties.front_cover_url'))->not->toBeNull()
+        ->and(data_get($schemas, 'ReferenceDirectoryItem.properties.publication_year'))->not->toBeNull()
         ->and(collect(data_get($paths, '/institutions.get.parameters', []))->pluck('name')->all())->toContain('lat', 'lng', 'near', 'radius_km', 'fields')
         ->and(collect(data_get($paths, '/institutions/near.get.parameters', []))->pluck('name')->all())->toContain('near', 'radius_km', 'fields')
         ->and(data_get($institutionsNearParameters->get('lat'), 'schema.type'))->toBe('number')
         ->and(data_get($institutionsNearParameters->get('lng'), 'schema.type'))->toBe('number')
         ->and(collect(data_get($paths, '/speakers.get.parameters', []))->pluck('name')->all())->toContain('fields')
+        ->and(collect(data_get($paths, '/references.get.parameters', []))->pluck('name')->all())->toContain('fields', 'search', 'following', 'page', 'per_page')
         ->and(data_get($paths, '/speakers.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/speakers/{speakerKey}.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/institutions.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/institutions/near.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/institutions/{institutionKey}.get.responses.200.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/references.get.responses.200.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/references/{referenceKey}.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($schemas, 'EventSummary.properties.institution.properties.type'))->not->toBeNull()
         ->and(data_get($schemas, 'EventSummary.properties.speakers.items.properties.gender'))->not->toBeNull();
 });

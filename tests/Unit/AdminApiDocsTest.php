@@ -78,3 +78,13 @@ it('documents tag and subdistrict mutation semantics in the admin api reference'
         ->toContain('`district_id` is required for non-federal-territory states')
         ->toContain('`district_id=null` is only valid for federal-territory states');
 });
+
+it('documents the public reference directory in the mobile api reference', function () {
+    $markdown = file_get_contents(base_path('docs/MAJLISILMU_MOBILE_API_REFERENCE.md')) ?: '';
+
+    expect($markdown)
+        ->toContain('| `GET` | `/references` | Public reference listing filters; reference directory items include `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` in the default payload |')
+        ->toContain('`/speakers`, `/institutions`, and `/references` return **only** records where `is_active = true` AND `status = \'verified\'`')
+        ->toContain('Public reference directory list items expose `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` by default.')
+        ->toContain('Public `/events`, `/institutions`, `/institutions/near`, `/speakers`, and `/references` list endpoints accept `fields=`');
+});

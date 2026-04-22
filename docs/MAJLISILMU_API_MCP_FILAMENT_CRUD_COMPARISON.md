@@ -1,6 +1,6 @@
 ---
 title: API / MCP / Filament Capability Matrix
-verified_at: 2026-04-21
+verified_at: 2026-04-22
 purpose: Canonical parity map for public workflow API, generic admin HTTP API, admin/member MCP, and the Filament admin/Ahli panels.
 machine_readable_companion: docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.json
 ---
@@ -92,7 +92,7 @@ The public/authenticated API is not a second generic CRUD registry. It is a set 
 - `GET /api/v1/institutions*`
 - `GET /api/v1/speakers*`
 - `GET /api/v1/venues/{venueKey}`
-- `GET /api/v1/references/{referenceKey}`
+- `GET /api/v1/references*`
 - `GET /api/v1/series/{series}`
 - `GET /api/v1/events*`
 
@@ -233,7 +233,7 @@ These twelve resources are the entire current generic admin write whitelist.
 | `inspirations` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public random inspiration discovery |
 | `institutions` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `edit` | public read/detail; authenticated contribution create/suggest; institution workspace; follows |
 | `speakers` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/detail; authenticated contribution create/suggest; follows |
-| `references` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `edit` | `index`, `edit` | public read/detail; authenticated suggest update; follows |
+| `references` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `edit` | `index`, `edit` | public read/list/detail; authenticated suggest update; follows |
 | `reports` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | authenticated report submission; explicit admin report triage |
 | `donation-channels` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public institution donation details; event default donation detail |
 | `series` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public read/detail; authenticated follows; event-series assignment |
