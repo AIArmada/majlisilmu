@@ -51,6 +51,8 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
         $this->putSchema($components, 'PublicManifestResponse', $this->publicManifestResponseSchema());
         $this->putSchema($components, 'PublicFormFieldContract', $this->publicFormFieldContractSchema());
         $this->putSchema($components, 'PublicConditionalRule', $this->publicConditionalRuleSchema());
+        $this->putSchema($components, 'MobileTelemetryAcceptedResponse', $this->mobileTelemetryAcceptedResponseSchema());
+        $this->putSchema($components, 'MobileTelemetryFormResponse', $this->mobileTelemetryFormResponseSchema($components));
         $this->putSchema($components, 'SubmitEventFormResponse', $this->submitEventFormResponseSchema($components));
         $this->putSchema($components, 'InstitutionContributionFormResponse', $this->institutionContributionFormResponseSchema($components));
         $this->putSchema($components, 'SpeakerContributionFormResponse', $this->speakerContributionFormResponseSchema($components));
@@ -67,6 +69,8 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
     {
         $this->replaceJsonResponseSchema($document, 'search', 'get', 200, $components, 'SearchIndexResponse', 'Unified search response.');
         $this->replaceJsonResponseSchema($document, 'manifest', 'get', 200, $components, 'PublicManifestResponse', 'Public capability manifest response.');
+        $this->replaceJsonResponseSchema($document, 'mobile/telemetry/events', 'post', 202, $components, 'MobileTelemetryAcceptedResponse', 'Native mobile telemetry accepted response.');
+        $this->replaceJsonResponseSchema($document, 'forms/mobile-telemetry', 'get', 200, $components, 'MobileTelemetryFormResponse', 'Mobile telemetry field contract response.');
         $this->replaceJsonResponseSchema($document, 'forms/submit-event', 'get', 200, $components, 'SubmitEventFormResponse', 'Submit-event field contract response.');
         $this->replaceJsonResponseSchema($document, 'forms/contributions/institutions', 'get', 200, $components, 'InstitutionContributionFormResponse', 'Institution contribution field contract response.');
         $this->replaceJsonResponseSchema($document, 'forms/contributions/speakers', 'get', 200, $components, 'SpeakerContributionFormResponse', 'Speaker contribution field contract response.');
@@ -99,6 +103,7 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
         $tagDescriptions = [
             'Catalog' => 'Public lookup catalogs for geography, tags, languages, references, venues, and write-flow selectors.',
             'Search' => 'Public aggregate search endpoints across events, speakers, and institutions.',
+            'Telemetry' => 'Native mobile telemetry endpoints for batching UI interaction events from real iOS, iPadOS, and Android app sessions. This surface is not for mobile web browsing.',
             'AccountSettings' => 'Authenticated account-settings read and update endpoints for client applications.',
             'GitHub Issue Reporting' => 'Authenticated feedback endpoints that create GitHub issues in the MajlisIlmu repository for maintainers to triage.',
             'InstitutionWorkspace' => 'Authenticated institution workspace endpoints for member management and institution-scoped event listings.',
@@ -274,6 +279,43 @@ final class ApiWorkflowSchemasTransformer implements DocumentTransformer
                 ->addProperty('data', $this->standardFormContractType($components, [
                     'defaults' => null,
                 ], includeDefaults: false))
+                ->addProperty('meta', $this->requestMetaType())
+                ->setRequired(['data', 'meta']),
+        );
+    }
+
+    private function mobileTelemetryAcceptedResponseSchema(): Schema
+    {
+        return Schema::fromType(
+            (new ObjectType)
+                ->addProperty('message', new StringType)
+                ->addProperty(
+                    'data',
+                    (new ObjectType)
+                        ->addProperty('received_events', new IntegerType)
+                        ->addProperty('recorded_events', new IntegerType)
+                        ->addProperty('dropped_events', new IntegerType)
+                        ->addProperty('authenticated', new BooleanType)
+                        ->addProperty('client', $this->mixedObjectType())
+                        ->setRequired(['received_events', 'recorded_events', 'dropped_events', 'authenticated', 'client']),
+                )
+                ->addProperty('meta', $this->requestMetaType())
+                ->setRequired(['message', 'data', 'meta']),
+        );
+    }
+
+    private function mobileTelemetryFormResponseSchema(Components $components): Schema
+    {
+        return Schema::fromType(
+            (new ObjectType)
+                ->addProperty('data', $this->standardFormContractType($components, [
+                    'bearer_auth_optional' => new BooleanType,
+                    'native_only' => new BooleanType,
+                    'intended_clients' => (new ArrayType)->setItems(new StringType),
+                    'required_headers' => (new ArrayType)->setItems($this->mixedObjectType()),
+                    'event_fields' => (new ArrayType)->setItems($components->getSchemaReference('PublicFormFieldContract')),
+                    'notes' => (new ArrayType)->setItems(new StringType),
+                ]))
                 ->addProperty('meta', $this->requestMetaType())
                 ->setRequired(['data', 'meta']),
         );

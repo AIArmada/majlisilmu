@@ -3,6 +3,7 @@
 use AIArmada\FilamentSignals\Pages\PageViewsReport;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
+use App\Filament\Pages\ProductSignals;
 use App\Filament\Pages\ShareAnalytics;
 use App\Models\Event;
 use App\Models\User;
@@ -52,6 +53,67 @@ it('renders the admin share analytics page', function () {
         ->assertSee('Provider Breakdown')
         ->assertSee('Top Sharers')
         ->assertSee('Top Links');
+});
+
+it('renders product signals client origin and platform visibility in admin', function () {
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+    $trackedProperty = TrackedProperty::query()->firstOrFail();
+
+    SignalEvent::query()->create([
+        'tracked_property_id' => $trackedProperty->id,
+        'signal_session_id' => null,
+        'signal_identity_id' => null,
+        'occurred_at' => now(),
+        'event_name' => 'search.executed',
+        'event_category' => 'search',
+        'path' => '/api/v1/events',
+        'url' => url('/api/v1/events'),
+        'currency' => 'MYR',
+        'revenue_minor' => 0,
+        'properties' => [
+            'client_origin' => 'ios',
+            'client_platform' => 'ios',
+            'client_family' => 'mobile',
+            'client_transport' => 'api',
+            'client_version' => '1.2.3',
+            'query' => 'Admin visible mobile search',
+        ],
+        'property_types' => null,
+    ]);
+
+    SignalEvent::query()->create([
+        'tracked_property_id' => $trackedProperty->id,
+        'signal_session_id' => null,
+        'signal_identity_id' => null,
+        'occurred_at' => now()->subMinute(),
+        'event_name' => 'navigation.quick_filter_clicked',
+        'event_category' => 'navigation',
+        'path' => '/',
+        'url' => url('/'),
+        'currency' => 'MYR',
+        'revenue_minor' => 0,
+        'properties' => [
+            'client_origin' => 'web',
+            'client_platform' => 'macos',
+            'client_family' => 'desktop',
+            'client_transport' => 'web',
+        ],
+        'property_types' => null,
+    ]);
+
+    $this->actingAs($administrator)
+        ->get(ProductSignals::getUrl(panel: 'admin'))
+        ->assertSuccessful()
+        ->assertSee('Product Signals')
+        ->assertSee('Client Origins')
+        ->assertSee('Platforms')
+        ->assertSee('Transport')
+        ->assertSee('iOS')
+        ->assertSee('macOS')
+        ->assertSee('API')
+        ->assertSee('Admin visible mobile search')
+        ->assertSee('1.2.3');
 });
 
 it('shows copy link activity on the admin share analytics page', function () {

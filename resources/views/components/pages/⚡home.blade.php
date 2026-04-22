@@ -194,6 +194,11 @@ new
                             }">
                     <div class="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-gold-400 to-emerald-500 rounded-2xl opacity-50 group-hover:opacity-100 blur transition duration-500 group-hover:duration-200 animate-tilt"></div>
                     <form action="{{ route('search.index') }}" method="GET" x-ref="form"
+                        data-signal-submit-event="search.submitted"
+                        data-signal-category="search"
+                        data-signal-component="home_hero"
+                        data-signal-control="hero_search"
+                        data-signal-props='@json(['destination' => 'unified_search'])'
                         class="relative bg-slate-900/90 rounded-2xl p-2 flex flex-col sm:flex-row items-center gap-2 border border-white/10 shadow-2xl backdrop-blur-xl">
 
                         {{-- Search Input --}}
@@ -204,12 +209,17 @@ new
                                 </svg>
                             </div>
                             <input type="text" name="search" placeholder="{{ __('Cari majlis, penceramah, atau institusi...') }}"
+                                data-signal-include-value="true"
                                 class="w-full h-full bg-transparent border-none pl-12 pr-4 text-white placeholder-slate-400 focus:ring-0 focus:outline-none text-base">
                         </div>
 
                         {{-- Locate Button --}}
                         <button type="button" @click="locate" :disabled="locating"
                             data-testid="near-me-button"
+                            data-signal-event="search.nearby_requested"
+                            data-signal-category="search"
+                            data-signal-component="home_hero"
+                            data-signal-control="near_me"
                             title="{{ __('Cari majlis berdekatan anda') }}"
                             class="hidden sm:flex items-center justify-center w-14 h-14 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-400 hover:text-emerald-400 transition-all">
                             <div x-show="!locating">
@@ -228,6 +238,10 @@ new
 
                         {{-- Search Button --}}
                         <button type="submit"
+                            data-signal-event="search.submit_clicked"
+                            data-signal-category="search"
+                            data-signal-component="home_hero"
+                            data-signal-control="search_button"
                             class="w-full sm:w-auto px-8 h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-emerald-500/25 flex items-center justify-center gap-2">
                             <span>{{ __('Cari') }}</span>
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -246,37 +260,76 @@ new
                 {{-- Quick Links --}}
                 <div class="mt-10 flex flex-wrap justify-center gap-3 text-sm font-medium">
                     <a href="{{ route('events.index', $eventDateLinks['today']) }}" wire:navigate
+                        data-signal-event="navigation.quick_filter_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_quick_links"
+                        data-signal-control="today"
+                        data-signal-props='@json(['filter' => 'today'])'
                         class="text-slate-400 hover:text-gold-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-gold-500/30">
                         <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                         {{ __('Malam Ini') }}
                     </a>
                     <a href="{{ route('events.index', $eventDateLinks['friday']) }}" wire:navigate
+                        data-signal-event="navigation.quick_filter_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_quick_links"
+                        data-signal-control="friday"
+                        data-signal-props='@json(['filter' => 'friday'])'
                         class="text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-emerald-500/30">
                         <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                         {{ __('Jumaat Ini') }}
                     </a>
                     <a href="{{ route('events.index', $eventDateLinks['this_week']) }}" wire:navigate
+                        data-signal-event="navigation.quick_filter_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_quick_links"
+                        data-signal-control="this_week"
+                        data-signal-props='@json(['filter' => 'this_week'])'
                         class="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         {{ __('Minggu Ini') }}
                     </a>
                     <a href="{{ route('events.index', $eventDateLinks['weekend']) }}" wire:navigate
+                        data-signal-event="navigation.quick_filter_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_quick_links"
+                        data-signal-control="weekend"
+                        data-signal-props='@json(['filter' => 'weekend'])'
                         class="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         {{ __('Hujung Minggu') }}
                     </a>
                     <a href="{{ route('events.index', ['domain_tag_ids' => [$this->categoryTagIds['aqidah']]]) }}" wire:navigate
+                        data-signal-event="navigation.quick_filter_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_quick_links"
+                        data-signal-control="domain_aqidah"
+                        data-signal-props='@json(['filter' => 'domain', 'tag' => 'aqidah'])'
                         class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         #Aqidah
                     </a>
                     <a href="{{ route('events.index', ['domain_tag_ids' => [$this->categoryTagIds['syariah']]]) }}" wire:navigate
+                        data-signal-event="navigation.quick_filter_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_quick_links"
+                        data-signal-control="domain_syariah"
+                        data-signal-props='@json(['filter' => 'domain', 'tag' => 'syariah'])'
                         class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         #Syariah
                     </a>
                     <a href="{{ route('events.index', ['domain_tag_ids' => [$this->categoryTagIds['akhlak']]]) }}" wire:navigate
+                        data-signal-event="navigation.quick_filter_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_quick_links"
+                        data-signal-control="domain_akhlak"
+                        data-signal-props='@json(['filter' => 'domain', 'tag' => 'akhlak'])'
                         class="text-slate-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         #Akhlak
                     </a>
 
                     <button type="button" @click="$dispatch('mi-home-nearby')"
+                        data-signal-event="search.nearby_requested"
+                        data-signal-category="search"
+                        data-signal-component="home_quick_links"
+                        data-signal-control="near_me_mobile"
                         class="sm:hidden text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
@@ -314,7 +367,12 @@ new
                 {{-- Features Grid --}}
                 <div class="grid md:grid-cols-3 gap-8">
                     {{-- Feature 1: Majlis --}}
-                    <a href="{{ route('events.index') }}" wire:navigate class="group p-8 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-100 transition-all hover:-translate-y-1">
+                    <a href="{{ route('events.index') }}" wire:navigate
+                        data-signal-event="navigation.home_feature_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_value_cards"
+                        data-signal-control="events"
+                        class="group p-8 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-100 transition-all hover:-translate-y-1">
                         <div class="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/30">
                             <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -331,7 +389,12 @@ new
                     </a>
 
                     {{-- Feature 2: Institusi --}}
-                    <a href="{{ route('institutions.index') }}" wire:navigate class="group p-8 rounded-3xl bg-gradient-to-br from-blue-50 to-sky-50 border border-blue-100 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-100 transition-all hover:-translate-y-1">
+                    <a href="{{ route('institutions.index') }}" wire:navigate
+                        data-signal-event="navigation.home_feature_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_value_cards"
+                        data-signal-control="institutions"
+                        class="group p-8 rounded-3xl bg-gradient-to-br from-blue-50 to-sky-50 border border-blue-100 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-100 transition-all hover:-translate-y-1">
                         <div class="w-14 h-14 rounded-2xl bg-blue-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/30">
                             <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
@@ -348,7 +411,12 @@ new
                     </a>
 
                     {{-- Feature 3: Penceramah --}}
-                    <a href="{{ route('speakers.index') }}" wire:navigate class="group p-8 rounded-3xl bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 hover:border-purple-300 hover:shadow-xl hover:shadow-purple-100 transition-all hover:-translate-y-1">
+                    <a href="{{ route('speakers.index') }}" wire:navigate
+                        data-signal-event="navigation.home_feature_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="home_value_cards"
+                        data-signal-control="speakers"
+                        class="group p-8 rounded-3xl bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 hover:border-purple-300 hover:shadow-xl hover:shadow-purple-100 transition-all hover:-translate-y-1">
                         <div class="w-14 h-14 rounded-2xl bg-purple-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/30">
                             <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
@@ -373,13 +441,23 @@ new
                         <h3 class="font-heading text-2xl sm:text-3xl font-bold text-white mb-3">{{ __('Daftar Sekarang — Percuma Selamanya') }}</h3>
                         <p class="text-emerald-100 mb-8 max-w-xl mx-auto">{{ __('Simpan majlis kegemaran, ikuti penceramah, dan dapatkan peringatan majlis ilmu berdekatan anda.') }}</p>
                         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                            <a href="{{ route('register') }}" wire:navigate class="inline-flex items-center gap-2 px-8 py-4 bg-white text-emerald-700 font-bold rounded-xl hover:bg-emerald-50 transition-all shadow-xl hover:-translate-y-0.5">
+                            <a href="{{ route('register') }}" wire:navigate
+                                data-signal-event="auth.signup_intent"
+                                data-signal-category="auth"
+                                data-signal-component="home_guest_cta"
+                                data-signal-control="register"
+                                class="inline-flex items-center gap-2 px-8 py-4 bg-white text-emerald-700 font-bold rounded-xl hover:bg-emerald-50 transition-all shadow-xl hover:-translate-y-0.5">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
                                 </svg>
                                 {{ __('Buat Akaun Percuma') }}
                             </a>
-                            <a href="{{ route('login') }}" wire:navigate class="text-emerald-100 hover:text-white font-medium transition-colors">
+                            <a href="{{ route('login') }}" wire:navigate
+                                data-signal-event="auth.login_intent"
+                                data-signal-category="auth"
+                                data-signal-component="home_guest_cta"
+                                data-signal-control="login"
+                                class="text-emerald-100 hover:text-white font-medium transition-colors">
                                 {{ __('Sudah ada akaun? Log Masuk →') }}
                             </a>
                         </div>
@@ -438,6 +516,10 @@ new
 
                     <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
                         <a href="{{ route('submit-event.create') }}" wire:navigate
+                            data-signal-event="submission.event_start_clicked"
+                            data-signal-category="submission"
+                            data-signal-component="home_submit_event_cta"
+                            data-signal-control="submit_event"
                             class="inline-flex items-center gap-2 px-8 py-4 font-bold text-white transition-all transform rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-xl shadow-emerald-900/40 hover:shadow-emerald-500/25 hover:-translate-y-1 group border border-gold-500/20">
                             <svg class="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>

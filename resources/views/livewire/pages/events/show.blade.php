@@ -475,6 +475,12 @@
                             <div class="absolute -inset-3 rounded-3xl bg-white/5 blur-xl" aria-hidden="true"></div>
                             {{-- Poster card button → opens fullscreen --}}
                             <button type="button" @click="posterModalOpen = true"
+                                data-signal-event="engagement.poster_opened"
+                                data-signal-category="engagement"
+                                data-signal-component="event_detail_hero"
+                                data-signal-control="poster"
+                                data-signal-entity-type="event"
+                                data-signal-entity-id="{{ $event->id }}"
                                 class="group relative block w-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 transition-transform duration-300 hover:scale-[1.02] focus:outline-none"
                                 aria-label="{{ __('Lihat poster penuh') }}"
                                 data-poster-aspect="{{ $eventPosterDisplayAspectRatio }}">
@@ -556,6 +562,13 @@
                 @if(!$isCancelledStatus)
                     @if(!$event->starts_at || !$event->starts_at->isPast())
                         <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
+                            data-signal-event="engagement.event_going_clicked"
+                            data-signal-category="engagement"
+                            data-signal-component="event_detail_actions"
+                            data-signal-control="going"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['currently_going' => $isGoing])'
                             class="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold shadow-sm transition-all
                                                                                                                                                                                                                     {{ $isGoing
                         ? 'bg-emerald-600 text-white shadow-emerald-200'
@@ -577,6 +590,13 @@
 
                     <button type="button" wire:click="checkIn" wire:loading.attr="disabled"
                         @disabled($checkInActionDisabled)
+                        data-signal-event="engagement.event_check_in_clicked"
+                        data-signal-category="engagement"
+                        data-signal-component="event_detail_actions"
+                        data-signal-control="check_in"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['available' => ! $checkInActionDisabled, 'checked_in' => $isCheckedIn])'
                         @if($checkInActionDisabled && filled($checkInReason)) title="{{ $checkInReason }}" @endif
                         class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
                         {{ $isCheckedIn
@@ -591,7 +611,15 @@
                         {{ $isCheckedIn ? __('Sudah Check-in') : __('Check-in') }}
                     </button>
 
-                    <button type="button" wire:click="toggleSave" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
+                    <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
+                        data-signal-event="engagement.event_save_clicked"
+                        data-signal-category="engagement"
+                        data-signal-component="event_detail_actions"
+                        data-signal-control="save"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['currently_saved' => $isSaved])'
+                        class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
                         {{ $isSaved
         ? 'border-blue-200 bg-blue-50 text-blue-600'
         : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600' }}">
@@ -615,6 +643,12 @@
                 @if(!$isCancelledStatus)
                     <div class="relative" x-data="{ open: false }">
                         <button type="button" @click="open = !open"
+                            data-signal-event="engagement.calendar_opened"
+                            data-signal-category="engagement"
+                            data-signal-component="event_detail_actions"
+                            data-signal-control="calendar"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
                             class="inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50">
                             <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -635,6 +669,13 @@
                             x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
                             class="absolute left-0 z-50 mt-3 w-72 max-w-[90vw] overflow-hidden rounded-2xl border border-slate-200/60 bg-white/95 p-2 shadow-2xl backdrop-blur-xl">
                             <a href="{{ $this->calendarLinks['google'] }}" target="_blank" rel="noopener"
+                                data-signal-event="engagement.calendar_provider_clicked"
+                                data-signal-category="engagement"
+                                data-signal-component="event_detail_actions"
+                                data-signal-control="calendar_google"
+                                data-signal-entity-type="event"
+                                data-signal-entity-id="{{ $event->id }}"
+                                data-signal-props='@json(['provider' => 'google'])'
                                 class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
                                 <svg class="size-5 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -644,6 +685,13 @@
                                 <span class="text-sm font-bold text-slate-700">Google Calendar</span>
                             </a>
                             <a href="{{ $this->calendarLinks['ics'] }}" download
+                                data-signal-event="engagement.calendar_provider_clicked"
+                                data-signal-category="engagement"
+                                data-signal-component="event_detail_actions"
+                                data-signal-control="calendar_ics"
+                                data-signal-entity-type="event"
+                                data-signal-entity-id="{{ $event->id }}"
+                                data-signal-props='@json(['provider' => 'ics'])'
                                 class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
                                 <svg class="size-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                     stroke-width="2">
@@ -653,6 +701,13 @@
                                 <span class="text-sm font-bold text-slate-700">Apple / iCal (.ics)</span>
                             </a>
                             <a href="{{ $this->calendarLinks['outlook'] }}" target="_blank" rel="noopener"
+                                data-signal-event="engagement.calendar_provider_clicked"
+                                data-signal-category="engagement"
+                                data-signal-component="event_detail_actions"
+                                data-signal-control="calendar_outlook"
+                                data-signal-entity-type="event"
+                                data-signal-entity-id="{{ $event->id }}"
+                                data-signal-props='@json(['provider' => 'outlook'])'
                                 class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
                                 <svg class="size-5 text-[#0078D4]" viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -661,6 +716,13 @@
                                 <span class="text-sm font-bold text-slate-700">Outlook.com</span>
                             </a>
                             <a href="{{ $this->calendarLinks['office365'] }}" target="_blank" rel="noopener"
+                                data-signal-event="engagement.calendar_provider_clicked"
+                                data-signal-category="engagement"
+                                data-signal-component="event_detail_actions"
+                                data-signal-control="calendar_office365"
+                                data-signal-entity-type="event"
+                                data-signal-entity-id="{{ $event->id }}"
+                                data-signal-props='@json(['provider' => 'office365'])'
                                 class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
                                 <svg class="size-5 text-[#D83B01]" viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -669,6 +731,13 @@
                                 <span class="text-sm font-bold text-slate-700">Office 365</span>
                             </a>
                             <a href="{{ $this->calendarLinks['yahoo'] }}" target="_blank" rel="noopener"
+                                data-signal-event="engagement.calendar_provider_clicked"
+                                data-signal-category="engagement"
+                                data-signal-component="event_detail_actions"
+                                data-signal-control="calendar_yahoo"
+                                data-signal-entity-type="event"
+                                data-signal-entity-id="{{ $event->id }}"
+                                data-signal-props='@json(['provider' => 'yahoo'])'
                                 class="flex items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-slate-100">
                                 <svg class="size-5 text-[#6001D2]" viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -691,6 +760,12 @@
 
             <div class="flex items-center gap-3">
                 <button type="button" @click="openShareModal()"
+                    data-signal-event="share.modal_opened"
+                    data-signal-category="share"
+                    data-signal-component="event_detail_actions"
+                    data-signal-control="share"
+                    data-signal-entity-type="event"
+                    data-signal-entity-id="{{ $event->id }}"
                     class="inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50">
                     <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -779,6 +854,13 @@
                     <p class="text-sm font-bold text-emerald-800">{{ __('Sedang Berlangsung') }}</p>
                     @if($event->live_url)
                         <a href="{{ $event->live_url }}" target="_blank" rel="noopener"
+                            data-signal-event="navigation.external_link_clicked"
+                            data-signal-category="navigation"
+                            data-signal-component="event_detail_status"
+                            data-signal-control="live_url"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['link_type' => 'live_url'])'
                             class="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700">
                             <svg class="size-3" fill="currentColor" viewBox="0 0 24 24">
                                 <circle cx="12" cy="12" r="4" />
@@ -1470,6 +1552,13 @@
                 class="flex flex-wrap gap-4 rounded-3xl border border-slate-200/60 bg-white/80 p-6 shadow-xl shadow-slate-200/40 backdrop-blur-xl sm:p-8">
                 @if($event->live_url)
                     <a href="{{ $event->live_url }}" target="_blank" rel="noopener"
+                        data-signal-event="navigation.external_link_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="event_detail_media"
+                        data-signal-control="live_url"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['link_type' => 'live_url'])'
                         class="group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl bg-slate-900 px-8 py-4 font-bold text-white shadow-lg shadow-slate-900/20 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/30">
                         <div
                             class="absolute inset-0 bg-gradient-to-r from-red-600 to-red-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
@@ -1486,6 +1575,13 @@
                 @endif
                 @if($event->recording_url)
                     <a href="{{ $event->recording_url }}" target="_blank" rel="noopener"
+                        data-signal-event="navigation.external_link_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="event_detail_media"
+                        data-signal-control="recording_url"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['link_type' => 'recording_url'])'
                         class="group inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-8 py-4 font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-1 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md">
                         <svg class="size-5 text-slate-400 transition-colors group-hover:text-slate-600" fill="none"
                             viewBox="0 0 24 24" stroke="currentColor">
@@ -1871,6 +1967,13 @@
                         </button>
                     @else
                         <a href="#register" @click.prevent="registerOpen = true"
+                            data-signal-event="submission.event_registration_opened"
+                            data-signal-category="submission"
+                            data-signal-component="event_detail_registration"
+                            data-signal-control="register_open"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['registration_mode' => $registrationMode->value])'
                             class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-emerald-600 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-500/30">
                             <div
                                 class="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
@@ -2085,6 +2188,13 @@ SHARE MODAL
 
                 <div class="mt-8 grid grid-cols-2 gap-4">
                     <button type="button" @click="nativeShare()"
+                        data-signal-event="share.provider_clicked"
+                        data-signal-category="share"
+                        data-signal-component="event_detail_share_modal"
+                        data-signal-control="native_share"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['provider' => 'native_share'])'
                         class="group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-500/30">
                         <div
                             class="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
@@ -2098,6 +2208,13 @@ SHARE MODAL
                         </span>
                     </button>
                     <button type="button" @click="copyLink()"
+                        data-signal-event="share.provider_clicked"
+                        data-signal-category="share"
+                        data-signal-component="event_detail_share_modal"
+                        data-signal-control="copy_link"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['provider' => 'copy_link'])'
                         class="flex items-center justify-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:border-emerald-500 hover:text-emerald-700 hover:shadow-md">
                         <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -2129,43 +2246,99 @@ SHARE MODAL
                     </p>
                     <div class="grid grid-cols-4 gap-3">
                         <a href="{{ $shareLinks['whatsapp'] }}" target="_blank" rel="noopener" title="WhatsApp"
+                            data-signal-event="share.provider_clicked"
+                            data-signal-category="share"
+                            data-signal-component="event_detail_share_modal"
+                            data-signal-control="whatsapp"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['provider' => 'whatsapp'])'
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#25D366] hover:bg-[#25D366]/10">
                             <img src="{{ asset('storage/social-media-icons/whatsapp.svg') }}" alt="WhatsApp"
                                 class="h-6 w-6" loading="lazy">
                         </a>
                         <a href="{{ $shareLinks['telegram'] }}" target="_blank" rel="noopener" title="Telegram"
+                            data-signal-event="share.provider_clicked"
+                            data-signal-category="share"
+                            data-signal-component="event_detail_share_modal"
+                            data-signal-control="telegram"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['provider' => 'telegram'])'
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#0088cc] hover:bg-[#0088cc]/10">
                             <img src="{{ asset('storage/social-media-icons/telegram.svg') }}" alt="Telegram"
                                 class="h-6 w-6" loading="lazy">
                         </a>
                         <a href="{{ $shareLinks['threads'] }}" target="_blank" rel="noopener" title="Threads"
+                            data-signal-event="share.provider_clicked"
+                            data-signal-category="share"
+                            data-signal-component="event_detail_share_modal"
+                            data-signal-control="threads"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['provider' => 'threads'])'
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-black hover:bg-black/10">
                             <img src="{{ asset('storage/social-media-icons/threads.svg') }}" alt="Threads" class="h-6 w-6"
                                 loading="lazy">
                         </a>
                         <a href="{{ $shareLinks['facebook'] }}" target="_blank" rel="noopener" title="Facebook"
+                            data-signal-event="share.provider_clicked"
+                            data-signal-category="share"
+                            data-signal-component="event_detail_share_modal"
+                            data-signal-control="facebook"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['provider' => 'facebook'])'
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#1877F2] hover:bg-[#1877F2]/10">
                             <img src="{{ asset('storage/social-media-icons/facebook.svg') }}" alt="Facebook"
                                 class="h-6 w-6" loading="lazy">
                         </a>
                         <a href="{{ $shareLinks['x'] }}" target="_blank" rel="noopener" title="X"
+                            data-signal-event="share.provider_clicked"
+                            data-signal-category="share"
+                            data-signal-component="event_detail_share_modal"
+                            data-signal-control="x"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['provider' => 'x'])'
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-slate-900 hover:bg-slate-900/10">
                             <img src="{{ asset('storage/social-media-icons/x.svg') }}" alt="X" class="h-6 w-6"
                                 loading="lazy">
                         </a>
                         <a href="{{ $shareLinks['instagram'] }}" target="_blank" rel="noopener" @click="copyLink(false, 'instagram')"
                             title="Instagram"
+                            data-signal-event="share.provider_clicked"
+                            data-signal-category="share"
+                            data-signal-component="event_detail_share_modal"
+                            data-signal-control="instagram"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['provider' => 'instagram'])'
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-[#E4405F] hover:bg-[#E4405F]/10">
                             <img src="{{ asset('storage/social-media-icons/instagram.svg') }}" alt="Instagram"
                                 class="h-6 w-6" loading="lazy">
                         </a>
                         <a href="{{ $shareLinks['tiktok'] }}" target="_blank" rel="noopener" @click="copyLink(false, 'tiktok')"
                             title="TikTok"
+                            data-signal-event="share.provider_clicked"
+                            data-signal-category="share"
+                            data-signal-component="event_detail_share_modal"
+                            data-signal-control="tiktok"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['provider' => 'tiktok'])'
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-black hover:bg-black/10">
                             <img src="{{ asset('storage/social-media-icons/tiktok.svg') }}" alt="TikTok" class="h-6 w-6"
                                 loading="lazy">
                         </a>
                         <a href="{{ $shareLinks['email'] }}" title="Email"
+                            data-signal-event="share.provider_clicked"
+                            data-signal-category="share"
+                            data-signal-component="event_detail_share_modal"
+                            data-signal-control="email"
+                            data-signal-entity-type="event"
+                            data-signal-entity-id="{{ $event->id }}"
+                            data-signal-props='@json(['provider' => 'email'])'
                             class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50 transition hover:-translate-y-1 hover:border-emerald-500 hover:bg-emerald-500/10">
                             <img src="{{ asset('storage/social-media-icons/email.svg') }}" alt="Email" class="h-6 w-6"
                                 loading="lazy">
@@ -2196,7 +2369,15 @@ REGISTRATION MODAL
                 <p class="mt-1 text-sm text-slate-500">{{ __('Please fill in your details below.') }}</p>
             </div>
 
-            <form action="{{ route('events.register', $event) }}" method="POST" class="p-8">
+            <form action="{{ route('events.register', $event) }}" method="POST"
+                data-signal-submit-event="submission.event_registration_submitted"
+                data-signal-category="submission"
+                data-signal-component="event_detail_registration"
+                data-signal-control="registration_form"
+                data-signal-entity-type="event"
+                data-signal-entity-id="{{ $event->id }}"
+                data-signal-props='@json(['registration_mode' => $registrationMode->value])'
+                class="p-8">
                 @csrf
                 <div class="space-y-5">
                     <div>
@@ -2253,7 +2434,15 @@ MOBILE BOTTOM ACTION BAR
             <div class="flex items-center gap-2">
             @auth
                 @if(!$isCancelledStatus)
-                    <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled" class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all
+                    <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
+                        data-signal-event="engagement.event_going_clicked"
+                        data-signal-category="engagement"
+                        data-signal-component="event_detail_mobile_actions"
+                        data-signal-control="going"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['currently_going' => $isGoing])'
+                        class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all
                                                                                                                                                             {{ $isGoing
                     ? 'border-2 border-emerald-200 bg-emerald-50 text-emerald-700 shadow-inner'
                     : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700' }}">
@@ -2270,6 +2459,13 @@ MOBILE BOTTOM ACTION BAR
 
                     <button type="button" wire:click="checkIn" wire:loading.attr="disabled"
                         @disabled($checkInActionDisabled)
+                        data-signal-event="engagement.event_check_in_clicked"
+                        data-signal-category="engagement"
+                        data-signal-component="event_detail_mobile_actions"
+                        data-signal-control="check_in"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['available' => ! $checkInActionDisabled, 'checked_in' => $isCheckedIn])'
                         @if($checkInActionDisabled && filled($checkInReason)) title="{{ $checkInReason }}" @endif
                         class="rounded-xl border-2 p-3 transition-all
                         {{ $isCheckedIn
@@ -2284,6 +2480,13 @@ MOBILE BOTTOM ACTION BAR
                     </button>
 
                     <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
+                        data-signal-event="engagement.event_save_clicked"
+                        data-signal-category="engagement"
+                        data-signal-component="event_detail_mobile_actions"
+                        data-signal-control="save"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['currently_saved' => $isSaved])'
                         class="rounded-xl border-2 p-3 transition-all
                                                                                                                                                             {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
                         <svg class="size-5 {{ $isSaved ? 'fill-current' : '' }}" viewBox="0 0 24 24"
@@ -2315,6 +2518,12 @@ MOBILE BOTTOM ACTION BAR
             @if(!$isCancelledStatus)
                 <div class="relative" x-data="{ calendarOpen: false }">
                     <button type="button" @click="calendarOpen = !calendarOpen"
+                        data-signal-event="engagement.calendar_opened"
+                        data-signal-category="engagement"
+                        data-signal-component="event_detail_mobile_actions"
+                        data-signal-control="calendar"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
                         class="rounded-xl border-2 border-slate-200 bg-white p-3 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
                         aria-label="{{ __('Tambah ke Kalendar') }}">
                         <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -2383,6 +2592,12 @@ MOBILE BOTTOM ACTION BAR
             @endif
 
             <button type="button" @click="openShareModal()"
+                data-signal-event="share.modal_opened"
+                data-signal-category="share"
+                data-signal-component="event_detail_mobile_actions"
+                data-signal-control="share"
+                data-signal-entity-type="event"
+                data-signal-entity-id="{{ $event->id }}"
                 class="rounded-xl border-2 border-slate-200 bg-white p-3 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700">
                 <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round"

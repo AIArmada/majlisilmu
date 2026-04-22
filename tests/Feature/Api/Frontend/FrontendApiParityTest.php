@@ -104,19 +104,25 @@ it('exposes corrected frontend contract metadata', function () {
     $followFlow = $manifest['flows']['follow'] ?? [];
     $inspirationFlow = $manifest['flows']['inspirations_random'] ?? [];
     $shareFlow = $manifest['flows']['share'] ?? [];
+    $mobileTelemetryFlow = $manifest['flows']['mobile_telemetry'] ?? [];
     $shareAnalyticsFlow = $manifest['flows']['share_analytics'] ?? [];
     $institutionsNearFlow = $manifest['flows']['institutions_near'] ?? [];
     $quickstart = $manifest['ai_quickstart']['read_order'] ?? [];
+
+    $mobileTelemetryContract = $this->getJson(route('api.client.forms.mobile-telemetry'))
+        ->assertOk()
+        ->json('data');
 
     $submitEvent = $this->getJson(route('api.client.forms.submit-event'))
         ->assertOk()
         ->json('data');
 
+    $mobileTelemetryEventFields = collect($mobileTelemetryContract['event_fields'] ?? [])->pluck('name')->all();
     $submitEventFields = collect($submitEvent['fields'] ?? [])->pluck('name')->all();
     $submitEventConditionalRules = collect($submitEvent['conditional_rules'] ?? []);
 
     expect($submitEvent['captcha_required_when_turnstile_enabled'])->toBeTrue()
-        ->and($manifest['version'] ?? null)->toBe('2026-04-21')
+        ->and($manifest['version'] ?? null)->toBe('2026-04-22')
         ->and($manifest['docs']['ui'] ?? null)->toBe('https://api.majlisilmu.test/docs')
         ->and($manifest['docs']['openapi'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($manifest['surface_sync']['strategy'] ?? null)->toBe('curated_parity')
@@ -152,6 +158,13 @@ it('exposes corrected frontend contract metadata', function () {
         ->and($shareFlow['origins'] ?? [])->toContain('web', 'iosapp', 'android', 'macapp')
         ->and($shareFlow['copy_link_channel'] ?? null)->toBe('copy_link')
         ->and($shareFlow['native_share_channel'] ?? null)->toBe('native_share')
+        ->and($mobileTelemetryFlow['endpoint'] ?? null)->toContain('/api/v1/mobile/telemetry/events')
+        ->and($mobileTelemetryFlow['schema_endpoint'] ?? null)->toContain('/api/v1/forms/mobile-telemetry')
+        ->and($mobileTelemetryFlow['auth_required'] ?? null)->toBeFalse()
+        ->and($mobileTelemetryFlow['bearer_auth_optional'] ?? null)->toBeTrue()
+        ->and($mobileTelemetryFlow['native_only'] ?? null)->toBeTrue()
+        ->and($mobileTelemetryFlow['intended_clients'] ?? [])->toContain('ios', 'ipados', 'android')
+        ->and($mobileTelemetryFlow['required_headers'] ?? [])->toContain('X-Majlis-Client-Origin')
         ->and($shareAnalyticsFlow['endpoint'] ?? null)->toContain('/api/v1/share/analytics')
         ->and($shareAnalyticsFlow['link_endpoint_template'] ?? null)->toContain('/api/v1/share/analytics/links/link')
         ->and($shareAnalyticsFlow['auth_required'] ?? null)->toBeTrue()
@@ -160,6 +173,15 @@ it('exposes corrected frontend contract metadata', function () {
         ->and($institutionsNearFlow['endpoint'] ?? null)->toContain('/api/v1/institutions/near')
         ->and($institutionsNearFlow['near_format'] ?? null)->toBe('lat,lng')
         ->and($institutionsNearFlow['radius_parameter'] ?? null)->toBe('radius_km');
+
+    expect($mobileTelemetryContract['flow'] ?? null)->toBe('mobile_telemetry')
+        ->and($mobileTelemetryContract['endpoint'] ?? null)->toContain('/api/v1/mobile/telemetry/events')
+        ->and($mobileTelemetryContract['bearer_auth_optional'] ?? null)->toBeTrue()
+        ->and($mobileTelemetryContract['native_only'] ?? null)->toBeTrue()
+        ->and($mobileTelemetryContract['required_headers'][0]['name'] ?? null)->toBe('X-Majlis-Client-Origin')
+        ->and($mobileTelemetryContract['required_headers'][0]['allowed_values'] ?? [])->toContain('iosapp', 'ipadosapp', 'androidapp')
+        ->and($mobileTelemetryEventFields)->toContain('event_name', 'screen_name', 'component', 'action', 'properties')
+        ->and($mobileTelemetryContract['notes'] ?? [])->toContain('Do not use this endpoint for mobile web page views; browser sessions should keep using the web signals tracker.');
 
     $speakerContract = $this->getJson(route('api.client.forms.contributions.speakers'))
         ->assertOk()
