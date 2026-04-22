@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Events\PublishEventChangeAnnouncement;
+use App\Enums\EventChangeType;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\NotificationTrigger;
 use App\Models\Event;
@@ -14,6 +16,8 @@ use App\Models\User;
 use App\Services\Notifications\EventNotificationService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
@@ -116,10 +120,21 @@ it('sends update alerts to saved users but no reminders for them', function () {
     ]);
 
     $savedUser->savedEvents()->attach($event->id);
+    $this->seed(RoleSeeder::class);
+    $this->seed(PermissionSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
 
     try {
+        app(PublishEventChangeAnnouncement::class)->handle(
+            event: $event,
+            actor: $administrator,
+            type: EventChangeType::ScheduleChanged,
+            publicMessage: 'Masa majlis telah dikemas kini.',
+        );
+
         $service = app(EventNotificationService::class);
-        $service->notifyMaterialEventChange($event, ['starts_at']);
         $service->dispatchDueReminderNotifications($now);
 
         $this->assertDatabaseHas('notification_messages', [

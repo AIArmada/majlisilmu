@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Actions\Events\RegisterForEventAction;
 use App\Enums\EventVisibility;
+use App\Enums\ScheduleState;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\User;
@@ -25,7 +26,8 @@ class EventsController extends Controller
     public function calendar(Event $event): Response
     {
         if ((! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true))
-            || $event->visibility !== EventVisibility::Public) {
+            || $event->visibility !== EventVisibility::Public
+            || $event->schedule_state === ScheduleState::Postponed) {
             abort(404);
         }
 

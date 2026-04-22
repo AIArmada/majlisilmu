@@ -43,6 +43,7 @@ class EventSearchService
             'venue.address.state',
             'venue.address.district',
             'venue.address.subdistrict',
+            'latestPublishedChangeAnnouncement',
         ];
     }
 

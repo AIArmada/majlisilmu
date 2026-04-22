@@ -127,6 +127,10 @@
 
     // Schedule state
     $scheduleState = $event->schedule_state;
+    $latestChangeNotice = $this->activeChangeNotice;
+    $replacementEvent = $this->replacementEvent;
+    $isPostponedWithoutConfirmedTime = $this->isPostponedWithoutConfirmedTime;
+    $eventActionsDisabled = $this->eventActionsDisabled;
 
     // Full address parts for venue/institution
     $fullAddressParts = array_filter([
@@ -559,7 +563,7 @@
         <div
             class="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/40 bg-white/80 p-4 shadow-2xl shadow-slate-200/50 backdrop-blur-xl sm:p-6">
             <div class="flex flex-wrap items-center gap-3">
-                @if(!$isCancelledStatus)
+                @if(!$eventActionsDisabled)
                     @if(!$event->starts_at || !$event->starts_at->isPast())
                         <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
                             data-signal-event="engagement.event_going_clicked"
@@ -631,16 +635,38 @@
                         {{ $isSaved ? __('Disimpan') : __('Simpan') }}
                     </button>
                 @else
-                    <span class="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                    <span class="inline-flex items-center gap-2 rounded-2xl border {{ $isPostponedWithoutConfirmedTime ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-rose-200 bg-rose-50 text-rose-700' }} px-4 py-3 text-sm font-bold">
                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                                d="{{ $isPostponedWithoutConfirmedTime ? 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z' : 'M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636' }}" />
                         </svg>
-                        {{ __('Majlis Dibatalkan') }}
+                        {{ $isPostponedWithoutConfirmedTime ? __('Tarikh Belum Disahkan') : __('Majlis Dibatalkan') }}
                     </span>
                 @endif
 
-                @if(!$isCancelledStatus)
+                @if($eventActionsDisabled && !$isCancelledStatus)
+                    <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
+                        data-signal-event="engagement.event_save_clicked"
+                        data-signal-category="engagement"
+                        data-signal-component="event_detail_actions"
+                        data-signal-control="save"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['currently_saved' => $isSaved])'
+                        class="inline-flex items-center gap-2 rounded-2xl border-2 px-5 py-3 text-sm font-bold transition-all
+                        {{ $isSaved
+        ? 'border-blue-200 bg-blue-50 text-blue-600'
+        : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600' }}">
+                        <svg class="size-5 {{ $isSaved ? 'fill-blue-500' : '' }}" viewBox="0 0 24 24"
+                            fill="{{ $isSaved ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                        {{ $isSaved ? __('Disimpan') : __('Simpan') }}
+                    </button>
+                @endif
+
+                @if(!$eventActionsDisabled)
                     <div class="relative" x-data="{ open: false }">
                         <button type="button" @click="open = !open"
                             data-signal-event="engagement.calendar_opened"
@@ -748,12 +774,12 @@
                         </div>
                     </div>
                 @else
-                    <span class="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                    <span class="inline-flex items-center gap-2 rounded-2xl border {{ $isPostponedWithoutConfirmedTime ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-rose-200 bg-rose-50 text-rose-700' }} px-4 py-3 text-sm font-bold">
                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                                d="{{ $isPostponedWithoutConfirmedTime ? 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' : 'M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636' }}" />
                         </svg>
-                        {{ __('Kalendar tidak tersedia untuk majlis dibatalkan.') }}
+                        {{ $isPostponedWithoutConfirmedTime ? __('Kalendar ditutup sehingga tarikh disahkan.') : __('Kalendar tidak tersedia untuk majlis dibatalkan.') }}
                     </span>
                 @endif
             </div>
@@ -796,6 +822,47 @@
         @php
             $hasModerationStatusBanner = $event->status instanceof \App\States\EventStatus\Pending || $isCancelledStatus;
         @endphp
+
+        @if($latestChangeNotice)
+            <div class="relative z-30 -mt-4 mb-4">
+                <div class="rounded-2xl border {{ $latestChangeNotice->severity === \App\Enums\EventChangeSeverity::Urgent ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50' }} p-4 shadow-sm">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="flex items-start gap-3">
+                            <svg class="mt-0.5 size-5 shrink-0 {{ $latestChangeNotice->severity === \App\Enums\EventChangeSeverity::Urgent ? 'text-rose-500' : 'text-amber-500' }}" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM10.29 3.86 1.82 18a2.25 2.25 0 0 0 1.93 3.38h16.5A2.25 2.25 0 0 0 22.18 18L13.71 3.86a2.25 2.25 0 0 0-3.42 0z" />
+                            </svg>
+                            <div>
+                                <p class="text-sm font-black {{ $latestChangeNotice->severity === \App\Enums\EventChangeSeverity::Urgent ? 'text-rose-800' : 'text-amber-800' }}">
+                                    {{ $latestChangeNotice->type->publicBadgeLabel() }}
+                                </p>
+                                <p class="mt-1 text-sm leading-6 {{ $latestChangeNotice->severity === \App\Enums\EventChangeSeverity::Urgent ? 'text-rose-700' : 'text-amber-700' }}">
+                                    {{ $latestChangeNotice->public_message ?: __('Maklumat majlis ini telah dikemas kini. Sila semak butiran terkini sebelum hadir.') }}
+                                </p>
+                                @if($latestChangeNotice->published_at)
+                                    <p class="mt-2 text-xs font-semibold {{ $latestChangeNotice->severity === \App\Enums\EventChangeSeverity::Urgent ? 'text-rose-600' : 'text-amber-600' }}">
+                                        {{ __('Diumumkan') }}:
+                                        {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($latestChangeNotice->published_at, 'j M Y') }},
+                                        {{ \App\Support\Timezone\UserDateTimeFormatter::format($latestChangeNotice->published_at, 'h:i A') }}
+                                    </p>
+                                @endif
+                            </div>
+                        </div>
+
+                        @if($replacementEvent)
+                            <a href="{{ route('events.show', $replacementEvent) }}" wire:navigate
+                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700">
+                                {{ __('Lihat Majlis Pengganti') }}
+                                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
 
         @if($event->status instanceof \App\States\EventStatus\Pending)
             <div class="relative z-30 -mt-4 mb-4">
@@ -896,7 +963,17 @@
             </div>
         @endif
 
-        @if($scheduleState === \App\Enums\ScheduleState::Paused)
+        @if($isPostponedWithoutConfirmedTime)
+            <div class="mb-4">
+                <div class="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <svg class="size-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="text-sm font-bold text-amber-700">{{ __('Tarikh baharu belum disahkan. Pendaftaran, check-in dan kalendar ditutup buat masa ini.') }}</p>
+                </div>
+            </div>
+        @elseif($scheduleState === \App\Enums\ScheduleState::Paused)
             <div class="mb-4">
                 <div class="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                     <svg class="size-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -926,6 +1003,50 @@
 
         {{-- ====== LEFT COLUMN (Main Content) ====== --}}
         <div class="space-y-8 lg:col-span-2">
+
+            @if($event->publishedChangeAnnouncements->isNotEmpty())
+                <section class="scroll-reveal reveal-up revealed" x-intersect.once="$el.classList.add('revealed')">
+                    <div class="mb-5 flex items-center gap-3">
+                        <div class="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 6v6h4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                        </div>
+                        <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Sejarah Perubahan') }}</h2>
+                    </div>
+
+                    <div class="space-y-3">
+                        @foreach($event->publishedChangeAnnouncements as $changeAnnouncement)
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <p class="text-sm font-black text-slate-900">{{ $changeAnnouncement->type->publicBadgeLabel() }}</p>
+                                        <p class="mt-1 text-sm leading-6 text-slate-600">
+                                            {{ $changeAnnouncement->public_message ?: __('Maklumat majlis ini telah dikemas kini.') }}
+                                        </p>
+                                        @if($changeAnnouncement->replacementEvent)
+                                            <a href="{{ route('events.show', $changeAnnouncement->replacementEvent) }}" wire:navigate
+                                                class="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700 hover:text-emerald-800">
+                                                {{ __('Lihat majlis pengganti') }}
+                                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                                </svg>
+                                            </a>
+                                        @endif
+                                    </div>
+                                    @if($changeAnnouncement->published_at)
+                                        <time class="shrink-0 text-xs font-semibold text-slate-500" datetime="{{ $changeAnnouncement->published_at->toIso8601String() }}">
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($changeAnnouncement->published_at, 'j M Y') }},
+                                            {{ \App\Support\Timezone\UserDateTimeFormatter::format($changeAnnouncement->published_at, 'h:i A') }}
+                                        </time>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
 
             {{-- SPEAKERS — shown first: people come for the speaker --}}
             @if($event->speakers->isNotEmpty())
@@ -1949,7 +2070,12 @@
                         $atCapacity = $registrationMode === \App\Enums\RegistrationMode::Event && $event->settings?->capacity && $event->registrations_count >= $event->settings->capacity;
                     @endphp
 
-                    @if($regClosed)
+                    @if($eventActionsDisabled)
+                        <button disabled
+                            class="flex w-full items-center justify-center rounded-2xl bg-slate-200 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed">
+                            {{ $isPostponedWithoutConfirmedTime ? __('Pendaftaran ditutup sehingga tarikh disahkan') : __('Registration Closed') }}
+                        </button>
+                    @elseif($regClosed)
                         <button disabled
                             class="flex w-full items-center justify-center rounded-2xl bg-slate-200 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed">
                             {{ __('Registration Closed') }}
@@ -2353,7 +2479,7 @@ SHARE MODAL
 {{-- ==============================
 REGISTRATION MODAL
 ============================== --}}
-@if($event->settings?->registration_required)
+@if($event->settings?->registration_required && !$eventActionsDisabled)
     <div x-show="registerOpen" x-cloak x-transition.opacity
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
         <div @click.away="registerOpen = false" x-show="registerOpen" x-transition:enter="transition ease-out duration-300"
@@ -2433,7 +2559,7 @@ MOBILE BOTTOM ACTION BAR
         style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));">
             <div class="flex items-center gap-2">
             @auth
-                @if(!$isCancelledStatus)
+                @if(!$eventActionsDisabled)
                     <button type="button" wire:click="toggleGoing" wire:loading.attr="disabled"
                         data-signal-event="engagement.event_going_clicked"
                         data-signal-category="engagement"
@@ -2496,13 +2622,32 @@ MOBILE BOTTOM ACTION BAR
                         </svg>
                     </button>
                 @else
-                    <div class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                    <div class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border {{ $isPostponedWithoutConfirmedTime ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-rose-200 bg-rose-50 text-rose-700' }} px-4 py-3 text-sm font-bold">
                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636" />
+                                d="{{ $isPostponedWithoutConfirmedTime ? 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z' : 'M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636' }}" />
                         </svg>
-                        {{ __('Majlis Dibatalkan') }}
+                        {{ $isPostponedWithoutConfirmedTime ? __('Tarikh Belum Disahkan') : __('Majlis Dibatalkan') }}
                     </div>
+                @endif
+
+                @if($eventActionsDisabled && !$isCancelledStatus)
+                    <button type="button" wire:click="toggleSave" wire:loading.attr="disabled"
+                        data-signal-event="engagement.event_save_clicked"
+                        data-signal-category="engagement"
+                        data-signal-component="event_detail_mobile_actions"
+                        data-signal-control="save"
+                        data-signal-entity-type="event"
+                        data-signal-entity-id="{{ $event->id }}"
+                        data-signal-props='@json(['currently_saved' => $isSaved])'
+                        class="rounded-xl border-2 p-3 transition-all
+                                                                                                                                                            {{ $isSaved ? 'border-blue-200 bg-blue-50 text-blue-500 shadow-inner' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-500' }}">
+                        <svg class="size-5 {{ $isSaved ? 'fill-current' : '' }}" viewBox="0 0 24 24"
+                            fill="{{ $isSaved ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                    </button>
                 @endif
             @else
                 <a href="{{ \App\Support\Auth\IntendedRedirect::loginUrl(route('events.show', $event)) }}"
@@ -2515,7 +2660,7 @@ MOBILE BOTTOM ACTION BAR
                 </a>
             @endauth
 
-            @if(!$isCancelledStatus)
+            @if(!$eventActionsDisabled)
                 <div class="relative" x-data="{ calendarOpen: false }">
                     <button type="button" @click="calendarOpen = !calendarOpen"
                         data-signal-event="engagement.calendar_opened"
@@ -2586,8 +2731,8 @@ MOBILE BOTTOM ACTION BAR
                     </div>
                 </div>
             @else
-                <span class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
-                    {{ __('Kalendar ditutup') }}
+                <span class="rounded-xl border {{ $isPostponedWithoutConfirmedTime ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-rose-200 bg-rose-50 text-rose-700' }} px-3 py-2 text-xs font-bold">
+                    {{ $isPostponedWithoutConfirmedTime ? __('Tarikh belum disahkan') : __('Kalendar ditutup') }}
                 </span>
             @endif
 

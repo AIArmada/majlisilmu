@@ -3,6 +3,7 @@
 namespace App\Actions\Events;
 
 use App\Enums\DawahShareOutcomeType;
+use App\Enums\ScheduleState;
 use App\Models\Event;
 use App\Models\EventSettings;
 use App\Models\Registration;
@@ -104,6 +105,12 @@ final readonly class RegisterForEventAction
         if (! in_array((string) $event->status, ['approved', 'pending'], true)) {
             throw ValidationException::withMessages([
                 'registration' => 'This event is not available for registration.',
+            ]);
+        }
+
+        if ($event->schedule_state === ScheduleState::Postponed) {
+            throw ValidationException::withMessages([
+                'registration' => 'Registration is paused until the new event date is confirmed.',
             ]);
         }
 

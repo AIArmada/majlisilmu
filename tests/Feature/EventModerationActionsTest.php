@@ -2,6 +2,7 @@
 
 use App\Filament\Resources\Events\Pages\ViewEvent;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\Institution;
 use App\Models\ModerationReview;
 use App\Models\Speaker;
@@ -186,12 +187,13 @@ describe('Cancel Action (ViewEvent)', function () {
         expect((string) $event->status)->toBe('cancelled');
         expect($event->is_active)->toBeTrue();
 
-        $review = ModerationReview::where('event_id', $event->id)->latest()->first();
-        expect($review->decision)->toBe('cancelled');
+        $announcement = EventChangeAnnouncement::query()->where('event_id', $event->id)->latest()->first();
+        expect($announcement)->toBeInstanceOf(EventChangeAnnouncement::class);
+        expect($announcement->type->value)->toBe('cancelled');
 
         $this->assertDatabaseHas('notification_messages', [
             'user_id' => $submitter->id,
-            'trigger' => 'submission_cancelled',
+            'trigger' => 'event_cancelled',
         ]);
         $this->assertDatabaseHas('notification_messages', [
             'user_id' => $goingUser->id,

@@ -97,6 +97,36 @@ class EventsTable
                         default => (string) $state,
                     })
                     ->sortable(),
+                TextColumn::make('latestPublishedChangeAnnouncement.type')
+                    ->label('Latest Notice')
+                    ->badge()
+                    ->color(fn (mixed $state): string => match ($state instanceof BackedEnum ? $state->value : (string) $state) {
+                        'cancelled' => 'danger',
+                        'postponed',
+                        'rescheduled_earlier',
+                        'rescheduled_later',
+                        'schedule_changed' => 'warning',
+                        'location_changed',
+                        'replacement_linked' => 'info',
+                        default => filled($state) ? 'gray' : 'gray',
+                    })
+                    ->formatStateUsing(fn (mixed $state): string => match ($state instanceof BackedEnum ? $state->value : (string) $state) {
+                        'cancelled' => 'Cancelled',
+                        'postponed' => 'Postponed',
+                        'rescheduled_earlier' => 'Earlier',
+                        'rescheduled_later' => 'Later',
+                        'schedule_changed' => 'Schedule',
+                        'location_changed' => 'Location',
+                        'speaker_changed' => 'Speaker',
+                        'topic_changed' => 'Topic',
+                        'reference_changed' => 'Reference',
+                        'organizer_changed' => 'Organizer',
+                        'replacement_linked' => 'Replacement',
+                        'other' => 'Updated',
+                        default => 'None',
+                    })
+                    ->placeholder('None')
+                    ->toggleable(),
                 TextColumn::make('visibility')
                     ->badge()
                     ->formatStateUsing(fn (mixed $state): string => self::formatEnumValue($state, EventVisibility::class))
@@ -173,6 +203,13 @@ class EventsTable
                     ->relationship('institution', 'name'),
                 TernaryFilter::make('is_active')
                     ->label('Active'),
+                TernaryFilter::make('has_active_notice')
+                    ->label('Has Active Notice')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->whereHas('publishedChangeAnnouncements'),
+                        false: fn (Builder $query): Builder => $query->whereDoesntHave('publishedChangeAnnouncements'),
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
                 SelectFilter::make('event_type')
                     ->label('Event Type')
                     ->options(EventType::class)

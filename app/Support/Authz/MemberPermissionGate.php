@@ -78,6 +78,32 @@ final readonly class MemberPermissionGate
             ->values();
     }
 
+    /**
+     * @return Collection<int, User>
+     */
+    public function speakerMembersWithPermission(Speaker $speaker, string $permission): Collection
+    {
+        /** @var Collection<int, User> $members */
+        $members = $speaker->members()->get();
+
+        return $members
+            ->filter(fn (User $member): bool => $this->canSpeaker($member, $permission, $speaker))
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function eventMembersWithPermission(Event $event, string $permission): Collection
+    {
+        /** @var Collection<int, User> $members */
+        $members = $event->members()->get();
+
+        return $members
+            ->filter(fn (User $member): bool => $this->canEvent($member, $permission, $event))
+            ->values();
+    }
+
     public function institutionScope(): AuthzScope
     {
         return $this->memberRoleScopes->institution();

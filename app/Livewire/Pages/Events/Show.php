@@ -9,8 +9,10 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
+use App\Enums\ScheduleState;
 use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\EventCheckin;
 use App\Models\EventKeyPerson;
 use App\Models\EventSubmission;
@@ -93,6 +95,13 @@ class Show extends Component
             'series',
             'references.media',
             'languages',
+            'latestPublishedChangeAnnouncement.replacementEvent.media',
+            'latestPublishedChangeAnnouncement.replacementEvent.institution.media',
+            'latestPublishedChangeAnnouncement.replacementEvent.speakers.media',
+            'latestPublishedReplacementAnnouncement.replacementEvent.media',
+            'latestPublishedReplacementAnnouncement.replacementEvent.institution.media',
+            'latestPublishedReplacementAnnouncement.replacementEvent.speakers.media',
+            'publishedChangeAnnouncements.replacementEvent',
             'childEvents.media',
             'childEvents.institution.media',
             'childEvents.institution.address.state',
@@ -118,6 +127,10 @@ class Show extends Component
     #[Computed]
     public function calendarLinks(): array
     {
+        if ($this->eventActionsDisabled()) {
+            return [];
+        }
+
         return app(CalendarService::class)->getAllCalendarLinks($this->event);
     }
 
@@ -162,6 +175,70 @@ class Show extends Component
                 && $childEvent->visibility === EventVisibility::Public)
             ->sortBy('starts_at')
             ->values();
+    }
+
+    #[Computed]
+    public function activeChangeNotice(): ?EventChangeAnnouncement
+    {
+        $notice = $this->event->latestPublishedChangeAnnouncement;
+
+        return $notice instanceof EventChangeAnnouncement ? $notice : null;
+    }
+
+    /**
+     * Resolve replacement chains to the latest event users should inspect.
+     */
+    #[Computed]
+    public function replacementEvent(): ?Event
+    {
+        $notice = $this->event->latestPublishedReplacementAnnouncement;
+        $replacement = $notice?->replacementEvent;
+
+        if (! $replacement instanceof Event) {
+            return null;
+        }
+
+        /** @var array<string, true> $visited */
+        $visited = [(string) $this->event->getKey() => true];
+
+        while (! isset($visited[(string) $replacement->getKey()])) {
+            $visited[(string) $replacement->getKey()] = true;
+            $replacement->loadMissing([
+                'media',
+                'institution.media',
+                'speakers.media',
+                'latestPublishedReplacementAnnouncement.replacementEvent.media',
+                'latestPublishedReplacementAnnouncement.replacementEvent.institution.media',
+                'latestPublishedReplacementAnnouncement.replacementEvent.speakers.media',
+            ]);
+
+            $nextNotice = $replacement->latestPublishedReplacementAnnouncement;
+            $nextReplacement = $nextNotice?->replacementEvent;
+
+            if (! $nextNotice instanceof EventChangeAnnouncement || ! $nextReplacement instanceof Event) {
+                break;
+            }
+
+            if (isset($visited[(string) $nextReplacement->getKey()])) {
+                break;
+            }
+
+            $replacement = $nextReplacement;
+        }
+
+        return $replacement;
+    }
+
+    #[Computed]
+    public function isPostponedWithoutConfirmedTime(): bool
+    {
+        return $this->event->schedule_state === ScheduleState::Postponed;
+    }
+
+    #[Computed]
+    public function eventActionsDisabled(): bool
+    {
+        return $this->isCancelledStatus($this->event) || $this->isPostponedWithoutConfirmedTime();
     }
 
     public function registrationMode(): RegistrationMode
@@ -323,7 +400,7 @@ class Show extends Component
 
     public function toggleGoing(): void
     {
-        $this->toggleEngagement('goingEvents', 'isGoing', 'going_count', 'goingCount');
+        $this->toggleEngagement('goingEvents', 'isGoing', 'going_count', 'goingCount', requiresActiveEvent: true);
     }
 
     public function checkIn(): void
@@ -332,6 +409,15 @@ class Show extends Component
 
         if (! $user instanceof User) {
             $this->redirect(IntendedRedirect::loginUrl(route('events.show', $this->event)), navigate: true);
+
+            return;
+        }
+
+        if ($this->eventActionsDisabled()) {
+            FilamentNotification::make()
+                ->title(__('Tindakan ini ditutup kerana jadual majlis belum tersedia.'))
+                ->warning()
+                ->send();
 
             return;
         }
@@ -400,7 +486,7 @@ class Show extends Component
         ];
     }
 
-    protected function toggleEngagement(string $relation, string $stateProperty, string $countColumn, ?string $countProperty = null): void
+    protected function toggleEngagement(string $relation, string $stateProperty, string $countColumn, ?string $countProperty = null, bool $requiresActiveEvent = false): void
     {
         $user = auth()->user();
 
@@ -412,6 +498,15 @@ class Show extends Component
 
         if (! $this->isEngagementStatus($this->event) || $this->event->visibility !== EventVisibility::Public) {
             abort(403);
+        }
+
+        if ($requiresActiveEvent && $this->eventActionsDisabled()) {
+            FilamentNotification::make()
+                ->title(__('Tindakan ini ditutup kerana jadual majlis belum tersedia.'))
+                ->warning()
+                ->send();
+
+            return;
         }
 
         if ($this->{$stateProperty}) {
@@ -543,6 +638,17 @@ class Show extends Component
         }
 
         return in_array((string) $status, ['approved', 'cancelled'], true);
+    }
+
+    protected function isCancelledStatus(Event $event): bool
+    {
+        $status = $event->status;
+
+        if ($status instanceof EventStatus) {
+            return $status->equals(Cancelled::class);
+        }
+
+        return (string) $status === 'cancelled';
     }
 
     /**

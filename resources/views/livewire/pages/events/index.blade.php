@@ -1086,6 +1086,7 @@
                             $eventHasPoster = $posterMedia !== null;
                             $posterUrl = $eventHasPoster ? (string) $posterMedia->getAvailableUrl(['card', 'preview', 'thumb']) : '';
                             $eventCardImageUrl = $posterUrl !== '' ? $posterUrl : $event->card_image_url;
+                            $eventChangeBadgeLabel = $event->public_change_badge_label;
                             $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
                             $eventPosterAspectClass = match ($eventPosterAspectRatio) {
                                 '4:5' => 'aspect-[4/5]',
@@ -1125,7 +1126,7 @@
                                         class="w-full h-full transition-transform duration-700 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
                                 </div>
 
-                                @if($event->status instanceof \App\States\EventStatus\Pending || $event->status instanceof \App\States\EventStatus\Cancelled)
+                                @if($event->status instanceof \App\States\EventStatus\Pending || $eventChangeBadgeLabel)
                                     <div class="absolute top-5 left-5 z-20">
                                         @if($event->status instanceof \App\States\EventStatus\Pending)
                                             <span class="inline-flex items-center gap-1 rounded-full bg-amber-500/92 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-md">
@@ -1133,9 +1134,9 @@
                                                 {{ __('Menunggu Kelulusan') }}
                                             </span>
                                         @else
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-600/92 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-md">
+                                            <span class="inline-flex items-center gap-1 rounded-full {{ $event->schedule_state === \App\Enums\ScheduleState::Postponed ? 'bg-amber-600/92' : ($event->status instanceof \App\States\EventStatus\Cancelled ? 'bg-rose-600/92' : 'bg-sky-600/92') }} px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-md">
                                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636"/></svg>
-                                                {{ __('Dibatalkan') }}
+                                                {{ $eventChangeBadgeLabel }}
                                             </span>
                                         @endif
                                     </div>

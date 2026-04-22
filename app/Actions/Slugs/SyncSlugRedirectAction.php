@@ -4,6 +4,7 @@ namespace App\Actions\Slugs;
 
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
+use App\Models\Event;
 use App\Models\SlugRedirect;
 use App\Services\Signals\SignalsTracker;
 use App\Support\Slugs\PublicSlugPathResolver;
@@ -57,7 +58,7 @@ final readonly class SyncSlugRedirectAction
 
         $firstVisitedAt = $this->firstVisitedAt($sourcePath);
 
-        if (! $firstVisitedAt instanceof CarbonImmutable) {
+        if (! ($model instanceof Event) && ! ($firstVisitedAt instanceof CarbonImmutable)) {
             return $didChange;
         }
 

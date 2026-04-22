@@ -2,6 +2,7 @@
 
 namespace App\Filament\Ahli\Resources\Events;
 
+use App\Enums\EventKeyPersonRole;
 use App\Filament\Ahli\Resources\Events\Pages\EditEvent;
 use App\Filament\Ahli\Resources\Events\Pages\ListEvents;
 use App\Filament\Ahli\Resources\Events\Pages\ViewEvent;
@@ -14,6 +15,7 @@ use App\Filament\Resources\Events\RelationManagers\MemberInvitationsRelationMana
 use App\Filament\Resources\Events\RelationManagers\ModerationReviewsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\RegistrationsRelationManager;
 use App\Models\Event;
+use App\Models\EventKeyPerson;
 use App\Models\EventSubmission;
 use App\Models\Institution;
 use App\Models\Speaker;
@@ -80,6 +82,13 @@ class EventResource extends AdminEventResource
                 ->orWhereIn(
                     'events.id',
                     $user->memberEvents()->select('events.id')
+                )
+                ->orWhereIn(
+                    'events.id',
+                    EventKeyPerson::query()
+                        ->whereIn('speaker_id', $user->speakers()->select('speakers.id'))
+                        ->where('role', EventKeyPersonRole::Speaker->value)
+                        ->select('event_id')
                 );
 
             // Events organized by institutions where user is a member.

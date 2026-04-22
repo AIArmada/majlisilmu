@@ -13,7 +13,6 @@ use App\Models\Address;
 use App\Models\Event;
 use App\Models\Speaker;
 use App\Observers\Concerns\SyncsCurrentAndPreviousValues;
-use App\Services\Notifications\EventNotificationService;
 use App\Services\PrayerTimeService;
 use App\Support\Cache\PublicDirectoryCacheVersion;
 use App\Support\Cache\PublicListingsCache;
@@ -106,17 +105,15 @@ class EventObserver
             );
         }
 
-        $changedFields = collect(array_keys($event->getChanges()))
-            ->reject(static fn (string $field): bool => in_array($field, ['updated_at', 'saves_count', 'going_count', 'registrations_count', 'published_at'], true))
-            ->values()
-            ->all();
+        if ($event->searchIndexShouldBeUpdated()) {
+            if ($event->shouldBeSearchable()) {
+                $event->searchable();
 
-        if ($changedFields === []) {
-            return;
+                return;
+            }
+
+            $event->unsearchable();
         }
-
-        app(EventNotificationService::class)
-            ->notifyMaterialEventChange($event->fresh(), $changedFields);
     }
 
     public function deleted(Event $event): void

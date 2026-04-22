@@ -724,7 +724,7 @@ it('applies direct institution gallery edits for owner maintainers from the sugg
         ->and(ContributionRequest::query()->count())->toBe(0);
 });
 
-it('re-moderates approved events when maintainers apply sensitive direct edits from the suggest update page', function () {
+it('keeps approved events approved when maintainers apply sensitive ordinary edits from the suggest update page', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create([
         'status' => 'verified',
@@ -751,7 +751,7 @@ it('re-moderates approved events when maintainers apply sensitive direct edits f
         ->call('submit')
         ->assertHasNoErrors();
 
-    expect((string) $event->fresh()->status)->toBe('pending')
+    expect((string) $event->fresh()->status)->toBe('approved')
         ->and(ContributionRequest::query()->count())->toBe(0);
 });
 

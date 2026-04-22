@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EventAgeGroup;
+use App\Enums\EventChangeType;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventKeyPersonRole;
@@ -62,6 +63,7 @@ use Spatie\Tags\HasTags;
  * @property Carbon|null $starts_at
  * @property Carbon|null $ends_at
  * @property EventStatus|string $status
+ * @property ScheduleState|string|null $schedule_state
  * @property EventVisibility|string|null $visibility
  * @property EventFormat|string|null $event_format
  * @property EventStructure|string $event_structure
@@ -73,6 +75,8 @@ use Spatie\Tags\HasTags;
  * @property-read Address|null $addressModel
  * @property-read Institution|null $institution
  * @property-read Venue|null $venue
+ * @property-read EventChangeAnnouncement|null $latestPublishedChangeAnnouncement
+ * @property-read EventChangeAnnouncement|null $latestPublishedReplacementAnnouncement
  * @property-read string|null $reference_study_subtitle
  * @property-read \Illuminate\Database\Eloquent\Collection<int, EventKeyPerson> $keyPeople
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Speaker> $speakers
@@ -130,6 +134,9 @@ class Event extends Model implements AuditableContract, HasMedia
             });
             $event->moderationReviews()->each(function (ModerationReview $review): void {
                 $review->delete();
+            });
+            $event->changeAnnouncements()->each(function (EventChangeAnnouncement $announcement): void {
+                $announcement->delete();
             });
             $event->mediaLinks()->each(function (MediaLink $mediaLink): void {
                 $mediaLink->delete();
@@ -321,6 +328,25 @@ class Event extends Model implements AuditableContract, HasMedia
             'registrations_count',
             'is_active',
         ]);
+    }
+
+    public function getPublicChangeBadgeLabelAttribute(): ?string
+    {
+        if ((string) $this->status === 'cancelled') {
+            return EventChangeType::Cancelled->publicBadgeLabel();
+        }
+
+        if ($this->schedule_state === ScheduleState::Postponed) {
+            return EventChangeType::Postponed->publicBadgeLabel();
+        }
+
+        $notice = $this->latestPublishedChangeAnnouncement;
+
+        if (! $notice instanceof EventChangeAnnouncement) {
+            return null;
+        }
+
+        return $notice->type->publicBadgeLabel();
     }
 
     /**
@@ -777,6 +803,65 @@ class Event extends Model implements AuditableContract, HasMedia
         return $this->hasOne(ModerationReview::class)
             ->orderByDesc('created_at')
             ->orderByDesc('id');
+    }
+
+    /**
+     * @return HasMany<EventChangeAnnouncement, $this>
+     */
+    public function changeAnnouncements(): HasMany
+    {
+        return $this->hasMany(EventChangeAnnouncement::class);
+    }
+
+    /**
+     * @return HasMany<EventChangeAnnouncement, $this>
+     */
+    public function publishedChangeAnnouncements(): HasMany
+    {
+        return $this->changeAnnouncements()
+            ->published()
+            ->orderByDesc('published_at')
+            ->orderByDesc('created_at');
+    }
+
+    /**
+     * @return HasOne<EventChangeAnnouncement, $this>
+     */
+    public function latestPublishedChangeAnnouncement(): HasOne
+    {
+        return $this->hasOne(EventChangeAnnouncement::class)
+            ->published()
+            ->latestOfMany('published_at');
+    }
+
+    /**
+     * @return HasOne<EventChangeAnnouncement, $this>
+     */
+    public function latestPublishedReplacementAnnouncement(): HasOne
+    {
+        return $this->hasOne(EventChangeAnnouncement::class)
+            ->published()
+            ->whereNotNull('replacement_event_id')
+            ->orderByDesc('published_at')
+            ->orderByDesc('created_at');
+    }
+
+    /**
+     * @return HasMany<EventChangeAnnouncement, $this>
+     */
+    public function incomingReplacementAnnouncements(): HasMany
+    {
+        return $this->hasMany(EventChangeAnnouncement::class, 'replacement_event_id');
+    }
+
+    /**
+     * @return HasOne<EventChangeAnnouncement, $this>
+     */
+    public function latestIncomingReplacementAnnouncement(): HasOne
+    {
+        return $this->hasOne(EventChangeAnnouncement::class, 'replacement_event_id')
+            ->published()
+            ->latestOfMany('published_at');
     }
 
     /**

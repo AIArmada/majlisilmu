@@ -15,6 +15,8 @@ enum NotificationTrigger: string
     case EventCancelled = 'event_cancelled';
     case EventScheduleChanged = 'event_schedule_changed';
     case EventVenueChanged = 'event_venue_changed';
+    case EventDetailsChanged = 'event_details_changed';
+    case EventReplacementLinked = 'event_replacement_linked';
     case Reminder24Hours = 'reminder_24_hours';
     case Reminder2Hours = 'reminder_2_hours';
     case CheckinOpen = 'checkin_open';

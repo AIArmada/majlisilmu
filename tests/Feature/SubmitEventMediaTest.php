@@ -63,7 +63,7 @@ function submitEventMediaFormData(array $fixtures, array $overrides = []): array
 
 function submitEventMediaUpload(string $targetName): UploadedFile
 {
-    return fakeGeneratedImageUpload($targetName, 1600, 900);
+    return UploadedFile::fake()->image($targetName, 1600, 900);
 }
 
 it('stores poster and gallery uploads when submitting an event', function () {

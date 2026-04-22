@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
+use App\Enums\EventChangeType;
+use App\Filament\Resources\Events\Concerns\PublishesEventChanges;
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
 use App\Models\Institution;
@@ -25,6 +27,8 @@ use Filament\Support\Icons\Heroicon;
 
 class ViewEvent extends ViewRecord
 {
+    use PublishesEventChanges;
+
     protected static string $resource = EventResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -40,6 +44,7 @@ class ViewEvent extends ViewRecord
             $this->getReconsiderAction(),
             $this->getRemoderateAction(),
             $this->getRevertToDraftAction(),
+            $this->getPublishChangeAction(),
             Action::make('duplicate_event')
                 ->label('Duplicate Event')
                 ->url(fn (): string => $this->duplicateEventUrl()),
@@ -203,22 +208,21 @@ class ViewEvent extends ViewRecord
             ->icon(Heroicon::OutlinedXCircle)
             ->color('danger')
             ->modalHeading('Cancel Event')
-            ->modalDescription('This event will remain visible with a cancelled badge and notify users who saved or plan to attend.')
+            ->modalDescription('This event will remain visible with a cancelled notice and notify committed users.')
             ->schema([
                 Textarea::make('note')
-                    ->label('Cancellation note (optional)')
+                    ->label('Public cancellation message')
                     ->rows(3)
-                    ->maxLength(2000),
+                    ->maxLength(2000)
+                    ->required(),
             ])
-            ->action(function (array $data, ModerationService $service): void {
-                $service->cancel($this->eventRecord(), auth()->user(), $data['note'] ?? null);
-
-                Notification::make()
-                    ->title('Event cancelled')
-                    ->danger()
-                    ->send();
-
-                $this->refreshFormData(['status']);
+            ->action(function (array $data): void {
+                $this->publishChangeAnnouncement([
+                    'type' => EventChangeType::Cancelled->value,
+                    'public_message' => $data['note'] ?? null,
+                    'internal_note' => $data['note'] ?? null,
+                    'notify' => true,
+                ]);
             })
             ->visible(fn (): bool => $this->canModerate() && (
                 $this->eventRecord()->status instanceof Pending
