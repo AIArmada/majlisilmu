@@ -254,6 +254,31 @@ it('documents share payload and tracking endpoints for client integrations', fun
         ->and(data_get($paths, '/share/analytics/links/{link}.get.responses.200.content.application/json.schema'))->not->toBeNull();
 });
 
+it('documents the native mobile telemetry contract and endpoint for real app clients', function () {
+    $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
+        'Host' => 'api.majlisilmu.test',
+    ])->assertOk();
+
+    $paths = $response->json('paths');
+    $schemas = $response->json('components.schemas');
+    $tags = collect($response->json('tags'))->keyBy('name');
+
+    expect($paths['/forms/mobile-telemetry']['get']['summary'] ?? null)->toBe('Get mobile-telemetry field contract')
+        ->and($paths['/forms/mobile-telemetry']['get']['description'] ?? null)->toContain('not for mobile web browsing')
+        ->and($paths['/mobile/telemetry/events']['post']['summary'] ?? null)->toBe('Record native mobile telemetry')
+        ->and($paths['/mobile/telemetry/events']['post']['description'] ?? null)->toContain('X-Majlis-Client-Origin')
+        ->and($paths['/mobile/telemetry/events']['post']['description'] ?? null)->toContain('not for mobile web browsing')
+        ->and($paths['/mobile/telemetry/events']['post']['tags'] ?? null)->toContain('Telemetry')
+        ->and(data_get($paths, '/mobile/telemetry/events.post.requestBody.content.application/json.schema'))->not->toBeNull()
+        ->and(data_get($paths, '/mobile/telemetry/events.post.responses.202.content.application/json.schema.$ref'))->toBe('#/components/schemas/MobileTelemetryAcceptedResponse')
+        ->and(data_get($paths, '/forms/mobile-telemetry.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/MobileTelemetryFormResponse')
+        ->and(data_get($paths, '/mobile/telemetry/events.post.requestBody.content.application/json.example.events.0.event_name'))->toBe('screen.viewed')
+        ->and(data_get($schemas, 'MobileTelemetryFormResponse.properties.data.properties.required_headers.type'))->toBe('array')
+        ->and(data_get($schemas, 'MobileTelemetryFormResponse.properties.data.properties.event_fields.type'))->toBe('array')
+        ->and(data_get($schemas, 'MobileTelemetryAcceptedResponse.properties.data.properties.recorded_events.type'))->toBe('integer')
+        ->and($tags->get('Telemetry')['description'] ?? null)->toContain('not for mobile web browsing');
+});
+
 it('documents sparse event list fields for public event index clients', function () {
     $response = $this->getJson('https://api.majlisilmu.test/docs.json', [
         'Host' => 'api.majlisilmu.test',
@@ -531,11 +556,14 @@ it('adds workflow summaries to public contract and mutation endpoints', function
     $paths = $response->json('paths');
 
     expect($paths['/manifest']['get']['summary'] ?? null)->toBe('Discover public client flows')
+        ->and($paths['/forms/mobile-telemetry']['get']['summary'] ?? null)->toBe('Get mobile-telemetry field contract')
         ->and($paths['/forms/submit-event']['get']['summary'] ?? null)->toBe('Get submit-event field contract')
         ->and($paths['/submit-event']['post']['summary'] ?? null)->toBe('Submit a public event')
         ->and($paths['/submit-event']['post']['description'] ?? null)->toContain('This route is create-only')
         ->and($paths['/submit-event']['post']['description'] ?? null)->toContain('submission_country_id')
         ->and($paths['/submit-event']['post']['description'] ?? null)->not->toContain('submission_country_code')
+        ->and($paths['/mobile/telemetry/events']['post']['summary'] ?? null)->toBe('Record native mobile telemetry')
+        ->and($paths['/mobile/telemetry/events']['post']['description'] ?? null)->toContain('anonymous_id or session_identifier')
         ->and($paths['/forms/contributions/institutions']['get']['description'] ?? null)->toContain('canonical Google Maps URL')
         ->and($paths['/contributions/institutions']['post']['summary'] ?? null)->toBe('Create an institution contribution')
         ->and($paths['/contributions/institutions']['post']['description'] ?? null)->toContain('address.country_id')
@@ -693,6 +721,8 @@ it('publishes explicit schemas for search manifest and public form contracts', f
         'PublicManifestResponse',
         'PublicFormFieldContract',
         'PublicConditionalRule',
+        'MobileTelemetryAcceptedResponse',
+        'MobileTelemetryFormResponse',
         'SubmitEventFormResponse',
         'InstitutionContributionFormResponse',
         'SpeakerContributionFormResponse',
@@ -706,6 +736,7 @@ it('publishes explicit schemas for search manifest and public form contracts', f
     ])
         ->and(data_get($paths, '/search.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/SearchIndexResponse')
         ->and(data_get($paths, '/manifest.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/PublicManifestResponse')
+        ->and(data_get($paths, '/forms/mobile-telemetry.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/MobileTelemetryFormResponse')
         ->and(data_get($paths, '/forms/submit-event.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/SubmitEventFormResponse')
         ->and(data_get($paths, '/forms/contributions/institutions.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/InstitutionContributionFormResponse')
         ->and(data_get($paths, '/forms/contributions/speakers.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/SpeakerContributionFormResponse')
@@ -774,6 +805,8 @@ it('publishes high-value request body examples for agentic write endpoints', fun
         ->and(data_get($paths, '/saved-searches/{savedSearch}.put.requestBody.content.application/json.example.notify'))->toBe('instant')
         ->and(data_get($paths, '/reports.post.requestBody.content.multipart/form-data.example.category'))->toBe('wrong_info')
         ->and(data_get($paths, '/reports.post.requestBody.content.multipart/form-data.example.evidence.0'))->toBe('poster-screenshot.jpg')
+        ->and(data_get($paths, '/mobile/telemetry/events.post.requestBody.content.application/json.example.anonymous_id'))->toBe('ios-installation-123')
+        ->and(data_get($paths, '/mobile/telemetry/events.post.requestBody.content.application/json.example.events.1.component'))->toBe('register_button')
         ->and(data_get($paths, '/github-issues.post.requestBody.content.application/json.example.category'))->toBe('docs_mismatch')
         ->and(data_get($paths, '/github-issues.post.requestBody.content.application/json.example.client_version'))->toBe('GPT-5.4');
 });

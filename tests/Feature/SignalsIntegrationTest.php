@@ -35,9 +35,51 @@ it('injects the signals tracker script into public layouts when a tracked proper
     expect($trackerConfig)->not->toBeNull();
     expect(data_get($trackerConfig, 'write_key'))->toBe((string) $trackedProperty?->write_key);
     expect(data_get($trackerConfig, 'script_url'))->toContain('/api/signals/tracker.js');
+    expect(data_get($trackerConfig, 'event_endpoint'))->toContain('/api/signals/collect/event');
     expect(data_get($trackerConfig, 'identify_endpoint'))->toContain('/api/signals/collect/identify');
     expect(data_get($trackerConfig, 'anonymous_cookie_name'))->toBe('mi_signals_anonymous_id');
     expect(data_get($trackerConfig, 'session_cookie_name'))->toBe('mi_signals_session_id');
+});
+
+it('renders the centralized custom UI event tracker and discovery funnel hooks', function () {
+    $this->get(route('home'))
+        ->assertSuccessful()
+        ->assertSee('window.majlisIlmu.trackSignal', false)
+        ->assertSee('/api/signals/collect/event', false)
+        ->assertSee("client_origin: 'web'", false)
+        ->assertSee("client_transport: 'web'", false)
+        ->assertSee('data-signal-submit-event="search.submitted"', false)
+        ->assertSee('data-signal-event="search.nearby_requested"', false)
+        ->assertSee('data-signal-event="navigation.quick_filter_clicked"', false)
+        ->assertSee('data-signal-event="submission.event_start_clicked"', false);
+
+    $this->get(route('events.index'))
+        ->assertSuccessful()
+        ->assertSee('data-signal-change-event="filter.changed"', false)
+        ->assertSee('data-signal-event="filter.panel_toggled"', false)
+        ->assertSee('data-signal-event="filter.sort_changed"', false)
+        ->assertSee('data-signal-event="search.nearby_requested"', false);
+});
+
+it('renders event detail conversion tracking hooks', function () {
+    $event = Event::factory()->create([
+        'event_format' => 'online',
+        'institution_id' => null,
+        'live_url' => 'https://example.test/live',
+        'starts_at' => now()->addWeek(),
+        'status' => 'approved',
+        'visibility' => 'public',
+    ]);
+
+    $this->get(route('events.show', $event))
+        ->assertSuccessful()
+        ->assertSee('data-signal-event="engagement.event_going_clicked"', false)
+        ->assertSee('data-signal-event="engagement.event_save_clicked"', false)
+        ->assertSee('data-signal-event="engagement.event_check_in_clicked"', false)
+        ->assertSee('data-signal-event="engagement.calendar_opened"', false)
+        ->assertSee('data-signal-event="share.modal_opened"', false)
+        ->assertSee('data-signal-event="share.provider_clicked"', false)
+        ->assertSee('data-signal-event="navigation.external_link_clicked"', false);
 });
 
 it('accepts signals page view ingestion for the default tracked property', function () {

@@ -43,7 +43,7 @@ class FrontendFormContractService
     public function manifest(?User $user): array
     {
         return [
-            'version' => '2026-04-21',
+            'version' => '2026-04-22',
             'docs' => [
                 'ui' => $this->urlResolver->docsUrl(),
                 'openapi' => $this->urlResolver->docsJsonUrl(),
@@ -156,6 +156,16 @@ class FrontendFormContractService
                     'channels' => $this->shareTrackingService->supportedChannels(),
                     'copy_link_channel' => 'copy_link',
                     'native_share_channel' => 'native_share',
+                ],
+                'mobile_telemetry' => [
+                    'method' => 'POST',
+                    'endpoint' => route('api.client.mobile-telemetry.store'),
+                    'schema_endpoint' => route('api.client.forms.mobile-telemetry'),
+                    'auth_required' => false,
+                    'bearer_auth_optional' => true,
+                    'native_only' => true,
+                    'intended_clients' => ['ios', 'ipados', 'android'],
+                    'required_headers' => ['X-Majlis-Client-Origin'],
                 ],
                 'share_analytics' => [
                     'method' => 'GET',
@@ -492,6 +502,81 @@ class FrontendFormContractService
             ],
             'conditional_rules' => [
                 ['field' => 'job_title', 'required_when' => ['is_freelance' => [true]]],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mobileTelemetry(): array
+    {
+        return [
+            'flow' => 'mobile_telemetry',
+            'method' => 'POST',
+            'endpoint' => route('api.client.mobile-telemetry.store'),
+            'auth_required' => false,
+            'bearer_auth_optional' => true,
+            'native_only' => true,
+            'intended_clients' => ['ios', 'ipados', 'android'],
+            'required_headers' => [
+                [
+                    'name' => 'X-Majlis-Client-Origin',
+                    'required' => true,
+                    'allowed_values' => ['iosapp', 'ipadosapp', 'androidapp'],
+                    'description' => 'Required native client hint. Mobile web browsing should keep using the browser tracker instead of this endpoint.',
+                ],
+                [
+                    'name' => 'X-Majlis-Client-Name',
+                    'required' => false,
+                ],
+                [
+                    'name' => 'X-Majlis-Client-Version',
+                    'required' => false,
+                ],
+                [
+                    'name' => 'X-Majlis-Client-Build',
+                    'required' => false,
+                ],
+            ],
+            'defaults' => [
+                'anonymous_id' => null,
+                'session_identifier' => null,
+                'session_started_at' => null,
+                'events' => [],
+            ],
+            'fields' => [
+                $this->field('anonymous_id', 'string', required: false, maxLength: 120),
+                $this->field('session_identifier', 'string', required: false, maxLength: 120),
+                $this->field('session_started_at', 'datetime', required: false),
+                $this->field('events', 'array<object>', required: true),
+            ],
+            'event_fields' => [
+                $this->field('event_name', 'string', required: true, maxLength: 120),
+                $this->field('event_category', 'string', required: false, maxLength: 80),
+                $this->field('occurred_at', 'datetime', required: false),
+                $this->field('path', 'string', required: false, maxLength: 2048),
+                $this->field('url', 'string', required: false, maxLength: 2048),
+                $this->field('referrer', 'string', required: false, maxLength: 2048),
+                $this->field('screen_name', 'string', required: false, maxLength: 120),
+                $this->field('previous_screen_name', 'string', required: false, maxLength: 120),
+                $this->field('component', 'string', required: false, maxLength: 120),
+                $this->field('action', 'string', required: false, maxLength: 120),
+                $this->field('utm_source', 'string', required: false, maxLength: 120),
+                $this->field('utm_medium', 'string', required: false, maxLength: 120),
+                $this->field('utm_campaign', 'string', required: false, maxLength: 120),
+                $this->field('utm_content', 'string', required: false, maxLength: 120),
+                $this->field('utm_term', 'string', required: false, maxLength: 120),
+                $this->field('properties', 'object', required: false),
+            ],
+            'conditional_rules' => [
+                ['field' => 'anonymous_id', 'required_when_missing' => ['session_identifier'], 'unless_authenticated' => true],
+                ['field' => 'session_identifier', 'required_when_missing' => ['anonymous_id'], 'unless_authenticated' => true],
+            ],
+            'notes' => [
+                'This endpoint is reserved for real native app sessions on iOS, iPadOS, and Android.',
+                'Do not use this endpoint for mobile web page views; browser sessions should keep using the web signals tracker.',
+                'Batch up to 50 events per request and send stable anonymous/session identifiers for guest sessions.',
             ],
         ];
     }

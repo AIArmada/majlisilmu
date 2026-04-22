@@ -48,6 +48,16 @@ class RateLimitServiceProvider extends ServiceProvider
         // Share tracking payloads can create guest-scoped affiliate records.
         RateLimiter::for('share-tracking', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
 
+        // Native mobile telemetry is batched and may be sent frequently by iOS/Android clients.
+        RateLimiter::for('mobile-telemetry', function (Request $request) {
+            $identifier = $request->user()?->id
+                ?: trim((string) $request->input('anonymous_id'))
+                ?: trim((string) $request->input('session_identifier'))
+                ?: $request->ip();
+
+            return Limit::perMinute(120)->by($identifier);
+        });
+
         // Admin/Moderation: Higher limits for moderators
         RateLimiter::for('moderation', function (Request $request) {
             $user = $request->user();

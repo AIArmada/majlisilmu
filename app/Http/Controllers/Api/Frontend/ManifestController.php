@@ -74,6 +74,17 @@ class ManifestController extends FrontendController
     }
 
     #[Endpoint(
+        title: 'Get mobile-telemetry field contract',
+        description: 'Returns the native mobile telemetry contract for real iOS, iPadOS, and Android app sessions. Use this before calling `POST /mobile/telemetry/events`. This route is not for mobile web browsing.',
+    )]
+    public function mobileTelemetry(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->contracts->mobileTelemetry(),
+        ]);
+    }
+
+    #[Endpoint(
         title: 'Get membership-claim field contract',
         description: 'Returns the field contract for claiming membership on a supported public subject type.',
     )]

@@ -330,7 +330,13 @@
     </div>
 
     <div class="container mx-auto px-6 lg:px-12 -mt-8 relative z-10">
-        <form wire:submit.prevent x-data="{
+        <form wire:submit.prevent
+            data-signal-change-event="filter.changed"
+            data-signal-category="filter"
+            data-signal-component="events_index_filters"
+            data-signal-control="filter_form"
+            data-signal-props='@json(['surface' => 'events_index'])'
+            x-data="{
                     ...window.majlisIlmu.geolocationPermission({
                         initiallyGranted: @js($showsGeolocationControls),
                         cookieName: @js(\App\Support\Location\PublicGeolocationPermission::COOKIE_NAME),
@@ -533,6 +539,8 @@
                         id="event-search"
                         wire:model.live.debounce.300ms="filterData.search"
                         wire:keydown.escape="clearSearch"
+                        data-signal-control="search"
+                        data-signal-include-value="true"
                         placeholder="{{ __('Cari mengikut tajuk...') }}"
                         class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 bg-white shadow-lg shadow-slate-200/60 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
                     >
@@ -543,6 +551,10 @@
                     </svg>
                     @if(filled($search))
                         <button type="button" wire:click="clearSearch"
+                            data-signal-event="search.cleared"
+                            data-signal-category="search"
+                            data-signal-component="events_index_filters"
+                            data-signal-control="clear_search"
                             class="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500 hover:underline">
                             {{ __('Clear') }}
                         </button>
@@ -557,6 +569,10 @@
                         <p class="text-sm text-slate-600">{{ __('Keep the filters you use often for quick access.') }}</p>
                     </div>
                     <a href="{{ route('saved-searches.index') }}" wire:navigate
+                        data-signal-event="navigation.saved_searches_clicked"
+                        data-signal-category="navigation"
+                        data-signal-component="events_index_filters"
+                        data-signal-control="saved_searches"
                         class="shrink-0 text-sm font-semibold text-sky-700 hover:text-sky-600 hover:underline">
                         {{ __('Saved Searches') }} →
                     </a>
@@ -567,6 +583,10 @@
                 <div class="flex items-center gap-2">
                     <button type="button" @click="locate" :disabled="locating"
                         data-testid="near-me-button"
+                        data-signal-event="search.nearby_requested"
+                        data-signal-category="search"
+                        data-signal-component="events_index_filters"
+                        data-signal-control="near_me"
                         class="h-11 px-4 rounded-xl border border-slate-200 bg-white font-semibold text-slate-600 hover:border-emerald-500 hover:text-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all flex items-center justify-center gap-2">
                         <svg class="w-4 h-4" :class="locating ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
@@ -584,6 +604,10 @@
 
                     @if($lat)
                         <button type="button" wire:click="clearLocation"
+                            data-signal-event="filter.location_cleared"
+                            data-signal-category="filter"
+                            data-signal-component="events_index_filters"
+                            data-signal-control="clear_location"
                             class="h-11 px-4 rounded-xl border border-rose-100 bg-rose-50 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition">
                             {{ __('Clear Location') }}
                         </button>
@@ -604,6 +628,8 @@
                                     max="1000"
                                     step="1"
                                     wire:model.live="filterData.radius_km"
+                                    data-signal-control="radius_km"
+                                    data-signal-include-value="true"
                                     class="h-8 w-20 rounded-lg border border-slate-200 px-2 text-sm font-medium text-slate-900 focus:border-emerald-500 focus:outline-none"
                                 >
                             </label>
@@ -615,15 +641,30 @@
                     <span class="text-sm font-medium text-slate-600">{{ __('Sort:') }}</span>
                     <div class="flex bg-slate-100 p-1 rounded-xl">
                         <button type="button" wire:click="setSort('time')"
+                            data-signal-event="filter.sort_changed"
+                            data-signal-category="filter"
+                            data-signal-component="events_index_filters"
+                            data-signal-control="sort_time"
+                            data-signal-props='@json(['sort' => 'time'])'
                             class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'time' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
                             {{ __('Latest') }}
                         </button>
                         <button type="button" wire:click="setSort('relevance')"
+                            data-signal-event="filter.sort_changed"
+                            data-signal-category="filter"
+                            data-signal-component="events_index_filters"
+                            data-signal-control="sort_relevance"
+                            data-signal-props='@json(['sort' => 'relevance'])'
                             class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'relevance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
                             {{ __('Relevance') }}
                         </button>
                         @if($lat)
                             <button type="button" wire:click="setSort('distance')"
+                                data-signal-event="filter.sort_changed"
+                                data-signal-category="filter"
+                                data-signal-component="events_index_filters"
+                                data-signal-control="sort_distance"
+                                data-signal-props='@json(['sort' => 'distance'])'
                                 class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'distance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
                                 {{ __('Distance') }}
                             </button>
@@ -637,6 +678,11 @@
 
             <div class="mi-filter-shell space-y-4">
                 <button type="button" wire:click="toggleAdvancedFiltersPanel"
+                    data-signal-event="filter.panel_toggled"
+                    data-signal-category="filter"
+                    data-signal-component="events_index_filters"
+                    data-signal-control="advanced_filters"
+                    data-signal-props='@json(['opened' => ! $showAdvancedFiltersPanel, 'active_filter_count' => $activeFilterCount])'
                     class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50/60 focus:outline-none focus:ring-4 focus:ring-emerald-500/10">
                     <div>
                         <p class="text-sm font-semibold text-slate-900">{{ __('Advanced Filters') }}</p>
@@ -911,20 +957,36 @@
 
                     <div class="ml-auto flex flex-wrap items-center gap-3">
                         <button type="button" @click="shareResults()"
+                            data-signal-event="share.results_native_clicked"
+                            data-signal-category="share"
+                            data-signal-component="events_index_filters"
+                            data-signal-control="share_results"
                             class="text-xs font-bold text-slate-600 hover:text-emerald-700 hover:underline">
                             {{ __('Share These Results') }}
                         </button>
                         <button type="button" @click="copyShareLink()"
+                            data-signal-event="share.results_copy_clicked"
+                            data-signal-category="share"
+                            data-signal-component="events_index_filters"
+                            data-signal-control="copy_share_link"
                             class="text-xs font-bold text-slate-600 hover:text-emerald-700 hover:underline">
                             {{ __('Copy Share Link') }}
                         </button>
                         <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
+                            data-signal-event="saved_search.create_intent"
+                            data-signal-category="retention"
+                            data-signal-component="events_index_filters"
+                            data-signal-control="save_search"
                             class="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
                             {{ __('Save This Search') }}
                         </a>
                     </div>
 
                     <button type="button" wire:click="clearAllFilters"
+                        data-signal-event="filter.cleared"
+                        data-signal-category="filter"
+                        data-signal-component="events_index_filters"
+                        data-signal-control="clear_all"
                         class="text-xs font-bold text-red-500 hover:text-red-600 hover:underline">
                         {{ __('Clear All Filters') }}
                     </button>
@@ -1008,6 +1070,10 @@
                         {{ __('Try adjusting your search terms or filters to find what you\'re looking for.') }}
                     </p>
                     <button type="button" @click="window.location.href='{{ route('events.index') }}'"
+                        data-signal-event="filter.cleared"
+                        data-signal-category="filter"
+                        data-signal-component="events_index_empty_state"
+                        data-signal-control="view_all_events"
                         class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
                         {{ __('View all events') }} &rarr;
                     </button>
@@ -1043,6 +1109,12 @@
                             class="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-xl hover:shadow-emerald-900/8 hover:-translate-y-1 transition-all duration-300 border border-slate-200">
                             <!-- Image/Date -->
                             <a href="{{ route('events.show', $event) }}" wire:navigate
+                                data-signal-event="navigation.result_clicked"
+                                data-signal-category="navigation"
+                                data-signal-component="events_index_results"
+                                data-signal-control="event_card_image"
+                                data-signal-entity-type="event"
+                                data-signal-entity-id="{{ $event->id }}"
                                 class="relative overflow-hidden bg-slate-100 block {{ $eventPosterAspectClass }}"
                                 data-poster-aspect="{{ $eventPosterAspectRatio }}">
                                 <div
@@ -1106,6 +1178,12 @@
                                 <div class="flex justify-between items-start mb-3 gap-4">
                                     <div>
                                         <a href="{{ route('events.show', $event) }}" wire:navigate
+                                            data-signal-event="navigation.result_clicked"
+                                            data-signal-category="navigation"
+                                            data-signal-component="events_index_results"
+                                            data-signal-control="event_card_title"
+                                            data-signal-entity-type="event"
+                                            data-signal-entity-id="{{ $event->id }}"
                                             class="group-hover:text-emerald-700 transition-colors" data-testid="event-card-title-link">
                                             <h3 class="font-heading text-xl font-bold text-slate-900 line-clamp-2 leading-tight">
                                                 {{ $event->title }}

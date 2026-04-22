@@ -24,25 +24,33 @@ Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
 - Ask yourself: "Would a staff engineer approve this?"
 - Run tests, check logs, demonstrate correctness
 
-### 5. Demand Elegant (Balanced)
+### 5. UI Tracking Review
+
+- Whenever a task changes UI behavior, navigation, forms, filters, tabs, table actions, buttons, or stateful interactions, explicitly evaluate whether product event tracking should be added or updated
+- Prefer curated high-signal tracking over blanket click logging; track user intent and meaningful workflow transitions, not every cosmetic interaction
+- For backend-confirmed outcomes, prefer server-side Signals events so the data represents what actually happened
+- For frontend-only intent, use the centralized Signals UI event helper instead of one-off JavaScript handlers
+- Purely cosmetic changes can skip tracking only when they do not alter user behavior, entry points, or interaction paths
+
+### 6. Demand Elegant (Balanced)
 - For non-trivial changes: pause and ask "Is there a more elegant way?"
 - If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
 - Skip this for simple, obvious fixes – don't over-engineer
 - Challenge your own work before presenting it
 
-### 6. Autonomous Bug Fixing
+### 7. Autonomous Bug Fixing
 - When given a bug report: just fix it. Don't ask for hand-holding
 - Point at logs, errors, failing tests – then resolve them
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
 
-### 7. Laravel Actions Where Appropriate
+### 8. Laravel Actions Where Appropriate
 - Prefer Laravel Actions for reusable workflow orchestration that spans validation-adjacent normalization, transactions, side effects, or multiple entrypoints
 - Do not force every mutation into an action; trivial single-call controller or Livewire handlers can stay inline
 - Before adding a new action, check whether the behavior is already covered by an existing action and extend that path instead of duplicating orchestration
 - Keep controllers and Livewire components focused on HTTP/UI concerns when a workflow is substantial enough to extract
 
-### 8. Spatie Laravel Data Adoption
+### 9. Spatie Laravel Data Adoption
 
 - Use `spatie/laravel-data` as a boundary-contract layer, not as a default application pattern.
 - Prefer Data objects for API response DTOs when controllers build large nested arrays, the same payload shape is reused across endpoints, or public/mobile contracts need stronger consistency.

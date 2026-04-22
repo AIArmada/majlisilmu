@@ -10755,3 +10755,82 @@
 - Verification:
   - `vendor/bin/pint --dirty --format agent` => **fixed**
   - `vendor/bin/pest --parallel --compact tests/Feature/PublicSubmissionLockActionsTest.php` => **11 passed (84 assertions)**
+
+---
+
+# Product Signals UI Tracking Foundation Todo
+
+- [x] Add the permanent guideline that UI-affecting changes require a product-signals review
+- [x] Expose the custom Signals event endpoint through the existing tracker config and Blade wrapper
+- [x] Add one centralized frontend helper for curated custom UI events
+- [x] Instrument the first high-value public funnel: homepage discovery, `/majlis` search/filter intent, and event-detail conversion intent
+- [x] Add focused regression coverage for tracker config and markup hooks
+- [x] Run targeted Pest, PHPStan/Pint where applicable, build verification, and diff checks
+
+## Review
+- Root cause:
+  - the existing Signals browser tracker covered page views, SPA navigation, identity, and geolocation, but there was no centralized app-wide convention for curated UI intent events such as search submit, filter changes, result clicks, share intent, or event-detail conversion actions
+  - the previous plan also required a permanent guideline so future UI changes explicitly evaluate whether product event tracking should be added or updated
+- Fix:
+  - added a UI tracking review rule to `.ai/guidelines/general.blade.php`
+  - extended `SignalsTracker::trackerConfig()` with `event_endpoint` for `signals.collect.event`
+  - expanded `resources/views/components/analytics/signals-tracker.blade.php` into the single shared bootstrap for custom UI events, including `window.majlisIlmu.trackSignal(...)`, cookie/session reuse, delegated `data-signal-event`, `data-signal-submit-event`, and `data-signal-change-event` support
+  - added high-signal hooks to homepage discovery CTAs/search, `/majlis` search/filter/sort/share/result-click controls, and event-detail conversion/share/calendar/registration/external-link actions
+  - added regression coverage in `tests/Feature/SignalsIntegrationTest.php` for the custom endpoint, centralized helper, and first-funnel hooks
+  - captured the previous planning-mode false-blocker lesson in `tasks/lessons.md`
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SignalsIntegrationTest.php` => **7 passed (41 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminShareAnalyticsPageTest.php` => **8 passed (31 assertions)**
+  - `vendor/bin/phpstan analyse --ansi app/Services/Signals/SignalsTracker.php tests/Feature/SignalsIntegrationTest.php` => **No errors**
+  - `vendor/bin/phpstan analyse --ansi` => **No errors**
+  - `vendor/bin/pint --test .ai/guidelines/general.blade.php app/Services/Signals/SignalsTracker.php resources/views/components/analytics/signals-tracker.blade.php resources/views/components/pages/⚡home.blade.php resources/views/livewire/pages/events/index.blade.php resources/views/livewire/pages/events/show.blade.php tests/Feature/SignalsIntegrationTest.php` => **pass**
+  - `npm run build` => **pass**
+  - `git diff --check` => **clean**
+  - database rule checks => **no SoftDeletes matches** and **packages directory not present for package migration constraint scan**
+
+---
+
+# Product Signals API And Backend Visibility Todo
+
+- [x] Add normalized client-origin context to backend product signals so API/mobile telemetry can distinguish web, API, iOS, Android, iPadOS, macOS, and unknown clients
+- [x] Preserve the existing Signals storage model and keep web/browser UI tracking on the shared custom-event helper
+- [x] Add focused tests for API search telemetry with mobile-origin headers/query parameters and default web/API attribution
+- [x] Verify frontend event capture through Chrome MCP
+- [x] Verify the captured data is visible from the backend Filament Signals/admin reporting surface through Chrome MCP
+- [x] Run automated verification: Pest, PHPStan, Pint, build, diff checks, and database guard checks
+- [x] Complete three review/audit rounds and fix any issues found
+
+## Review
+- Root cause:
+  - backend product signals were stored in Signals tables but did not consistently include a normalized client context for API/mobile traffic
+  - the built-in Filament Signals Live Activity report showed the new event rows, but not the client-origin JSON properties clearly enough for web/iOS/Android comparison
+- Fix:
+  - added `ProductSignalsClientContext` to normalize `X-Majlis-Client-Origin`, compatible origin/platform headers, `origin` query values, and user-agent fallbacks into stable `client_origin`, `client_platform`, `client_family`, and `client_transport` properties
+  - enriched all server-side `ProductSignalsService` events with canonical client context while preventing arbitrary event properties from overriding `client_*` fields
+  - added browser-side `client_origin=web`, detected platform, family, and transport metadata to the centralized custom UI event helper
+  - added an admin `Product Signals` page under Insights that aggregates existing `signal_events` data by client origin, platform, and transport, and lists recent client-attributed events with version/query details
+  - kept storage inside the existing Signals package tables; no new database tables or migrations were needed
+  - added tests for web login attribution, default API attribution, iOS header attribution, Android query-origin attribution, UI hooks, and backend Filament visibility
+- Chrome MCP verification:
+  - public frontend loaded `https://majlisilmu.test/` with `window.majlisIlmu.trackSignal` present
+  - clicking the home quick-filter emitted `navigation.quick_filter_clicked` to `POST /api/signals/collect/event` with HTTP `202`
+  - persisted frontend event had `client_origin=web`, `client_platform=macos`, `client_transport=web`
+  - real API calls with iOS and Android origins persisted `search.executed` events with `client_origin=ios` / `client_origin=android`, `client_family=mobile`, and `client_transport=api`
+  - admin Live Activity showed the new events
+  - admin `Product Signals` page showed Web, iOS, and Android rows plus the test queries `Chrome MCP iOS API` and `Chrome MCP Android API`
+- Audit rounds:
+  - Round 1 correctness/data-shape: verified API/web properties persist into `signal_events.properties` and are surfaced in Filament
+  - Round 2 security/privacy/noise: fixed canonical `client_*` fields so `data-signal-props` and backend custom properties cannot override resolver-generated client context
+  - Round 3 UX/reporting/tests: changed the backend page to focus breakdowns/recent table on client-attributed events while showing unattributed legacy/page-view volume separately
+  - Full-suite follow-up: aligned `AdminDashboardTest` with the existing Filament Signals dashboard root behavior by testing the explicit admin dashboard URL instead of expecting `/admin` to redirect there
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/SignalsIntegrationTest.php` => **7 passed (43 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/ProductSignalsTelemetryTest.php` => **15 passed (78 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminShareAnalyticsPageTest.php` => **9 passed (41 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminDashboardTest.php` => **4 passed (13 assertions)**
+  - `vendor/bin/pest --parallel --compact` => **1796 passed (11472 assertions)**
+  - `vendor/bin/phpstan analyse --ansi` => **No errors**
+  - `vendor/bin/pint --test ...` on all touched PHP/Blade/test files => **pass**
+  - `npm run build` => **pass**
+  - `git diff --check` => **clean**
+  - database rule checks => **no SoftDeletes matches** and **packages directory not present for package migration constraint scan**

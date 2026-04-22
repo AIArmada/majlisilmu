@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\Frontend\GitHubIssueController;
 use App\Http\Controllers\Api\Frontend\InstitutionWorkspaceController;
 use App\Http\Controllers\Api\Frontend\ManifestController;
 use App\Http\Controllers\Api\Frontend\MembershipClaimController;
+use App\Http\Controllers\Api\Frontend\MobileTelemetryController;
 use App\Http\Controllers\Api\Frontend\SearchController;
 use App\Http\Controllers\Api\Frontend\ShareAnalyticsController;
 use App\Http\Controllers\Api\NotificationDestinationController;
@@ -64,6 +65,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/manifest', [ManifestController::class, 'manifest'])->name('manifest');
 
         Route::prefix('forms')->name('forms.')->group(function () {
+            Route::get('/mobile-telemetry', [ManifestController::class, 'mobileTelemetry'])->name('mobile-telemetry');
             Route::get('/submit-event', [ManifestController::class, 'submitEvent'])->name('submit-event');
             Route::get('/contributions/institutions', [ManifestController::class, 'submitInstitution'])->name('contributions.institutions');
             Route::get('/contributions/speakers', [ManifestController::class, 'submitSpeaker'])->name('contributions.speakers');
@@ -94,6 +96,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/share/track', [DawahShareController::class, 'track'])
             ->middleware('throttle:30,1')
             ->name('share.track');
+        Route::post('/mobile/telemetry/events', [MobileTelemetryController::class, 'store'])
+            ->middleware('throttle:mobile-telemetry')
+            ->name('mobile-telemetry.store');
         Route::get('/institutions', [SearchController::class, 'institutions'])->name('institutions.index');
         Route::get('/institutions/near', [SearchController::class, 'institutionsNear'])->name('institutions.near');
         Route::get('/institutions/{institutionKey}', [SearchController::class, 'showInstitution'])->name('institutions.show');

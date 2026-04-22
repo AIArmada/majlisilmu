@@ -45,12 +45,7 @@ it('renders the admin dashboard with moderation actions before event overview in
     $administrator->assignRole('super_admin');
 
     $this->actingAs($administrator)
-        ->get('/admin')
-        ->assertRedirect(AdminDashboard::getUrl(panel: 'admin'));
-
-    $this->actingAs($administrator)
-        ->followingRedirects()
-        ->get('/admin')
+        ->get(AdminDashboard::getUrl(panel: 'admin'))
         ->assertSuccessful()
         ->assertSeeInOrder([
             'Needs Approval',

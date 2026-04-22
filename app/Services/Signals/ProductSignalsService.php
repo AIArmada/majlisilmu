@@ -10,6 +10,7 @@ use App\Models\Event;
 use App\Models\NotificationMessage;
 use App\Models\Report;
 use App\Models\User;
+use App\Support\Signals\ProductSignalsClientContext;
 use Illuminate\Http\Request;
 use Throwable;
 
@@ -18,6 +19,7 @@ final readonly class ProductSignalsService
     public function __construct(
         private SignalEventRecorder $signalEventRecorder,
         private SignalsTracker $signalsTracker,
+        private ProductSignalsClientContext $clientContext,
     ) {}
 
     public function recordLogin(User $user, Request $request, string $method, bool $createdAccount = false): ?SignalEvent
@@ -314,6 +316,7 @@ final readonly class ProductSignalsService
             'route_name' => is_string($routeName) && $routeName !== '' ? $routeName : null,
             'request_method' => $request?->getMethod(),
             ...$properties,
+            ...$this->clientContext->properties($request),
         ], function (mixed $value): bool {
             if ($value === null || $value === '') {
                 return false;

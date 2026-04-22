@@ -30,6 +30,8 @@ it('records a signals event for successful password login', function () {
     expect($event)->not->toBeNull();
     expect($event?->event_category)->toBe('auth');
     expect(data_get($event?->properties, 'method'))->toBe('password');
+    expect(data_get($event?->properties, 'client_origin'))->toBe('web');
+    expect(data_get($event?->properties, 'client_transport'))->toBe('web');
     expect($event?->identity?->external_id)->toBe($user->id);
 });
 
@@ -268,6 +270,66 @@ it('records signals events for api and saved search executions', function () {
     expect($searchEvents)->toHaveCount(2);
     expect($surfaces)->toContain('api.events.index', 'saved_search.execute');
     expect($event->title)->toBe('Signals Search Event');
+});
+
+it('records normalized client context for api and mobile search telemetry', function () {
+    Event::factory()->create([
+        'title' => 'Signals Client Context Event',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    $this->getJson('/api/v1/events?filter[search]=Default%20API')
+        ->assertOk();
+
+    $this->getJson('/api/v1/events?filter[search]=Mobile%20Android&origin=android')
+        ->assertOk();
+
+    $this->withHeaders([
+        'X-Majlis-Client-Origin' => 'iosapp',
+        'X-Majlis-Client-Name' => 'MajlisIlmu iOS',
+        'X-Majlis-Client-Version' => '1.2.3',
+        'X-Majlis-Client-Build' => '456',
+    ])->getJson('/api/v1/events?filter[search]=Mobile%20iOS')
+        ->assertOk();
+
+    $signalEvents = SignalEvent::query()
+        ->where('event_name', 'search.executed')
+        ->get();
+
+    $defaultApiEvent = $signalEvents->first(
+        fn (SignalEvent $signalEvent): bool => data_get($signalEvent->properties, 'query') === 'Default API',
+    );
+    $iosEvent = $signalEvents->first(
+        fn (SignalEvent $signalEvent): bool => data_get($signalEvent->properties, 'query') === 'Mobile iOS',
+    );
+    $androidEvent = $signalEvents->first(
+        fn (SignalEvent $signalEvent): bool => data_get($signalEvent->properties, 'query') === 'Mobile Android',
+    );
+
+    expect($defaultApiEvent)->not->toBeNull();
+    expect(data_get($defaultApiEvent?->properties, 'surface'))->toBe('api.events.index');
+    expect(data_get($defaultApiEvent?->properties, 'client_origin'))->toBe('api');
+    expect(data_get($defaultApiEvent?->properties, 'client_family'))->toBe('api');
+    expect(data_get($defaultApiEvent?->properties, 'client_transport'))->toBe('api');
+
+    expect($iosEvent)->not->toBeNull();
+    expect(data_get($iosEvent?->properties, 'client_origin'))->toBe('ios');
+    expect(data_get($iosEvent?->properties, 'client_origin_source'))->toBe('header:X-Majlis-Client-Origin');
+    expect(data_get($iosEvent?->properties, 'client_platform'))->toBe('ios');
+    expect(data_get($iosEvent?->properties, 'client_family'))->toBe('mobile');
+    expect(data_get($iosEvent?->properties, 'client_transport'))->toBe('api');
+    expect(data_get($iosEvent?->properties, 'client_name'))->toBe('MajlisIlmu iOS');
+    expect(data_get($iosEvent?->properties, 'client_version'))->toBe('1.2.3');
+    expect(data_get($iosEvent?->properties, 'client_build'))->toBe('456');
+
+    expect($androidEvent)->not->toBeNull();
+    expect(data_get($androidEvent?->properties, 'client_origin'))->toBe('android');
+    expect(data_get($androidEvent?->properties, 'client_origin_source'))->toBe('query:origin');
+    expect(data_get($androidEvent?->properties, 'client_platform'))->toBe('android');
+    expect(data_get($androidEvent?->properties, 'client_family'))->toBe('mobile');
+    expect(data_get($androidEvent?->properties, 'client_transport'))->toBe('api');
 });
 
 it('records listing filtered events for filter-only discovery traffic', function () {

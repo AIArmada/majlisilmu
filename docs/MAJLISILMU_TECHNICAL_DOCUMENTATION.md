@@ -244,6 +244,8 @@ Current source of truth for native clients:
 Public:
 - `POST /auth/register`
 - `POST /auth/login`
+- `GET /forms/mobile-telemetry`
+- `POST /mobile/telemetry/events`
 - `GET /events`
 - `GET /events/{event}`
 - `POST /events/{event}/registrations`
@@ -266,6 +268,8 @@ Authenticated (`auth:sanctum`):
 - Event registration export
 
 Notes:
+- Native app telemetry now has a dedicated client route: `POST /api/v1/mobile/telemetry/events`, with `GET /api/v1/forms/mobile-telemetry` as the canonical write contract for real iOS/iPadOS/Android sessions.
+- That telemetry route is intentionally separate from browser tracking so native-app usage is not confused with users browsing the website on mobile Safari/Chrome.
 - `DELETE /user` now keeps a sanitized deleted-account snapshot for the admin grace-period restore flow while still revoking transient credentials immediately.
 - `GET /me/events/going` and `GET /me/events/saved` now use simple pagination metadata (`page`, `per_page`, `has_more`, `next_page`) and do not expose `total`.
 - `GET /events/{event}` now serializes linked references with normalized cover aliases (`media.front_cover_url`, `front_cover_url`, `cover_url`, `thumb_url`) so native clients can render reference cards without depending on a second reference-detail request.
@@ -302,6 +306,7 @@ Current policy/implementation:
 - Search pages use `throttle:search`.
 - Registration endpoint uses `throttle:registration`.
 - Report API uses `throttle:reports`.
+- Native mobile telemetry uses `throttle:mobile-telemetry` and keys by authenticated user, anonymous install id, session id, or IP fallback.
 - Submit-event route is intentionally unthrottled (business policy decision).
 - Captcha support exists through Turnstile service settings.
 

@@ -5,7 +5,7 @@
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
 
-This is the current mobile-facing API contract. It reflects the live routes and controllers, including the Action-class refactors and the native-client endpoints for auth tokens, share tracking, analytics, going, registration, and check-in.
+This is the current mobile-facing API contract. It reflects the live routes and controllers, including the Action-class refactors and the native-client endpoints for auth tokens, share tracking, native app telemetry, analytics, going, registration, and check-in.
 
 Use this document as the source of truth for mobile and AI agent integrations.
 
@@ -463,6 +463,7 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/manifest` | Optional | Top-level flow manifest and endpoint discovery |
+| `GET` | `/forms/mobile-telemetry` | Optional | Native mobile telemetry contract for real iOS/iPadOS/Android apps |
 | `GET` | `/forms/submit-event` | Optional | Submit-event schema, defaults, and validation metadata |
 | `GET` | `/forms/contributions/institutions` | Optional | Institution contribution contract |
 | `GET` | `/forms/contributions/speakers` | Optional | Speaker contribution contract |
@@ -511,6 +512,7 @@ Notes:
 
 | Method | Path | Purpose |
 |---|---|---|
+| `POST` | `/mobile/telemetry/events` | Record batched UI telemetry from real iOS, iPadOS, or Android app sessions |
 | `POST` | `/submit-event` | Submit the public/authenticated event form, including poster/gallery uploads |
 | `POST` | `/share/track` | Record a guest or authenticated outbound share action for analytics |
 | `GET` | `/share/analytics` | Fetch the authenticated Dawah impact dashboard for mobile clients |
@@ -545,6 +547,108 @@ Authorization note:
 - Institution workspace permissions currently follow the existing app model where scoped member roles are assigned per subject type, not per individual institution. The API matches that behavior exactly.
 - `GET /institution-workspace` auto-selects the first accessible institution when `institution_id` is omitted and always returns a non-null `selected_institution` block together with `events_pagination` and `members_pagination` metadata.
 - `POST /github-issues` uses the same authenticated user identity as the rest of the client API. Non-admin users create a plain issue. Application admins create the issue and auto-assign Copilot, with the Copilot model resolved from server config and fallbacks.
+
+### Native mobile telemetry
+
+Use this dedicated endpoint when the user is inside the real iOS, iPadOS, or Android app and you need to record UI behavior such as screen views, button taps, drawer opens, tab changes, or deep-link entrypoints.
+
+**Do not use this endpoint for mobile web browsing.** Web page views and browser-side UI interactions should keep using the web tracker that posts to the shared browser telemetry surface.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/forms/mobile-telemetry` | Optional bearer | Returns the native telemetry contract, helper field metadata, and required headers |
+| `POST` | `/mobile/telemetry/events` | Optional bearer | Accepts batched telemetry events from real native app sessions |
+
+Required request header:
+
+```http
+X-Majlis-Client-Origin: iosapp | ipadosapp | androidapp
+```
+
+Optional request headers:
+
+- `X-Majlis-Client-Name`
+- `X-Majlis-Client-Version`
+- `X-Majlis-Client-Build`
+
+Anonymous/native identity rules:
+
+- Bearer auth is optional.
+- If the request is authenticated, the API attaches the current user automatically.
+- If the request is anonymous, send at least one of:
+  - `anonymous_id`
+  - `session_identifier`
+
+Recommended client behavior:
+
+1. Use a stable install/device identifier for `anonymous_id`.
+2. Use an app-session identifier for `session_identifier`.
+3. Batch up to 50 events per request.
+4. Send `screen_name`, `component`, and `action` inside each event when available.
+5. Keep using the web tracker for browser sessions, even on phones or tablets.
+
+Canonical request shape:
+
+```json
+{
+  "anonymous_id": "ios-installation-123",
+  "session_identifier": "ios-session-2026-04-22T10:00:00Z",
+  "session_started_at": "2026-04-22T10:00:00Z",
+  "events": [
+    {
+      "event_name": "screen.viewed",
+      "event_category": "navigation",
+      "occurred_at": "2026-04-22T10:00:05Z",
+      "path": "/home",
+      "screen_name": "home",
+      "properties": {
+        "entrypoint": "push_notification"
+      }
+    },
+    {
+      "event_name": "ui.clicked",
+      "event_category": "engagement",
+      "occurred_at": "2026-04-22T10:00:18Z",
+      "path": "/events/weekly-kuliah",
+      "screen_name": "event_detail",
+      "component": "register_button",
+      "action": "tap"
+    }
+  ]
+}
+```
+
+Response shape:
+
+```json
+{
+  "message": "Mobile telemetry accepted.",
+  "data": {
+    "received_events": 2,
+    "recorded_events": 2,
+    "dropped_events": 0,
+    "authenticated": false,
+    "client": {
+      "client_origin": "ios",
+      "client_family": "mobile",
+      "client_transport": "api",
+      "client_name": "MajlisIlmu iOS",
+      "client_version": "1.2.3",
+      "client_build": "456"
+    }
+  },
+  "meta": {
+    "request_id": "uuid"
+  }
+}
+```
+
+Notes:
+
+- The API returns `202 Accepted` when the batch is accepted for processing.
+- `recorded_events` may be lower than `received_events` if the analytics backend drops one or more events after acceptance.
+- Client metadata is normalized into analytics properties as `client_origin`, `client_family`, `client_transport`, `client_name`, `client_version`, and `client_build`.
+- This route is intentionally app-specific so analytics can distinguish real native usage from browser traffic.
 
 ### GitHub issue reporting workflow
 
