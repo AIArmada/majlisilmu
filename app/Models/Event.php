@@ -888,16 +888,7 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function latestPublishedChangeAnnouncement(): HasOne
     {
-        return $this->hasOne(EventChangeAnnouncement::class)
-            ->ofMany([
-                'published_at' => 'max',
-                'created_at' => 'max',
-                'id' => 'max',
-            ], function (Builder $query): void {
-                $query
-                    ->where('status', EventChangeStatus::Published->value)
-                    ->whereNull('retracted_at');
-            });
+        return $this->latestPublishedAnnouncementRelation();
     }
 
     /**
@@ -905,17 +896,9 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function latestPublishedReplacementAnnouncement(): HasOne
     {
-        return $this->hasOne(EventChangeAnnouncement::class)
-            ->ofMany([
-                'published_at' => 'max',
-                'created_at' => 'max',
-                'id' => 'max',
-            ], function (Builder $query): void {
-                $query
-                    ->where('status', EventChangeStatus::Published->value)
-                    ->whereNull('retracted_at')
-                    ->whereNotNull('replacement_event_id');
-            });
+        return $this->latestPublishedAnnouncementRelation(function (Builder $query): void {
+            $query->whereNotNull('replacement_event_id');
+        });
     }
 
     /**
@@ -931,16 +914,35 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function latestIncomingReplacementAnnouncement(): HasOne
     {
-        return $this->hasOne(EventChangeAnnouncement::class, 'replacement_event_id')
+        return $this->latestPublishedAnnouncementRelation(
+            relation: $this->hasOne(EventChangeAnnouncement::class, 'replacement_event_id'),
+        );
+    }
+
+    /**
+     * PostgreSQL cannot aggregate UUIDs with `max()`, so keep the one-of-many
+     * aggregate on the timestamp columns and break ties with a normal UUID order.
+     *
+     * @param  HasOne<EventChangeAnnouncement, $this>|null  $relation
+     * @param  (\Closure(Builder<EventChangeAnnouncement>): void)|null  $extraConstraint
+     * @return HasOne<EventChangeAnnouncement, $this>
+     */
+    private function latestPublishedAnnouncementRelation(?\Closure $extraConstraint = null, ?HasOne $relation = null): HasOne
+    {
+        $baseRelation = $relation ?? $this->hasOne(EventChangeAnnouncement::class);
+
+        return $baseRelation
             ->ofMany([
                 'published_at' => 'max',
                 'created_at' => 'max',
-                'id' => 'max',
-            ], function (Builder $query): void {
+            ], function (Builder $query) use ($extraConstraint): void {
                 $query
                     ->where('status', EventChangeStatus::Published->value)
                     ->whereNull('retracted_at');
-            });
+
+                $extraConstraint?->__invoke($query);
+            })
+            ->orderByDesc('id');
     }
 
     /**
