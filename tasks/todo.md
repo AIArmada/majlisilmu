@@ -1,3 +1,31 @@
+# API Read Endpoint Report Triage
+
+- [x] Reconcile the external read-endpoint report against the current API route contract
+- [x] Reproduce confirmed failures for speaker, institution, reference, follow, and nearby-institution endpoints
+- [x] Patch real API contract defects with focused regression coverage
+- [x] Run targeted Pest, PHPStan, formatter, and diff checks
+- [x] Record the final findings and verification outcome
+
+## Review
+
+- Findings:
+  - Current local runtime resolves public speaker, institution, and reference detail endpoints by UUID and slug when the record is active/verified. The report's sample speaker UUID is not present in the current local database.
+  - `/follows/speakers` and `/follows/institutions` are not part of the current contract. Follow state/mutations are singular at `/follows/{type}/{subject}`; followed directory lists use `/speakers?following=true`, `/institutions?following=true`, and `/references?following=true`.
+  - `/institutions/near` intentionally validates coordinates and returns `422` without `near=lat,lng` or `lat` + `lng`; it returns `200` with valid coordinates.
+  - `GET /events/{event}/registrations`, `GET /events/{event}/saved`, and `GET /events/{event}/going` are method mismatches. Existing read routes are `/events/{event}/me`, `/user/registrations`, `/me/events/saved`, and `/me/events/going`; event registration/save/going mutations use POST/PUT/DELETE.
+- Changes:
+  - Added focused regression coverage for UUID detail lookup across institutions, speakers, and references.
+  - Added regression coverage for followed directory lists through `following=true`.
+  - Added regression coverage for the nearby-institution coordinate validation contract.
+  - Clarified the mobile API reference so clients do not treat `/follows/{plural}` as a collection route.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/PublicReadEndpointReportTest.php` => 5 passed, 18 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FollowApiTest.php` => 5 passed, 38 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='supports the nearby institution alias and sparse list fields|filters public institutions by current location radius and returns distance metadata|allows following and unfollowing a speaker through the frontend api'` => 3 passed, 23 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `git diff --check` => pass
+
 # Public Reference And Venue Directories
 
 - [x] Trace the existing `/institusi` and `/penceramah` directory patterns
