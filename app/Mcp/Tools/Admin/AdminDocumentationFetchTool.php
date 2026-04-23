@@ -23,7 +23,7 @@ class AdminDocumentationFetchTool extends AbstractAdminTool
 
     protected string $title = 'Fetch Verified Documentation Page';
 
-    protected string $description = 'Use this when you need the full text of a verified MajlisIlmu documentation page returned by the search tool. Do not use this for runtime record fetches; use the admin record tools for those.';
+    protected string $description = 'Use this when you need the full text of a verified MajlisIlmu documentation page returned by the search tool. Accepts a stable documentation id only, not a url or file:// resource URI. Do not use this for runtime record fetches; use the admin record tools for those.';
 
     public function __construct(
         private readonly VerifiedDocumentationCatalog $documentationCatalog,
@@ -60,7 +60,7 @@ class AdminDocumentationFetchTool extends AbstractAdminTool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'id' => $schema->string()->required()->min(1)->description('Stable documentation identifier returned by the search tool, such as docs-mcp-guide.'),
+            'id' => $schema->string()->required()->min(1)->description('Stable documentation identifier returned by the search tool, such as docs-mcp-guide. Do not pass the document url or file:// resource URI.'),
         ];
     }
 

@@ -2852,6 +2852,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-update-record',
     );
 
+    expect($tools->keys()->all())->not->toContain('member-list-resources', 'member-list-records');
+
     expect($tools->get('search')['securitySchemes'] ?? [])->toContainEqual([
         'type' => 'oauth2',
         'scopes' => ['mcp:use'],
@@ -2860,7 +2862,9 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
     expect($tools->get('fetch')['securitySchemes'] ?? [])->toContainEqual([
         'type' => 'oauth2',
         'scopes' => ['mcp:use'],
-    ]);
+    ])
+        ->and($tools->get('fetch')['description'] ?? '')->toContain('not a url or file:// resource URI')
+        ->and(data_get($tools->get('fetch'), 'inputSchema.properties.id.description'))->toContain('Do not pass the document url');
 
     expect($tools->get('admin-list-resources')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,

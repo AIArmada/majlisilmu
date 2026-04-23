@@ -517,7 +517,7 @@ it('requires an explicit speaker country when the address is mutated through mem
         ])
         ->assertStructuredContent(fn ($json) => $json
             ->where('error.code', 'validation_error')
-            ->where('error.details.errors', fn($errors): bool => (collect($errors)->get('address.country_id')[0] ?? null) === 'The address country is required.')
+            ->where('error.details.errors', fn ($errors): bool => (collect($errors)->get('address.country_id')[0] ?? null) === 'The address country is required.')
             ->etc());
 });
 
@@ -947,6 +947,8 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'member-update-record',
     );
 
+    expect($tools->keys()->all())->not->toContain('admin-list-resources', 'admin-list-records');
+
     expect($tools->get('search')['securitySchemes'] ?? [])->toContainEqual([
         'type' => 'oauth2',
         'scopes' => ['mcp:use'],
@@ -955,7 +957,9 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
     expect($tools->get('fetch')['securitySchemes'] ?? [])->toContainEqual([
         'type' => 'oauth2',
         'scopes' => ['mcp:use'],
-    ]);
+    ])
+        ->and($tools->get('fetch')['description'] ?? '')->toContain('not a url or file:// resource URI')
+        ->and(data_get($tools->get('fetch'), 'inputSchema.properties.id.description'))->toContain('Do not pass the document url');
 
     expect($tools->get('member-list-resources')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => true,
