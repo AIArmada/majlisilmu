@@ -465,6 +465,97 @@ it('prefers the newest replacement announcement when published timestamps tie', 
         ->toBe($secondReplacement->id);
 });
 
+it('eager loads latest published announcement relations without aggregating uuid ids', function () {
+    $administrator = eventChangeAdministrator();
+    $original = eventChangeApprovedEvent([
+        'title' => 'Kuliah Asal Eager',
+    ]);
+    $replacement = eventChangeApprovedEvent([
+        'title' => 'Kuliah Ganti Eager',
+    ]);
+    $incomingSource = eventChangeApprovedEvent([
+        'title' => 'Kuliah Sumber Incoming',
+    ]);
+    $incomingTarget = eventChangeApprovedEvent([
+        'title' => 'Kuliah Sasaran Incoming',
+    ]);
+    $publishedAt = CarbonImmutable::parse('2026-05-05 12:00:00', 'UTC');
+
+    EventChangeAnnouncement::unguarded(function () use ($administrator, $original, $replacement, $incomingSource, $incomingTarget, $publishedAt): void {
+        EventChangeAnnouncement::query()->create([
+            'id' => '00000000-0000-0000-0000-000000000111',
+            'event_id' => $original->id,
+            'actor_id' => $administrator->id,
+            'type' => EventChangeType::ScheduleChanged,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Versi awal.',
+            'published_at' => $publishedAt,
+            'created_at' => $publishedAt,
+            'updated_at' => $publishedAt,
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'id' => '00000000-0000-0000-0000-000000000112',
+            'event_id' => $original->id,
+            'replacement_event_id' => $replacement->id,
+            'actor_id' => $administrator->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Versi pengganti terkini.',
+            'published_at' => $publishedAt,
+            'created_at' => $publishedAt,
+            'updated_at' => $publishedAt,
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'id' => '00000000-0000-0000-0000-000000000121',
+            'event_id' => $original->id,
+            'replacement_event_id' => $incomingTarget->id,
+            'actor_id' => $administrator->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Incoming awal.',
+            'published_at' => $publishedAt,
+            'created_at' => $publishedAt,
+            'updated_at' => $publishedAt,
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'id' => '00000000-0000-0000-0000-000000000122',
+            'event_id' => $incomingSource->id,
+            'replacement_event_id' => $incomingTarget->id,
+            'actor_id' => $administrator->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Incoming terkini.',
+            'published_at' => $publishedAt,
+            'created_at' => $publishedAt,
+            'updated_at' => $publishedAt,
+        ]);
+    });
+
+    $events = Event::query()
+        ->with([
+            'latestPublishedChangeAnnouncement',
+            'latestPublishedReplacementAnnouncement',
+            'latestIncomingReplacementAnnouncement',
+        ])
+        ->whereKey([$original->id, $incomingTarget->id])
+        ->get()
+        ->keyBy(fn (Event $event): string => $event->id);
+
+    expect($events->get($original->id)?->latestPublishedChangeAnnouncement?->id)
+        ->toBe('00000000-0000-0000-0000-000000000121')
+        ->and($events->get($original->id)?->latestPublishedReplacementAnnouncement?->id)
+        ->toBe('00000000-0000-0000-0000-000000000121')
+        ->and($events->get($incomingTarget->id)?->latestIncomingReplacementAnnouncement?->id)
+        ->toBe('00000000-0000-0000-0000-000000000122');
+});
+
 it('creates same-event slug aliases when a published change mutates the schedule', function () {
     $administrator = eventChangeAdministrator();
     $event = eventChangeApprovedEvent([

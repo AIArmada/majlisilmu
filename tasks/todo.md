@@ -1,3 +1,22 @@
+# PostgreSQL Event Change Relation Fix
+
+- [x] Trace the `/majlis` failure to the eager-loaded event-change announcement relation
+- [x] Remove UUID aggregation from the affected one-of-many event-change relations while keeping deterministic latest-row semantics
+- [x] Add eager-load regression coverage and rerun focused page/relation verification plus static/style checks
+
+## Review
+
+- Findings:
+  - `Event::latestPublishedChangeAnnouncement()`, `latestPublishedReplacementAnnouncement()`, and `latestIncomingReplacementAnnouncement()` were all using `ofMany([... 'id' => 'max'])` against UUID primary keys.
+  - PostgreSQL does not support `max(uuid)`, so eager loading those relations on `/majlis` crashed before the page rendered.
+  - The existing tie-break requirement still matters when `published_at` and `created_at` are identical, so the fix keeps `ofMany()` on the timestamp columns and resolves same-timestamp ties with `orderByDesc('id')`, which PostgreSQL does support for UUIDs.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/EventChangeAnnouncementTest.php --filter="prefers the newest replacement announcement when published timestamps tie|eager loads latest published announcement relations without aggregating uuid ids"` => 2 passed, 4 assertions
+  - `vendor/bin/pest --parallel tests/Feature/PublicPagesTest.php --filter="loads public index pages"` => 1 passed, 17 assertions
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Models/Event.php tests/Feature/EventChangeAnnouncementTest.php` => pass
+  - `vendor/bin/pint --dirty --test` => pass
+  - `git diff --check` => pass
+
 # Saved Search Normalization Follow-up
 
 - [x] Re-audit the shared saved-search normalizer against the page/Livewire write path
