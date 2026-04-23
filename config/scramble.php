@@ -52,9 +52,9 @@ return [
 
     Viewer-facing helper fields such as event timing_display and end_time_display are localized only when the request provides timezone context (authenticated user preference, X-Timezone, user_timezone, cookie, or session). Without timezone context, bare API requests fall back to UTC.
 
-    Date-only event filters such as filter[starts_after] and filter[starts_before] are interpreted in the resolved request timezone and converted to UTC day boundaries before querying.
+    Public event date-only filters use `filter[starts_after]`, `filter[starts_before]`, and `filter[starts_on_local_date]`. Admin resource date-only filters use top-level `starts_after`, `starts_before`, and `starts_on_local_date`. All of these are interpreted in the resolved request timezone and converted to UTC day boundaries before querying.
 
-    For MYT today requests, send X-Timezone: Asia/Kuala_Lumpur and date-only values such as filter[starts_after]=2026-04-12&filter[starts_before]=2026-04-12.
+    For MYT today requests, send X-Timezone: Asia/Kuala_Lumpur with either public-event values such as filter[starts_after]=2026-04-12&filter[starts_before]=2026-04-12 or admin-resource values such as starts_after=2026-04-12&starts_before=2026-04-12.
 
     The server timezone is UTC. The web application commonly supplies Asia/Kuala_Lumpur as user timezone context, but API consumers should not assume MYT unless they send it explicitly.
 
