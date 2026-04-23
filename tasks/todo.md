@@ -1,3 +1,30 @@
+# MCP Admin Connector Read-Tools Report Triage
+
+- [x] Reconcile the ChatGPT connector report against current MCP admin/member route registration
+- [x] Verify docs search/fetch contract wording and tool availability expectations
+- [x] Patch confirmed MCP documentation or runtime mismatches with focused coverage
+- [x] Run targeted MCP docs tests, PHPStan, formatter, and diff checks
+- [x] Record the final findings and verification outcome
+
+## Review
+
+- Findings:
+  - `/mcp/admin` and `/mcp/member` are intentionally separate MCP web servers in `routes/ai.php`, backed by `AdminServer` and `MemberServer` with separate tool arrays.
+  - Missing `member-*` tools from a ChatGPT connector mounted at `/mcp/admin` is expected. Member tools require a separate connector/session pointed at `/mcp/member` with member-scoped access.
+  - The admin read tools reported as passing did not need runtime fixes.
+  - The real fixes were docs/tool-descriptor clarity: `fetch` accepts only the stable docs `id`, not `url` or the `file://` resource URI, and `admin-list-resources` should be understood as a discovery manifest.
+- Changes:
+  - Updated admin and member `fetch` tool descriptions and `id` schema descriptions to say URL/resource URI input is not accepted.
+  - Updated `docs/MAJLISILMU_MCP_GUIDE.md` to document admin/member connector separation, the `fetch` id-only contract, and the discovery-manifest nature of `admin-list-resources`.
+  - Added regression coverage that `/mcp/admin` lists admin tools but not member tools, `/mcp/member` lists member tools but not admin tools, and both fetch descriptors advertise the id-only contract.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideDocsTest.php` => 2 passed, 113 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php --filter='initializes and lists admin MCP tools over the HTTP endpoint for Passport-authenticated admins|searches and fetches verified documentation through admin MCP tools'` => 2 passed, 86 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php --filter='initializes and lists member MCP tools over the HTTP endpoint for Passport-authenticated members|searches and fetches verified documentation through member MCP tools'` => 2 passed, 84 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `git diff --check` => pass
+
 # API Read Endpoint Report Triage
 
 - [x] Reconcile the external read-endpoint report against the current API route contract

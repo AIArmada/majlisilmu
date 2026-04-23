@@ -51,6 +51,12 @@ If you are writing or reviewing an AI-generated report, read the raw HTTP admin 
 - Server class: `App\Mcp\Servers\MemberServer`
 - Intended for Ahli/member workflows such as resource discovery, record browsing, record detail, schema discovery, supported updates on writable member-visible resources, contribution-request queues, and membership claims.
 
+Important connector-surface rule:
+
+- A client connected to `/mcp/admin` sees only the shared docs tools (`search`, `fetch`) plus `admin-*` tools. It will not see any `member-*` tools.
+- A client connected to `/mcp/member` sees only the shared docs tools plus `member-*` tools. It will not see any `admin-*` tools.
+- In ChatGPT, test or operate member tools through a separate connector pointed at `/mcp/member` with a member-scoped token or OAuth session. Missing `member-*` tools from an `/mcp/admin` connector is expected, not evidence that the member server is unregistered.
+
 ## How To Connect
 
 ### 1. Issue a bearer token
@@ -179,6 +185,8 @@ Both servers expose two MCP-standard read-only documentation tools for model dis
 | `fetch` | Fetch the verified documentation page by id | Input: one `id` string returned by `search`. Returns JSON text with `{id,title,text,url,metadata}`. |
 
 These tools search and fetch only the verified MCP guide exposed above. They do **not** search admin/member resource records.
+
+The `url` returned by `search` and shown in the raw MCP resource list is informational. The `fetch` tool schema accepts `id` only; call it as `{"id":"docs-mcp-guide"}` and do not pass `url` or `file://...`.
 
 ### Documentation routing prompt
 
@@ -365,6 +373,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 Admin tool behavior notes:
 
 - `validate_only=true` is supported for create/update preview flows.
+- `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments.
