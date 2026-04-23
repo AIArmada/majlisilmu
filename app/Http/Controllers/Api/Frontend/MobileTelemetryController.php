@@ -36,7 +36,7 @@ class MobileTelemetryController extends FrontendController
                 'received_events' => $result['received_events'],
                 'recorded_events' => $result['recorded_events'],
                 'dropped_events' => $result['dropped_events'],
-                'authenticated' => $request->actor() !== null,
+                'authenticated' => $request->actor() instanceof \App\Models\User,
                 'client' => $result['client'],
             ],
             'meta' => [

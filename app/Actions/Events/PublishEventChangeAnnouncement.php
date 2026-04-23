@@ -63,7 +63,7 @@ class PublishEventChangeAnnouncement
             $event->loadMissing($this->snapshotRelations());
 
             $beforeSnapshot = $this->snapshot($event);
-            $changedFields = $this->applyEventMutations($event, $type, $replacementEvent, $changes);
+            $changedFields = $this->applyEventMutations($event, $type, $changes);
 
             $event->save();
             $event->refresh();
@@ -173,7 +173,7 @@ class PublishEventChangeAnnouncement
      * @param  array<string, mixed>  $changes
      * @return list<string>
      */
-    private function applyEventMutations(Event $event, EventChangeType $type, ?Event $replacementEvent, array $changes): array
+    private function applyEventMutations(Event $event, EventChangeType $type, array $changes): array
     {
         $changedFields = [];
 

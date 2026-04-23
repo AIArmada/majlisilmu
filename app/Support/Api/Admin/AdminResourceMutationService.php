@@ -851,7 +851,7 @@ class AdminResourceMutationService
     private function normalizeReportPayload(array $validated): array
     {
         $entityType = is_string($validated['entity_type'] ?? null)
-            ? trim((string) $validated['entity_type'])
+            ? trim($validated['entity_type'])
             : '';
 
         if (! in_array($entityType, $this->resolveReportEntityMetadataAction->validKeys(), true)) {
@@ -873,7 +873,7 @@ class AdminResourceMutationService
         }
 
         $category = is_string($validated['category'] ?? null)
-            ? trim((string) $validated['category'])
+            ? trim($validated['category'])
             : '';
 
         if (! in_array($category, $this->resolveReportCategoryOptionsAction->validKeys($entityType), true)) {
