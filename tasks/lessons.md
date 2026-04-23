@@ -1,5 +1,7 @@
 # Lessons
 
+- When you harden saved-search API validation, harden the shared action/Livewire filter normalizer in the same pass; otherwise tampered page query params can still persist raw filter values even though the API path is strict.
+- When legacy database rows contain stale enum labels or invalid persisted enum values, repair the installed data with an idempotent forward migration first; keep serializers strict unless there is a separate rollout-skew reason for read-side compatibility.
 - If a session is edit-capable, do not claim a planning-mode blocker just because prior context mentioned planning; verify the active mode and proceed with implementation when the user explicitly asks to start.
 - When a user explicitly wants a production feature to read values from `.env` without a config bridge, direct `$_ENV` / `$_SERVER` / `getenv()` lookups are not enough under `config:cache`; add an explicit environment-file fallback or the app will falsely report the values as missing.
 - When a user wants documentation exposed through MCP for ChatGPT/OpenAI clients, raw `resources/list` registration is not enough by itself; keep the resources, but also expose the same verified docs through model-friendly `search` / `fetch` tools because tool-centric clients import from `tools/list`.

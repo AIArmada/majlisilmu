@@ -104,7 +104,11 @@ final class ApiRequestBodyExamplesExtension extends OperationExtension
             'filters' => [
                 'language_codes' => ['ms'],
                 'event_type' => ['kuliah_ceramah'],
+                'event_format' => ['physical'],
+                'gender' => 'all',
                 'age_group' => ['all_ages'],
+                'prayer_time' => 'selepas_maghrib',
+                'timing_mode' => 'prayer_relative',
             ],
             'radius_km' => 25,
             'lat' => 3.139,
@@ -116,6 +120,8 @@ final class ApiRequestBodyExamplesExtension extends OperationExtension
             'filters' => [
                 'language_codes' => ['ms', 'en'],
                 'event_type' => ['forum'],
+                'event_format' => ['online'],
+                'gender' => 'all',
                 'age_group' => ['youth'],
             ],
             'notify' => 'instant',

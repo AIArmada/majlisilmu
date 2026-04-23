@@ -350,6 +350,7 @@ it('documents public and admin mutation capability boundaries in the api overvie
         ->toContain("\n\nTIMEZONE:\n")
         ->toContain('Resource manifests now expose explicit `mcp_tools` for collection, meta, schema, store, and update call surfaces; use those tool names and argument templates instead of guessing URLs.')
         ->toContain('Event discovery supports `filter[starts_on_local_date]=YYYY-MM-DD` and returns `starts_at_local` / `starts_on_local_date` in event payloads.')
+        ->toContain('Enum filters and write fields use enum backing values such as `kuliah_ceramah`, `all_ages`, and `prayer_relative`, not display labels such as `Kuliah / Ceramah`.')
         ->toContain('Event collections expose explicit filters such as filter[status], filter[visibility], filter[event_format], filter[event_type], filter[timing_mode], and filter[prayer_reference]. Speaker collections expose filter[status], filter[is_active], and filter[has_events]. Date-aware admin resources also accept starts_after, starts_before, and starts_on_local_date.')
         ->toContain('use the admin record `route_key` returned by admin collection or detail payloads')
         ->toContain('If you only have a public UUID-backed payload and route_key is unavailable, use the UUID id directly as recordKey.')
@@ -782,8 +783,8 @@ it('adds summaries and descriptions to catalog and authenticated workflow endpoi
         ->and($paths['/follows/{type}/{subject}']['get']['description'] ?? null)->toContain('current authenticated user is following')
         ->and($paths['/follows/{type}/{subject}']['post']['description'] ?? null)->toContain('Creates a follow relationship')
         ->and($paths['/follows/{type}/{subject}']['delete']['description'] ?? null)->toContain('Removes the follow relationship')
-        ->and($paths['/events/{event}']['get']['summary'] ?? null)->toBe('Get a public event')
-        ->and($paths['/events/{event}']['get']['description'] ?? null)->toContain('public event detail payload')
+        ->and($paths['/events/{event}']['get']['summary'] ?? null)->toBe('Get an event detail payload')
+        ->and($paths['/events/{event}']['get']['description'] ?? null)->toContain('event detail payload by slug or UUID')
         ->and($tags->get('Catalog')['description'] ?? null)->toBe('Public lookup catalogs for geography, tags, languages, references, venues, and write-flow selectors.')
         ->and($tags->get('InstitutionWorkspace')['description'] ?? null)->toContain('member management')
         ->and($tags->get('RegistrationExport')['description'] ?? null)->toContain('CSV export');

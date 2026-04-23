@@ -88,6 +88,8 @@ it('keeps the MCP guide aligned with the verified admin and member write-capable
         ->toContain('Speaker write schemas now expose additional field semantics for `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media`.')
         ->toContain('If you send `address`, include `address.country_id`; `address: {}` is invalid on the MCP write path just like the raw admin HTTP API.')
         ->toContain('Venue write schemas now expose additional field semantics for `address`, `facilities`, `contacts`, and `social_media`.')
+        ->toContain('Enum fields and filters use enum backing values, not display labels.')
+        ->toContain('Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.')
         ->toContain('`address: {}` deletes the stored venue address on the shared save path.')
         ->toContain('Reference write schemas now expose additional field semantics for `author`, `publication_year`, `publisher`, and `social_media`.')
         ->toContain('Event write schemas now expose additional field semantics for `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`.')

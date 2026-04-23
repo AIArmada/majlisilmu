@@ -28,7 +28,7 @@ class MemberGetRecordActionsTool extends AbstractMemberTool
     public function handle(Request $request): ResponseFactory|Response
     {
         return $this->structuredResponse(function () use ($request): array {
-            $actor = $this->authorizeMember($request);
+            $this->authorizeMember($request);
 
             $validated = $this->validateArguments($request, [
                 'resource_key' => ['required', 'string'],
@@ -38,7 +38,6 @@ class MemberGetRecordActionsTool extends AbstractMemberTool
             return $this->recordActionService->describe(
                 resourceKey: (string) $validated['resource_key'],
                 recordKey: (string) $validated['record_key'],
-                actor: $actor,
             );
         });
     }

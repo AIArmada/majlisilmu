@@ -14,6 +14,8 @@ use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
+use App\Enums\PrayerOffset;
+use App\Enums\PrayerReference;
 use App\Enums\RegistrationMode;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
@@ -599,6 +601,65 @@ it('lists admin event records without server errors through the MCP server', fun
             ->where('data.0.attributes.starts_on_local_date', '2026-04-23')
             ->where('meta.resource.key', 'events')
             ->where('meta.pagination.page', 1)
+            ->etc());
+});
+
+it('lists admin event records after repairing legacy enum values through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $admin->forceFill([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $event = Event::factory()->create([
+        'title' => 'Admin MCP Legacy Enum Event',
+        'starts_at' => Carbon::parse('2026-04-23 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    DB::table('events')
+        ->where('id', $event->getKey())
+        ->update([
+            'event_type' => json_encode('Kuliah / Ceramah', JSON_THROW_ON_ERROR),
+            'age_group' => json_encode(['Semua Peringkat Umur'], JSON_THROW_ON_ERROR),
+            'timing_mode' => 'legacy_prayer_time',
+            'prayer_reference' => 'Maghrib',
+            'prayer_offset' => 'Sejurus selepas',
+        ]);
+
+    runLegacyEventEnumValueRepairMigration();
+
+    $repairedEvent = DB::table('events')
+        ->where('id', $event->getKey())
+        ->first(['event_type', 'age_group', 'timing_mode', 'prayer_reference', 'prayer_offset']);
+
+    assert($repairedEvent !== null);
+
+    expect(json_decode((string) $repairedEvent->event_type, true))->toBe([EventType::KuliahCeramah->value])
+        ->and(json_decode((string) $repairedEvent->age_group, true))->toBe([EventAgeGroup::AllAges->value])
+        ->and($repairedEvent->timing_mode)->toBe('prayer_relative')
+        ->and($repairedEvent->prayer_reference)->toBe(PrayerReference::Maghrib->value)
+        ->and($repairedEvent->prayer_offset)->toBe(PrayerOffset::Immediately->value);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'filters' => [
+                'status' => 'approved',
+            ],
+            'starts_on_local_date' => '2026-04-23',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $event->getKey())
+            ->where('data.0.title', 'Admin MCP Legacy Enum Event')
+            ->where('data.0.attributes.event_type.0', EventType::KuliahCeramah->value)
+            ->where('data.0.attributes.age_group.0', EventAgeGroup::AllAges->value)
+            ->where('data.0.attributes.prayer_reference', PrayerReference::Maghrib->value)
+            ->where('data.0.attributes.prayer_offset', PrayerOffset::Immediately->value)
+            ->where('data.0.attributes.starts_on_local_date', '2026-04-23')
+            ->where('data.0.attributes.timing_display', EventPrayerTime::SelepasMaghrib->getLabel())
+            ->where('meta.resource.key', 'events')
             ->etc());
 });
 
@@ -1653,7 +1714,7 @@ it('requires an explicit speaker country when the address is mutated through adm
         ])
         ->assertStructuredContent(fn ($json) => $json
             ->where('error.code', 'validation_error')
-            ->where('error.details.errors', fn($errors): bool => (collect($errors)->get('address.country_id')[0] ?? null) === 'The address country is required.')
+            ->where('error.details.errors', fn ($errors): bool => (collect($errors)->get('address.country_id')[0] ?? null) === 'The address country is required.')
             ->etc());
 });
 
@@ -2896,6 +2957,15 @@ function adminMcpUser(string $role): User
     $user->assignRole($role);
 
     return $user;
+}
+
+function runLegacyEventEnumValueRepairMigration(): void
+{
+    $migration = require base_path('database/migrations/2026_04_23_120000_repair_legacy_event_enum_values.php');
+
+    assert(is_object($migration) && method_exists($migration, 'up'));
+
+    $migration->up();
 }
 
 /**
