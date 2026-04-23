@@ -114,6 +114,7 @@ class MemberSubmitMembershipClaimTool extends AbstractMemberWriteTool
         )));
     }
 
+    #[\Override]
     public function shouldRegister(Request $request, MemberResourceService $resourceService): bool
     {
         unset($resourceService);

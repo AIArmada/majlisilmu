@@ -715,7 +715,7 @@ it('surfaces tag update semantics through the admin api schema', function () {
 
     Sanctum::actingAs($admin);
 
-    $schema = $this->getJson('/api/v1/admin/tags/schema?operation=update&recordKey='.(string) $tag->getKey())
+    $schema = $this->getJson('/api/v1/admin/tags/schema?operation=update&recordKey='.$tag->getKey())
         ->assertOk()
         ->json('data.schema');
 
@@ -978,7 +978,7 @@ it('surfaces report update semantics through the admin api schema', function () 
 
     Sanctum::actingAs($admin);
 
-    $schema = $this->getJson('/api/v1/admin/reports/schema?operation=update&recordKey='.(string) $report->getRouteKey())
+    $schema = $this->getJson('/api/v1/admin/reports/schema?operation=update&recordKey='.$report->getRouteKey())
         ->assertOk()
         ->json('data.schema');
 
@@ -1122,7 +1122,7 @@ it('surfaces inspiration update semantics through the admin api schema', functio
 
     Sanctum::actingAs($admin);
 
-    $schema = $this->getJson('/api/v1/admin/inspirations/schema?operation=update&recordKey='.(string) $inspiration->getRouteKey())
+    $schema = $this->getJson('/api/v1/admin/inspirations/schema?operation=update&recordKey='.$inspiration->getRouteKey())
         ->assertOk()
         ->json('data.schema');
 
@@ -1241,7 +1241,7 @@ it('surfaces series update semantics through the admin api schema', function () 
 
     Sanctum::actingAs($admin);
 
-    $schema = $this->getJson('/api/v1/admin/series/schema?operation=update&recordKey='.(string) $series->getKey())
+    $schema = $this->getJson('/api/v1/admin/series/schema?operation=update&recordKey='.$series->getKey())
         ->assertOk()
         ->json('data.schema');
 
@@ -1353,7 +1353,7 @@ it('surfaces space update semantics through the admin api schema', function () {
 
     Sanctum::actingAs($admin);
 
-    $schema = $this->getJson('/api/v1/admin/spaces/schema?operation=update&recordKey='.(string) $space->getKey())
+    $schema = $this->getJson('/api/v1/admin/spaces/schema?operation=update&recordKey='.$space->getKey())
         ->assertOk()
         ->json('data.schema');
 
@@ -1496,7 +1496,7 @@ it('surfaces donation channel update semantics through the admin api schema', fu
 
     Sanctum::actingAs($admin);
 
-    $schema = $this->getJson('/api/v1/admin/donation-channels/schema?operation=update&recordKey='.(string) $donationChannel->getKey())
+    $schema = $this->getJson('/api/v1/admin/donation-channels/schema?operation=update&recordKey='.$donationChannel->getKey())
         ->assertOk()
         ->json('data.schema');
 
@@ -1773,7 +1773,7 @@ it('surfaces speaker update semantics and collection rules through the admin api
         ],
     ])->assertCreated();
 
-    $schema = $this->getJson('/api/v1/admin/speakers/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+    $schema = $this->getJson('/api/v1/admin/speakers/schema?operation=update&recordKey='.$createResponse->json('data.record.route_key'))
         ->assertOk()
         ->json('data.schema');
 
@@ -2074,7 +2074,7 @@ it('surfaces institution update semantics and nested item schemas through the ad
         ],
     ])->assertCreated();
 
-    $schema = $this->getJson('/api/v1/admin/institutions/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+    $schema = $this->getJson('/api/v1/admin/institutions/schema?operation=update&recordKey='.$createResponse->json('data.record.route_key'))
         ->assertOk()
         ->json('data.schema');
 
@@ -2442,7 +2442,7 @@ it('surfaces venue update semantics and destructive empty-address behavior throu
         ],
     ])->assertCreated();
 
-    $schema = $this->getJson('/api/v1/admin/venues/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+    $schema = $this->getJson('/api/v1/admin/venues/schema?operation=update&recordKey='.$createResponse->json('data.record.route_key'))
         ->assertOk()
         ->json('data.schema');
 
@@ -2722,7 +2722,7 @@ it('surfaces reference update semantics and social-media normalization rules thr
         'status' => 'verified',
     ])->assertCreated();
 
-    $schema = $this->getJson('/api/v1/admin/references/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+    $schema = $this->getJson('/api/v1/admin/references/schema?operation=update&recordKey='.$createResponse->json('data.record.route_key'))
         ->assertOk()
         ->json('data.schema');
 
@@ -2883,7 +2883,7 @@ it('surfaces subdistrict update semantics through the admin api schema', functio
         'name' => 'Admin API Schema Subdistrict',
     ])->assertCreated();
 
-    $schema = $this->getJson('/api/v1/admin/subdistricts/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+    $schema = $this->getJson('/api/v1/admin/subdistricts/schema?operation=update&recordKey='.$createResponse->json('data.record.route_key'))
         ->assertOk()
         ->json('data.schema');
 
@@ -3091,7 +3091,7 @@ it('surfaces event update semantics and sparse relation rules through the admin 
         'discipline_tag' => $disciplineTag,
     ]))->assertCreated();
 
-    $schema = $this->getJson('/api/v1/admin/events/schema?operation=update&recordKey='.(string) $createResponse->json('data.record.route_key'))
+    $schema = $this->getJson('/api/v1/admin/events/schema?operation=update&recordKey='.$createResponse->json('data.record.route_key'))
         ->assertOk()
         ->json('data.schema');
 

@@ -27,7 +27,7 @@ final readonly class MemberRecordActionService
      *   }
      * }
      */
-    public function describe(string $resourceKey, string $recordKey, ?User $actor = null): array
+    public function describe(string $resourceKey, string $recordKey): array
     {
         $resourceClass = $this->resolveAccessibleResource($resourceKey);
         $record = $this->registry->resolveRecord($resourceClass, $recordKey);
@@ -38,7 +38,7 @@ final readonly class MemberRecordActionService
         $resource = $this->registry->metadata($resourceClass);
         $recordDetail = $this->registry->serializeRecordDetail($resourceClass, $record);
         $resolvedRecordKey = is_string($recordDetail['route_key'] ?? null)
-            ? (string) $recordDetail['route_key']
+            ? $recordDetail['route_key']
             : (string) $record->getRouteKey();
         $actions = $this->actions($resource, $resolvedRecordKey, $abilities);
 
@@ -182,13 +182,7 @@ final readonly class MemberRecordActionService
      */
     private function hasAction(array $actions, string $key): bool
     {
-        foreach ($actions as $action) {
-            if (($action['key'] ?? null) === $key) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($actions, fn($action) => ($action['key'] ?? null) === $key);
     }
 
     /**

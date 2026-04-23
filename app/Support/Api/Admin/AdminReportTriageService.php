@@ -92,8 +92,8 @@ final readonly class AdminReportTriageService
 
         $report = DB::transaction(function () use ($report, $actor, $validated): Report {
             $action = (string) $validated['action'];
-            $resolutionNote = is_string($validated['resolution_note'] ?? null) && trim((string) $validated['resolution_note']) !== ''
-                ? trim((string) $validated['resolution_note'])
+            $resolutionNote = is_string($validated['resolution_note'] ?? null) && trim($validated['resolution_note']) !== ''
+                ? trim($validated['resolution_note'])
                 : null;
 
             match ($action) {

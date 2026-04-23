@@ -134,10 +134,10 @@ it('returns focused next-step actions for member records through the MCP server'
             ->where('data.resource.key', 'institutions')
             ->where('data.record.route_key', $institution->getRouteKey())
             ->where('data.focus_actions.recommended_keys.0', 'get_update_schema')
-            ->where('data.focus_actions.actions', fn ($actions): bool => empty(array_diff(
+            ->where('data.focus_actions.actions', fn ($actions): bool => array_diff(
                 ['get_record', 'get_update_schema', 'update_record'],
                 collect($actions)->pluck('key')->all(),
-            )))
+            ) === [])
             ->where('data.focus_actions.actions', fn ($actions): bool => data_get(collect($actions)->firstWhere('key', 'update_record'), 'tool') === 'member-update-record')
             ->where('data.focus_actions.actions', fn ($actions): bool => data_get(collect($actions)->firstWhere('key', 'update_record'), 'arguments.validate_only', false) === true)
             ->etc());
@@ -517,9 +517,7 @@ it('requires an explicit speaker country when the address is mutated through mem
         ])
         ->assertStructuredContent(fn ($json) => $json
             ->where('error.code', 'validation_error')
-            ->where('error.details.errors', function ($errors): bool {
-                return (collect($errors)->get('address.country_id')[0] ?? null) === 'The address country is required.';
-            })
+            ->where('error.details.errors', fn($errors): bool => (collect($errors)->get('address.country_id')[0] ?? null) === 'The address country is required.')
             ->etc());
 });
 

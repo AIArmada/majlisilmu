@@ -124,7 +124,6 @@ final readonly class AdminContributionRequestReviewService
 
     private function resolveContributionRequest(string $recordKey, User $actor): ContributionRequest
     {
-        /** @var ContributionRequest $request */
         $request = $this->resolveReviewableContributionRequestAction->handle($actor, $recordKey);
 
         return $request->loadMissing(['entity', 'proposer', 'reviewer']);

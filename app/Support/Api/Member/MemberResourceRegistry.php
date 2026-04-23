@@ -459,7 +459,6 @@ class MemberResourceRegistry
             $property = $reflection->getProperty('relationship');
 
             if ($property->isStatic()) {
-                /** @var mixed $value */
                 $value = $property->getValue();
 
                 if (is_string($value) && $value !== '') {

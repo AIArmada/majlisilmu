@@ -53,7 +53,7 @@ final readonly class AdminRecordActionService
         $resource = $this->registry->metadata($resourceClass);
         $recordDetail = $this->registry->serializeRecordDetail($resourceClass, $record);
         $resolvedRecordKey = is_string($recordDetail['route_key'] ?? null)
-            ? (string) $recordDetail['route_key']
+            ? $recordDetail['route_key']
             : (string) $record->getRouteKey();
 
         $actions = [
@@ -391,11 +391,11 @@ final readonly class AdminRecordActionService
             'defaults' => is_array($schema['defaults'] ?? null) ? $schema['defaults'] : [],
             'fields' => array_values(array_filter(
                 is_array($schema['fields'] ?? null) ? $schema['fields'] : [],
-                static fn (mixed $field): bool => is_array($field),
+                is_array(...),
             )),
             'conditional_rules' => array_values(array_filter(
                 is_array($schema['conditional_rules'] ?? null) ? $schema['conditional_rules'] : [],
-                static fn (mixed $rule): bool => is_array($rule),
+                is_array(...),
             )),
             'available_actions' => $this->extractAvailableActions($schema),
         ];
@@ -409,7 +409,7 @@ final readonly class AdminRecordActionService
     {
         $availableActions = array_values(array_filter(
             is_array($schema['available_actions'] ?? null) ? $schema['available_actions'] : [],
-            static fn (mixed $action): bool => is_array($action),
+            is_array(...),
         ));
 
         if ($availableActions !== []) {
@@ -495,13 +495,7 @@ final readonly class AdminRecordActionService
      */
     private function hasAction(array $actions, string $key): bool
     {
-        foreach ($actions as $action) {
-            if (($action['key'] ?? null) === $key) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($actions, fn($action) => ($action['key'] ?? null) === $key);
     }
 
     /**
@@ -509,13 +503,7 @@ final readonly class AdminRecordActionService
      */
     private function hasWorkflowAction(array $actions): bool
     {
-        foreach ($actions as $action) {
-            if (($action['category'] ?? null) === 'workflow') {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($actions, fn($action) => ($action['category'] ?? null) === 'workflow');
     }
 
     /**
@@ -523,13 +511,7 @@ final readonly class AdminRecordActionService
      */
     private function hasWorkflowSchemaAction(array $actions): bool
     {
-        foreach ($actions as $action) {
-            if (($action['category'] ?? null) === 'workflow_schema') {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($actions, fn($action) => ($action['category'] ?? null) === 'workflow_schema');
     }
 
     /**

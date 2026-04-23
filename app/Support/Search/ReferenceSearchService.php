@@ -119,7 +119,7 @@ class ReferenceSearchService
                     $this->normalizeText((string) $reference->author),
                     $this->normalizeText((string) $reference->publisher),
                     $this->normalizeText((string) $reference->slug),
-                    $this->normalizeText((string) strip_tags((string) $reference->description)),
+                    $this->normalizeText(strip_tags((string) $reference->description)),
                 ], static fn (string $candidate): bool => $candidate !== ''));
 
                 $scoreCandidates = [];
