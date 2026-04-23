@@ -345,7 +345,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `fetch` | Fetch one verified MajlisIlmu documentation page by id | MCP-only documentation fetch tool |
 | `admin-list-resources` | List accessible admin resources and their capability summary | `GET /api/v1/admin/manifest` |
 | `admin-get-resource-meta` | Read one admin resource's metadata, pages, relations, abilities, and write-support flags | `GET /api/v1/admin/{resourceKey}/meta` |
-| `admin-list-records` | List records for one admin resource with optional search and pagination | `GET /api/v1/admin/{resourceKey}` |
+| `admin-list-records` | List records for one admin resource with optional search, structured filters, date filters, and pagination | `GET /api/v1/admin/{resourceKey}` |
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | MCP-only next-step action guidance tool |
@@ -366,6 +366,8 @@ Admin tool behavior notes:
 
 - `validate_only=true` is supported for create/update preview flows.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
+- `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
+- For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
 - `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
 - The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
@@ -530,7 +532,7 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `fetch` | Fetch the full text of one verified docs page | `id` |
 | `admin-list-resources` | Discover accessible admin resources | `verbose?`, `writable_only?` |
 | `admin-get-resource-meta` | Inspect one resource’s metadata, routes, relations, and abilities | `resource_key` |
-| `admin-list-records` | Search and paginate records for one admin resource | `resource_key`, `search?`, `page?`, `per_page?` |
+| `admin-list-records` | Search and paginate records for one admin resource | `resource_key`, `search?`, `filters?`, `starts_after?`, `starts_before?`, `starts_on_local_date?`, `page?`, `per_page?` |
 | `admin-list-related-records` | Traverse a named relation on a record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `admin-get-record` | Read one admin record and its permissions | `resource_key`, `record_key` |
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | `resource_key`, `record_key` |

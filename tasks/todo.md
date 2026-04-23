@@ -20,6 +20,51 @@
   - `vendor/bin/pint --dirty` => pass
   - `git diff --check` => pass
 
+# MCP Events Report Hardening
+
+- [x] Reconcile the external MCP events report against the current runtime and published connector contract
+- [x] Add focused MCP admin event-list coverage for single filters, date-plus-filter, date-range, and search shapes
+- [x] Tighten MCP docs/examples so `admin-list-records` clearly advertises `filters` and date-only range arguments
+- [x] Run focused verification and record the final review outcome
+
+## Review
+
+- Findings:
+  - The report’s claimed `filters` failure does not reproduce on the current admin MCP runtime; structured event filters, date-plus-filter requests, date ranges, and search are all healthy on the current codebase.
+  - The real gap was confidence and contract clarity: existing MCP regression coverage proved baseline listing, one structured-filter case, and local-date filtering, but it did not explicitly lock the single-filter, combined date+filter, date-range, or search shapes described in the report.
+  - The MCP guide and examples also under-described `admin-list-records`, especially the `filters` object shape and the fact that `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` arguments rather than ISO 8601 timestamps.
+- Changes:
+  - Added focused admin MCP regression coverage for single `status` / `is_active` / `visibility` / `timing_mode` filters, local-date plus filters, `starts_after` / `starts_before` range queries, and search plus local-date queries.
+  - Tightened `docs/MAJLISILMU_MCP_GUIDE.md` so `admin-list-records` explicitly advertises structured filters and date filters in both the tool catalog and compact appendix.
+  - Added concrete `admin-list-records` examples to `docs/MAJLISILMU_MCP_TOOL_EXAMPLES.md`, including structured filters, local-date plus filters, and date-range examples.
+  - Extended the MCP guide docs test to lock the new `admin-list-records` argument row and the clarified filter/date-contract language.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php --filter='filters admin event records by structured filters through the MCP server|filters admin event records by single status, boolean, visibility, and timing filters through the MCP server|filters admin event records by local date through the MCP server|combines local-date and structured filters through the MCP server|filters admin event records by local date ranges through the MCP server|searches admin event records and combines search with local dates through the MCP server|lists admin event records without server errors through the MCP server'` => 7 passed, 122 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideDocsTest.php` => 2 passed, 110 assertions
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `git diff --check` => pass
+
+# MCP Events Report Verification
+
+- [x] Re-check the reported `admin-list-records` failure against the current local code and installed database
+- [x] Compare the report against recent event MCP and event-change relation fixes
+- [x] Record whether a new patch is required or whether the report points to an older runtime state
+
+## Review
+
+- Findings:
+  - The current checkout does not reproduce the reported MCP failure. `admin-list-records` for `resource_key=events` succeeds locally with both `filters={"status":"approved","is_active":true}` and `starts_on_local_date=2026-04-24`.
+  - Focused MCP regression coverage also passes in the current codebase for unfiltered event listing, structured filters, and local-date filtering.
+  - The installed code already contains the April 24 event-list hardening work: `8abe456` added admin MCP event-list regression coverage, while `166cb5e` and `4938bc2` replaced the UUID-unsafe latest published announcement lookup with a PostgreSQL-safe `whereNotExists` strategy.
+  - A recent `laravel.log` entry still shows the old `max(uuid)` failure shape on `/majlis`, which is consistent with a stale worker or older backend instance rather than a remaining bug in the checked-out code.
+- Outcome:
+  - No additional code patch was required during this verification pass.
+  - If ChatGPT still sees `server_error` from MCP, the backend instance serving MCP should be checked for stale code/opcache or an older deploy that predates the April 24 fixes.
+- Verification:
+  - `php artisan test --filter="lists admin event records without server errors through the MCP server|filters admin event records by local date through the MCP server|filters admin event records by structured filters through the MCP server" tests/Feature/Mcp/AdminServerTest.php` => 3 passed, 38 assertions
+  - `php artisan tinker --execute="..."` admin `AdminResourceService::listRecords(resourceKey: 'events', filters: ['status' => 'approved', 'is_active' => true], startsOnLocalDate: '2026-04-24')` => success
+  - `php artisan tinker --execute="..."` admin `AdminResourceService::listRecords(resourceKey: 'events', filters: ['status' => 'approved', 'is_active' => true])` => success
+
 # Saved Search Normalization Follow-up
 
 - [x] Re-audit the shared saved-search normalizer against the page/Livewire write path

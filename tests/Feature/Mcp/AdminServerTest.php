@@ -450,6 +450,82 @@ it('filters admin event records by structured filters through the MCP server', f
             ->etc());
 });
 
+it('filters admin event records by single status, boolean, visibility, and timing filters through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $approvedActivePublicAbsolute = Event::factory()->create([
+        'title' => 'Admin MCP Single Filter Approved Active Public Absolute',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'timing_mode' => 'absolute',
+        'is_active' => true,
+    ]);
+
+    $draftInactivePrivatePrayerRelative = Event::factory()->create([
+        'title' => 'Admin MCP Single Filter Draft Inactive Private Prayer Relative',
+        'status' => 'draft',
+        'visibility' => EventVisibility::Private,
+        'timing_mode' => 'prayer_relative',
+        'is_active' => false,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'filters' => [
+                'status' => 'approved',
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $approvedActivePublicAbsolute->getKey())
+            ->where('data.0.title', 'Admin MCP Single Filter Approved Active Public Absolute')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'filters' => [
+                'is_active' => false,
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $draftInactivePrivatePrayerRelative->getKey())
+            ->where('data.0.title', 'Admin MCP Single Filter Draft Inactive Private Prayer Relative')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'filters' => [
+                'visibility' => 'public',
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $approvedActivePublicAbsolute->getKey())
+            ->where('data.0.title', 'Admin MCP Single Filter Approved Active Public Absolute')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'filters' => [
+                'timing_mode' => 'prayer_relative',
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $draftInactivePrivatePrayerRelative->getKey())
+            ->where('data.0.title', 'Admin MCP Single Filter Draft Inactive Private Prayer Relative')
+            ->etc());
+});
+
 it('surfaces public event change projections on admin event record detail through the MCP server', function () {
     $admin = adminMcpUser('super_admin');
     $actor = User::factory()->create();
@@ -572,6 +648,178 @@ it('filters admin event records by local date through the MCP server', function 
             ->where('data.0.attributes.starts_on_local_date', '2026-05-01')
             ->where('meta.resource.key', 'events')
             ->where('meta.search', null)
+            ->etc());
+});
+
+it('combines local-date and structured filters through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $admin->forceFill([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $matchingEvent = Event::factory()->create([
+        'title' => 'Admin MCP Date Plus Filter Match',
+        'starts_at' => Carbon::parse('2026-05-06 02:00:00', 'UTC'),
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Admin MCP Date Plus Filter Wrong Status',
+        'starts_at' => Carbon::parse('2026-05-06 05:00:00', 'UTC'),
+        'status' => 'draft',
+        'is_active' => true,
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Admin MCP Date Plus Filter Wrong Date',
+        'starts_at' => Carbon::parse('2026-05-07 02:00:00', 'UTC'),
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'starts_on_local_date' => '2026-05-06',
+            'filters' => [
+                'status' => 'approved',
+                'is_active' => true,
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $matchingEvent->getKey())
+            ->where('data.0.title', 'Admin MCP Date Plus Filter Match')
+            ->where('data.0.attributes.starts_on_local_date', '2026-05-06')
+            ->etc());
+});
+
+it('filters admin event records by local date ranges through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $admin->forceFill([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $beforeRange = Event::factory()->create([
+        'title' => 'Admin MCP Date Range Before',
+        'starts_at' => Carbon::parse('2026-05-01 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    $withinRange = Event::factory()->create([
+        'title' => 'Admin MCP Date Range Within',
+        'starts_at' => Carbon::parse('2026-05-03 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    $afterRange = Event::factory()->create([
+        'title' => 'Admin MCP Date Range After',
+        'starts_at' => Carbon::parse('2026-05-05 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'starts_after' => '2026-05-03',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 2)
+            ->where('data', fn (mixed $records): bool => collect($records)
+                ->pluck('id')
+                ->sort()
+                ->values()
+                ->all() === collect([
+                    (string) $withinRange->getKey(),
+                    (string) $afterRange->getKey(),
+                ])->sort()->values()->all())
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'starts_before' => '2026-05-03',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 2)
+            ->where('data', fn (mixed $records): bool => collect($records)
+                ->pluck('id')
+                ->sort()
+                ->values()
+                ->all() === collect([
+                    (string) $beforeRange->getKey(),
+                    (string) $withinRange->getKey(),
+                ])->sort()->values()->all())
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'starts_after' => '2026-05-02',
+            'starts_before' => '2026-05-04',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $withinRange->getKey())
+            ->where('data.0.title', 'Admin MCP Date Range Within')
+            ->etc());
+});
+
+it('searches admin event records and combines search with local dates through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $admin->forceFill([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $kuliahEvent = Event::factory()->create([
+        'title' => 'Admin MCP Search Kuliah Match',
+        'starts_at' => Carbon::parse('2026-05-08 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    $dhuhaDateMatch = Event::factory()->create([
+        'title' => 'Admin MCP Search Dhuha Date Match',
+        'starts_at' => Carbon::parse('2026-05-08 03:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Admin MCP Search Dhuha Wrong Date',
+        'starts_at' => Carbon::parse('2026-05-09 03:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'search' => 'Kuliah Match',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $kuliahEvent->getKey())
+            ->where('data.0.title', 'Admin MCP Search Kuliah Match')
+            ->where('meta.search', 'Kuliah Match')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'search' => 'Dhuha',
+            'starts_on_local_date' => '2026-05-08',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $dhuhaDateMatch->getKey())
+            ->where('data.0.title', 'Admin MCP Search Dhuha Date Match')
+            ->where('data.0.attributes.starts_on_local_date', '2026-05-08')
+            ->where('meta.search', 'Dhuha')
             ->etc());
 });
 
