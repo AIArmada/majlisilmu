@@ -191,14 +191,12 @@ class Show extends Component
     #[Computed]
     public function replacementEvent(): ?Event
     {
-        return $this->resolveLatestReachableReplacementEvent(
-            $this->event->latestPublishedReplacementAnnouncement?->replacementEvent,
-        );
+        return $this->event->replacementLinkTarget();
     }
 
     public function replacementLinkTargetForAnnouncement(EventChangeAnnouncement $announcement): ?Event
     {
-        return $this->resolveLatestReachableReplacementEvent($announcement->replacementEvent);
+        return $this->event->replacementLinkTargetForAnnouncement($announcement);
     }
 
     #[Computed]
@@ -562,39 +560,6 @@ class Show extends Component
             'thumb' => $thumbnailUrl !== '' ? $thumbnailUrl : ($fullImageUrl !== '' ? $fullImageUrl : $media->getUrl()),
             'alt' => filled($media->name) ? (string) $media->name : $fallbackAlt,
         ];
-    }
-
-    protected function resolveLatestReachableReplacementEvent(?Event $event): ?Event
-    {
-        if (! $event instanceof Event) {
-            return null;
-        }
-
-        /** @var array<string, true> $visited */
-        $visited = [(string) $this->event->getKey() => true];
-        $current = $event;
-        $latestReachable = null;
-
-        while (! isset($visited[(string) $current->getKey()])) {
-            $visited[(string) $current->getKey()] = true;
-
-            if ($current->isPubliclyReachable()) {
-                $latestReachable = $current;
-            }
-
-            $current->loadMissing('latestPublishedReplacementAnnouncement.replacementEvent');
-
-            $nextAnnouncement = $current->latestPublishedReplacementAnnouncement;
-            $nextReplacement = $nextAnnouncement?->replacementEvent;
-
-            if (! $nextAnnouncement instanceof EventChangeAnnouncement || ! $nextReplacement instanceof Event) {
-                break;
-            }
-
-            $current = $nextReplacement;
-        }
-
-        return $latestReachable;
     }
 
     public function render(): View

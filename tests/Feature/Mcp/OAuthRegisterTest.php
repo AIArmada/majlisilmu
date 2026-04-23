@@ -2,8 +2,20 @@
 
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Route;
+use Laravel\Mcp\Server\McpServiceProvider;
 use Laravel\Passport\Client;
 use Laravel\Passport\ClientRepository;
+use Laravel\Passport\PassportServiceProvider;
+
+it('boots Passport and MCP auth providers for connector routes', function (): void {
+    expect(app()->providerIsLoaded(PassportServiceProvider::class))->toBeTrue()
+        ->and(app()->providerIsLoaded(McpServiceProvider::class))->toBeTrue()
+        ->and(Route::has('passport.authorizations.authorize'))->toBeTrue()
+        ->and(Route::has('passport.token'))->toBeTrue()
+        ->and(Route::has('mcp.oauth.authorization-server.nested'))->toBeTrue()
+        ->and(Route::has('mcp.oauth.protected-resource.nested'))->toBeTrue();
+});
 
 it('registers MCP OAuth clients without using Passport schema introspection', function (): void {
     config()->set('mcp.redirect_domains', [

@@ -6,6 +6,9 @@ use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
 use App\Enums\EventAgeGroup;
+use App\Enums\EventChangeSeverity;
+use App\Enums\EventChangeStatus;
+use App\Enums\EventChangeType;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventPrayerTime;
@@ -38,6 +41,7 @@ use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
 use App\Models\ContributionRequest;
 use App\Models\DonationChannel;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\MembershipClaim;
@@ -441,6 +445,97 @@ it('filters admin event records by structured filters through the MCP server', f
             ->where('data.0.id', $draftOnlineEvent->getKey())
             ->where('data.0.title', 'Admin MCP Filtered Draft Online Event')
             ->where('meta.resource.key', 'events')
+            ->etc());
+});
+
+it('surfaces public event change projections on admin event record detail through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $actor = User::factory()->create();
+    $original = Event::factory()->create([
+        'title' => 'Admin MCP Change Surface Original',
+        'slug' => 'admin-mcp-change-surface-original',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+    $firstReplacement = Event::factory()->create([
+        'title' => 'Admin MCP Change Surface First Replacement',
+        'slug' => 'admin-mcp-change-surface-first-replacement',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+    $finalReplacement = Event::factory()->create([
+        'title' => 'Admin MCP Change Surface Final Replacement',
+        'slug' => 'admin-mcp-change-surface-final-replacement',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    EventChangeAnnouncement::unguarded(function () use ($actor, $original, $firstReplacement, $finalReplacement): void {
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $original->id,
+            'replacement_event_id' => $firstReplacement->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Sila rujuk majlis pengganti pertama.',
+            'changed_fields' => [],
+            'published_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $firstReplacement->id,
+            'replacement_event_id' => $finalReplacement->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Majlis pengganti pertama diganti pula.',
+            'changed_fields' => [],
+            'published_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $original->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::Other,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::Info,
+            'public_message' => 'Nota terkini untuk pautan lama.',
+            'changed_fields' => ['title'],
+            'published_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+        ]);
+    });
+
+    $finalReplacement->update([
+        'visibility' => EventVisibility::Private,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetRecordTool::class, [
+            'resource_key' => 'events',
+            'record_key' => $original->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'events')
+            ->where('data.record.route_key', $original->getRouteKey())
+            ->where('data.record.attributes.active_change_notice.type', EventChangeType::Other->value)
+            ->where('data.record.attributes.replacement_event.id', $firstReplacement->id)
+            ->where('data.record.attributes.change_announcements.1.type', EventChangeType::ReplacementLinked->value)
+            ->where('data.record.attributes.change_announcements.1.replacement_event.id', $firstReplacement->id)
+            ->missing('data.record.attributes.latest_published_change_announcement')
+            ->missing('data.record.attributes.latest_published_replacement_announcement')
+            ->missing('data.record.attributes.published_change_announcements')
             ->etc());
 });
 

@@ -1,5 +1,8 @@
 <?php
 
+use App\Enums\EventChangeSeverity;
+use App\Enums\EventChangeStatus;
+use App\Enums\EventChangeType;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
@@ -8,11 +11,13 @@ use App\Enums\ReferenceType;
 use App\Enums\TimingMode;
 use App\Models\District;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
+use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -909,4 +914,111 @@ it('serializes included institution address display fields on event detail paylo
         ->assertJsonPath('data.institution.map_lat', 3.139)
         ->assertJsonPath('data.institution.map_lng', 101.6869)
         ->assertJsonPath('data.institution.waze_url', 'https://waze.com/ul?ll=3.1390,101.6869');
+});
+
+it('returns active unlisted event detail payloads when the client already has the direct identifier', function () {
+    $event = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Unlisted,
+        'is_active' => true,
+        'slug' => 'api-unlisted-event-detail',
+    ]);
+
+    $this->getJson('/api/v1/events/'.$event->getRouteKey())
+        ->assertOk()
+        ->assertJsonPath('data.id', $event->id)
+        ->assertJsonPath('data.visibility', EventVisibility::Unlisted->value);
+});
+
+it('serializes event change notices and latest reachable replacement targets on event detail payloads', function () {
+    $actor = User::factory()->create();
+    $original = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'title' => 'API Change Surface Original',
+        'slug' => 'api-change-surface-original',
+    ]);
+    $firstReplacement = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'title' => 'API Change Surface First Replacement',
+        'slug' => 'api-change-surface-first-replacement',
+    ]);
+    $finalReplacement = Event::factory()->create([
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+        'title' => 'API Change Surface Final Replacement',
+        'slug' => 'api-change-surface-final-replacement',
+    ]);
+
+    EventChangeAnnouncement::unguarded(function () use ($actor, $original, $firstReplacement, $finalReplacement): void {
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $original->id,
+            'replacement_event_id' => $firstReplacement->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Sila rujuk majlis pengganti pertama.',
+            'changed_fields' => [],
+            'published_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $firstReplacement->id,
+            'replacement_event_id' => $finalReplacement->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Majlis pengganti pertama diganti pula.',
+            'changed_fields' => [],
+            'published_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $original->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::Other,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::Info,
+            'public_message' => 'Nota terkini untuk pautan lama.',
+            'changed_fields' => ['title'],
+            'published_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+        ]);
+    });
+
+    $finalReplacement->update([
+        'visibility' => EventVisibility::Private,
+    ]);
+
+    $response = $this->getJson('/api/v1/events/'.$original->getRouteKey());
+
+    $response->assertOk()
+        ->assertJsonPath('data.active_change_notice.type', EventChangeType::Other->value)
+        ->assertJsonPath('data.active_change_notice.public_message', 'Nota terkini untuk pautan lama.')
+        ->assertJsonPath('data.active_change_notice.replacement_event', null)
+        ->assertJsonPath('data.replacement_event.id', $firstReplacement->id)
+        ->assertJsonPath('data.replacement_event.route_key', $firstReplacement->getRouteKey())
+        ->assertJsonPath('data.replacement_event.slug', $firstReplacement->slug)
+        ->assertJsonCount(2, 'data.change_announcements')
+        ->assertJsonPath('data.change_announcements.0.type', EventChangeType::Other->value)
+        ->assertJsonPath('data.change_announcements.1.type', EventChangeType::ReplacementLinked->value)
+        ->assertJsonPath('data.change_announcements.1.replacement_event.id', $firstReplacement->id)
+        ->assertJsonPath('data.change_announcements.1.replacement_event.slug', $firstReplacement->slug)
+        ->assertJsonMissingPath('data.latest_published_change_announcement')
+        ->assertJsonMissingPath('data.latest_published_replacement_announcement')
+        ->assertJsonMissingPath('data.published_change_announcements');
+
+    expect($response->json('data.replacement_event.id'))->not->toBe($finalReplacement->id)
+        ->and($response->json('data.change_announcements.1.replacement_event.id'))->not->toBe($finalReplacement->id);
 });

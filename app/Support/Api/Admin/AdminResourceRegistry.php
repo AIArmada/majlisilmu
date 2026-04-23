@@ -2,6 +2,7 @@
 
 namespace App\Support\Api\Admin;
 
+use App\Data\Api\Event\EventPayloadData;
 use App\Enums\EventFormat;
 use App\Enums\EventStructure;
 use App\Enums\EventType;
@@ -534,7 +535,9 @@ class AdminResourceRegistry
         return [
             'route_key' => (string) $record->getRouteKey(),
             'title' => $this->htmlableToString($resourceClass::getRecordTitle($record)),
-            'attributes' => $this->serializeAttributes($record),
+            'attributes' => $record instanceof Event
+                ? EventPayloadData::fromModel($record)->toArray()
+                : $this->serializeAttributes($record),
             'abilities' => $this->recordAbilities($resourceClass, $record),
             'panel_routes' => [
                 'view' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => $record], panel: 'admin') : null,
