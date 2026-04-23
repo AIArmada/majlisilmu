@@ -1,3 +1,84 @@
+# Saved Search Normalization Follow-up
+
+- [x] Re-audit the shared saved-search normalizer against the page/Livewire write path
+- [x] Canonicalize scalar saved-search filters in the shared normalizer and drop structurally invalid page-query values
+- [x] Add regression coverage for API and page writes, then rerun focused tests plus repo checks
+
+## Review
+
+- Findings:
+  - The new saved-search API validation was stricter than the shared action/Livewire write path. A tampered saved-search page URL could still persist raw scalar filters like invalid dates, invalid UUID-shaped location filters, and unnormalized boolean/time values even though the API rejected or canonicalized them.
+  - `SavedSearchFilterNormalizer` now canonicalizes geography integers, UUID filters, date filters, time filters, trimmed text filters, and boolean-like filters for every write path, not just enum-backed filters.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/SavedSearchApiTest.php` => 26 passed, 115 assertions
+  - `vendor/bin/pest --parallel tests/Feature/SavedSearchPageTest.php` => 24 passed, 97 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --dirty` => pass
+  - `git diff --check` => pass
+
+# Event Enum Backing Value Audit
+
+- [x] Audit event enum storage and repair migration for label dependencies
+- [x] Audit raw API, MCP, frontend form, backend mutation, query, search, and cache surfaces
+- [x] Patch confirmed enum backing-value defects with focused tests
+- [x] Rerun targeted tests, PHPStan, formatter, database policy scans, and diff checks
+- [x] Record final audit outcome
+
+## Review
+
+- Findings:
+  - The event repair migration was building aliases from mutable enum display labels; it now uses hardcoded legacy aliases and current backing-value targets.
+  - Saved-search enum filter storage accepted some enum-like filters without backing-value validation; saved-search create/update now normalize through a shared backing-value normalizer and API validation rejects display labels.
+  - Saved-search execution omitted `starts_on_local_date`; stored local-date filters are now passed into event search execution.
+  - Legacy saved-search filter JSON could retain old labels; added a forward repair migration for saved-search enum filter labels.
+- API/docs outcome: the saved-search API needed tightening for enum filter validation/canonical storage, and the mobile API docs/examples were updated to state that saved-search enum filters use backing values.
+- Verification:
+  - `vendor/bin/pest --parallel tests/Feature/SavedSearchApiTest.php` => 24 passed, 94 assertions
+  - `vendor/bin/pest --parallel tests/Feature/SavedSearchPageTest.php` => 22 passed, 75 assertions
+  - `vendor/bin/pest --parallel tests/Feature/Mcp/AdminServerTest.php --filter="lists admin event records after repairing legacy enum values through the MCP server"` => 1 passed, 27 assertions
+  - `vendor/bin/pest --parallel tests/Feature/Mcp/MemberServerTest.php --filter="returns focused next-step actions"` => 1 passed, 14 assertions
+  - `vendor/bin/pest --parallel tests/Feature/Api/EventApiContractTest.php --filter="event_type|prayer|local date"` => 8 passed, 30 assertions
+  - `vendor/bin/pest --parallel tests/Feature/ScrambleDocsTest.php --filter="OpenAPI|openapi|generates"` => 1 passed, 3 assertions
+  - `vendor/bin/pest --parallel tests/Unit/McpGuideDocsTest.php` => 2 passed, 105 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --dirty` => pass
+  - Package database constraint/cascade scan => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database/ app/Models/` => no matches
+  - `git diff --check` => pass
+
+# MCP Events List Failure
+
+- [x] Review project lessons and applicable Laravel/MCP/Pest coding rules
+- [x] Trace changes from `64679e026fb85d7cca0cea069ce7e293ea595b05` through current `HEAD`
+- [x] Reproduce the `admin-list-records` failure for the `events` resource
+- [x] Identify the event-specific query, authorization, serializer, relation, or bad-data trigger
+- [x] Patch the root cause with an idempotent data repair migration
+- [x] Add focused regression coverage for repaired event MCP listing
+- [x] Run targeted tests, PHPStan/formatter where relevant, and database policy scans
+- [x] Record the final review and verification results
+
+## Review
+
+- Root cause: the admin MCP event list path serializes event records through enum-backed model casts. A legacy event row that still stored display labels such as `Kuliah / Ceramah` / `Semua Peringkat Umur`, or stale timing enum labels, could throw during `EventPayloadData` construction and make every `events` list request return `server_error`.
+- Added a forward data repair migration that normalizes legacy `events.event_type`, `events.age_group`, `events.timing_mode`, `events.prayer_reference`, and `events.prayer_offset` values to the current enum backing values.
+- Restored `EventPayloadData` to normal strict serialization so the payload contract assumes repaired persisted data instead of masking invalid rows at read time.
+- Added regression coverage for repairing the legacy row shape before `admin-list-records` with `resource_key=events`, `filters.status=approved`, and `starts_on_local_date=2026-04-23`.
+- Audited the raw HTTP API surfaces and found no runtime API fix needed; the existing contracts already expect enum backing values. Updated the generated API quickstart, mobile API reference, and MCP guide to make that requirement explicit for event enum filters and write payloads.
+- Fixed a separate recent MCP regression discovered during verification: `MemberGetRecordActionsTool` no longer passes an unsupported `actor` named argument to `MemberRecordActionService::describe()`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php --filter='lists admin event records without server errors|lists admin event records after repairing legacy enum values|filters admin event records by local date|filters admin event records by structured filters'` => 4 passed, 65 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 64 passed, 1001 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php` => 35 passed, 439 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/EventApiContractTest.php` => 27 passed, 174 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='adds summaries and descriptions to catalog and authenticated workflow endpoints|generates openapi docs'` => 1 passed, 26 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideDocsTest.php` => 2 passed, 105 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/phpstan analyse --ansi --no-progress app/Support/ApiDocumentation/ApiDocumentationConfigFactory.php tests/Feature/ScrambleDocsTest.php tests/Unit/McpGuideDocsTest.php` => pass
+  - `vendor/bin/pint --dirty --test --format agent` => pass
+  - `rg -n -- "constrained\(|cascadeOnDelete\(" database` plus package database scan => no matches
+  - `rg -n -- "softDeletes\(\)|SoftDeletes" database app/Models` => no matches
+  - `git diff --check` => pass
+
 # Hybrid Event Change Second Audit
 
 - [x] Re-review the changed event-change persistence, URL, authorization, notification, Filament, public UI, and test surfaces

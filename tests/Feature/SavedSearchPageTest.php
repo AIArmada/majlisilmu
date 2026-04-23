@@ -67,6 +67,70 @@ it('allows authenticated users to create and delete saved searches', function ()
     expect(SavedSearch::where('id', $savedSearch->id)->exists())->toBeFalse();
 });
 
+it('drops unsupported speaker-only key person roles before saving searches from the page', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams([
+        'key_person_roles' => [EventKeyPersonRole::Speaker->value],
+    ])->test(SavedSearchesIndex::class)
+        ->set('name', 'Speaker Role Search')
+        ->set('notify', 'daily')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $savedSearch = SavedSearch::query()
+        ->where('user_id', $user->id)
+        ->where('name', 'Speaker Role Search')
+        ->first();
+
+    expect($savedSearch)->not->toBeNull()
+        ->and(data_get($savedSearch?->filters, 'key_person_roles'))->toBeNull();
+});
+
+it('normalizes tampered saved search scalar filters before storing them from the page', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams([
+        'country_id' => '0132',
+        'institution_id' => 'not-a-uuid',
+        'starts_after' => '2026-04-23',
+        'starts_before' => '23-04-2026',
+        'starts_time_from' => '8:05',
+        'starts_time_until' => '25:99',
+        'children_allowed' => 'yes',
+        'has_event_url' => '0',
+        'person_in_charge_search' => '  Penyelaras Saf  ',
+        'time_scope' => 'all',
+    ])->test(SavedSearchesIndex::class)
+        ->set('name', 'Normalized Scalar Search')
+        ->set('notify', 'daily')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $savedSearch = SavedSearch::query()
+        ->where('user_id', $user->id)
+        ->where('name', 'Normalized Scalar Search')
+        ->first();
+
+    expect($savedSearch)->not->toBeNull()
+        ->and($savedSearch?->filters)->toMatchArray([
+            'country_id' => 132,
+            'starts_after' => '2026-04-23',
+            'starts_time_from' => '08:05',
+            'children_allowed' => true,
+            'has_event_url' => false,
+            'person_in_charge_search' => 'Penyelaras Saf',
+            'time_scope' => 'all',
+        ])
+        ->and(data_get($savedSearch?->filters, 'institution_id'))->toBeNull()
+        ->and(data_get($savedSearch?->filters, 'starts_before'))->toBeNull()
+        ->and(data_get($savedSearch?->filters, 'starts_time_until'))->toBeNull();
+});
+
 it('enforces the max 10 saved searches rule on the page', function () {
     $user = User::factory()->create();
 

@@ -6,8 +6,12 @@ use App\Actions\SavedSearches\CreateSavedSearchAction;
 use App\Actions\SavedSearches\ExecuteSavedSearchAction;
 use App\Actions\SavedSearches\UpdateSavedSearchAction;
 use App\Enums\EventAgeGroup;
+use App\Enums\EventFormat;
+use App\Enums\EventGenderRestriction;
 use App\Enums\EventKeyPersonRole;
+use App\Enums\EventPrayerTime;
 use App\Enums\EventType;
+use App\Enums\TimingMode;
 use App\Exceptions\SavedSearchLimitReachedException;
 use App\Http\Controllers\Controller;
 use App\Models\SavedSearch;
@@ -192,13 +196,30 @@ class SavedSearchController extends Controller
             'filters.state_id' => 'nullable|integer|exists:states,id',
             'filters.district_id' => 'nullable|integer|exists:districts,id',
             'filters.subdistrict_id' => 'nullable|integer|exists:subdistricts,id',
+            'filters.institution_id' => 'nullable|uuid|exists:institutions,id',
+            'filters.venue_id' => 'nullable|uuid|exists:venues,id',
             'filters.language_codes' => 'nullable|array',
             'filters.language_codes.*' => 'string|max:12',
             'filters.event_type' => 'nullable|array',
             'filters.event_type.*' => ['string', Rule::in(array_column(EventType::cases(), 'value'))],
+            'filters.event_format' => 'nullable|array',
+            'filters.event_format.*' => ['string', Rule::in(array_column(EventFormat::cases(), 'value'))],
+            'filters.gender' => ['nullable', 'string', Rule::in(array_column(EventGenderRestriction::cases(), 'value'))],
             'filters.age_group' => 'nullable|array',
             'filters.age_group.*' => ['string', Rule::in(array_column(EventAgeGroup::cases(), 'value'))],
+            'filters.starts_after' => 'nullable|date_format:Y-m-d',
+            'filters.starts_before' => 'nullable|date_format:Y-m-d',
             'filters.starts_on_local_date' => 'nullable|date_format:Y-m-d',
+            'filters.time_scope' => ['nullable', 'string', Rule::in(['upcoming', 'past', 'all'])],
+            'filters.prayer_time' => ['nullable', 'string', Rule::in(array_column(EventPrayerTime::cases(), 'value'))],
+            'filters.timing_mode' => ['nullable', 'string', Rule::in(array_column(TimingMode::cases(), 'value'))],
+            'filters.starts_time_from' => ['nullable', 'string', 'max:32', $this->validTimeFilterRule()],
+            'filters.starts_time_until' => ['nullable', 'string', 'max:32', $this->validTimeFilterRule()],
+            'filters.children_allowed' => ['nullable', $this->validBooleanFilterRule()],
+            'filters.is_muslim_only' => ['nullable', $this->validBooleanFilterRule()],
+            'filters.has_event_url' => ['nullable', $this->validBooleanFilterRule()],
+            'filters.has_live_url' => ['nullable', $this->validBooleanFilterRule()],
+            'filters.has_end_time' => ['nullable', $this->validBooleanFilterRule()],
             'filters.speaker_ids' => 'nullable|array',
             'filters.speaker_ids.*' => 'uuid|exists:speakers,id',
             'filters.key_person_roles' => 'nullable|array',
@@ -231,6 +252,36 @@ class SavedSearchController extends Controller
                 ? ['sometimes', 'required', Rule::in(['off', 'instant', 'daily', 'weekly'])]
                 : ['required', Rule::in(['off', 'instant', 'daily', 'weekly'])],
         ];
+    }
+
+    private function validTimeFilterRule(): \Closure
+    {
+        return static function (string $attribute, mixed $value, \Closure $fail): void {
+            if (! is_string($value) || trim($value) === '') {
+                return;
+            }
+
+            try {
+                now()->setTimeFromTimeString(trim($value));
+            } catch (\Throwable) {
+                $fail('The '.$attribute.' must be a valid time.');
+            }
+        };
+    }
+
+    private function validBooleanFilterRule(): \Closure
+    {
+        return static function (string $attribute, mixed $value, \Closure $fail): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            if (is_bool($value) || in_array($value, [1, '1', 'true', 'on', 'yes', 0, '0', 'false', 'off', 'no'], true)) {
+                return;
+            }
+
+            $fail('The '.$attribute.' field must be boolean-like.');
+        };
     }
 
     /**

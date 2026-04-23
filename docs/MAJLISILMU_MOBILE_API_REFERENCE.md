@@ -78,6 +78,19 @@ GET /api/v1/events?filter[speaker]=019d5cb5-7de1-7055-a4d3-b57ab007331e&filter[s
 
 Date-only event filters such as filter[starts_after], filter[starts_before], and filter[starts_on_local_date] are interpreted in the resolved request timezone.
 
+## Enum Value Semantics
+
+Enum fields in API filters, form payloads, admin write payloads, and MCP arguments use the enum backing value, not the display label.
+
+Examples:
+
+- Send `event_type = ["kuliah_ceramah"]`, not `["Kuliah / Ceramah"]`
+- Send `age_group = ["all_ages"]`, not `["Semua Peringkat Umur"]`
+- Send `timing_mode = "prayer_relative"`, not `"Prayer Time"`
+- Send `prayer_reference = "maghrib"` and `prayer_offset = "immediately"`, not localized prayer labels
+
+Labels may change for translation or product wording. Backing values are the stable API contract.
+
 **Implications for API consumers:**
 
 - When you receive `starts_at: "2026-04-12T00:00:00Z"`, that is midnight UTC, which is **08:00 MYT** on the same calendar date.
@@ -832,6 +845,8 @@ Safe defaults are surfaced as `set_field` actions, unresolved enums/catalog choi
 
 > **Record filtering:** event admin collections support `filter[status]`, `filter[visibility]`, `filter[event_format]`, `filter[event_type]`, `filter[timing_mode]`, and `filter[prayer_reference]`. Speaker admin collections support `filter[status]`, `filter[is_active]`, and `filter[has_events]`. Date-aware admin collections also support `starts_after`, `starts_before`, and `starts_on_local_date`.
 
+> **Enum filters:** send enum backing values in filters. For example, use `filter[event_type]=kuliah_ceramah`, `filter[timing_mode]=prayer_relative`, and `filter[prayer_reference]=maghrib`; do not send display labels.
+
 Authorization note:
 
 - The admin API now follows the same top-level access rule as the Filament admin panel: any authenticated user with application admin-panel access can reach it.
@@ -940,6 +955,7 @@ Nested collection item contracts for institutions:
 ### Event-specific update rules
 
 - Event `PUT` is sparse on the raw admin API. Core fields such as `title`, `event_date`, `prayer_time`, `timezone`, `event_format`, `visibility`, `gender`, `age_group`, and `event_type` are required on create, but they may be omitted on update.
+- Event enum write values must use backing values from the schema. Do not submit display labels for `event_type`, `age_group`, `timing_mode`, `prayer_reference`, or `prayer_offset`.
 - Optional URL scalars like `event_url`, `live_url`, and `recording_url` preserve the current value when omitted and clear to `null` when you send `null` or `""`.
 - The relation arrays `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, and `issue_tags` use server-merged replacement semantics on update: omit to preserve the current set, send `null` or `[]` to clear, and send the full replacement list when changing them.
 - `speakers` and `other_key_people` also preserve on omission, but any submitted array rebuilds the underlying `key_people` rows. Stable item ids are not preserved, and payload order becomes the new `order_column` sequence (speaker rows first, then `other_key_people`).
@@ -1303,6 +1319,8 @@ Selected fields:
 - `lat`
 - `lng`
 - `notify`
+
+Saved-search `filters` use the same enum backing-value contract as event discovery. Store values such as `event_type: ["kuliah_ceramah"]`, `event_format: ["online"]`, `gender: "all"`, `age_group: ["all_ages"]`, `prayer_time: "selepas_maghrib"`, and `timing_mode: "prayer_relative"`; do not store display labels.
 
 ---
 

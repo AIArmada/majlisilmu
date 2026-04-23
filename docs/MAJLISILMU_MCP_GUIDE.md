@@ -326,6 +326,7 @@ When the user asks you to “look for” a named place, start with the most like
 - For subdistricts, `country_id`, `state_id`, and `name` remain required on update, `name` is trimmed, `state_id` must match `country_id`, and `district_id=null` is valid only for federal-territory states.
 - Handle-style social platforms (`facebook`, `twitter`, `instagram`, `youtube`, `tiktok`, `telegram`, `whatsapp`, `linkedin`, `threads`) may canonicalize a submitted URL into stored `username`, so persisted `url` can come back as `null` after normalization.
 - Even though the schema advertises model-layer normalization notes for Twitter / X, validated MCP payloads should still use the canonical platform value `twitter`, not `x`.
+- Enum fields and filters use enum backing values, not display labels. For events, use values like `kuliah_ceramah`, `all_ages`, `prayer_relative`, `maghrib`, and `immediately` instead of labels like `Kuliah / Ceramah` or localized prayer text.
 - This guide summarizes server-level capability only; actor-specific authorization still applies at runtime.
 
 ### Non-goals
@@ -365,6 +366,7 @@ Admin tool behavior notes:
 
 - `validate_only=true` is supported for create/update preview flows.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
+- Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
 - `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
 - The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
 - Media/file upload fields accept JSON base64 descriptors only when the matching write schema advertises them.
