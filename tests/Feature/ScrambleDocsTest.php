@@ -381,8 +381,8 @@ it('documents utc transport fields and request-timezone helper behavior clearly'
         ->toContain('Raw API timestamp fields are stored and returned in UTC')
         ->toContain('Viewer-facing helper fields such as event timing_display and end_time_display are localized only when the request provides timezone context')
         ->toContain('Without timezone context, bare API requests fall back to UTC.')
-        ->toContain('Date-only event filters such as filter[starts_after], filter[starts_before], and filter[starts_on_local_date] are interpreted in the resolved request timezone')
-        ->toContain('send X-Timezone: Asia/Kuala_Lumpur and date-only values such as filter[starts_after]=2026-04-12&filter[starts_before]=2026-04-12')
+        ->toContain('Public event date-only filters use `filter[starts_after]`, `filter[starts_before]`, and `filter[starts_on_local_date]`. Admin resource date-only filters use top-level `starts_after`, `starts_before`, and `starts_on_local_date`.')
+        ->toContain('send X-Timezone: Asia/Kuala_Lumpur with either public-event values such as filter[starts_after]=2026-04-12&filter[starts_before]=2026-04-12 or admin-resource values such as starts_after=2026-04-12&starts_before=2026-04-12')
         ->toContain('If you omit timezone context, the same filter values are interpreted in UTC instead.')
         ->not->toContain('The server timezone is UTC; the default display timezone is Asia/Kuala_Lumpur (MYT, UTC+8).')
         ->not->toContain('All date/time filter values must be expressed in UTC.');

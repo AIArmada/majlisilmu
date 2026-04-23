@@ -847,6 +847,8 @@ Safe defaults are surfaced as `set_field` actions, unresolved enums/catalog choi
 
 > **Enum filters:** send enum backing values in filters. For example, use `filter[event_type]=kuliah_ceramah`, `filter[timing_mode]=prayer_relative`, and `filter[prayer_reference]=maghrib`; do not send display labels.
 
+> **Admin date-filter shape:** on `/api/v1/admin/{resourceKey}`, the date arguments are top-level query params, for example `/api/v1/admin/events?starts_on_local_date=2026-04-24&filter[status]=approved` or `/api/v1/admin/events?starts_after=2026-04-24&starts_before=2026-04-30`. Do not nest admin date filters under `filter[...]`.
+
 Authorization note:
 
 - The admin API now follows the same top-level access rule as the Filament admin panel: any authenticated user with application admin-panel access can reach it.

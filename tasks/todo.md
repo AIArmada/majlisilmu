@@ -44,6 +44,27 @@
   - `vendor/bin/pint --dirty --test --format=agent` => pass
   - `git diff --check` => pass
 
+# Admin API Event Date Contract Hardening
+
+- [x] Verify whether the raw admin HTTP API needs runtime changes or only docs/test updates
+- [x] Add focused admin API coverage for top-level date parameters and search/date combinations
+- [x] Correct generated-docs language that mixed public event date syntax into admin resource guidance
+
+## Review
+
+- Findings:
+  - The raw admin HTTP API runtime is healthy. `/api/v1/admin/events` already accepts event filters as `filter[...]` and date arguments as top-level `starts_after`, `starts_before`, and `starts_on_local_date`.
+  - The drift was in documentation, not query execution: generated API prose still described date-only filters with public-event syntax such as `filter[starts_after]` in places that also referenced admin resources.
+- Changes:
+  - Added admin API regression coverage for top-level admin date parameters, combined date+status filtering, and search plus local-date filtering.
+  - Updated the Scramble description text to distinguish public event date filters (`filter[...]`) from admin resource date filters (top-level query params).
+  - Updated the mobile/admin API reference to state the admin date-filter shape explicitly.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Admin/AdminApiTest.php --filter='filters admin event records by explicit query parameters|filters admin event records by top-level date parameters and combines date filters with search'` => 2 passed, 44 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='documents api quickstart guidance clearly|documents utc transport fields and request-timezone helper behavior clearly'` => 1 passed, 9 assertions
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `git diff --check` => pass
+
 # MCP Events Report Verification
 
 - [x] Re-check the reported `admin-list-records` failure against the current local code and installed database

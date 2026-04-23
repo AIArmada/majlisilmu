@@ -325,6 +325,71 @@ it('filters admin event records by explicit query parameters', function () {
         ->and(collect($eventTypeResponse->json('data'))->pluck('route_key')->all())->not->toContain($cancelledHybridEvent->getRouteKey());
 });
 
+it('filters admin event records by top-level date parameters and combines date filters with search', function () {
+    $admin = adminApiUser('super_admin');
+    $admin->forceFill([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $matchingDateAndStatusEvent = Event::factory()->create([
+        'title' => 'Admin API Date Plus Status Match',
+        'starts_at' => Carbon::parse('2026-05-10 02:00:00', 'UTC'),
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Admin API Date Plus Status Wrong Status',
+        'starts_at' => Carbon::parse('2026-05-10 05:00:00', 'UTC'),
+        'status' => 'draft',
+        'is_active' => true,
+    ]);
+
+    $withinRange = Event::factory()->create([
+        'title' => 'Admin API Date Range Within',
+        'starts_at' => Carbon::parse('2026-05-12 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Admin API Date Range Outside',
+        'starts_at' => Carbon::parse('2026-05-15 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    $searchDateMatch = Event::factory()->create([
+        'title' => 'Admin API Search Dhuha Match',
+        'starts_at' => Carbon::parse('2026-05-10 03:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    Event::factory()->create([
+        'title' => 'Admin API Search Dhuha Wrong Date',
+        'starts_at' => Carbon::parse('2026-05-14 03:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $dateAndStatusResponse = $this->getJson('/api/v1/admin/events?starts_on_local_date=2026-05-10&filter[status]=approved')
+        ->assertOk();
+
+    expect($dateAndStatusResponse->json('meta.pagination.total'))->toBe(2)
+        ->and(collect($dateAndStatusResponse->json('data'))->pluck('route_key')->all())->toContain($matchingDateAndStatusEvent->getRouteKey(), $searchDateMatch->getRouteKey());
+
+    $rangeResponse = $this->getJson('/api/v1/admin/events?starts_after=2026-05-11&starts_before=2026-05-13')
+        ->assertOk();
+
+    expect($rangeResponse->json('meta.pagination.total'))->toBe(1)
+        ->and(collect($rangeResponse->json('data'))->pluck('route_key')->all())->toContain($withinRange->getRouteKey());
+
+    $searchAndDateResponse = $this->getJson('/api/v1/admin/events?search=Dhuha&starts_on_local_date=2026-05-10')
+        ->assertOk();
+
+    expect($searchAndDateResponse->json('meta.pagination.total'))->toBe(1)
+        ->and(collect($searchAndDateResponse->json('data'))->pluck('route_key')->all())->toContain($searchDateMatch->getRouteKey());
+});
+
 it('surfaces public event change projections on admin event detail payloads', function () {
     $admin = adminApiUser('super_admin');
     $actor = User::factory()->create();
