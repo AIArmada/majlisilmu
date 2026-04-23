@@ -1,3 +1,32 @@
+# Latest API Read Test Report Triage
+
+- [x] Reconcile the latest API read report against current public API routes
+- [x] Reproduce `/search`, `/institutions/near`, `/follows/speakers`, and detail-by-ID concerns locally
+- [x] Patch confirmed runtime or contract clarity gaps with focused coverage
+- [x] Run targeted Pest, PHPStan, formatter, and diff checks
+- [x] Record final findings and verification outcome
+
+## Review
+
+- Findings:
+  - `/api/v1/search?search=Kuliah` works locally and returns filtered results, but `/api/v1/search?q=Kuliah` previously ignored `q` and behaved like an unfiltered request. This explains the latest report's search confusion.
+  - `/api/v1/institutions/near` intentionally returns `422` without coordinates; `/api/v1/institutions/near?near=3.139,101.6869&per_page=1` returns `200`.
+  - `/api/v1/follows/speakers` is not a route. Follow lists use `/api/v1/speakers?following=true`, `/api/v1/institutions?following=true`, and `/api/v1/references?following=true`; single follow state uses `/api/v1/follows/{type}/{subject}`.
+  - Public speaker, institution, and reference detail endpoints resolve UUIDs locally for active verified records; existing regression coverage now locks that behavior.
+- Changes:
+  - Added `q` as a compatibility alias for the public unified search endpoint while keeping `search` as canonical.
+  - Added OpenAPI query-parameter annotations for both `search` and `q`.
+  - Added focused regression coverage for `/api/v1/search?q=...`.
+  - Clarified the mobile API reference for the `search`/`q` query contract, the required `/institutions/near` coordinate parameters, and the absence of plural follow-list routes such as `/follows/speakers`.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/PublicReadEndpointReportTest.php` => 6 passed, 21 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php --filter='falls back to local speaker and institution search on the frontend unified search api when typesense fails|returns full unified search totals while limiting speaker and institution previews|supports the nearby institution alias and sparse list fields'` => 3 passed, 14 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='documents api quickstart guidance clearly|adds summaries and descriptions to catalog and authenticated workflow endpoints|generates openapi docs'` => 1 passed, 26 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/AdminApiDocsTest.php --filter='documents the public reference directory in the mobile api reference'` => 1 passed, 7 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `git diff --check` => pass
+
 # MCP Admin Connector Read-Tools Report Triage
 
 - [x] Reconcile the ChatGPT connector report against current MCP admin/member route registration

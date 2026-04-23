@@ -37,6 +37,21 @@ it('resolves public directory detail endpoints by uuid', function (string $resou
     'reference',
 ]);
 
+it('accepts q as an alias for the unified public search query', function (): void {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Query Alias Search',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson('/api/v1/search?q='.urlencode('Query Alias Search'))
+        ->assertOk()
+        ->assertJsonPath('meta.search', 'Query Alias Search');
+
+    expect(collect($response->json('data.institutions.items'))->pluck('id')->all())
+        ->toContain((string) $institution->id);
+});
+
 it('lists followed directory resources through the public listing following filter', function (): void {
     $user = User::factory()->create();
     $followedInstitution = Institution::factory()->create(['status' => 'verified', 'is_active' => true]);

@@ -195,6 +195,8 @@ it('publishes named speaker institution and reference schemas for the public dir
     $schemas = $response->json('components.schemas');
     $institutionsNearParameters = collect(data_get($paths, '/institutions/near.get.parameters', []))->keyBy('name');
 
+    $searchParameters = collect(data_get($paths, '/search.get.parameters', []))->pluck('name')->all();
+
     expect($schemas)->toHaveKeys([
         'Speaker',
         'SpeakerListItem',
@@ -735,6 +737,7 @@ it('publishes explicit schemas for search manifest and public form contracts', f
         'MembershipClaimFormResponse',
         'ContributionSuggestContextResponse',
     ])
+        ->and($searchParameters)->toContain('search', 'q')
         ->and(data_get($paths, '/search.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/SearchIndexResponse')
         ->and(data_get($paths, '/manifest.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/PublicManifestResponse')
         ->and(data_get($paths, '/forms/mobile-telemetry.get.responses.200.content.application/json.schema.$ref'))->toBe('#/components/schemas/MobileTelemetryFormResponse')
