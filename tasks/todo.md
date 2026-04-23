@@ -1,3 +1,26 @@
+# Public Reference And Venue Directories
+
+- [x] Trace the existing `/institusi` and `/penceramah` directory patterns
+- [x] Add public `/rujukan` and `/tempat` directory routes and matching Livewire pages
+- [x] Mirror search, empty-state, media, count, pagination, and visibility behavior for references and venues
+- [x] Surface the new directories in the footer/bottom menu
+- [x] Add focused regression coverage and run verification
+
+## Review
+
+- Added `/rujukan` and `/tempat` public directory routes with Volt index pages that match the existing listing-page hero/search/card/pagination pattern.
+- Reference search uses the existing `ReferenceSearchService` and limits public results to active verified references.
+- Venue search supports name, slug, description, and address hierarchy matching, with the same country/state/district/subdistrict location scoping pattern as institutions.
+- Added footer/bottom-menu links for the new directories while keeping the primary header focused on `Majlis`, `Institusi`, and `Penceramah`.
+- Added Malay and English translation coverage for the new directory copy.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/ReferenceIndexTest.php` => 5 passed, 18 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/VenueIndexTest.php` => 6 passed, 21 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter='loads public index pages|uses homepage-like vertical spacing'` => 2 passed, 43 assertions
+  - `vendor/bin/pint --test --format=agent routes/web.php tests/Feature/ReferenceIndexTest.php tests/Feature/VenueIndexTest.php tests/Feature/PublicPagesTest.php resources/views/layouts/app.blade.php 'resources/views/components/pages/references/⚡index.blade.php' 'resources/views/components/pages/venues/⚡index.blade.php'` => pass
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `git diff --check` => pass
+
 # PostgreSQL Event Change Relation Fix
 
 - [x] Trace the `/majlis` failure to the eager-loaded event-change announcement relation

@@ -144,6 +144,9 @@ Route::livewire('/penceramah/{speaker:slug}', 'pages.speakers.show')
     ->name('speakers.show');
 
 // Venues
+Route::livewire('/tempat', 'pages.venues.index')
+    ->middleware('throttle:search')
+    ->name('venues.index');
 Route::livewire('/lokasi/{venue:slug}', 'pages.venues.show')
     ->middleware(ResolvePublicSlugRedirect::class)
     ->name('venues.show');
@@ -152,6 +155,9 @@ Route::livewire('/lokasi/{venue:slug}', 'pages.venues.show')
 Route::livewire('/siri/{series:slug}', 'pages.series.show')->name('series.show');
 
 // References
+Route::livewire('/rujukan', 'pages.references.index')
+    ->middleware('throttle:search')
+    ->name('references.index');
 Route::livewire('/rujukan/{reference:slug}', 'pages.references.show')
     ->middleware(ResolvePublicSlugRedirect::class)
     ->name('references.show');
