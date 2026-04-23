@@ -9,12 +9,15 @@
 - Findings:
   - `Event::latestPublishedChangeAnnouncement()`, `latestPublishedReplacementAnnouncement()`, and `latestIncomingReplacementAnnouncement()` were all using `ofMany([... 'id' => 'max'])` against UUID primary keys.
   - PostgreSQL does not support `max(uuid)`, so eager loading those relations on `/majlis` crashed before the page rendered.
-  - The existing tie-break requirement still matters when `published_at` and `created_at` are identical, so the fix keeps `ofMany()` on the timestamp columns and resolves same-timestamp ties with `orderByDesc('id')`, which PostgreSQL does support for UUIDs.
+  - The first attempted fix was still incomplete because layering `orderByDesc('id')` onto `ofMany()` let Laravel fold `id` back into the aggregate plan. The final fix replaces `ofMany()` entirely with a UUID-safe `whereNotExists` latest-row strategy that excludes any newer published candidate by `(published_at, created_at, id)`.
 - Verification:
-  - `vendor/bin/pest --parallel tests/Feature/EventChangeAnnouncementTest.php --filter="prefers the newest replacement announcement when published timestamps tie|eager loads latest published announcement relations without aggregating uuid ids"` => 2 passed, 4 assertions
-  - `vendor/bin/pest --parallel tests/Feature/PublicPagesTest.php --filter="loads public index pages"` => 1 passed, 17 assertions
-  - `vendor/bin/phpstan analyse --ansi --no-progress app/Models/Event.php tests/Feature/EventChangeAnnouncementTest.php` => pass
-  - `vendor/bin/pint --dirty --test` => pass
+  - `vendor/bin/pest --parallel tests/Feature/EventChangeAnnouncementTest.php --filter="prefers the newest replacement announcement when published timestamps tie|eager loads latest published announcement relations without aggregating uuid ids|loads the public events index when listed events have published change announcements"` => 3 passed, 6 assertions
+  - `vendor/bin/pest --parallel tests/Feature/EventChangeAnnouncementTest.php` => 18 passed, 58 assertions
+  - `vendor/bin/pest --parallel tests/Feature/Api/EventApiContractTest.php --filter="serializes event change notices and latest reachable replacement targets on event detail payloads"` => 1 passed, 17 assertions
+  - `vendor/bin/pest --parallel tests/Feature/Mcp/AdminServerTest.php --filter="surfaces public event change projections on admin event record detail through the MCP server"` => 1 passed, 17 assertions
+  - `vendor/bin/pest --parallel tests/Feature/Mcp/MemberServerTest.php --filter="surfaces public event change projections on member event record detail through the MCP server"` => 1 passed, 17 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --dirty` => pass
   - `git diff --check` => pass
 
 # Saved Search Normalization Follow-up

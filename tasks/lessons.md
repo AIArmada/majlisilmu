@@ -1,6 +1,6 @@
 # Lessons
 
-- On PostgreSQL, do not use `ofMany()` tie-break aggregates like `max(id)` on UUID primary keys; keep the aggregate on sortable timestamp columns and break same-timestamp ties with a normal `orderByDesc('id')` instead.
+- On PostgreSQL, do not rely on `ofMany()` tie-breaks for UUID primary keys at all; even an added `orderByDesc('id')` can still be folded back into `MAX(id)`. Use a UUID-safe latest-row strategy such as excluding newer candidates by timestamp and id instead.
 - When you harden saved-search API validation, harden the shared action/Livewire filter normalizer in the same pass; otherwise tampered page query params can still persist raw filter values even though the API path is strict.
 - When legacy database rows contain stale enum labels or invalid persisted enum values, repair the installed data with an idempotent forward migration first; keep serializers strict unless there is a separate rollout-skew reason for read-side compatibility.
 - If a session is edit-capable, do not claim a planning-mode blocker just because prior context mentioned planning; verify the active mode and proceed with implementation when the user explicitly asks to start.

@@ -556,6 +556,35 @@ it('eager loads latest published announcement relations without aggregating uuid
         ->toBe('00000000-0000-0000-0000-000000000122');
 });
 
+it('loads the public events index when listed events have published change announcements', function () {
+    $administrator = eventChangeAdministrator();
+    $event = eventChangeApprovedEvent([
+        'title' => 'Kuliah Indeks Perubahan',
+        'starts_at' => now()->addDay(),
+        'ends_at' => now()->addDay()->addHours(2),
+    ]);
+    $publishedAt = CarbonImmutable::parse('2026-05-06 12:00:00', 'UTC');
+
+    EventChangeAnnouncement::unguarded(function () use ($administrator, $event, $publishedAt): void {
+        EventChangeAnnouncement::query()->create([
+            'id' => '00000000-0000-0000-0000-000000000131',
+            'event_id' => $event->id,
+            'actor_id' => $administrator->id,
+            'type' => EventChangeType::ScheduleChanged,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Masa majlis dikemas kini.',
+            'published_at' => $publishedAt,
+            'created_at' => $publishedAt,
+            'updated_at' => $publishedAt,
+        ]);
+    });
+
+    $this->get(route('events.index', ['search' => 'Kuliah Indeks Perubahan']))
+        ->assertOk()
+        ->assertSee('Kuliah Indeks Perubahan');
+});
+
 it('creates same-event slug aliases when a published change mutates the schedule', function () {
     $administrator = eventChangeAdministrator();
     $event = eventChangeApprovedEvent([
