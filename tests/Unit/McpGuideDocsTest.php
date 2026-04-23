@@ -72,6 +72,7 @@ it('keeps the MCP guide aligned with the verified admin and member write-capable
         ->toContain('### Explicit workflow schema tools')
         ->toContain('Current explicit workflow schema tools are `admin-get-event-moderation-schema`, `admin-get-report-triage-schema`, `admin-get-contribution-request-review-schema`, and `admin-get-membership-claim-review-schema`.')
         ->toContain('| `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | `resource_key`, `record_key` |')
+        ->toContain('| `admin-list-records` | Search and paginate records for one admin resource | `resource_key`, `search?`, `filters?`, `starts_after?`, `starts_before?`, `starts_on_local_date?`, `page?`, `per_page?` |')
         ->toContain('| `admin-get-event-moderation-schema` | Fetch the explicit moderation schema for one event | `record_key` |')
         ->toContain('| `admin-get-report-triage-schema` | Fetch the explicit triage schema for one report | `record_key` |')
         ->toContain('| `admin-get-contribution-request-review-schema` | Fetch the explicit review schema for one contribution request | `record_key` |')
@@ -111,6 +112,8 @@ it('keeps the MCP guide aligned with the verified admin and member write-capable
         ->toContain('For tags, `name.en` falls back to `name.ms` when it is omitted, `null`, or trimmed empty input, and blank / null `order_column` values trigger sortable recomputation instead of storing `null`.')
         ->toContain('Subdistrict write schemas now expose additional field semantics for `country_id`, `state_id`, `district_id`, and `name`.')
         ->toContain('For subdistricts, `country_id`, `state_id`, and `name` remain required on update, `name` is trimmed')
+        ->toContain('`admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.')
+        ->toContain('For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments.')
         ->toContain('validated MCP payloads should still use the canonical platform value `twitter`, not `x`.');
 
     foreach (InstitutionType::cases() as $type) {

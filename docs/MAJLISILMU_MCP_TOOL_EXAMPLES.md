@@ -26,6 +26,51 @@ For the full connector rules, tool catalog, and API mappings, see `docs/MAJLISIL
 
 Event record detail for `events` now includes the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` inside `data.record.attributes`.
 
+### Filter an event list
+
+Use enum backing values in `filters`, and use date-only `YYYY-MM-DD` values for `starts_after`, `starts_before`, and `starts_on_local_date`.
+
+```json
+{
+  "tool": "admin-list-records",
+  "arguments": {
+    "resource_key": "events",
+    "filters": {
+      "status": "approved",
+      "is_active": true,
+      "timing_mode": "absolute"
+    },
+    "page": 1,
+    "per_page": 10
+  }
+}
+```
+
+```json
+{
+  "tool": "admin-list-records",
+  "arguments": {
+    "resource_key": "events",
+    "search": "Dhuha",
+    "starts_on_local_date": "2026-04-24",
+    "filters": {
+      "status": "approved"
+    }
+  }
+}
+```
+
+```json
+{
+  "tool": "admin-list-records",
+  "arguments": {
+    "resource_key": "events",
+    "starts_after": "2026-04-24",
+    "starts_before": "2026-04-30"
+  }
+}
+```
+
 ### Preview a write
 
 ```json
