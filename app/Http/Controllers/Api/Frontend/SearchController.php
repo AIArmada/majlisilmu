@@ -129,10 +129,13 @@ class SearchController extends FrontendController
         title: 'Search events, speakers, and institutions',
         description: 'Returns a compact public search payload for events, speakers, and institutions using the same visibility rules as the client surface.',
     )]
+    #[QueryParameter('search', 'Optional free-text search query across public events, speakers, and institutions.', required: false, type: 'string', infer: false, example: 'Kuliah')]
+    #[QueryParameter('q', 'Alias for `search`, accepted for clients that use common search-query naming.', required: false, type: 'string', infer: false, example: 'Kuliah')]
     public function search(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
-        $search = $this->normalizedString($request->query('search'));
+        $search = $this->normalizedString($request->query('search'))
+            ?? $this->normalizedString($request->query('q'));
         $coordinates = $this->resolvedNearbyCoordinates($request);
         $lat = $coordinates['lat'];
         $lng = $coordinates['lng'];
