@@ -510,6 +510,10 @@
                                 </li>
                                 <li><a href="{{ route('speakers.index') }}" wire:navigate
                                         class="hover:text-emerald-600 transition-colors">{{ __('Speakers') }}</a></li>
+                                <li><a href="{{ route('venues.index') }}" wire:navigate
+                                        class="hover:text-emerald-600 transition-colors">{{ __('Venue') }}</a></li>
+                                <li><a href="{{ route('references.index') }}" wire:navigate
+                                        class="hover:text-emerald-600 transition-colors">{{ __('Reference') }}</a></li>
                             </ul>
                         </div>
 

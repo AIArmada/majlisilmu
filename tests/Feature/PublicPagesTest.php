@@ -33,12 +33,16 @@ it('loads public index pages', function () {
     $this->get(route('events.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
     $this->get(route('institutions.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
     $this->get(route('speakers.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get(route('venues.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get(route('references.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
     $this->get(route('submit-event.create'))->assertSuccessful()->assertSee('Hantar Majlis');
     $this->get(route('submit-event.success'))->assertSuccessful()->assertSee(__('Event Submitted!'));
 
     $this->get('/events')->assertNotFound();
     $this->get('/institutions')->assertNotFound();
     $this->get('/speakers')->assertNotFound();
+    $this->get('/venues')->assertNotFound();
+    $this->get('/references')->assertNotFound();
     $this->get('/submit-event')->assertNotFound();
     $this->get('/submit-event/success')->assertNotFound();
 });
@@ -68,6 +72,8 @@ it('uses homepage-like vertical spacing on the public listing pages', function (
         route('events.index'),
         route('institutions.index'),
         route('speakers.index'),
+        route('venues.index'),
+        route('references.index'),
     ])->each(function (string $url): void {
         $this->get($url)
             ->assertSuccessful()
