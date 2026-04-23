@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -896,8 +897,8 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function latestPublishedReplacementAnnouncement(): HasOne
     {
-        return $this->latestPublishedAnnouncementRelation(function (Builder $query): void {
-            $query->whereNotNull('replacement_event_id');
+        return $this->latestPublishedAnnouncementRelation(function (Builder|QueryBuilder $query, string $table): void {
+            $query->whereNotNull("{$table}.replacement_event_id");
         });
     }
 
@@ -920,29 +921,86 @@ class Event extends Model implements AuditableContract, HasMedia
     }
 
     /**
-     * PostgreSQL cannot aggregate UUIDs with `max()`, so keep the one-of-many
-     * aggregate on the timestamp columns and break ties with a normal UUID order.
+     * UUID primary keys cannot be aggregated portably with `MAX()` on PostgreSQL,
+     * so resolve the latest row by excluding any newer published candidate.
      *
      * @param  HasOne<EventChangeAnnouncement, $this>|null  $relation
-     * @param  (\Closure(Builder<EventChangeAnnouncement>): void)|null  $extraConstraint
      * @return HasOne<EventChangeAnnouncement, $this>
      */
-    private function latestPublishedAnnouncementRelation(?\Closure $extraConstraint = null, ?HasOne $relation = null): HasOne
-    {
+    private function latestPublishedAnnouncementRelation(
+        ?\Closure $extraConstraint = null,
+        ?HasOne $relation = null,
+    ): HasOne {
         $baseRelation = $relation ?? $this->hasOne(EventChangeAnnouncement::class);
+        $relatedTable = $baseRelation->getRelated()->getTable();
+        $foreignKey = $baseRelation->getForeignKeyName();
+        $candidateAlias = 'event_change_announcements_candidate';
+
+        $this->applyLatestPublishedAnnouncementFilters(
+            $baseRelation->getQuery(),
+            $relatedTable,
+            $extraConstraint,
+        );
 
         return $baseRelation
-            ->ofMany([
-                'published_at' => 'max',
-                'created_at' => 'max',
-            ], function (Builder $query) use ($extraConstraint): void {
+            ->whereNotExists(function (QueryBuilder $query) use (
+                $candidateAlias,
+                $extraConstraint,
+                $foreignKey,
+                $relatedTable,
+            ): void {
                 $query
-                    ->where('status', EventChangeStatus::Published->value)
-                    ->whereNull('retracted_at');
+                    ->selectRaw('1')
+                    ->from("{$relatedTable} as {$candidateAlias}")
+                    ->whereColumn("{$candidateAlias}.{$foreignKey}", "{$relatedTable}.{$foreignKey}");
 
-                $extraConstraint?->__invoke($query);
+                $this->applyLatestPublishedAnnouncementFilters($query, $candidateAlias, $extraConstraint);
+                $this->applyLatestPublishedAnnouncementTieBreaker($query, $candidateAlias, $relatedTable);
             })
-            ->orderByDesc('id');
+            ->orderByDesc("{$relatedTable}.published_at")
+            ->orderByDesc("{$relatedTable}.created_at")
+            ->orderByDesc("{$relatedTable}.id");
+    }
+
+    /**
+     * @param  Builder<EventChangeAnnouncement>|QueryBuilder  $query
+     * @param  (\Closure(Builder<EventChangeAnnouncement>|QueryBuilder, string): void)|null  $extraConstraint
+     */
+    private function applyLatestPublishedAnnouncementFilters(
+        Builder|QueryBuilder $query,
+        string $table,
+        ?\Closure $extraConstraint = null,
+    ): void {
+        $query
+            ->where("{$table}.status", EventChangeStatus::Published->value)
+            ->whereNull("{$table}.retracted_at");
+
+        $extraConstraint?->__invoke($query, $table);
+    }
+
+    /**
+     * @param  Builder<EventChangeAnnouncement>|QueryBuilder  $query
+     */
+    private function applyLatestPublishedAnnouncementTieBreaker(
+        Builder|QueryBuilder $query,
+        string $candidateTable,
+        string $currentTable,
+    ): void {
+        $query->where(function (QueryBuilder $comparisonQuery) use ($candidateTable, $currentTable): void {
+            $comparisonQuery
+                ->whereColumn("{$candidateTable}.published_at", '>', "{$currentTable}.published_at")
+                ->orWhere(function (QueryBuilder $createdAtQuery) use ($candidateTable, $currentTable): void {
+                    $createdAtQuery
+                        ->whereColumn("{$candidateTable}.published_at", "{$currentTable}.published_at")
+                        ->whereColumn("{$candidateTable}.created_at", '>', "{$currentTable}.created_at");
+                })
+                ->orWhere(function (QueryBuilder $idQuery) use ($candidateTable, $currentTable): void {
+                    $idQuery
+                        ->whereColumn("{$candidateTable}.published_at", "{$currentTable}.published_at")
+                        ->whereColumn("{$candidateTable}.created_at", "{$currentTable}.created_at")
+                        ->whereColumn("{$candidateTable}.id", '>', "{$currentTable}.id");
+                });
+        });
     }
 
     /**
