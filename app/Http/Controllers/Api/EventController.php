@@ -473,8 +473,8 @@ class EventController extends Controller
      * Show a single event by ID or slug.
      */
     #[Endpoint(
-        title: 'Get a public event',
-        description: 'Returns the public event detail payload by slug or UUID, including all allowed related resources requested through `include` parameters.',
+        title: 'Get an event detail payload',
+        description: 'Returns the event detail payload by slug or UUID for active public events, plus active unlisted events when the client already has the direct identifier.',
     )]
     public function show(Request $request, Event $event): JsonResponse
     {
@@ -503,7 +503,7 @@ class EventController extends Controller
             'address.city',
         ];
 
-        $this->abortUnlessPublicEvent($event);
+        $this->abortUnlessShowVisibleEvent($event);
 
         $event = QueryBuilder::for(Event::query()->with(['keyPeople.speaker', 'institution.media', 'media', 'references.media']))
             ->allowedIncludes(...$allowedIncludes)
@@ -584,7 +584,7 @@ class EventController extends Controller
         return EventListData::fromModel($event)->toArray();
     }
 
-    private function abortUnlessPublicEvent(Event $event): void
+    private function abortUnlessShowVisibleEvent(Event $event): void
     {
         $status = (string) $event->getRawOriginal('status');
         $visibility = (string) $event->getRawOriginal('visibility');
@@ -592,7 +592,7 @@ class EventController extends Controller
         abort_unless(
             $event->is_active
                 && in_array($status, self::PUBLIC_STATUSES, true)
-                && $visibility === EventVisibility::Public->value,
+                && in_array($visibility, [EventVisibility::Public->value, EventVisibility::Unlisted->value], true),
             404,
         );
     }

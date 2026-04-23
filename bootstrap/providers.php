@@ -12,6 +12,8 @@ use App\Providers\Filament\AhliPanelProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Providers\HorizonServiceProvider;
 use App\Providers\RateLimitServiceProvider;
+use Laravel\Mcp\Server\McpServiceProvider;
+use Laravel\Passport\PassportServiceProvider;
 use Ysfkaya\FilamentPhoneInput\FilamentPhoneInputServiceProvider;
 
 return [
@@ -26,4 +28,6 @@ return [
     RateLimitServiceProvider::class,
     FortifyServiceProvider::class,
     HorizonServiceProvider::class,
+    McpServiceProvider::class,
+    PassportServiceProvider::class,
 ];

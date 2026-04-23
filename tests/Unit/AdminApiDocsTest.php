@@ -88,3 +88,14 @@ it('documents the public reference directory in the mobile api reference', funct
         ->toContain('Public reference directory list items expose `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` by default.')
         ->toContain('Public `/events`, `/institutions`, `/institutions/near`, `/speakers`, and `/references` list endpoints accept `fields=`');
 });
+
+it('documents event change projections and unlisted direct-detail access in the mobile api reference', function () {
+    $markdown = file_get_contents(base_path('docs/MAJLISILMU_MOBILE_API_REFERENCE.md')) ?: '';
+
+    expect($markdown)
+        ->toContain('| `GET` | `/events/{eventOrSlug}` | Event detail by UUID or slug for active public events, plus active unlisted events when the client already has the direct identifier |')
+        ->toContain('The detail endpoint returns active `public` events plus active `unlisted` events when the client already has the UUID or slug.')
+        ->toContain('Event detail payloads now include `active_change_notice`, `change_announcements`, and `replacement_event`')
+        ->toContain('`change_announcements` is the published history ordered newest-first.')
+        ->toContain('falls back to the last reachable target or omits the field entirely.');
+});

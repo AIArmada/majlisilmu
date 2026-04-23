@@ -317,6 +317,51 @@ class Event extends Model implements AuditableContract, HasMedia
             && in_array((string) $this->status, self::PUBLIC_STATUSES, true);
     }
 
+    public function replacementLinkTarget(): ?self
+    {
+        return $this->resolveReachableReplacementEvent(
+            $this->latestPublishedReplacementAnnouncement?->replacementEvent,
+        );
+    }
+
+    public function replacementLinkTargetForAnnouncement(?EventChangeAnnouncement $announcement): ?self
+    {
+        return $this->resolveReachableReplacementEvent($announcement?->replacementEvent);
+    }
+
+    private function resolveReachableReplacementEvent(?self $event): ?self
+    {
+        if (! $event instanceof self) {
+            return null;
+        }
+
+        /** @var array<string, true> $visited */
+        $visited = [(string) $this->getKey() => true];
+        $current = $event;
+        $latestReachable = null;
+
+        while (! isset($visited[(string) $current->getKey()])) {
+            $visited[(string) $current->getKey()] = true;
+
+            if ($current->isPubliclyReachable()) {
+                $latestReachable = $current;
+            }
+
+            $current->loadMissing('latestPublishedReplacementAnnouncement.replacementEvent');
+
+            $nextAnnouncement = $current->latestPublishedReplacementAnnouncement;
+            $nextReplacement = $nextAnnouncement?->replacementEvent;
+
+            if (! $nextAnnouncement instanceof EventChangeAnnouncement || ! $nextReplacement instanceof self) {
+                break;
+            }
+
+            $current = $nextReplacement;
+        }
+
+        return $latestReachable;
+    }
+
     public function searchIndexShouldBeUpdated(): bool
     {
         return $this->wasRecentlyCreated || $this->wasChanged([

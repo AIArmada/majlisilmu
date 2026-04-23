@@ -18,6 +18,14 @@ For the full connector rules, tool catalog, and API mappings, see `docs/MAJLISIL
 { "tool": "admin-get-record", "arguments": { "resource_key": "speakers", "record_key": "ahmad-fauzi-my" } }
 ```
 
+### Read one event with public change projections
+
+```json
+{ "tool": "admin-get-record", "arguments": { "resource_key": "events", "record_key": "weekly-kuliah-selasa" } }
+```
+
+Event record detail for `events` now includes the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` inside `data.record.attributes`.
+
 ### Preview a write
 
 ```json
@@ -104,6 +112,8 @@ Fetch the write schema first and follow the field-specific `mcp_upload`, `accept
 ```json
 { "tool": "member-get-record", "arguments": { "resource_key": "institutions", "record_key": "019d5cb5-7de1-7055-a4d3-b57ab007331e" } }
 ```
+
+For member-scoped event reads, the same `data.record.attributes.active_change_notice`, `change_announcements`, and `replacement_event` fields are available on `member-get-record` when `resource_key` is `events`.
 
 ### Preview a write
 

@@ -1,6 +1,6 @@
 {
-  "schema_version": "2.2.0",
-  "verified_at": "2026-04-22",
+  "schema_version": "2.3.0",
+  "verified_at": "2026-04-23",
   "title": "API / MCP / Filament Capability Matrix",
   "markdown_companion": "docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md",
   "purpose": "Canonical parity map for public workflow API, generic admin HTTP API, admin/member MCP, and the Filament admin/Ahli panels.",
@@ -126,6 +126,11 @@
       "notifications and notification destinations/settings"
     ]
   },
+  "event_detail_parity_notes": [
+    "Public GET /api/v1/events/{eventOrSlug} now returns active_change_notice, change_announcements, and replacement_event, and direct detail reads accept active unlisted events when the caller already has the UUID or slug.",
+    "Admin API event detail plus admin/member MCP event record detail project the same event-change fields inside their event attributes or record payloads.",
+    "Replacement targets are resolved to the latest still-reachable public or unlisted event so stale replacement chains do not expose dead public links."
+  ],
   "surface_sync_contract": {
     "strategy": "curated_parity",
     "adapter_rule": "Keep validation, normalization, side effects, and orchestration in shared actions/services; panel, API, and MCP should remain thin adapters over the same backend behavior.",

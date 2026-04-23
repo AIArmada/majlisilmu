@@ -69,8 +69,9 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
         ->values()
         ->all();
 
-    expect($document['schema_version'])->toBe('2.2.0')
+    expect($document['schema_version'])->toBe('2.3.0')
         ->and($document['markdown_companion'])->toBe('docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md')
+        ->and(data_get($document, 'event_detail_parity_notes.0'))->toContain('active_change_notice')
         ->and(data_get($document, 'workflow_api_families.public_discovery_and_form_contracts'))->toContain('GET /api/v1/references*')
         ->and(data_get($document, 'surface_sync_contract'))->toEqual(SurfaceSyncPolicy::manifest())
         ->and(data_get($document, 'runtime_inventory.admin_panel.resource_count'))->toBe(count($runtimeAdminResources))
@@ -120,6 +121,10 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
     expect($markdown)
         ->toContain('Runtime panel registration wins.')
         ->toContain('`GET /api/v1/references*`')
+        ->toContain('Event detail parity note')
+        ->toContain('active_change_notice')
+        ->toContain('change_announcements')
+        ->toContain('replacement_event')
         ->toContain('Surface sync operating model')
         ->toContain('curated parity')
         ->toContain('workflow-first capabilities')
@@ -139,5 +144,6 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
         ->toContain('Membership-claim review:')
         ->toContain('Contribution-request queue tools:')
         ->toContain('member-submit-membership-claim')
-        ->toContain('public read/list/detail; authenticated suggest update; follows');
+        ->toContain('public read/list/detail; authenticated suggest update; follows')
+        ->toContain('public read/search/detail with event-change projections');
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Api\Member;
 
+use App\Data\Api\Event\EventPayloadData;
 use App\Filament\Ahli\Resources\Events\EventResource as AhliEventResource;
 use App\Filament\Ahli\Resources\Institutions\InstitutionResource as AhliInstitutionResource;
 use App\Filament\Ahli\Resources\References\ReferenceResource as AhliReferenceResource;
@@ -374,7 +375,9 @@ class MemberResourceRegistry
         return [
             'route_key' => (string) $record->getRouteKey(),
             'title' => $this->htmlableToString($resourceClass::getRecordTitle($record)),
-            'attributes' => $this->serializeAttributes($record),
+            'attributes' => $record instanceof Event
+                ? EventPayloadData::fromModel($record)->toArray()
+                : $this->serializeAttributes($record),
             'abilities' => $this->recordAbilities($record),
             'panel_routes' => [
                 'view' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => $record], panel: 'ahli') : null,

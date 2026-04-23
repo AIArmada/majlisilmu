@@ -4,6 +4,9 @@ use App\Enums\ContributionRequestStatus;
 use App\Enums\ContributionRequestType;
 use App\Enums\ContributionSubjectType;
 use App\Enums\EventAgeGroup;
+use App\Enums\EventChangeSeverity;
+use App\Enums\EventChangeStatus;
+use App\Enums\EventChangeType;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventKeyPersonRole;
@@ -14,6 +17,7 @@ use App\Enums\RegistrationMode;
 use App\Models\ContributionRequest;
 use App\Models\DonationChannel;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\MembershipClaim;
@@ -28,6 +32,7 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
 use App\Support\Location\FederalTerritoryLocation;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -318,6 +323,94 @@ it('filters admin event records by explicit query parameters', function () {
         ->and(collect($eventTypeResponse->json('data'))->pluck('route_key')->all())->toContain($draftOnlineEvent->getRouteKey())
         ->and(collect($eventTypeResponse->json('data'))->pluck('route_key')->all())->not->toContain($approvedPhysicalEvent->getRouteKey())
         ->and(collect($eventTypeResponse->json('data'))->pluck('route_key')->all())->not->toContain($cancelledHybridEvent->getRouteKey());
+});
+
+it('surfaces public event change projections on admin event detail payloads', function () {
+    $admin = adminApiUser('super_admin');
+    $actor = User::factory()->create();
+    $original = Event::factory()->create([
+        'title' => 'Admin API Change Surface Original',
+        'slug' => 'admin-api-change-surface-original',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+    $firstReplacement = Event::factory()->create([
+        'title' => 'Admin API Change Surface First Replacement',
+        'slug' => 'admin-api-change-surface-first-replacement',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+    $finalReplacement = Event::factory()->create([
+        'title' => 'Admin API Change Surface Final Replacement',
+        'slug' => 'admin-api-change-surface-final-replacement',
+        'status' => 'approved',
+        'visibility' => EventVisibility::Public,
+        'is_active' => true,
+    ]);
+
+    EventChangeAnnouncement::unguarded(function () use ($actor, $original, $firstReplacement, $finalReplacement): void {
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $original->id,
+            'replacement_event_id' => $firstReplacement->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Sila rujuk majlis pengganti pertama.',
+            'changed_fields' => [],
+            'published_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $firstReplacement->id,
+            'replacement_event_id' => $finalReplacement->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::ReplacementLinked,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::High,
+            'public_message' => 'Majlis pengganti pertama diganti pula.',
+            'changed_fields' => [],
+            'published_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:05:00', 'UTC'),
+        ]);
+
+        EventChangeAnnouncement::query()->create([
+            'event_id' => $original->id,
+            'actor_id' => $actor->id,
+            'type' => EventChangeType::Other,
+            'status' => EventChangeStatus::Published,
+            'severity' => EventChangeSeverity::Info,
+            'public_message' => 'Nota terkini untuk pautan lama.',
+            'changed_fields' => ['title'],
+            'published_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+            'created_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+            'updated_at' => Carbon::parse('2026-05-05 12:10:00', 'UTC'),
+        ]);
+    });
+
+    $finalReplacement->update([
+        'visibility' => EventVisibility::Private,
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/events/'.$original->getRouteKey())
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'events')
+        ->assertJsonPath('data.record.attributes.active_change_notice.type', EventChangeType::Other->value)
+        ->assertJsonPath('data.record.attributes.active_change_notice.public_message', 'Nota terkini untuk pautan lama.')
+        ->assertJsonPath('data.record.attributes.replacement_event.id', $firstReplacement->id)
+        ->assertJsonPath('data.record.attributes.replacement_event.route_key', $firstReplacement->getRouteKey())
+        ->assertJsonPath('data.record.attributes.change_announcements.1.type', EventChangeType::ReplacementLinked->value)
+        ->assertJsonPath('data.record.attributes.change_announcements.1.replacement_event.id', $firstReplacement->id)
+        ->assertJsonMissingPath('data.record.attributes.latest_published_change_announcement')
+        ->assertJsonMissingPath('data.record.attributes.latest_published_replacement_announcement')
+        ->assertJsonMissingPath('data.record.attributes.published_change_announcements');
 });
 
 it('previews admin speaker creation without persisting the record', function () {

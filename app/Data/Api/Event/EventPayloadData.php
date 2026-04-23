@@ -5,6 +5,7 @@ namespace App\Data\Api\Event;
 use App\Data\Api\Frontend\Search\ReferenceDetailMediaData;
 use App\Enums\EventType;
 use App\Models\Event;
+use App\Models\EventChangeAnnouncement;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
@@ -12,6 +13,7 @@ use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use DateTimeInterface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Support\Transformation\TransformationContext;
@@ -29,8 +31,14 @@ class EventPayloadData extends Data
 
     public static function fromModel(Event $event): self
     {
+        $event->loadMissing([
+            'latestPublishedChangeAnnouncement.replacementEvent',
+            'latestPublishedReplacementAnnouncement.replacementEvent',
+            'publishedChangeAnnouncements.replacementEvent',
+        ]);
+
         /** @var array<string, mixed> $payload */
-        $payload = [
+        $payload = Arr::except([
             ...$event->toArray(),
             'reference_study_subtitle' => $event->reference_study_subtitle,
             'card_image_url' => $event->card_image_url,
@@ -44,7 +52,23 @@ class EventPayloadData extends Data
                 ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
                 : null,
             'event_type_label' => self::resolveEventTypeLabel($event),
-        ];
+        ], [
+            'latest_published_change_announcement',
+            'latest_published_replacement_announcement',
+            'published_change_announcements',
+            'incoming_replacement_announcements',
+            'latest_incoming_replacement_announcement',
+        ]);
+
+        $payload['active_change_notice'] = self::serializeChangeAnnouncement(
+            $event->latestPublishedChangeAnnouncement,
+            $event,
+        );
+        $payload['change_announcements'] = $event->publishedChangeAnnouncements
+            ->map(fn (EventChangeAnnouncement $announcement): array => self::serializeChangeAnnouncement($announcement, $event))
+            ->values()
+            ->all();
+        $payload['replacement_event'] = self::serializeReplacementEventPreview($event->replacementLinkTarget());
 
         if ($event->relationLoaded('institution') && $event->institution instanceof Institution) {
             $payload['institution'] = self::serializeInstitutionPayload(
@@ -186,5 +210,78 @@ class EventPayloadData extends Data
         }
 
         return is_string($value) && $value !== '' ? substr($value, 0, 10) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function serializeChangeAnnouncement(?EventChangeAnnouncement $announcement, Event $rootEvent): ?array
+    {
+        if (! $announcement instanceof EventChangeAnnouncement) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $announcement->getKey(),
+            'type' => $announcement->type->value,
+            'type_label' => $announcement->type->label(),
+            'type_badge_label' => $announcement->type->publicBadgeLabel(),
+            'severity' => $announcement->severity->value,
+            'severity_label' => $announcement->severity->label(),
+            'public_message' => $announcement->public_message,
+            'display_message' => filled($announcement->public_message)
+                ? (string) $announcement->public_message
+                : __('Maklumat majlis ini telah dikemas kini.'),
+            'changed_fields' => array_values($announcement->changed_fields ?? []),
+            'published_at' => $announcement->published_at?->toIso8601String(),
+            'replacement_event' => self::serializeReplacementEventPreview(
+                $rootEvent->replacementLinkTargetForAnnouncement($announcement),
+            ),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function serializeReplacementEventPreview(?Event $event): ?array
+    {
+        if (! $event instanceof Event) {
+            return null;
+        }
+
+        $event->loadMissing([
+            'media',
+            'institution.media',
+            'speakers.media',
+        ]);
+
+        return [
+            'id' => (string) $event->getKey(),
+            'route_key' => (string) $event->getRouteKey(),
+            'slug' => $event->slug,
+            'title' => $event->title,
+            'starts_at' => self::utcDateTimeString($event->starts_at),
+            'starts_at_local' => self::localDateTimeString($event->starts_at),
+            'starts_on_local_date' => self::localDateString($event->starts_at),
+            'ends_at' => self::utcDateTimeString($event->ends_at),
+            'ends_at_local' => self::localDateTimeString($event->ends_at),
+            'timing_display' => $event->timing_display,
+            'end_time_display' => $event->ends_at instanceof DateTimeInterface
+                ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
+                : null,
+            'visibility' => (string) $event->getRawOriginal('visibility'),
+            'status' => (string) $event->getRawOriginal('status'),
+            'poster_url' => self::preferredMediaUrl($event->getFirstMedia('poster'), ['preview', 'card', 'thumb']),
+            'card_image_url' => $event->card_image_url,
+        ];
+    }
+
+    private static function utcDateTimeString(mixed $value): ?string
+    {
+        if ($value instanceof CarbonInterface) {
+            return $value->copy()->utc()->toIso8601String();
+        }
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }

@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-22
+**Last Updated:** 2026-04-23
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -1070,7 +1070,7 @@ status=verified
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/events` | Event index with filters, includes, and sorting |
-| `GET` | `/events/{eventOrSlug}` | Event detail by UUID or slug |
+| `GET` | `/events/{eventOrSlug}` | Event detail by UUID or slug for active public events, plus active unlisted events when the client already has the direct identifier |
 
 ### `GET /events`
 
@@ -1154,6 +1154,11 @@ GET /api/v1/events?filter[speaker]=019d5cb5-7de1-7055-a4d3-b57ab007331e&include=
 Mobile recommendation:
 
 - For event detail screens, request `institution`, `venue.address`, `speakers`, `settings`, `languages`, and `donationChannels` when needed.
+- The detail endpoint returns active `public` events plus active `unlisted` events when the client already has the UUID or slug. The `/events` index still excludes unlisted events.
+- Event detail payloads now include `active_change_notice`, `change_announcements`, and `replacement_event` so native clients can render the same source-of-truth notice, change history, and replacement CTA behavior as the web event page.
+- `active_change_notice` is the latest published public notice or `null`.
+- `change_announcements` is the published history ordered newest-first.
+- `replacement_event` and per-announcement `replacement_event` fields resolve replacement chains to the latest still-reachable public or unlisted event. If later targets become private, inactive, or otherwise unreachable, the payload falls back to the last reachable target or omits the field entirely.
 
 ---
 

@@ -1,6 +1,6 @@
 # MajlisIlmu MCP Guide
 
-Updated: April 22, 2026
+Updated: April 23, 2026
 Audience: developers and AI-client integrators.
 
 ## What MCP Means in MajlisIlmu
@@ -27,6 +27,8 @@ Key rules:
 - `GET /api/v1/admin/{resourceKey}/schema` documents the raw HTTP admin contract.
 - `GET /mcp/admin` uses a separate MCP write-schema formatter; destructive `clear_*` media flags are removed there, while supported media/file fields are advertised with JSON base64 descriptor metadata.
 - Public/mobile event detail payload changes do not automatically imply MCP event-record changes. For example, the public `GET /api/v1/events/{event}` surface now exposes normalized reference cover aliases for native clients, but MCP event records still come from the admin/member resource services rather than `App\Http\Controllers\Api\EventController`.
+- Event record detail through `admin-get-record` and `member-get-record` now embeds the same public change-surface projections as the public event detail payload under `data.record.attributes.active_change_notice`, `data.record.attributes.change_announcements`, and `data.record.attributes.replacement_event`.
+- Those MCP event-detail projections resolve replacement chains to the latest still-reachable public or unlisted target and omit stale unreachable replacements rather than exposing dead public links.
 - Public/mobile discovery additions also do not automatically imply new MCP tools. For example, the public `GET /api/v1/references` directory now exists for native reference browsing, but MCP still uses the existing generic `admin-list-records` and `member-list-records` flows for the `references` resource rather than a dedicated public-reference tool.
 - `current_media` contains metadata only; it does not expose signed or temporary URLs.
 - Generic user record payloads intentionally redact `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`.
@@ -306,6 +308,7 @@ When the user asks you to “look for” a named place, start with the most like
 - For references, omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `social_media` follows the same replacement and canonicalization rules as the other write-capable directory resources.
 - Event write schemas now expose additional field semantics for `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`.
 - For events, update schemas are sparse: omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear the supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values.
+- Event record detail payloads also expose the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` so MCP clients can reason about the same published replacement-chain behavior as the public/mobile event detail contract without following stale links.
 - Member event update schemas inherit the same event semantics because the member MCP surface delegates to the shared admin write service.
 - Series write schemas now expose additional field semantics for `description`, `languages`, and `slug`.
 - For series, `title`, `slug`, and `visibility` remain required on update; `description` clears on `null` / trimmed empty input and `languages` follows omit-preserve / null-clear / array-replace semantics.
