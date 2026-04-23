@@ -567,8 +567,38 @@ it('filters admin event records by local date through the MCP server', function 
             ->has('data', 1)
             ->where('data.0.id', $matchingEvent->getKey())
             ->where('data.0.title', 'Admin MCP Date Match')
+            ->where('data.0.attributes.starts_on_local_date', '2026-05-01')
             ->where('meta.resource.key', 'events')
             ->where('meta.search', null)
+            ->etc());
+});
+
+it('lists admin event records without server errors through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+    $admin->forceFill([
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $event = Event::factory()->create([
+        'title' => 'Admin MCP Unfiltered Event',
+        'starts_at' => Carbon::parse('2026-04-23 02:00:00', 'UTC'),
+        'status' => 'approved',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'page' => 1,
+            'per_page' => 50,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $event->getKey())
+            ->where('data.0.title', 'Admin MCP Unfiltered Event')
+            ->where('data.0.attributes.starts_on_local_date', '2026-04-23')
+            ->where('meta.resource.key', 'events')
+            ->where('meta.pagination.page', 1)
             ->etc());
 });
 
