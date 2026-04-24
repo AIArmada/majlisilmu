@@ -60,7 +60,7 @@ Use `admin-list-records` with `resource_key: "events"`. Date filters are **date-
 | Goal | `starts_after` | `starts_before` |
 |---|---|---|
 | Events on 3–9 May | `2026-05-02` | `2026-05-10` |
-| Events this week (25 Apr – 1 May) | `2026-04-24` | `2026-05-02` |
+| Inclusive week example: 25 Apr – 1 May | `2026-04-24` | `2026-05-02` |
 | Events on exactly 30 Apr | use `starts_on_local_date` | — |
 
 #### List events on one exact local date
@@ -75,6 +75,27 @@ Use `admin-list-records` with `resource_key: "events"`. Date filters are **date-
 ```
 
 Prefer `starts_on_local_date` over a same-day range for single-date queries.
+
+#### Filter to approved, active, public events
+
+For user-facing event reports, scope results to the records that are publicly visible:
+
+```json
+{
+  "resource_key": "events",
+  "filters": {
+    "status": "approved",
+    "is_active": true,
+    "visibility": "public"
+  },
+  "starts_after": "2026-05-02",
+  "starts_before": "2026-05-10",
+  "page": 1,
+  "per_page": 50
+}
+```
+
+Omit the `filters` block when you want all records regardless of approval or visibility status.
 
 #### Summarize event results
 
@@ -91,6 +112,8 @@ Event payloads are large. For user-facing summaries, prefer these fields:
 - `panel_routes.view` when an admin link is needed
 
 Use `meta.pagination.total` for the total result count and `meta.pagination.has_more` to know whether additional pages exist.
+
+If `data` is empty and `meta.pagination.total` is 0, the query succeeded but no records matched the filters. Do not treat this as an error.
 
 Avoid dumping large media payloads or raw UTC timestamps unless specifically requested.
 
