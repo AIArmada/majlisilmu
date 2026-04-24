@@ -784,6 +784,8 @@ it('adds summaries and descriptions to catalog and authenticated workflow endpoi
         ->and($paths['/events/{event}/registrations/export']['get']['summary'] ?? null)->toBe('Export registrations as CSV')
         ->and($paths['/institution-workspace/{institutionId}/members/{memberId}']['delete']['summary'] ?? null)->toBe('Remove an institution member')
         ->and($paths['/follows/{type}/{subject}']['get']['description'] ?? null)->toContain('current authenticated user is following')
+        ->and($paths['/follows/{type}/{subject}']['get']['description'] ?? null)->toContain('The `{subject}` path segment is required')
+        ->and($paths['/follows/{type}/{subject}']['get']['description'] ?? null)->toContain('instead of plural `/follows/...` routes')
         ->and($paths['/follows/{type}/{subject}']['post']['description'] ?? null)->toContain('Creates a follow relationship')
         ->and($paths['/follows/{type}/{subject}']['delete']['description'] ?? null)->toContain('Removes the follow relationship')
         ->and($paths['/events/{event}']['get']['summary'] ?? null)->toBe('Get an event detail payload')
@@ -828,7 +830,9 @@ it('publishes follow-up request examples for authenticated workflow mutations', 
         ->and(data_get($paths, '/institution-workspace/{institutionId}/members.post.requestBody.content.application/json.example.email'))->toBe('member@example.com')
         ->and(data_get($paths, '/institution-workspace/{institutionId}/members/{memberId}.put.requestBody.content.application/json.example.role_id'))->toBe('institution_editor')
         ->and(data_get($paths, '/follows/{type}/{subject}.post.requestBody'))->toBeNull()
-        ->and(data_get($paths, '/follows/{type}/{subject}.post.parameters.0.example'))->toBe('institution');
+        ->and(data_get($paths, '/follows/{type}/{subject}.post.parameters.0.example'))->toBe('institution')
+        ->and(data_get($paths, '/follows/{type}/{subject}.post.parameters.0.description'))->toContain('Use singular values only')
+        ->and(data_get($paths, '/follows/{type}/{subject}.post.parameters.0.description'))->toContain('plural list paths such as `/follows/speakers` are not valid');
 });
 
 function docsJsonCacheScope(): string

@@ -1,3 +1,29 @@
+# Follows API Read Report Verification
+
+- [x] Reconcile the April 23 v3 read report against current follow route registration
+- [x] Verify generated/mobile documentation clarity for follow state vs followed-directory lists
+- [x] Run focused route/docs/API regression checks
+- [x] Record final findings and any required fix
+
+## Review
+
+- Findings:
+  - Current local routes register only `GET|POST|DELETE /api/v1/follows/{type}/{subject}`. The reported `/api/v1/follows/speakers` and `/api/v1/follows/institutions` calls omit the required `{subject}` segment and are not valid follow-list endpoints.
+  - Live route probing matched that contract: `/api/v1/follows/speakers` returns route-not-found `404`, while `/api/v1/follows/institution/nonexistent-subject-for-route-probe` reaches auth middleware and returns `401` without a token, proving the singular route is registered.
+  - Existing mobile API docs already documented followed-directory lists through `/speakers?following=true`, `/institutions?following=true`, and `/references?following=true`.
+- Changes:
+  - Hardened generated OpenAPI descriptions for follow endpoints so `type` is clearly singular and `{subject}` is required.
+  - Documented that plural `/follows/...` list paths are invalid and followed-directory lists use each public directory endpoint with `following=true`.
+  - Added Scramble docs regression assertions for the clearer generated contract.
+- Verification:
+  - `php artisan route:list --path=api/v1/follows` => 3 routes registered
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php --filter='adds summaries and descriptions to catalog and authenticated workflow endpoints|publishes follow-up request examples for authenticated workflow mutations'` => 2 passed, 38 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/PublicReadEndpointReportTest.php` => 6 passed, 21 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/AdminApiDocsTest.php` => 7 passed, 55 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `git diff --check` => pass
+
 # Latest API Read Test Report Triage
 
 - [x] Reconcile the latest API read report against current public API routes
