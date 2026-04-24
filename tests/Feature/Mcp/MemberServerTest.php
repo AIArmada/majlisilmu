@@ -1343,6 +1343,83 @@ it('rejects operational member tool calls until the guide resource is read in th
     expect($allowedCall->json('result.structuredContent.data.resources'))->toBeArray();
 });
 
+it('accepts the member guide preflight when the initialized MCP session is forwarded via request metadata', function () {
+    [$member] = institutionMemberMcpContext(role: 'admin');
+    $token = $member->createToken('mcp-member-preflight-meta-test', [McpTokenManager::MEMBER_ABILITY])->plainTextToken;
+
+    $initialize = $this->withToken($token)->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'initialize-member-mcp-preflight-meta',
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => [
+                'name' => 'Pest',
+                'version' => '1.0.0',
+            ],
+        ],
+    ])->assertOk();
+
+    $sessionId = $initialize->headers->get('MCP-Session-Id');
+
+    expect($sessionId)->not->toBeNull();
+
+    $blockedCall = $this->withToken($token)->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'call-member-list-records-without-docs-meta-session',
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'member-list-records',
+            'arguments' => [
+                'resource_key' => 'institutions',
+            ],
+            '_meta' => [
+                'headers' => [
+                    'MCP-Session-Id' => (string) $sessionId,
+                ],
+            ],
+        ],
+    ])->assertOk();
+
+    expect($blockedCall->json('result.isError'))->toBeTrue();
+    expect($blockedCall->json('result.structuredContent.error.code'))->toBe('documentation_preflight_required');
+
+    $this->withToken($token)->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'read-member-mcp-guide-for-preflight-meta-session',
+        'method' => 'resources/read',
+        'params' => [
+            'uri' => MemberMcpDocumentationPreflight::GUIDE_RESOURCE_URI,
+            '_meta' => [
+                'headers' => [
+                    'MCP-Session-Id' => (string) $sessionId,
+                ],
+            ],
+        ],
+    ])->assertOk();
+
+    $allowedCall = $this->withToken($token)->postJson('/mcp/member', [
+        'jsonrpc' => '2.0',
+        'id' => 'call-member-list-records-after-docs-meta-session',
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'member-list-records',
+            'arguments' => [
+                'resource_key' => 'institutions',
+            ],
+            '_meta' => [
+                'headers' => [
+                    'MCP-Session-Id' => (string) $sessionId,
+                ],
+            ],
+        ],
+    ])->assertOk();
+
+    expect($allowedCall->json('result.isError'))->toBeFalse();
+    expect($allowedCall->json('result.structuredContent.data'))->toBeArray();
+});
+
 it('lists and reads the documentation routing prompt through the member MCP server', function () {
     [$member] = institutionMemberMcpContext(role: 'admin');
 

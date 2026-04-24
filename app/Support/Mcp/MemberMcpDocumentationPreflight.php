@@ -25,33 +25,29 @@ class MemberMcpDocumentationPreflight
             return false;
         }
 
-        if ($this->hasGuideInContext($request->sessionId())) {
+        if ($this->hasGuideInContext($request)) {
             return false;
         }
 
         return ! ($transport instanceof FakeTransporter);
     }
 
-    public function markGuideInContext(?string $sessionId): void
+    public function markGuideInContext(Request|string|null $request): void
     {
-        $normalizedSessionId = $this->normalizeSessionId($sessionId);
-
-        if ($normalizedSessionId === null) {
-            return;
+        foreach ($this->contextKeys($request) as $contextKey) {
+            Cache::put($this->cacheKey($contextKey), true, now()->addHours(12));
         }
-
-        Cache::put($this->cacheKey($normalizedSessionId), true, now()->addHours(12));
     }
 
-    public function hasGuideInContext(?string $sessionId): bool
+    public function hasGuideInContext(Request|string|null $request): bool
     {
-        $normalizedSessionId = $this->normalizeSessionId($sessionId);
-
-        if ($normalizedSessionId === null) {
-            return false;
+        foreach ($this->contextKeys($request) as $contextKey) {
+            if (Cache::get($this->cacheKey($contextKey), false) === true) {
+                return true;
+            }
         }
 
-        return Cache::get($this->cacheKey($normalizedSessionId), false) === true;
+        return false;
     }
 
     public function isDocumentationTool(string $toolName): bool
@@ -100,6 +96,91 @@ class MemberMcpDocumentationPreflight
         $normalizedSessionId = is_string($sessionId) ? trim($sessionId) : '';
 
         return $normalizedSessionId !== '' ? $normalizedSessionId : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function contextKeys(Request|string|null $request): array
+    {
+        if ($request instanceof Request) {
+            return $this->contextKeysFromRequest($request);
+        }
+
+        $normalizedSessionId = $this->normalizeSessionId($request);
+
+        return $normalizedSessionId === null ? [] : [$normalizedSessionId];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function contextKeysFromRequest(Request $request): array
+    {
+        $contextKeys = [$request->sessionId(), ...$this->extractSessionIdsFromMeta($request->meta())];
+
+        return array_values(array_unique(array_filter(
+            array_map(fn (mixed $contextKey): ?string => is_string($contextKey) ? $this->normalizeSessionId($contextKey) : null, $contextKeys),
+            fn (?string $contextKey): bool => $contextKey !== null,
+        )));
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meta
+     * @param  list<string>  $path
+     * @return list<string>
+     */
+    private function extractSessionIdsFromMeta(?array $meta, array $path = []): array
+    {
+        if ($meta === null) {
+            return [];
+        }
+
+        $sessionIds = [];
+
+        foreach ($meta as $key => $value) {
+            $currentPath = [...$path, (string) $key];
+
+            if (is_array($value)) {
+                $sessionIds = [...$sessionIds, ...$this->extractSessionIdsFromMeta($value, $currentPath)];
+
+                continue;
+            }
+
+            if (is_string($value) && $this->pathLooksLikeSessionId($currentPath)) {
+                $sessionIds[] = $value;
+            }
+        }
+
+        return $sessionIds;
+    }
+
+    /**
+     * @param  list<string>  $path
+     */
+    private function pathLooksLikeSessionId(array $path): bool
+    {
+        $normalizedPath = array_values(array_filter(array_map(
+            fn (string $segment): string => $this->normalizeMetaSegment($segment),
+            $path,
+        )));
+
+        $lastSegment = $normalizedPath[array_key_last($normalizedPath)] ?? null;
+
+        if (in_array($lastSegment, ['sessionid', 'mcpsessionid'], true)) {
+            return true;
+        }
+
+        $previousSegment = count($normalizedPath) >= 2
+            ? $normalizedPath[count($normalizedPath) - 2]
+            : null;
+
+        return $lastSegment === 'id' && in_array($previousSegment, ['session', 'mcpsession'], true);
+    }
+
+    private function normalizeMetaSegment(string $segment): string
+    {
+        return preg_replace('/[^a-z0-9]+/', '', strtolower($segment)) ?? '';
     }
 
     private function cacheKey(string $sessionId): string
