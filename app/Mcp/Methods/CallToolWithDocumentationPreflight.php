@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Methods;
 
 use App\Support\Mcp\McpDocumentationPreflight;
+use App\Support\Mcp\VerifiedDocumentationCatalog;
 use Generator;
 use Illuminate\Container\Container;
 use Laravel\Mcp\Request;
@@ -56,11 +57,19 @@ class CallToolWithDocumentationPreflight extends CallTool implements Errable, Me
             : null;
 
         if ($documentationPreflight->shouldBlockOperationalToolCall($mcpRequest, $tool->name(), $transport)) {
-            return $this->toJsonRpcResponse(
-                $request,
-                $documentationPreflight->blockedToolResponse($tool->name()),
-                $this->serializable($tool),
-            );
+            /** @var VerifiedDocumentationCatalog $catalog */
+            $catalog = $container->make(VerifiedDocumentationCatalog::class);
+            $guideDocument = $catalog->fetch(McpDocumentationPreflight::GUIDE_DOCUMENT_ID);
+
+            if ($guideDocument !== null) {
+                $documentationPreflight->markGuideInContext($mcpRequest);
+
+                return $this->toJsonRpcResponse(
+                    $request,
+                    $documentationPreflight->guideInjectionResponse($tool->name(), $guideDocument),
+                    $this->serializable($tool),
+                );
+            }
         }
 
         return parent::handle($request, $context);

@@ -1278,7 +1278,7 @@ it('searches and fetches verified documentation through member MCP tools', funct
         ]);
 });
 
-it('rejects operational member tool calls until the guide resource is read in the same MCP session', function () {
+it('auto-injects guide on first member operational call and allows the retry', function () {
     [$member] = institutionMemberMcpContext(role: 'admin');
     $token = $member->createToken('mcp-member-preflight-test', [McpTokenManager::MEMBER_ABILITY])->plainTextToken;
 
@@ -1300,11 +1300,11 @@ it('rejects operational member tool calls until the guide resource is read in th
 
     expect($sessionId)->not->toBeNull();
 
-    $blockedCall = $this->withToken($token)->withHeaders([
+    $firstCall = $this->withToken($token)->withHeaders([
         'MCP-Session-Id' => (string) $sessionId,
     ])->postJson('/mcp/member', [
         'jsonrpc' => '2.0',
-        'id' => 'call-member-list-records-without-docs',
+        'id' => 'call-member-list-records-first-attempt',
         'method' => 'tools/call',
         'params' => [
             'name' => 'member-list-records',
@@ -1312,20 +1312,11 @@ it('rejects operational member tool calls until the guide resource is read in th
         ],
     ])->assertOk();
 
-    expect($blockedCall->json('result.isError'))->toBeTrue();
-    expect($blockedCall->json('result.structuredContent.error.code'))->toBe('documentation_preflight_required');
-    expect($blockedCall->json('result.content.0.text'))->toContain('Documentation preflight required before calling [member-list-records].');
-
-    $this->withToken($token)->withHeaders([
-        'MCP-Session-Id' => (string) $sessionId,
-    ])->postJson('/mcp/member', [
-        'jsonrpc' => '2.0',
-        'id' => 'read-member-mcp-guide-for-preflight',
-        'method' => 'resources/read',
-        'params' => [
-            'uri' => MemberMcpDocumentationPreflight::GUIDE_RESOURCE_URI,
-        ],
-    ])->assertOk();
+    expect($firstCall->json('result.isError'))->toBeFalse();
+    expect($firstCall->json('result.structuredContent.action'))->toBe('documentation_preflight_injected');
+    expect($firstCall->json('result.structuredContent.document.id'))->toBe(MemberMcpDocumentationPreflight::GUIDE_DOCUMENT_ID);
+    expect($firstCall->json('result.structuredContent.retry.tool_name'))->toBe('member-list-records');
+    expect($firstCall->json('result.content.0.text'))->toContain('Guide auto-loaded');
 
     $allowedCall = $this->withToken($token)->withHeaders([
         'MCP-Session-Id' => (string) $sessionId,

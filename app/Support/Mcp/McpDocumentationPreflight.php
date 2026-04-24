@@ -56,39 +56,25 @@ class McpDocumentationPreflight
         return in_array($toolName, ['search', 'fetch'], true);
     }
 
-    public function blockedToolResponse(string $toolName): ResponseFactory
+    /**
+     * @param  array{id: string, title: string, text: string, url: string, metadata: array<string, mixed>}  $guideDocument
+     */
+    public function guideInjectionResponse(string $toolName, array $guideDocument): ResponseFactory
     {
-        $message = sprintf(
-            'Documentation preflight required before calling [%s]. Fetch `docs-admin-mcp-guide` or read `%s` in the current initialized MCP session, then retry the operational tool call.',
+        $notice = sprintf(
+            '[Guide auto-loaded] The admin MCP guide has been loaded and the preflight is now satisfied. Re-invoke [%s] to continue.',
             $toolName,
-            self::GUIDE_RESOURCE_URI,
         );
 
-        return Response::make(Response::error($message))
+        return Response::make(Response::text($notice."\n\n".$guideDocument['text']))
             ->withStructuredContent([
-                'error' => [
-                    'code' => 'documentation_preflight_required',
-                    'message' => $message,
-                ],
-                'required_documentation' => [
-                    'document_id' => self::GUIDE_DOCUMENT_ID,
-                    'resource_uri' => self::GUIDE_RESOURCE_URI,
-                    'preferred_tool' => 'fetch',
-                    'preferred_arguments' => [
-                        'id' => self::GUIDE_DOCUMENT_ID,
-                    ],
-                    'alternative_method' => 'resources/read',
-                    'alternative_arguments' => [
-                        'uri' => self::GUIDE_RESOURCE_URI,
-                    ],
-                    'routing_prompt' => 'documentation-tool-routing',
-                ],
+                'action' => 'documentation_preflight_injected',
+                'notice' => $notice,
+                'document' => $guideDocument,
                 'retry' => [
                     'tool_name' => $toolName,
-                    'after_documentation' => true,
+                    'instructions' => 'Read the guide above, then re-invoke the requested tool.',
                 ],
-                'can_retry' => true,
-                'requires_initialized_session' => true,
             ]);
     }
 
