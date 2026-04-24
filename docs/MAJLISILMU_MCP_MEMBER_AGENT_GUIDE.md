@@ -1,0 +1,244 @@
+# MajlisIlmu Member MCP Agent Guide
+
+Updated: April 25, 2026
+Audience: model-facing member MCP agents and tool clients.
+
+This guide is for the member MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The admin guide is separate and is not exposed through this server.
+
+## What MCP Means in MajlisIlmu
+
+MajlisIlmu exposes the member MCP server for Ahli-scoped resource access. Treat the live MCP tool descriptors as the source of truth for what the member agent can do.
+
+## Verified Documentation Resource
+
+| Resource | URI | Purpose |
+|---|---|---|
+| `docs-member-mcp-guide` | `file://docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md` | Member-facing guide for auth, transport, discovery primitives, capability matrix, writable resources, and workflow guidance |
+
+## Documentation search and fetch tools
+
+The member server exposes two read-only documentation tools for model discoverability:
+
+| Tool | Purpose | Notes |
+|---|---|---|
+| `search` | Search the verified member MCP guide exposed by this server | Input: one `query` string |
+| `fetch` | Fetch the member guide by id | Input: one `id` string returned by `search` |
+
+These tools search and fetch only the verified member guide above. They do **not** search member runtime records.
+
+## Documentation routing prompt
+
+| Prompt | Purpose | Arguments |
+|---|---|---|
+| `documentation-tool-routing` | Guidance for deciding when to use `search` vs `fetch` for the verified member docs page | `topic?` |
+
+The prompt tells the model to:
+
+- fetch `docs-member-mcp-guide` directly when the question is clearly about MajlisIlmu member MCP behavior
+- use `search` when the topic is fuzzy or a discovery step is still helpful
+- ensure the verified guide is already in context before the first operational member MCP tool call
+- keep runtime data access on the member record tools instead of the docs tools
+- optionally accept a `topic` hint such as `crud`, `auth`, `media uploads`, `runtime records`, `search`, or `fetch` for more targeted guidance
+
+## Operational preflight rule
+
+Before any MajlisIlmu member MCP read, search, query, lookup, list, fetch, write, update, create, relation traversal, schema discovery, or workflow action, the client must ensure the verified member guide is already in context. If it is not, fetch `docs-member-mcp-guide` first, or use `search` then `fetch` when the topic is still fuzzy.
+
+The member MCP server enforces a transport-level version of this rule for operational `tools/call` requests: those calls are rejected until `docs-member-mcp-guide` has been fetched through the MCP `fetch` tool or the guide resource has been read through MCP `resources/read` in the same initialized MCP session.
+
+Apply this before operational tools such as:
+
+- `member-list-records`
+- `member-get-record`
+- `member-list-related-records`
+- `member-get-resource-meta`
+- `member-get-write-schema`
+- `member-update-record`
+- `member-list-contribution-requests`
+- `member-approve-contribution-request`
+- `member-reject-contribution-request`
+- `member-cancel-contribution-request`
+- `member-list-membership-claims`
+- `member-submit-membership-claim`
+- `member-cancel-membership-claim`
+
+The client may skip a fresh docs fetch only when the verified guide is already active in context, or when the user provides the exact `resource_key`, `record_key`, tool, and intended read operation and no interpretation is required.
+
+Even then, re-check live write schemas or explicit workflow schema/tool guidance before update, preview, or workflow mutations.
+
+Because the server cannot safely infer conversational shortcuts such as “the user already supplied the exact resource and tool with zero interpretation needed”, the runtime MCP guard remains stricter and still requires a same-session guide fetch or read before operational tool execution.
+
+## What this server exposes
+
+Tool-centric clients like ChatGPT and the OpenAI Responses MCP integration import tools from `tools/list`, not raw resources from `resources/list`.
+
+- A client connected to `/mcp/member` sees only the member docs tools (`search`, `fetch`) plus `member-*` tools. It will not see any `admin-*` tools.
+- The `docs-member-mcp-guide` resource is the model-readable documentation page for the member MCP surface, not a replacement for the live tool and resource descriptors.
+
+## MCP capability matrix
+
+Use this section as the quick member-only capability summary.
+
+| Capability | Member MCP |
+| --- | --- |
+| Docs search | `search` |
+| Docs fetch | `fetch` |
+| Resource discovery | `member-list-resources` |
+| Resource metadata | `member-get-resource-meta` |
+| Record list | `member-list-records` |
+| Record read | `member-get-record` |
+| Record action guidance | `member-get-record-actions` |
+| Related-record traversal | `member-list-related-records` |
+| Write schema discovery | `member-get-write-schema` |
+| GitHub issue reporting | `member-create-github-issue` |
+| Contribution-request workflows | `member-list-contribution-requests`, `member-approve-contribution-request`, `member-reject-contribution-request`, `member-cancel-contribution-request` |
+| Membership-claim workflows | `member-list-membership-claims`, `member-submit-membership-claim`, `member-cancel-membership-claim` |
+| Update | `member-update-record` |
+| Validate-only preview | Yes, on `member-update-record` |
+
+## Writable resource matrix
+
+| Resource | Member MCP | Notes |
+| --- | --- | --- |
+| `events` | list/get/meta + schema + update + preview | Member scope only; no member create |
+| `institutions` | list/get/meta + schema + update + preview | Member scope limited to linked institutions |
+| `speakers` | list/get/meta + schema + update + preview | Member scope limited to linked speakers |
+| `references` | list/get/meta + schema + update + preview | Member scope limited to linked references |
+
+## Current member-write-capable resources include:
+
+- `institutions`
+- `speakers`
+- `references`
+- `events`
+
+## Relation traversal rules
+
+- Member MCP: use `member-get-resource-meta` to discover whether a relation is exposed, then call `member-list-related-records` with that relation name.
+- Do not assume every member resource has a relation you can traverse; rely on metadata returned by the live tool.
+
+## Record action guidance
+
+- Use `member-get-record-actions` when you already have a specific record and want the shortest model-visible list of next MCP calls.
+- These read-only tools return focused next-step actions such as refreshing record detail, traversing exposed relations, fetching update schemas, previewing updates, and any explicit workflow tools that are currently valid for that record.
+- These tools do not execute mutations; they only point the client at the correct next MCP tool call.
+
+## Entity selection heuristics for record search
+
+Use these heuristics before guessing which top-level resource to search:
+
+- Search `institutions` first when the noun matches an institution type from `App\Enums\InstitutionType`:
+  - `masjid`
+  - `surau`
+  - `madrasah`
+  - `maahad`
+  - `pondok`
+  - `sekolah`
+  - `kolej`
+  - `universiti`
+- Search `venues` first when the noun matches a venue type from `App\Enums\VenueType`:
+  - `dewan`
+  - `auditorium`
+  - `stadium`
+  - `perpustakaan`
+  - `padang`
+  - `hotel`
+- Treat `spaces` as finer-grained sublocations inside an institution, not as the default first lookup target for named mosques, surau, or other institution identities.
+- Example: `Masjid Abidin` should be searched in `institutions` first. If the noun does not match the institution-type terms and sounds like a standalone physical place, look in `venues` next.
+
+## Quick search playbook
+
+When the user asks you to “look for” a named place, start with the most likely top-level resource instead of fanning out across multiple resource types immediately:
+
+- Mosque, surau, school, campus, madrasah, maahad, pondok, or university-style names → search `institutions` first.
+- Standalone hall/dewan, auditorium, stadium, library, field, or hotel-style names → search `venues` first.
+- Room, wing, floor, block, or hall inside a known institution → resolve the parent `institution` first, then use `spaces` for the internal location when needed.
+- Only broaden to a second top-level resource when the first pass returns no good match or the user’s wording is genuinely ambiguous.
+
+## Record and schema reading rules
+
+- Use `record_key` values from prior MCP results; prefer returned route-key-style identifiers when the record payload exposes them.
+- Treat live write schemas as the field-level source of truth for payload structure, required fields, and media support.
+- Institution write schemas expose `nickname`, `address`, `contacts`, and `social_media` semantics. `address` updates deep-merge omitted nested keys, and `address: {}` is effectively a no-op when the record already has an address with a stored country.
+- Speaker write schemas expose `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media` semantics. If you send `address`, include `address.country_id`; `address: {}` is invalid on the write path, while array-style fields replace when present.
+- Reference write schemas expose `author`, `publication_year`, `publisher`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`.
+- Event write schemas expose `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`. Omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values.
+- Event record detail payloads also expose the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` so MCP clients can reason about the same published replacement-chain behavior as the public/mobile event detail contract without following stale links.
+- Handle-style social platforms (`facebook`, `twitter`, `instagram`, `youtube`, `tiktok`, `telegram`, `whatsapp`, `linkedin`, `threads`) may canonicalize a submitted URL into stored `username`, so persisted `url` can come back as `null` after normalization.
+- Even though the schema advertises model-layer normalization notes for Twitter / X, validated MCP payloads should still use the canonical platform value `twitter`, not `x`.
+- Enum fields and filters use enum backing values, not display labels. For events, use values like `kuliah_ceramah`, `all_ages`, `prayer_relative`, `maghrib`, and `immediately` instead of labels like `Kuliah / Ceramah` or localized prayer text.
+- This guide summarizes server-level capability only; actor-specific authorization still applies at runtime.
+
+## Validate-only preview behavior
+
+- `validate_only=true` is supported on `member-update-record`.
+- Previews normalize descriptors into file summaries without persisting media.
+- `apply_defaults=true` enables server-side default application during preview flows where the schema advertises it.
+- schema-driven `feedback` issues may include suggested values, defaults, and conditional `required_because` context.
+- Validation failures in validate-only mode include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.
+- `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP schema may mention destructive media handling.
+
+## MCP media/file upload contract
+
+MCP write tools are JSON tools, not multipart HTTP endpoints. When a schema advertises a media/file field, send a descriptor object instead of a browser file upload:
+
+```json
+{
+  "filename": "poster.png",
+  "mime_type": "image/png",
+  "content_base64": "iVBORw0KGgo..."
+}
+```
+
+Accepted aliases are `file_name` or `name` for `filename`, `mime` for `mime_type`, and `base64` or `data` for `content_base64`. Data URLs are accepted for `content_base64`. Filename extensions are recommended; when they are omitted, the server derives the staged extension from `mime_type`.
+
+Schema fields describe the exact upload rules:
+
+- `mcp_upload.shape` is `file_descriptor` for a single file and `array<file_descriptor>` for multiple files.
+- `accepted_mime_types`, `max_file_size_kb`, and `max_files` are authoritative for that field.
+- `mcp_upload.replacement_semantics` describes whether the submitted descriptor or descriptor array replaces the target media collection.
+- When a write tool supports `validate_only=true`, previews normalize descriptors into file summaries without persisting media.
+- `current_media` stays metadata-only and does not expose signed or temporary URLs.
+- `clear_*` media flags remain unsupported through MCP and are rejected even when clients submit them manually.
+
+## Member MCP tool catalog
+
+The member server is the model-visible API-like surface for Ahli-scoped workflows. The tools below are the current contract that ChatGPT can call:
+
+| Tool | Purpose | Raw HTTP member equivalent |
+|---|---|---|
+| `search` | Search the verified member MCP documentation pages exposed by this server | MCP-only documentation discovery tool |
+| `fetch` | Fetch one verified member documentation page by id | MCP-only documentation fetch tool |
+| `member-list-resources` | List accessible member resources and their capability summary | `GET /api/v1/member/manifest` |
+| `member-get-resource-meta` | Read one member resource's metadata, pages, relations, abilities, and write-support flags | `GET /api/v1/member/{resourceKey}/meta` |
+| `member-list-records` | List records for one member resource with optional search, structured filters, date filters, and pagination | `GET /api/v1/member/{resourceKey}` |
+| `member-list-related-records` | Traverse a named relation on one member record | `GET /api/v1/member/{resourceKey}/{recordKey}/relations/{relation}` |
+| `member-get-record` | Read one member record and its permissions | `GET /api/v1/member/{resourceKey}/{recordKey}` |
+| `member-get-record-actions` | Get focused next-step MCP actions for one member record | MCP-only next-step action guidance tool |
+| `member-get-write-schema` | Discover the update contract for a writable member record | `GET /api/v1/member/{resourceKey}/schema` |
+| `member-create-github-issue` | Create a GitHub issue in the configured repository | `POST /api/v1/github-issues` (member caller path) |
+| `member-update-record` | Update or preview a writable member record | `PUT /api/v1/member/{resourceKey}/{recordKey}` |
+| `member-list-contribution-requests` | List the authenticated member's contribution queue and pending approvals | `GET /api/v1/member/contribution-requests` |
+| `member-approve-contribution-request` | Approve a pending contribution request | `POST /api/v1/member/contribution-requests/{requestKey}/approve` |
+| `member-reject-contribution-request` | Reject a pending contribution request | `POST /api/v1/member/contribution-requests/{requestKey}/reject` |
+| `member-cancel-contribution-request` | Cancel one of the member's pending contribution requests | `DELETE /api/v1/member/contribution-requests/{requestKey}` |
+| `member-list-membership-claims` | List the authenticated member's membership claims | `GET /api/v1/member/membership-claims` |
+| `member-submit-membership-claim` | Submit a membership claim with evidence uploads | `POST /api/v1/member/membership-claims` |
+| `member-cancel-membership-claim` | Cancel one of the member's membership claims | `DELETE /api/v1/member/membership-claims/{claimKey}` |
+
+Member tool behavior notes:
+
+- `validate_only=true` is supported for member update previews.
+- `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries.
+- The member surface intentionally does not expose admin-only moderation, triage, or create workflows.
+- Member update schemas reuse the same resource-level write semantics where the resource is shared, so clients should still fetch the current record and re-send the full intended collection when a field is replacement-based.
+- `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
+- Read-only member tools should be annotated as such so ChatGPT can safely prefer them during discovery.
+
+## Summary for agents
+
+1. Fetch `docs-member-mcp-guide` before the first operational tool call.
+2. Use `search` when the topic is fuzzy, `fetch` when the guide is obvious.
+3. Choose the right top-level resource first.
+4. Trust live write schemas and workflow schema tools before mutating anything.
+5. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.

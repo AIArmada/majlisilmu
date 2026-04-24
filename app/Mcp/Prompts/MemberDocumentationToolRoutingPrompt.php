@@ -6,7 +6,7 @@ namespace App\Mcp\Prompts;
 
 use App\Enums\InstitutionType;
 use App\Enums\VenueType;
-use App\Support\Mcp\VerifiedDocumentationCatalog;
+use App\Support\Mcp\MemberVerifiedDocumentationCatalog;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -20,11 +20,11 @@ use Laravel\Mcp\Server\Prompts\Argument;
 
 #[Name('documentation-tool-routing')]
 #[Title('Documentation Tool Routing')]
-#[Description('Short guidance for deciding when to use the verified admin documentation search and fetch tools exposed by this server, with an optional topic hint for more targeted advice.')]
-class DocumentationToolRoutingPrompt extends Prompt implements Completable
+#[Description('Short guidance for deciding when to use the verified member documentation search and fetch tools exposed by this server, with an optional topic hint for more targeted advice.')]
+class MemberDocumentationToolRoutingPrompt extends Prompt implements Completable
 {
     public function __construct(
-        private readonly VerifiedDocumentationCatalog $documentationCatalog,
+        private readonly MemberVerifiedDocumentationCatalog $documentationCatalog,
     ) {
         //
     }
@@ -78,24 +78,24 @@ class DocumentationToolRoutingPrompt extends Prompt implements Completable
             <<<'TEXT'
 Use the verified documentation tools like this:
 
-- Before the first MajlisIlmu admin MCP operational tool call for runtime reads, search, lookup, listing, metadata inspection, relation traversal, write-schema discovery, preview, write, or workflow actions, ensure the verified guide is already in context.
-- If it is not already in context, call `fetch` with `docs-admin-mcp-guide` directly when the task is clearly about MajlisIlmu admin MCP behavior, or call `search` first when the topic is still fuzzy.
-- Use `fetch` first when the question is clearly about MajlisIlmu admin MCP behavior, because `docs-admin-mcp-guide` is the single exposed admin MCP-facing guide.
+- Before the first MajlisIlmu member MCP operational tool call for runtime reads, search, lookup, listing, metadata inspection, relation traversal, write-schema discovery, preview, write, or workflow actions, ensure the verified guide is already in context.
+- If it is not already in context, call `fetch` with `docs-member-mcp-guide` directly when the task is clearly about MajlisIlmu member MCP behavior, or call `search` first when the topic is still fuzzy.
+- Use `fetch` first when the question is clearly about MajlisIlmu member MCP behavior, because `docs-member-mcp-guide` is the single exposed member MCP-facing guide.
 - Use `search` when you want confirmation before fetching, when the user asks a fuzzy topical question, or when you want a model-friendly discovery step before quoting the guide.
 
 Known verified page id:
-- `docs-admin-mcp-guide` — auth, transport, discovery primitives, capability matrix, media rules, preview semantics, writable resources, and runtime workflow guidance.
+- `docs-member-mcp-guide` — auth, transport, discovery primitives, capability matrix, media rules, preview semantics, writable resources, and runtime workflow guidance.
 
 Do not use `search` or `fetch` as substitutes for live runtime records or mutations:
-- once the guide is in context, use the admin resource, record, relation, metadata, write-schema, preview, and workflow tools for runtime data
+- once the guide is in context, use the member resource, record, relation, metadata, write-schema, preview, and workflow tools for runtime data
 - use the docs tools again whenever you need to confirm capability, routing, schema, preview, or workflow semantics
 - a fresh docs fetch may be skipped only when the fetched guide is already active in context, or when the user supplied the exact resource key, record key, tool, and intended read operation with no interpretation required; still re-check schema or workflow guidance before mutations
 TEXT,
             $this->entitySelectionGuidance(),
             <<<'TEXT'
 Recommended flow:
-1. If the guide is not already in context and the task is operational, fetch `docs-admin-mcp-guide` first or use `search` then `fetch` when the topic is fuzzy.
-2. If the question is obviously about the exposed admin MCP docs, call `fetch` with `docs-admin-mcp-guide` directly.
+1. If the guide is not already in context and the task is operational, fetch `docs-member-mcp-guide` first or use `search` then `fetch` when the topic is fuzzy.
+2. If the question is obviously about the exposed member MCP docs, call `fetch` with `docs-member-mcp-guide` directly.
 3. Otherwise call `search` with a short topical query.
 4. Call `fetch` with the best matching page id.
 5. Base the answer or next runtime tool call on the fetched guide.
@@ -129,40 +129,36 @@ TEXT;
         }
 
         $displayTopic = trim($topic);
-        $institutionTerms = $this->institutionTerms();
-        $venueTerms = $this->venueTerms();
-        $institutionTermsList = $this->formattedTerms($institutionTerms);
-        $venueTermsList = $this->formattedTerms($venueTerms);
 
         return match (true) {
             $this->matchesAny($normalizedTopic, ['crud', 'create', 'update', 'delete', 'preview', 'parity', 'capability']) => <<<TEXT
 Topic-specific guidance for "{$displayTopic}":
-- Fetch `docs-admin-mcp-guide` and focus on the MCP capability matrix, writable resource matrix, and preview sections.
+- Fetch `docs-member-mcp-guide` and focus on the MCP capability matrix, writable resource matrix, and preview sections.
 - Suggested `search` query: `mcp capability matrix preview related records`.
 - Confirm which surface actually supports create, update, delete, preview, or related-record traversal before answering.
 TEXT,
             $this->matchesAny($normalizedTopic, ['auth', 'oauth', 'token', 'scope', 'connector', 'login']) => <<<TEXT
 Topic-specific guidance for "{$displayTopic}":
-- Fetch `docs-admin-mcp-guide` and focus on the auth, transport, and capability sections.
+- Fetch `docs-member-mcp-guide` and focus on the auth, transport, and capability sections.
 - Suggested `search` query: `oauth token auth scopes`.
 - Confirm whether the question is about bearer tokens, OAuth access, or `mcp:use` scope handling before answering.
 TEXT,
             $this->matchesAny($normalizedTopic, ['media', 'upload', 'file', 'descriptor', 'base64']) => <<<TEXT
 Topic-specific guidance for "{$displayTopic}":
-- Fetch `docs-admin-mcp-guide` and focus on the MCP media/file upload contract and preview rules sections.
+- Fetch `docs-member-mcp-guide` and focus on the MCP media/file upload contract and preview rules sections.
 - Suggested `search` query: `media upload descriptor base64 preview`.
 - Confirm `json base64 descriptor` transport, schema-advertised file fields, and whether `validate_only` preview applies on the target surface.
 TEXT,
             $this->matchesAny($normalizedTopic, ['runtime', 'record', 'records', 'resource', 'relation', 'live data']) => <<<TEXT
 Topic-specific guidance for "{$displayTopic}":
-- Before the first operational tool call, ensure `docs-admin-mcp-guide` is already in context; fetch it first when it is not.
-- After that, use admin list, get-record, related-record, resource-meta, write-schema, and workflow tools for live runtime records.
+- Before the first operational tool call, ensure `docs-member-mcp-guide` is already in context; fetch it first when it is not.
+- After that, use member list, get-record, related-record, resource-meta, write-schema, and workflow tools for live runtime records.
 - Re-open the guide when resource selection, routing, preview, or mutation semantics are unclear.
 TEXT,
-            $this->matchesAny($normalizedTopic, array_merge(['entity', 'selection', 'institution', 'venue', 'space', 'location'], $institutionTerms, $venueTerms)) => <<<TEXT
+            $this->matchesAny($normalizedTopic, ['entity', 'selection', 'institution', 'venue', 'space', 'location']) => <<<TEXT
 Topic-specific guidance for "{$displayTopic}":
-- Search `institutions` first for institution-type nouns such as {$institutionTermsList}.
-- Search `venues` first for venue-type nouns such as {$venueTermsList}.
+- Search `institutions` first for institution-type nouns.
+- Search `venues` first for venue-type nouns.
 - Only search `spaces` first when the user is clearly asking about an internal hall, room, or sublocation inside a known institution.
 - Example: `Masjid Abidin` belongs in `institutions` first, not `venues` or `spaces`.
 TEXT,
@@ -170,19 +166,19 @@ TEXT,
 Topic-specific guidance for "{$displayTopic}":
 - Start with `search` because the question is still discovery-oriented.
 - Keep the query short and topical, then `fetch` the best match.
-- If the result is clearly the admin MCP guide, fetch `docs-admin-mcp-guide` and answer from that canonical page.
+- If the result is clearly the member MCP guide, fetch `docs-member-mcp-guide` and answer from that canonical page.
 TEXT,
             $this->matchesAny($normalizedTopic, ['fetch']) => <<<TEXT
 Topic-specific guidance for "{$displayTopic}":
 - Use `fetch` when you already know the page id or want the canonical MCP guide immediately.
-- If the question is about the exposed MajlisIlmu admin MCP docs, go straight to `docs-admin-mcp-guide`.
+- If the question is about the exposed MajlisIlmu member MCP docs, go straight to `docs-member-mcp-guide`.
 - Quote or summarize from the fetched page before making capability claims.
 TEXT,
             default => <<<TEXT
 Topic-specific guidance for "{$displayTopic}":
 - Start with `search` using that phrase or a shorter topical variant.
 - `fetch` the strongest matching verified page before making capability or contract claims.
-- Prefer `docs-admin-mcp-guide`, because it is the canonical exposed admin MCP guide and includes the capability matrix and writable resource summaries.
+- Prefer `docs-member-mcp-guide`, because it is the canonical exposed member MCP guide and includes the capability matrix and writable resource summaries.
 TEXT,
         };
     }

@@ -69,9 +69,11 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
         ->values()
         ->all();
 
-    expect($document['schema_version'])->toBe('2.3.0')
+    expect($document['schema_version'])->toBe('2.4.0')
         ->and($document['markdown_companion'])->toBe('docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md')
         ->and(data_get($document, 'event_detail_parity_notes.0'))->toContain('active_change_notice')
+        ->and(data_get($document, 'search_parity_notes.0'))->toContain('speakers, institutions, and references')
+        ->and(data_get($document, 'search_parity_notes.1'))->toContain('active plus verified visibility')
         ->and(data_get($document, 'workflow_api_families.public_discovery_and_form_contracts'))->toContain('GET /api/v1/references*')
         ->and(data_get($document, 'surface_sync_contract'))->toEqual(SurfaceSyncPolicy::manifest())
         ->and(data_get($document, 'runtime_inventory.admin_panel.resource_count'))->toBe(count($runtimeAdminResources))
@@ -122,6 +124,7 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
         ->toContain('Runtime panel registration wins.')
         ->toContain('`GET /api/v1/references*`')
         ->toContain('Event detail parity note')
+        ->toContain('Search parity note')
         ->toContain('active_change_notice')
         ->toContain('change_announcements')
         ->toContain('replacement_event')
@@ -136,6 +139,7 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
         ->toContain('json_base64_descriptor')
         ->toContain('Validation failures in validate-only mode now return machine-readable remediation details')
         ->toContain('Validation failures now expose schema-driven `feedback`')
+        ->toContain('shared specialized search services')
         ->toContain('Supports `validate_only` preview for updates.')
         ->toContain('Supports one-level related-record traversal.')
         ->toContain('Event moderation:')

@@ -1190,6 +1190,46 @@ it('returns full unified search totals while limiting speaker and institution pr
         ->and($response->json('data.institutions.items'))->toHaveCount(4);
 });
 
+it('uses the same fuzzy speaker and institution resolution in the unified search api as the directory endpoints', function () {
+    $speaker = Speaker::factory()->create([
+        'name' => 'Aisyah Binti Hassan',
+        'honorific' => null,
+        'pre_nominal' => [],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Al Hidayah',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(SpeakerSearchService::class)->syncSpeakerRecord($speaker);
+
+    $speakerDirectoryResponse = $this->getJson('/api/v1/speakers?search='.urlencode('Aisyh'))
+        ->assertOk();
+    $speakerUnifiedResponse = $this->getJson('/api/v1/search?search='.urlencode('Aisyh'))
+        ->assertOk();
+
+    expect(collect($speakerDirectoryResponse->json('data'))->pluck('id')->all())
+        ->toContain((string) $speaker->id)
+        ->and(collect($speakerUnifiedResponse->json('data.speakers.items'))->pluck('id')->all())
+        ->toContain((string) $speaker->id);
+
+    $institutionDirectoryResponse = $this->getJson('/api/v1/institutions?search='.urlencode('Hidayh'))
+        ->assertOk();
+    $institutionUnifiedResponse = $this->getJson('/api/v1/search?search='.urlencode('Hidayh'))
+        ->assertOk();
+
+    expect(collect($institutionDirectoryResponse->json('data'))->pluck('id')->all())
+        ->toContain((string) $institution->id)
+        ->and(collect($institutionUnifiedResponse->json('data.institutions.items'))->pluck('id')->all())
+        ->toContain((string) $institution->id);
+});
+
 it('falls back to local speaker directory search when typesense fails', function () {
     $speaker = Speaker::factory()->create([
         'name' => 'Aisyah Binti Hassan',

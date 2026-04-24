@@ -32,6 +32,7 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
 use App\Support\Location\FederalTerritoryLocation;
+use App\Support\Search\SpeakerSearchService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -244,6 +245,67 @@ it('filters admin speaker records by explicit query parameters', function () {
 
     expect(in_array($speakerWithEvents->getKey(), $hasEventsIds, true))->toBeTrue();
     expect(in_array($speakerWithoutEvents->getKey(), $hasEventsIds, true))->toBeFalse();
+});
+
+it('uses the richer speaker institution and reference search behavior on the admin api', function () {
+    $admin = adminApiUser('super_admin');
+
+    $matchingSpeaker = Speaker::factory()->create([
+        'name' => 'Admin API Decorated Speaker',
+        'pre_nominal' => ['syeikhul_maqari'],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $otherSpeaker = Speaker::factory()->create([
+        'name' => 'Admin API Other Speaker',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(SpeakerSearchService::class)->syncSpeakerRecord($matchingSpeaker);
+    app(SpeakerSearchService::class)->syncSpeakerRecord($otherSpeaker);
+
+    $matchingInstitution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'nickname' => 'Masjid Biru',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    Institution::factory()->create([
+        'name' => 'Pusat Pengajian An-Nur',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $matchingReference = Reference::factory()->create([
+        'title' => 'Rujukan Tajwid',
+        'author' => 'Imam Contoh',
+        'description' => 'Syarahan tajwid dan adab',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    Reference::factory()->create([
+        'title' => 'Rujukan Lain',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/speakers?search='.urlencode('syeikhul maqari'))
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.total', 1)
+        ->assertJsonPath('data.0.id', (string) $matchingSpeaker->getKey());
+
+    $this->getJson('/api/v1/admin/institutions?search='.urlencode('Masjid Biru'))
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.total', 1)
+        ->assertJsonPath('data.0.id', (string) $matchingInstitution->getKey());
+
+    $this->getJson('/api/v1/admin/references?search='.urlencode('tajwid adab'))
+        ->assertOk()
+        ->assertJsonPath('meta.pagination.total', 1)
+        ->assertJsonPath('data.0.id', (string) $matchingReference->getKey());
 });
 
 it('filters admin event records by explicit query parameters', function () {

@@ -92,6 +92,15 @@ it('documents the public reference directory in the mobile api reference', funct
         ->toContain('Public `/events`, `/institutions`, `/institutions/near`, `/speakers`, and `/references` list endpoints accept `fields=`');
 });
 
+it('documents admin api search parity and scope differences versus the public and MCP surfaces', function () {
+    $markdown = file_get_contents(base_path('docs/MAJLISILMU_MOBILE_API_REFERENCE.md')) ?: '';
+
+    expect($markdown)
+        ->toContain('For `speakers`, `institutions`, and `references`, the admin HTTP API now reuses the same specialized search services')
+        ->toContain('admin/member MCP `*list-records` tools')
+        ->toContain('the main difference is which records each surface is allowed to return.');
+});
+
 it('documents event change projections and unlisted direct-detail access in the mobile api reference', function () {
     $markdown = file_get_contents(base_path('docs/MAJLISILMU_MOBILE_API_REFERENCE.md')) ?: '';
 
