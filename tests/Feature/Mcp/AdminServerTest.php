@@ -2935,6 +2935,12 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
 
     expect($tools->keys()->all())->not->toContain('member-list-resources', 'member-list-records');
 
+    expect($tools->keys()->all())->not->toContain(
+        'admin-delete-record',
+        'admin-delete',
+        'admin-remove-record',
+    );
+
     expect($tools->get('search')['securitySchemes'] ?? [])->toContainEqual([
         'type' => 'oauth2',
         'scopes' => ['mcp:use'],
@@ -3089,6 +3095,12 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-review-contribution-request',
         'admin-review-membership-claim',
         'admin-update-record',
+    );
+
+    expect($toolNames)->not->toContain(
+        'admin-delete-record',
+        'admin-delete',
+        'admin-remove-record',
     );
 });
 

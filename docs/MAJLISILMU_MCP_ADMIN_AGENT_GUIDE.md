@@ -289,3 +289,9 @@ Admin tool behavior notes:
 3. Choose the right top-level resource first.
 4. Trust live write schemas and workflow schema tools before mutating anything.
 5. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.
+
+## Explicit CRUD boundary
+
+- Admin MCP currently supports create and update for writable resources through schema-guided tools.
+- Admin MCP does **not** expose generic delete tools (for example `admin-delete-record`).
+- Treat delete, restore, reorder, and replicate as panel-led operations unless a future MCP tool is explicitly added.

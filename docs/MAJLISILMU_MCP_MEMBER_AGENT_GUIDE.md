@@ -242,3 +242,9 @@ Member tool behavior notes:
 3. Choose the right top-level resource first.
 4. Trust live write schemas and workflow schema tools before mutating anything.
 5. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.
+
+## Explicit CRUD boundary
+
+- Member MCP currently supports read flows and schema-guided updates on writable member-scoped resources.
+- Member MCP does **not** expose generic delete tools (for example `member-delete-record`).
+- Treat delete-like lifecycle actions as explicit workflows only where dedicated tools exist (for example claim or contribution cancellation).
