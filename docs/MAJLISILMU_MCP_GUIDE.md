@@ -403,7 +403,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 Admin tool behavior notes:
 
 - `validate_only=true` is supported for create/update preview flows.
-- `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata.
+- `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search now reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
@@ -413,9 +413,10 @@ Admin tool behavior notes:
 - The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
 - Media/file upload fields accept JSON base64 descriptors only when the matching write schema advertises them.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
-- `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain.
-- Read-only tools should be annotated as such so ChatGPT can safely choose them.
-- Write tools should be described as schema-guided and idempotent where the server logic supports that behavior.
+- `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain. This tool is **conditionally registered** and only present when the GitHub issue reporter is configured; it will be absent from `tools/list` if GitHub issue reporting has not been set up.
+- The admin workflow tools (`admin-get-event-moderation-schema`, `admin-moderate-event`, `admin-get-report-triage-schema`, `admin-triage-report`, `admin-get-contribution-request-review-schema`, `admin-review-contribution-request`, `admin-get-membership-claim-review-schema`, `admin-review-membership-claim`) are **conditionally registered** based on the current user's permissions: moderation tools require `canModerate`, triage tools require `canTriage`, and review tools require `canReview`. If these tools are absent from `tools/list`, the authenticated admin user lacks the corresponding workflow permission.
+- All read-only discovery, list, get, and schema tools carry `#[IsReadOnly]` + `#[IsIdempotent]` annotations; AI clients that honor MCP tool annotations can call them freely without confirmation prompts.
+- All write and workflow execution tools carry `#[IsReadOnly(false)]` + `#[IsIdempotent(false)]` annotations; AI clients that honor MCP annotations may prompt for confirmation before calling them.
 
 ### Member MCP tool catalog
 
@@ -449,7 +450,7 @@ Member tool behavior notes:
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
 - Member update tools support `validate_only=true` for preview-only member writes.
 - Member related-record traversal is limited to one level and only for relations exposed by member resource metadata.
-- For `speakers`, `institutions`, and `references`, `member-list-records` search reuses the same specialized search services as the public directory endpoints, while still respecting Ahli membership scope.
+- For `speakers`, `institutions`, and `references`, `member-list-records` search reuses the same specialized search services as the public directory endpoints, while still respecting Ahli membership scope. Unlike `admin-list-records`, `member-list-records` does **not** accept a `filters` object; use `search`, `starts_after`, `starts_before`, and `starts_on_local_date` to narrow results.
 - Contribution-request workflow tools cover listing, approving, rejecting, and cancelling queue items that the authenticated member can legitimately act on through the Ahli surface.
 - Membership-claim workflow tools cover listing, submitting with evidence uploads, and cancelling the member's own pending claims.
 - `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
