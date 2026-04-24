@@ -1,3 +1,24 @@
+# Dashboard End-To-End Polish
+
+- [x] Audit the current `/dashboard` route, Livewire component, view, translations, and regression tests
+- [x] Refine the dashboard hero, impact summary, planner navigation, calendar, list cards, and empty states without changing backend workflow semantics
+- [x] Add or update focused Pest assertions for the polished page structure and Malay copy
+- [x] Run formatter, focused dashboard tests, PHPStan, and browser smoke verification
+- [x] Record review notes and verification results
+
+## Review
+
+- Changes:
+  - Reworked the attendee dashboard into a calmer utility surface: compact hero, three summary tiles, quick actions, cleaner share-outcome metrics, mobile planner summary, tighter calendar/list cards, lazy-loaded media, and actionable empty states.
+  - Added English, Malay, and `ms_MY` strings for the new labels and strengthened dashboard regression coverage for the polished structure and Malay copy.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => 28 passed, 269 assertions
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `git diff --check` => pass
+  - `php artisan view:clear && php artisan view:cache` => pass
+  - Browser smoke: signed in with seeded local user and confirmed `/dashboard` renders localized dashboard copy with zero current tab console errors
+
 # Follows API Read Report Verification
 
 - [x] Reconcile the April 23 v3 read report against current follow route registration

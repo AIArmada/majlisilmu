@@ -60,6 +60,7 @@ use App\Models\Venue;
 use App\Services\Signals\SignalsTracker;
 use App\Support\GitHub\GitHubIssueReportContract;
 use App\Support\Mcp\McpTokenManager;
+use App\Support\Search\SpeakerSearchService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -114,6 +115,85 @@ it('hides write tools when the authenticated user has no writable admin access',
             'operation' => 'create',
         ])
         ->assertHasErrors(['Tool [admin-get-write-schema] not found.']);
+});
+
+it('matches richer public search behavior for speakers, institutions, and references through admin MCP list records', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $matchingSpeaker = Speaker::factory()->create([
+        'name' => 'Admin MCP Speaker Match',
+        'pre_nominal' => ['syeikhul_maqari'],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $otherSpeaker = Speaker::factory()->create([
+        'name' => 'Admin MCP Speaker Other',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(SpeakerSearchService::class)->syncSpeakerRecord($matchingSpeaker);
+    app(SpeakerSearchService::class)->syncSpeakerRecord($otherSpeaker);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'speakers',
+            'search' => 'syeikhul maqari',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.resource.key', 'speakers')
+            ->where('meta.pagination.total', 1)
+            ->where('data.0.id', (string) $matchingSpeaker->getKey())
+            ->etc());
+
+    $matchingInstitution = Institution::factory()->create([
+        'name' => 'Masjid Al Hidayah',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    Institution::factory()->create([
+        'name' => 'Pusat Pengajian An-Nur',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'institutions',
+            'search' => 'Hidayh',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.resource.key', 'institutions')
+            ->where('meta.pagination.total', 1)
+            ->where('data.0.id', (string) $matchingInstitution->getKey())
+            ->etc());
+
+    $matchingReference = Reference::factory()->create([
+        'title' => 'Rujukan Tajwid',
+        'author' => 'Imam Contoh',
+        'description' => 'Syarahan tajwid dan adab',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    Reference::factory()->create([
+        'title' => 'Rujukan Lain',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'references',
+            'search' => 'tajwid adab',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.resource.key', 'references')
+            ->where('meta.pagination.total', 1)
+            ->where('data.0.id', (string) $matchingReference->getKey())
+            ->etc());
 });
 
 it('reviews membership claims through the admin MCP workflow tool', function () {

@@ -41,6 +41,7 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Support\GitHub\GitHubIssueReportContract;
 use App\Support\Mcp\McpTokenManager;
+use App\Support\Search\SpeakerSearchService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -118,6 +119,100 @@ it('returns member resource metadata, record listings, and record detail for ins
             ->where('data.resource.key', 'institutions')
             ->where('data.record.route_key', $institution->getRouteKey())
             ->where('data.record.attributes.name', $institution->name)
+            ->etc());
+});
+
+it('searches member speakers by formatted public title parts through MCP list records', function () {
+    [$member, $matchingSpeaker] = speakerMemberMcpContext(role: 'admin');
+
+    $matchingSpeaker->update([
+        'name' => 'Member MCP Speaker Match',
+        'pre_nominal' => ['syeikhul_maqari'],
+    ]);
+
+    $otherSpeaker = Speaker::factory()->create([
+        'name' => 'Member MCP Speaker Other',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(AddMemberToSubject::class)->handle($otherSpeaker, $member, 'viewer');
+
+    $matchingSpeaker = $matchingSpeaker->fresh();
+
+    expect($matchingSpeaker)->not->toBeNull();
+
+    app(SpeakerSearchService::class)->syncSpeakerRecord($matchingSpeaker);
+    app(SpeakerSearchService::class)->syncSpeakerRecord($otherSpeaker);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberListRecordsTool::class, [
+            'resource_key' => 'speakers',
+            'search' => 'syeikhul maqari',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.resource.key', 'speakers')
+            ->where('meta.pagination.total', 1)
+            ->where('data.0.id', (string) $matchingSpeaker->getKey())
+            ->etc());
+});
+
+it('uses typo-tolerant institution search through member MCP list records', function () {
+    [$member, $matchingInstitution] = institutionMemberMcpContext(role: 'admin');
+
+    $matchingInstitution->update([
+        'name' => 'Masjid Al Hidayah',
+    ]);
+
+    $otherInstitution = Institution::factory()->create([
+        'name' => 'Pusat Pengajian An-Nur',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(AddMemberToSubject::class)->handle($otherInstitution, $member, 'viewer');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberListRecordsTool::class, [
+            'resource_key' => 'institutions',
+            'search' => 'Hidayh',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.resource.key', 'institutions')
+            ->where('meta.pagination.total', 1)
+            ->where('data.0.id', (string) $matchingInstitution->getKey())
+            ->etc());
+});
+
+it('searches member references by descriptive public terms through MCP list records', function () {
+    [$member, $matchingReference] = referenceMemberMcpContext(role: 'admin');
+
+    $matchingReference->update([
+        'title' => 'Rujukan Tajwid',
+        'author' => 'Imam Contoh',
+        'description' => 'Syarahan tajwid dan adab',
+    ]);
+
+    $otherReference = Reference::factory()->create([
+        'title' => 'Rujukan Lain',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(AddMemberToSubject::class)->handle($otherReference, $member, 'viewer');
+
+    MemberServer::actingAs($member)
+        ->tool(MemberListRecordsTool::class, [
+            'resource_key' => 'references',
+            'search' => 'tajwid adab',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.resource.key', 'references')
+            ->where('meta.pagination.total', 1)
+            ->where('data.0.id', (string) $matchingReference->getKey())
             ->etc());
 });
 

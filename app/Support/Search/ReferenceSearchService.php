@@ -11,6 +11,60 @@ use Illuminate\Support\Str;
 class ReferenceSearchService
 {
     /**
+     * @param  Builder<Reference>  $query
+     * @return Builder<Reference>
+     */
+    public function applySearch(Builder $query, string $search): Builder
+    {
+        $normalizedSearch = $this->normalizedSearch($search);
+
+        if ($normalizedSearch === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($this->shouldUseScoutSearch()) {
+            try {
+                return $this->applyScoutSearch($query, $normalizedSearch);
+            } catch (\Throwable $exception) {
+                $this->logScoutFallback('Reference Typesense search failed, falling back to database search', $exception, $normalizedSearch);
+            }
+        }
+
+        return $this->applyDatabaseSearch($query, $normalizedSearch);
+    }
+
+    /**
+     * @param  Builder<Reference>  $query
+     * @return list<string>
+     */
+    public function scopedSearchIds(Builder $query, string $search): array
+    {
+        $normalizedSearch = $this->normalizedSearch($search);
+
+        if ($normalizedSearch === null) {
+            return [];
+        }
+
+        $model = $query->getModel();
+        $keyColumn = $model->qualifyColumn($model->getKeyName());
+
+        $ids = (clone $query)
+            ->select($keyColumn)
+            ->tap(fn (Builder $builder): Builder => $this->applySearch($builder, $normalizedSearch))
+            ->orderBy($model->qualifyColumn('title'))
+            ->pluck($keyColumn)
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all();
+
+        if ($ids !== [] || mb_strlen($normalizedSearch) < 3) {
+            return $ids;
+        }
+
+        return $this->scopedFuzzySearchIds($query, $normalizedSearch, $this->minimumFuzzyScore($normalizedSearch));
+    }
+
+    /**
      * @return list<string>
      */
     public function publicSearchIds(string $search): array
@@ -111,6 +165,64 @@ class ReferenceSearchService
             ->select(['id', 'title', 'author', 'publisher', 'description', 'slug'])
             ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateFilter($query, $normalizedSearch))
             ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateOrdering($query, $normalizedSearch))
+            ->limit($this->typesenseResultLimit())
+            ->get()
+            ->map(function (Reference $reference) use ($normalizedSearch): array {
+                $candidates = array_values(array_filter([
+                    $this->normalizeText((string) $reference->title),
+                    $this->normalizeText((string) $reference->author),
+                    $this->normalizeText((string) $reference->publisher),
+                    $this->normalizeText((string) $reference->slug),
+                    $this->normalizeText(strip_tags((string) $reference->description)),
+                ], static fn (string $candidate): bool => $candidate !== ''));
+
+                $scoreCandidates = [];
+
+                foreach ($candidates as $candidate) {
+                    $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $candidate);
+
+                    $tokens = array_values(array_filter(
+                        explode(' ', $candidate),
+                        static fn (string $token): bool => mb_strlen($token) >= 2,
+                    ));
+
+                    foreach ($tokens as $token) {
+                        $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $token);
+                    }
+                }
+
+                return [
+                    'id' => (string) $reference->id,
+                    'score' => $scoreCandidates === [] ? 0.0 : max($scoreCandidates),
+                ];
+            })
+            ->filter(static fn (array $candidate): bool => $candidate['score'] >= $minimumScore)
+            ->sortByDesc('score')
+            ->pluck('id')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Reference>  $query
+     * @return list<string>
+     */
+    private function scopedFuzzySearchIds(Builder $query, string $normalizedSearch, float $minimumScore): array
+    {
+        $model = $query->getModel();
+
+        return (clone $query)
+            ->reorder()
+            ->select([
+                $model->qualifyColumn($model->getKeyName()),
+                $model->qualifyColumn('title'),
+                $model->qualifyColumn('author'),
+                $model->qualifyColumn('publisher'),
+                $model->qualifyColumn('description'),
+                $model->qualifyColumn('slug'),
+            ])
+            ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateFilter($builder, $normalizedSearch))
+            ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateOrdering($builder, $normalizedSearch))
             ->limit($this->typesenseResultLimit())
             ->get()
             ->map(function (Reference $reference) use ($normalizedSearch): array {
@@ -269,6 +381,28 @@ class ReferenceSearchService
             ->map(static fn (mixed $id): string => (string) $id)
             ->values()
             ->all();
+    }
+
+    protected function shouldUseScoutSearch(): bool
+    {
+        return in_array($this->scoutDriver(), ['typesense', 'database'], true);
+    }
+
+    /**
+     * @param  Builder<Reference>  $query
+     * @return Builder<Reference>
+     */
+    protected function applyScoutSearch(Builder $query, string $search): Builder
+    {
+        $ids = $this->searchIdsWithScout($search, [
+            'num_typos' => 0,
+        ]);
+
+        if ($ids === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn($query->getModel()->qualifyColumn('id'), $ids);
     }
 
     protected function shouldUseTypesenseSearch(): bool

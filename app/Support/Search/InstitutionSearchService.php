@@ -40,6 +40,37 @@ class InstitutionSearchService
 
     /**
      * @param  Builder<Institution>  $query
+     * @return list<string>
+     */
+    public function scopedSearchIds(Builder $query, string $search): array
+    {
+        $normalizedSearch = $this->normalizedSearch($search);
+
+        if ($normalizedSearch === null) {
+            return [];
+        }
+
+        $model = $query->getModel();
+        $keyColumn = $model->qualifyColumn($model->getKeyName());
+
+        $ids = (clone $query)
+            ->select($keyColumn)
+            ->tap(fn (Builder $builder): Builder => $this->applySearch($builder, $normalizedSearch))
+            ->orderBy($model->qualifyColumn('name'))
+            ->pluck($keyColumn)
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all();
+
+        if ($ids !== [] || mb_strlen($normalizedSearch) < 3) {
+            return $ids;
+        }
+
+        return $this->scopedFuzzySearchIds($query, $normalizedSearch, $this->minimumFuzzyScore($normalizedSearch));
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
      * @return Builder<Institution>
      */
     private function applyDatabaseSearch(Builder $query, string $normalizedSearch): Builder
@@ -213,6 +244,60 @@ class InstitutionSearchService
                     $tokens = array_values(array_filter(
                         explode(' ', $candidate),
                         static fn (string $token): bool => mb_strlen($token) >= 2
+                    ));
+
+                    foreach ($tokens as $token) {
+                        $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $token);
+                    }
+                }
+
+                return [
+                    'id' => (string) $institution->id,
+                    'score' => $scoreCandidates === [] ? 0.0 : max($scoreCandidates),
+                ];
+            })
+            ->filter(static fn (array $candidate): bool => $candidate['score'] >= $minimumScore)
+            ->sortByDesc('score')
+            ->pluck('id')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Institution>  $query
+     * @return list<string>
+     */
+    private function scopedFuzzySearchIds(Builder $query, string $normalizedSearch, float $minimumScore): array
+    {
+        $model = $query->getModel();
+
+        return (clone $query)
+            ->reorder()
+            ->select([
+                $model->qualifyColumn($model->getKeyName()),
+                $model->qualifyColumn('name'),
+                $model->qualifyColumn('nickname'),
+                $model->qualifyColumn('description'),
+            ])
+            ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateFilter($builder, $normalizedSearch))
+            ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateOrdering($builder, $normalizedSearch))
+            ->limit($this->typesenseResultLimit())
+            ->get()
+            ->map(function (Institution $institution) use ($normalizedSearch): array {
+                $candidates = array_values(array_filter([
+                    $this->normalizeText((string) $institution->name),
+                    $this->normalizeText((string) $institution->nickname),
+                    $this->normalizeText((string) $institution->description),
+                ], static fn (string $candidate): bool => $candidate !== ''));
+
+                $scoreCandidates = [];
+
+                foreach ($candidates as $candidate) {
+                    $scoreCandidates[] = $this->fuzzyScore($normalizedSearch, $candidate);
+
+                    $tokens = array_values(array_filter(
+                        explode(' ', $candidate),
+                        static fn (string $token): bool => mb_strlen($token) >= 2,
                     ));
 
                     foreach ($tokens as $token) {
