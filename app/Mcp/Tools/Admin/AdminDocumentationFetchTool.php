@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Admin;
 
+use App\Support\Mcp\McpDocumentationPreflight;
 use App\Support\Mcp\VerifiedDocumentationCatalog;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
-use JsonException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -23,10 +23,11 @@ class AdminDocumentationFetchTool extends AbstractAdminTool
 
     protected string $title = 'Fetch Verified Documentation Page';
 
-    protected string $description = 'Use this when you need the full text of a verified MajlisIlmu documentation page returned by the search tool. Accepts a stable documentation id only, not a url or file:// resource URI. Do not use this for runtime record fetches; use the admin record tools for those.';
+    protected string $description = 'Use this when you need the full text of a verified MajlisIlmu admin documentation page returned by the search tool. Accepts a stable documentation id only, not a url or file:// resource URI. Do not use this for runtime record fetches; use the admin record tools for those.';
 
     public function __construct(
         private readonly VerifiedDocumentationCatalog $documentationCatalog,
+        private readonly McpDocumentationPreflight $documentationPreflight,
     ) {
         $this->setMeta([
             'openai/toolInvocation/invoking' => 'Loading verified doc…',
@@ -36,7 +37,7 @@ class AdminDocumentationFetchTool extends AbstractAdminTool
 
     public function handle(Request $request): ResponseFactory|Response
     {
-        return $this->safeResponse(function () use ($request): Response {
+        return $this->structuredResponse(function () use ($request): array {
             $this->authorizeAdmin($request);
 
             $validated = $this->validateArguments($request, [
@@ -49,7 +50,11 @@ class AdminDocumentationFetchTool extends AbstractAdminTool
                 throw new NotFoundHttpException('Documentation page not found.');
             }
 
-            return Response::text($this->jsonEncode($document));
+            if ((string) $validated['id'] === McpDocumentationPreflight::GUIDE_DOCUMENT_ID) {
+                $this->documentationPreflight->markGuideInContext($request->sessionId());
+            }
+
+            return $document;
         });
     }
 
@@ -60,24 +65,33 @@ class AdminDocumentationFetchTool extends AbstractAdminTool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'id' => $schema->string()->required()->min(1)->description('Stable documentation identifier returned by the search tool, such as docs-mcp-guide. Do not pass the document url or file:// resource URI.'),
+            'id' => $schema->string()->required()->min(1)->description('Stable documentation identifier returned by the search tool, such as docs-admin-mcp-guide. Do not pass the document url or file:// resource URI.'),
+        ];
+    }
+
+    /**
+     * @return array<string, Type>
+     */
+    #[\Override]
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'id' => $schema->string()->required()->description('Stable documentation identifier.'),
+            'title' => $schema->string()->required()->description('Documentation title.'),
+            'text' => $schema->string()->required()->description('Full document body.'),
+            'url' => $schema->string()->required()->format('uri')->description('Canonical document URL.'),
+            'metadata' => $schema->object([
+                'description' => $schema->string()->required()->description('Human-readable document summary.'),
+                'mime_type' => $schema->string()->required()->description('Document MIME type.'),
+                'resource_uri' => $schema->string()->required()->format('uri')->description('Canonical MCP resource URI.'),
+                'relative_path' => $schema->string()->required()->description('Repository-relative source path.'),
+                'last_modified' => $schema->string()->required()->format('date-time')->description('UTC timestamp of the last modification.'),
+            ])->required()->withoutAdditionalProperties(),
         ];
     }
 
     public function shouldRegister(Request $request): bool
     {
         return $this->documentationCatalog->hasAnyDocuments();
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function jsonEncode(array $payload): string
-    {
-        try {
-            return json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        } catch (JsonException) {
-            return '{}';
-        }
     }
 }

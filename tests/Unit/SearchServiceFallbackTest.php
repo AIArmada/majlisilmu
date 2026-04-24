@@ -390,6 +390,100 @@ it('keeps local fuzzy institution search when the database driver is configured'
         ->not->toContain((string) $hiddenInstitution->id);
 });
 
+it('resolves the same speaker ids for public and scoped search flows when the scope matches', function () {
+    config()->set('scout.driver', 'collection');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Aisyah Binti Hassan',
+        'honorific' => null,
+        'pre_nominal' => [],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Speaker::factory()->create([
+        'name' => 'Aisyah Hidden',
+        'honorific' => null,
+        'pre_nominal' => [],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'rejected',
+        'is_active' => true,
+    ]);
+
+    $service = app(SpeakerSearchService::class);
+    $service->syncSpeakerRecord($speaker);
+
+    $publicIds = $service->resolvedPublicSearchIds('Aisyh');
+    $scopedIds = $service->scopedSearchIds(
+        Speaker::query()->active()->where('status', 'verified'),
+        'Aisyh',
+    );
+
+    expect($publicIds)->toBe($scopedIds)
+        ->toContain((string) $speaker->id);
+});
+
+it('resolves the same institution ids for public and scoped search flows when the scope matches', function () {
+    config()->set('scout.driver', 'collection');
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Al Hidayah',
+        'description' => 'Kuliah dan komuniti',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Institution::factory()->create([
+        'name' => 'Masjid Hidden',
+        'description' => 'Kuliah dan komuniti',
+        'status' => 'rejected',
+        'is_active' => true,
+    ]);
+
+    $service = app(InstitutionSearchService::class);
+
+    $publicIds = $service->resolvedPublicSearchIds('Hidayh');
+    $scopedIds = $service->scopedSearchIds(
+        Institution::query()->active()->where('status', 'verified'),
+        'Hidayh',
+    );
+
+    expect($publicIds)->toBe($scopedIds)
+        ->toContain((string) $institution->id);
+});
+
+it('resolves the same reference ids for public and scoped search flows when the scope matches', function () {
+    config()->set('scout.driver', 'collection');
+
+    $reference = Reference::factory()->create([
+        'title' => 'Bulugh al-Maram',
+        'author' => 'Imam Contoh',
+        'description' => 'Syarahan fiqh dan hadith',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Reference::factory()->create([
+        'title' => 'Bulugh Hidden',
+        'status' => 'rejected',
+        'is_active' => true,
+    ]);
+
+    $service = app(ReferenceSearchService::class);
+
+    $publicIds = $service->resolvedPublicSearchIds('Bulugh al Mram');
+    $scopedIds = $service->scopedSearchIds(
+        Reference::query()->active()->where('status', 'verified'),
+        'Bulugh al Mram',
+    );
+
+    expect($publicIds)->toBe($scopedIds)
+        ->toContain((string) $reference->id);
+});
+
 it('falls back to database reference search when typesense lookup fails', function () {
     $reference = Reference::factory()->create([
         'title' => 'Riyadus Solihin',

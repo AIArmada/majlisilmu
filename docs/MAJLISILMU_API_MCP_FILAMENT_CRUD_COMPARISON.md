@@ -1,6 +1,6 @@
 ---
 title: API / MCP / Filament Capability Matrix
-verified_at: 2026-04-23
+verified_at: 2026-04-25
 purpose: Canonical parity map for public workflow API, generic admin HTTP API, admin/member MCP, and the Filament admin/Ahli panels.
 machine_readable_companion: docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.json
 ---
@@ -125,6 +125,12 @@ The public/authenticated API is not a second generic CRUD registry. It is a set 
 - Public `GET /api/v1/events/{eventOrSlug}` now returns `active_change_notice`, `change_announcements`, and `replacement_event`, and direct detail reads accept active unlisted events when the caller already has the UUID or slug.
 - Admin API event detail plus admin/member MCP event record detail project the same event-change fields inside the returned event attributes and record payloads.
 - Replacement targets are resolved to the latest still-reachable public or unlisted event so stale replacement chains do not leak dead public links.
+
+## Search parity note
+
+- Admin HTTP API and Admin/Member MCP now route list search for `speakers`, `institutions`, and `references` through shared specialized search services.
+- Public speaker, institution, and reference directory endpoints use the same underlying search services for those resource families, but public reads still enforce active + verified visibility while admin/member surfaces preserve their broader or scoped record sets.
+- This is search-engine parity, not full surface symmetry; transport, authorization, filters, and returned field sets still differ by surface.
 
 ## Surface sync operating model
 
@@ -336,6 +342,7 @@ This is the area where the previous version drifted the most.
 - **Runtime admin inventory is broader than local app files.** Because the registry uses live Filament panel registration, vendor/plugin resources are part of the admin surface.
 - **Page keys do not equal permission.** `getPages()` and generic write support describe structural capability; per-actor authorization still comes from middleware and model policies.
 - **Admin API and Admin MCP share one mutation whitelist.** If `AdminResourceMutationService` changes, both transports change together.
+- **Admin API and Admin/Member MCP also share the richer directory search path for `speakers`, `institutions`, and `references`.** Public directories use the same search services, but visibility and scope still differ.
 - **Member MCP is narrower than admin.** Generic member CRUD still maps only to the four Ahli resources and exposes updates only, but the server now also carries workflow tools for contribution queues and membership claims.
 - **Public contributions and reports are authenticated workflows.** The API exposes form discovery publicly, but the actual create routes for contributions and reports live behind `auth:sanctum`.
 - **Delete, restore, replicate, and reorder remain panel-led.** Do not assume generic admin HTTP or MCP parity for those operations.

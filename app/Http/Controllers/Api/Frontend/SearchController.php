@@ -156,11 +156,11 @@ class SearchController extends FrontendController
                 sort: $search !== null ? 'relevance' : 'time',
             );
 
-        $speakerIds = $search !== null ? $this->speakerSearchService->publicSearchIds($search) : [];
+        $speakerIds = $search !== null ? $this->speakerSearchService->resolvedPublicSearchIds($search) : [];
         $speakerQuery = $search !== null
             ? $this->baseSpeakerQuery($user)->whereIn('speakers.id', $speakerIds)
             : Speaker::query()->whereRaw('1 = 0');
-        $institutionIds = $search !== null ? $this->institutionSearchService->publicSearchIds($search) : [];
+        $institutionIds = $search !== null ? $this->institutionSearchService->resolvedPublicSearchIds($search) : [];
         $institutionQuery = $search !== null
             ? $this->aggregateInstitutionSearchItemsQuery($institutionIds)
             : Institution::query()->whereRaw('1 = 0');

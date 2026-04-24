@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
  *   mime_type: string
  * }
  */
-class VerifiedDocumentationCatalog
+class MemberVerifiedDocumentationCatalog
 {
     /**
      * @return list<DocumentationRecord>
@@ -27,12 +27,12 @@ class VerifiedDocumentationCatalog
     {
         return array_values(array_filter([
             [
-                'id' => 'docs-admin-mcp-guide',
-                'title' => 'MajlisIlmu Admin MCP Agent Guide',
-                'description' => 'Verified guide for admin MCP auth, transport rules, discovery primitives, capability matrix, writable resources, and workflow guidance.',
-                'resource_uri' => 'file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md',
-                'url' => 'file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md',
-                'relative_path' => 'docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md',
+                'id' => 'docs-member-mcp-guide',
+                'title' => 'MajlisIlmu Member MCP Agent Guide',
+                'description' => 'Verified guide for member MCP auth, transport rules, discovery primitives, capability matrix, writable resources, and workflow guidance.',
+                'resource_uri' => 'file://docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md',
+                'url' => 'file://docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md',
+                'relative_path' => 'docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md',
                 'mime_type' => 'text/markdown',
             ],
         ], fn (array $document): bool => is_file(base_path($document['relative_path']))));

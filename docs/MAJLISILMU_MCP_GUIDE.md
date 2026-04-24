@@ -1,7 +1,10 @@
 # MajlisIlmu MCP Guide
 
-Updated: April 23, 2026
+Updated: April 25, 2026
 Audience: developers and AI-client integrators.
+
+This is the human setup and broader integration guide.
+The MCP-facing guides consumed by agents are `docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md` and `docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md`.
 
 ## What MCP Means in MajlisIlmu
 
@@ -30,6 +33,7 @@ Key rules:
 - Event record detail through `admin-get-record` and `member-get-record` now embeds the same public change-surface projections as the public event detail payload under `data.record.attributes.active_change_notice`, `data.record.attributes.change_announcements`, and `data.record.attributes.replacement_event`.
 - Those MCP event-detail projections resolve replacement chains to the latest still-reachable public or unlisted target and omit stale unreachable replacements rather than exposing dead public links.
 - Public/mobile discovery additions also do not automatically imply new MCP tools. For example, the public `GET /api/v1/references` directory now exists for native reference browsing, but MCP still uses the existing generic `admin-list-records` and `member-list-records` flows for the `references` resource rather than a dedicated public-reference tool.
+- For `speakers`, `institutions`, and `references`, `admin-list-records` and `member-list-records` now reuse the same specialized search services as the public directory endpoints. Expect decorated speaker-title matching, institution nickname or typo-tolerant matching, and reference descriptive-text matching to behave similarly while still honoring each surface's own visibility or membership scope.
 - `current_media` contains metadata only; it does not expose signed or temporary URLs.
 - Generic user record payloads intentionally redact `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`.
 - Record lookups use `route_key` for record-specific paths, and missing records return 404 rather than a generic server error.
@@ -163,34 +167,35 @@ If you want ChatGPT to understand a capability, expose it as a dedicated tool wi
 
 ### Verified documentation resources
 
-Both admin and member servers expose this read-only markdown resource through MCP `resources/list` and `resources/read`:
+Each MCP server exposes its own read-only markdown guide through MCP `resources/list` and `resources/read`:
 
 | Resource | URI | Purpose |
 |---|---|---|
-| `docs-mcp-guide` | `file://docs/MAJLISILMU_MCP_GUIDE.md` | Verified guide for MCP auth, transport, discovery primitives, capability matrix, media rules, and current admin/member write behavior |
+| `docs-admin-mcp-guide` | `file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md` | Verified guide for admin MCP auth, transport, discovery primitives, capability matrix, media rules, and admin write behavior |
+| `docs-member-mcp-guide` | `file://docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md` | Verified guide for member MCP auth, transport, discovery primitives, capability matrix, media rules, and member write behavior |
 
-Treat this resource as the model-readable documentation page for MajlisIlmu MCP, not as a replacement for the live tool/resource descriptors.
+Treat the matching server guide as the model-readable documentation page for that MCP surface, not as a replacement for the live tool/resource descriptors.
 
 The broader internal cross-surface parity docs (`MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.*`) are intentionally not exposed through MCP.
 
-Tool-centric clients like ChatGPT and the OpenAI Responses MCP integration import tools from `tools/list`, not raw resources from `resources/list`. To make these docs reliably discoverable in those clients, both servers also expose read-only `search` and `fetch` documentation tools.
+Tool-centric clients like ChatGPT and the OpenAI Responses MCP integration import tools from `tools/list`, not raw resources from `resources/list`. To make these docs reliably discoverable in those clients, each server also exposes read-only `search` and `fetch` documentation tools scoped to its own guide.
 
 ### Documentation search and fetch tools
 
-Both servers expose two MCP-standard read-only documentation tools for model discoverability:
+Each server exposes two MCP-standard read-only documentation tools for model discoverability:
 
 | Tool | Purpose | Notes |
 |---|---|---|
 | `search` | Search the verified documentation page exposed by this server | Input: one `query` string. Returns JSON text with `{results:[{id,title,url}]}`. |
 | `fetch` | Fetch the verified documentation page by id | Input: one `id` string returned by `search`. Returns JSON text with `{id,title,text,url,metadata}`. |
 
-These tools search and fetch only the verified MCP guide exposed above. They do **not** search admin/member resource records.
+These tools search and fetch only the verified MCP guide exposed by that same server. They do **not** search admin/member resource records.
 
-The `url` returned by `search` and shown in the raw MCP resource list is informational. The `fetch` tool schema accepts `id` only; call it as `{"id":"docs-mcp-guide"}` and do not pass `url` or `file://...`.
+The `url` returned by `search` and shown in the raw MCP resource list is informational. The `fetch` tool schema accepts `id` only; call it as `{"id":"docs-admin-mcp-guide"}` or `{"id":"docs-member-mcp-guide"}` depending on the connected server, and do not pass `url` or `file://...`.
 
 ### Documentation routing prompt
 
-Both servers also expose one small MCP prompt for clients that support prompt discovery:
+Each server also exposes one small MCP prompt for clients that support prompt discovery:
 
 | Prompt | Purpose | Arguments |
 |---|---|---|
@@ -198,10 +203,35 @@ Both servers also expose one small MCP prompt for clients that support prompt di
 
 The prompt tells the model to:
 
-- fetch `docs-mcp-guide` directly when the question is clearly about MajlisIlmu MCP docs
+- fetch the matching server guide directly when the question is clearly about MajlisIlmu MCP docs
+- ensure the verified guide is already in context before the first operational admin or member MCP tool call, fetching it first when needed
 - use `search` when the topic is fuzzy or a discovery step is still helpful
 - keep runtime data access on the admin/member record tools instead of the docs tools
 - optionally accept a `topic` hint such as `crud`, `auth`, `media uploads`, `runtime records`, `search`, or `fetch` for more targeted guidance
+
+### Operational preflight rule
+
+Before any MajlisIlmu MCP read, search, query, lookup, list, fetch, write, update, create, relation traversal, schema discovery, or workflow action, the client must ensure the matching verified MCP guide is already in context. If it is not, fetch `docs-admin-mcp-guide` or `docs-member-mcp-guide` first, or use `search` then `fetch` when the topic is still fuzzy.
+
+The current admin and member MCP servers enforce a stricter transport-level version of this rule for operational `tools/call` requests: those calls are rejected until the matching server guide has been fetched through the MCP `fetch` tool or the guide resource has been read through MCP `resources/read` in the same initialized MCP session.
+
+Apply this before operational tools such as:
+
+- `admin-list-records`, `member-list-records`
+- `admin-get-record`, `member-get-record`
+- `admin-list-related-records`, `member-list-related-records`
+- `admin-get-resource-meta`, `member-get-resource-meta`
+- `admin-get-write-schema`, `member-get-write-schema`
+- `admin-create-record`, `admin-update-record`, `member-update-record`
+- `admin-get-event-moderation-schema`, `admin-get-report-triage-schema`, `admin-get-contribution-request-review-schema`, `admin-get-membership-claim-review-schema`
+- `admin-moderate-event`, `admin-triage-report`, `admin-review-contribution-request`, `admin-review-membership-claim`
+- `member-list-contribution-requests`, `member-approve-contribution-request`, `member-reject-contribution-request`, `member-cancel-contribution-request`, `member-list-membership-claims`, `member-submit-membership-claim`, and `member-cancel-membership-claim`
+
+The client may skip a fresh docs fetch only when the verified guide is already active in context, or when the user provides the exact `resource_key`, `record_key`, tool, and intended read operation and no interpretation is required.
+
+Even then, re-check live write schemas or explicit workflow schema/tool guidance before create, update, preview, moderation, triage, or review mutations.
+
+Because the server cannot safely infer conversational shortcuts such as “the user already supplied the exact resource and tool with zero interpretation needed”, the runtime MCP guard remains stricter and still requires a same-session guide fetch or read before operational tool execution.
 
 ### MCP capability matrix
 
@@ -376,6 +406,7 @@ Admin tool behavior notes:
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
+- For `speakers`, `institutions`, and `references`, `admin-list-records` search now reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
 - `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
@@ -418,6 +449,7 @@ Member tool behavior notes:
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
 - Member update tools support `validate_only=true` for preview-only member writes.
 - Member related-record traversal is limited to one level and only for relations exposed by member resource metadata.
+- For `speakers`, `institutions`, and `references`, `member-list-records` search reuses the same specialized search services as the public directory endpoints, while still respecting Ahli membership scope.
 - Contribution-request workflow tools cover listing, approving, rejecting, and cancelling queue items that the authenticated member can legitimately act on through the Ahli surface.
 - Membership-claim workflow tools cover listing, submitting with evidence uploads, and cancelling the member's own pending claims.
 - `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.

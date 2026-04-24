@@ -1,6 +1,6 @@
 {
-  "schema_version": "2.3.0",
-  "verified_at": "2026-04-23",
+  "schema_version": "2.4.0",
+  "verified_at": "2026-04-25",
   "title": "API / MCP / Filament Capability Matrix",
   "markdown_companion": "docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md",
   "purpose": "Canonical parity map for public workflow API, generic admin HTTP API, admin/member MCP, and the Filament admin/Ahli panels.",
@@ -130,6 +130,11 @@
     "Public GET /api/v1/events/{eventOrSlug} now returns active_change_notice, change_announcements, and replacement_event, and direct detail reads accept active unlisted events when the caller already has the UUID or slug.",
     "Admin API event detail plus admin/member MCP event record detail project the same event-change fields inside their event attributes or record payloads.",
     "Replacement targets are resolved to the latest still-reachable public or unlisted event so stale replacement chains do not expose dead public links."
+  ],
+  "search_parity_notes": [
+    "Admin HTTP API and Admin/Member MCP now route list search for speakers, institutions, and references through shared specialized search services.",
+    "Public speaker, institution, and reference directory endpoints use the same underlying search services for those resource families, but public reads still enforce active plus verified visibility while admin/member surfaces preserve their broader or scoped record sets.",
+    "This is search-engine parity, not full surface symmetry; transport, authorization, filters, and returned field sets still differ by surface."
   ],
   "surface_sync_contract": {
     "strategy": "curated_parity",

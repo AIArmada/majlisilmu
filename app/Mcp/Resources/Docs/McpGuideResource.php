@@ -12,16 +12,16 @@ use Laravel\Mcp\Server\Annotations\Priority;
 #[Priority(1.0)]
 class McpGuideResource extends MarkdownDocumentResource
 {
-    protected string $name = 'docs-mcp-guide';
+    protected string $name = 'docs-admin-mcp-guide';
 
-    protected string $title = 'MajlisIlmu MCP Guide';
+    protected string $title = 'MajlisIlmu Admin MCP Agent Guide';
 
-    protected string $description = 'Verified markdown guide for MajlisIlmu MCP auth, transport rules, discovery primitives, capability matrix, media rules, and current admin/member write behavior.';
+    protected string $description = 'Verified markdown guide for admin MCP agent consumption: auth, transport, discovery primitives, capability matrix, writable resources, and workflow guidance.';
 
-    protected string $uri = 'file://docs/MAJLISILMU_MCP_GUIDE.md';
+    protected string $uri = 'file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md';
 
     protected function documentRelativePath(): string
     {
-        return 'docs/MAJLISILMU_MCP_GUIDE.md';
+        return 'docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md';
     }
 }

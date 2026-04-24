@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-23
+**Last Updated:** 2026-04-25
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -114,6 +114,8 @@ The `search` parameter on public and admin surfaces queries different record sco
 | Admin | `GET /api/v1/admin/institutions?search=...` | **All** records — active, inactive, pending, rejected |
 
 This is intentional. The admin surface mirrors Filament's resource query, which does not apply visibility filters. A speaker that returns zero results on the public surface may appear on the admin surface because it is inactive or has `status = 'pending'`.
+
+For `speakers`, `institutions`, and `references`, the admin HTTP API now reuses the same specialized search services that also back the public directory endpoints and the admin/member MCP `*list-records` tools. That means decorated speaker-title matching, institution nickname or typo-tolerant matching, and reference descriptive-text matching behave similarly across those surfaces; the main difference is which records each surface is allowed to return.
 
 Public event discovery follows the same principle: use `filter[search]` for event title/description text matching and `filter[speaker]` when you need an exact speaker UUID match.
 

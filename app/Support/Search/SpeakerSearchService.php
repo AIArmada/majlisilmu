@@ -214,6 +214,26 @@ class SpeakerSearchService
     /**
      * @return list<string>
      */
+    public function resolvedPublicSearchIds(string $search): array
+    {
+        $normalizedSearch = $this->normalizedSearch($search);
+
+        if ($normalizedSearch === null) {
+            return [];
+        }
+
+        $ids = $this->publicSearchIds($normalizedSearch);
+
+        if ($ids !== [] || mb_strlen($normalizedSearch) < 3) {
+            return $ids;
+        }
+
+        return $this->publicFuzzySearchIds($normalizedSearch);
+    }
+
+    /**
+     * @return list<string>
+     */
     private function publicSearchIdsFromScoutDatabase(string $normalizedSearch): array
     {
         return Speaker::search($normalizedSearch)
