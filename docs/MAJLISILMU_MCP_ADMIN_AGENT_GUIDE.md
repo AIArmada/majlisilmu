@@ -5,6 +5,111 @@ Audience: model-facing admin MCP agents and tool clients.
 
 This guide is for the admin MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The member guide is separate and is not exposed through this server.
 
+## Quick Start for Common Admin Reads
+
+### Step 1 — Ensure the guide is loaded
+
+Before the first operational tool call in a session, the guide must be in context:
+
+```json
+{
+  "tool": "fetch",
+  "arguments": { "id": "docs-admin-mcp-guide" }
+}
+```
+
+### Step 2 — Handling `documentation_preflight_injected`
+
+If you call an operational tool before the guide is loaded, the server auto-injects the guide and returns:
+
+```json
+{
+  "action": "documentation_preflight_injected",
+  "notice": "[Guide auto-loaded] The admin MCP guide has been loaded and the preflight is now satisfied. Re-invoke [admin-list-records] to continue."
+}
+```
+
+This is **not a failure**. The server has now loaded the guide into the MCP session. **Re-run the exact same operational tool call immediately** and it will proceed.
+
+The retry flow:
+1. Call operational tool (e.g. `admin-list-records`)
+2. Receive `documentation_preflight_injected`
+3. Call the same operational tool again
+4. Data returns normally
+
+---
+
+### Common Recipes
+
+#### List events for a date range
+
+Use `admin-list-records` with `resource_key: "events"`. Date filters are **date-only `YYYY-MM-DD` strings** — do not send ISO timestamps.
+
+```json
+{
+  "resource_key": "events",
+  "starts_after": "2026-04-24",
+  "starts_before": "2026-05-03",
+  "page": 1,
+  "per_page": 50
+}
+```
+
+**Date boundary rule:** `starts_after` and `starts_before` are exclusive boundaries. To list events for local dates 25 Apr through 2 May inclusive, set `starts_after` to the day before the range start and `starts_before` to the day after the range end:
+
+| Goal | `starts_after` | `starts_before` |
+|---|---|---|
+| Events on 3–9 May | `2026-05-02` | `2026-05-10` |
+| Events this week (25 Apr – 1 May) | `2026-04-24` | `2026-05-02` |
+| Events on exactly 30 Apr | use `starts_on_local_date` | — |
+
+#### List events on one exact local date
+
+```json
+{
+  "resource_key": "events",
+  "starts_on_local_date": "2026-04-30",
+  "page": 1,
+  "per_page": 50
+}
+```
+
+Prefer `starts_on_local_date` over a same-day range for single-date queries.
+
+#### Summarize event results
+
+Event payloads are large. For user-facing summaries, prefer these fields:
+
+- `title`
+- `attributes.starts_on_local_date`
+- `attributes.timing_display` ← best for user-facing time, includes prayer-relative labels
+- `attributes.end_time_display`
+- `attributes.event_type_label`
+- `attributes.institution.name`
+- `attributes.institution.address_line`
+- `attributes.reference_study_subtitle`
+- `panel_routes.view` when an admin link is needed
+
+Use `meta.pagination.total` for the total result count and `meta.pagination.has_more` to know whether additional pages exist.
+
+Avoid dumping large media payloads or raw UTC timestamps unless specifically requested.
+
+#### User-facing time display
+
+Event records expose multiple time representations:
+
+| Field | Use for |
+|---|---|
+| `timing_display` | User-facing summaries — includes prayer-relative labels like "Selepas Maghrib" |
+| `end_time_display` | User-facing end time |
+| `starts_on_local_date` | Date-only display or filtering |
+| `starts_at_local` | Local datetime when precise display is needed |
+| `starts_at` | Machine processing only — stored in UTC |
+
+For prayer-relative events, `timing_display` is always better than converting `starts_at`.
+
+---
+
 ## What MCP Means in MajlisIlmu
 
 MajlisIlmu exposes the admin MCP server for full admin-surface resource access. Treat the live MCP tool descriptors as the source of truth for what the admin agent can do.
@@ -44,7 +149,7 @@ The prompt tells the model to:
 
 Before any MajlisIlmu admin MCP read, search, query, lookup, list, fetch, write, update, create, relation traversal, schema discovery, or workflow action, the client must ensure the verified admin guide is already in context. If it is not, fetch `docs-admin-mcp-guide` first, or use `search` then `fetch` when the topic is still fuzzy.
 
-The admin MCP server enforces a transport-level version of this rule for operational `tools/call` requests: those calls are rejected until `docs-admin-mcp-guide` has been fetched through the MCP `fetch` tool or the guide resource has been read through MCP `resources/read` in the same initialized MCP session.
+The admin MCP server enforces a transport-level version of this rule for operational `tools/call` requests: those calls are rejected until `docs-admin-mcp-guide` has been fetched through the MCP `fetch` tool or the guide resource has been read through MCP `resources/read` in the same initialized MCP session. When the guard fires, the server auto-injects the guide and returns a `documentation_preflight_injected` action — see the **Quick Start** section above for the retry pattern.
 
 Apply this before operational tools such as:
 
@@ -151,6 +256,8 @@ Use this section as the quick admin-only capability summary.
 - Use the dedicated admin workflow-schema tools when you want the canonical read-only workflow contract for one record before calling the matching mutation tool.
 - These tools return the same workflow payload shape used by the HTTP admin schema endpoints: defaults, available actions, fields, and conditional rules.
 - Current explicit workflow schema tools are `admin-get-event-moderation-schema`, `admin-get-report-triage-schema`, `admin-get-contribution-request-review-schema`, and `admin-get-membership-claim-review-schema`.
+- These workflow-schema tools and their matching execution tools (`admin-moderate-event`, `admin-triage-report`, `admin-review-contribution-request`, `admin-review-membership-claim`) are **conditionally registered** based on the current user's permissions: moderation tools require `canModerate`, triage tools require `canTriage`, and review tools require `canReview`. If any of these tools are absent from `tools/list`, the authenticated admin user lacks the corresponding permission.
+- `admin-create-github-issue` is also **conditionally registered** — it is only present when the server-side GitHub issue reporter is configured. If it is absent from `tools/list`, GitHub issue reporting has not been set up on this server instance.
 
 ## Entity selection heuristics for record search
 
@@ -188,10 +295,10 @@ When the user asks you to “look for” a named place, start with the most like
 
 - Use `record_key` values from prior MCP results; prefer returned route-key-style identifiers when the record payload exposes them.
 - Treat live write schemas as the field-level source of truth for payload structure, required fields, and media support.
-- Institution write schemas expose `nickname`, `address`, `contacts`, and `social_media` semantics. `address` updates deep-merge omitted nested keys, and `address: {}` is effectively a no-op when the record already has an address with a stored country.
-- Speaker write schemas expose `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media` semantics. If you send `address`, include `address.country_id`; `address: {}` is invalid on the write path, while array-style fields replace when present.
-- Venue write schemas expose `address`, `facilities`, `contacts`, and `social_media` semantics. Omitted address keys preserve the existing nested values, but `address: {}` deletes the stored venue address on the shared save path.
-- Reference write schemas expose `author`, `publication_year`, `publisher`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`.
+- Institution write schemas expose `nickname`, `address`, `contacts`, and `social_media` semantics. `address` updates deep-merge omitted nested keys, and `address: {}` is effectively a no-op when the record already has an address with a stored country. Omitted `contacts` / `social_media` preserve the existing collection, `null` or `[]` clear it, and any submitted array replaces the stored collection — safe clients should fetch the current record, modify the collection locally, then resend the full array. `nickname: null` preserves the current stored nickname while `nickname: ""` reaches the mutation layer and clears the stored nickname to `null`.
+- Speaker write schemas expose `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media` semantics. If you send `address`, include `address.country_id`; `address: {}` is invalid on the write path, while array-style fields replace when present. The visible region fields deep-merge when present; the hidden map fields (`line1`, `line2`, `postcode`, `lat`, `lng`, `google_maps_url`, `google_place_id`, `waze_url`) remain prohibited on the MCP write path.
+- Venue write schemas expose `address`, `facilities`, `contacts`, and `social_media` semantics. Omitted address keys preserve the existing nested values, but `address: {}` deletes the stored venue address on the shared save path. `facilities`, `contacts`, and `social_media` are replacement collections; `facilities` input is normalized into the stored boolean facility map, so safe clients should resend the full enabled facility set.
+- Reference write schemas expose `author`, `publication_year`, `publisher`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `social_media` follows the same replacement and canonicalization rules as the other write-capable directory resources.
 - Event write schemas expose `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`. Omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values.
 - Event record detail payloads also expose the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` so MCP clients can reason about the same published replacement-chain behavior as the public/mobile event detail contract without following stale links.
 - Series write schemas expose `description`, `languages`, and `slug` semantics. `title`, `slug`, and `visibility` remain required on update; `description` clears on `null` / trimmed empty input and `languages` follows omit-preserve / null-clear / array-replace semantics.
@@ -204,6 +311,10 @@ When the user asks you to “look for” a named place, start with the most like
 - Handle-style social platforms (`facebook`, `twitter`, `instagram`, `youtube`, `tiktok`, `telegram`, `whatsapp`, `linkedin`, `threads`) may canonicalize a submitted URL into stored `username`, so persisted `url` can come back as `null` after normalization.
 - Even though the schema advertises model-layer normalization notes for Twitter / X, validated MCP payloads should still use the canonical platform value `twitter`, not `x`.
 - Enum fields and filters use enum backing values, not display labels. For events, use values like `kuliah_ceramah`, `all_ages`, `prayer_relative`, `maghrib`, and `immediately` instead of labels like `Kuliah / Ceramah` or localized prayer text.
+- Generic user record payloads intentionally redact `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`.
+- Record lookups use `route_key` for record-specific paths; missing records return 404 rather than a generic server error.
+- Public/mobile surface additions do not automatically imply new MCP tools. For example, a new public directory endpoint does not mean a matching dedicated MCP tool was added; the existing generic `admin-list-records` flow is still the correct path.
+- MCP event records come from the admin resource service, not the public event controller. Public/mobile event detail payload changes do not automatically appear in `admin-get-record` results.
 - This guide summarizes server-level capability only; actor-specific authorization still applies at runtime.
 
 ## Validate-only preview behavior
@@ -214,6 +325,7 @@ When the user asks you to “look for” a named place, start with the most like
 - schema-driven `feedback` issues may include suggested values, defaults, and conditional `required_because` context.
 - Validation failures in validate-only mode include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
+- Update previews include the current record snapshot alongside the normalized payload so you can compare what would change before retrying without `validate_only`.
 
 ## MCP media/file upload contract
 
@@ -268,30 +380,36 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 Admin tool behavior notes:
 
 - `validate_only=true` is supported for create/update preview flows.
-- `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata.
+- `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
-- For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments.
+- For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
 - `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
 - The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
 - Media/file upload fields accept JSON base64 descriptors only when the matching write schema advertises them.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain.
-- Read-only tools should be annotated as such so ChatGPT can safely choose them.
-- Write tools should be described as schema-guided and idempotent where the server logic supports that behavior.
+- All read-only tools (discovery, list, get, schema, and workflow-schema tools) carry read-only and idempotent metadata hints; MCP clients that honor these hints can call them without requiring confirmation.
+- Write and workflow execution tools carry non-read-only and non-idempotent metadata hints; MCP clients may prompt for confirmation before calling them.
 
-## Summary for agents
+## Agent Quick Rules
 
-1. Fetch `docs-admin-mcp-guide` before the first operational tool call.
-2. Use `search` when the topic is fuzzy, `fetch` when the guide is obvious.
-3. Choose the right top-level resource first.
-4. Trust live write schemas and workflow schema tools before mutating anything.
-5. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.
+1. Before operational calls, ensure `docs-admin-mcp-guide` is loaded via `fetch`.
+2. If an operational call returns `documentation_preflight_injected`, **repeat the exact same call** — the guide is now loaded and the call will succeed.
+3. For event lists by date range, use `resource_key: "events"` with `starts_after` and `starts_before` (exclusive date-only boundaries).
+4. For a single local date, prefer `starts_on_local_date` over a same-day range.
+5. For user-facing event summaries, prefer `timing_display`, `starts_on_local_date`, `end_time_display`, and `event_type_label` over raw UTC fields.
+6. For any write, call `admin-get-write-schema` first and trust the live schema.
+7. Never guess relation names — use `admin-get-resource-meta` to discover them.
+8. Use `search` when the topic is fuzzy, `fetch` when the guide id is already known.
+9. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.
 
-## Explicit CRUD boundary
+## Explicit CRUD boundary and non-goals
 
 - Admin MCP currently supports create and update for writable resources through schema-guided tools.
 - Admin MCP does **not** expose generic delete tools (for example `admin-delete-record`).
 - Treat delete, restore, reorder, and replicate as panel-led operations unless a future MCP tool is explicitly added.
+- This guide is not the raw HTTP admin API contract. Read `docs/MAJLISILMU_MOBILE_API_REFERENCE.md` for the HTTP surface, which has different payload shapes, destructive media flags, and raw schema semantics.
+- This guide is not a Filament panel parity matrix. Do not infer panel capabilities from MCP tool availability or vice versa.

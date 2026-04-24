@@ -5,6 +5,143 @@ Audience: model-facing member MCP agents and tool clients.
 
 This guide is for the member MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The admin guide is separate and is not exposed through this server.
 
+## Quick Start for Common Member Reads
+
+### Step 1 — Ensure the guide is loaded
+
+Before the first operational tool call in a session, the guide must be in context:
+
+```json
+{
+  "tool": "fetch",
+  "arguments": { "id": "docs-member-mcp-guide" }
+}
+```
+
+### Step 2 — Handling `documentation_preflight_injected`
+
+If you call an operational tool before the guide is loaded, the server auto-injects the guide and returns:
+
+```json
+{
+  "action": "documentation_preflight_injected",
+  "notice": "[Guide auto-loaded] The member MCP guide has been loaded and the preflight is now satisfied. Re-invoke the tool to continue."
+}
+```
+
+This is **not a failure**. The server has now loaded the guide into the MCP session. **Re-run the exact same operational tool call immediately** and it will proceed.
+
+The retry flow:
+1. Call operational tool (e.g. `member-list-records`)
+2. Receive `documentation_preflight_injected`
+3. Call the same operational tool again
+4. Data returns normally
+
+---
+
+### Common Recipes
+
+#### List events for a date range
+
+Use `member-list-records` with `resource_key: "events"`. Date filters are **date-only `YYYY-MM-DD` strings** — do not send ISO timestamps.
+
+```json
+{
+  "resource_key": "events",
+  "starts_after": "2026-04-24",
+  "starts_before": "2026-05-03",
+  "page": 1,
+  "per_page": 50
+}
+```
+
+**Date boundary rule:** `starts_after` and `starts_before` are exclusive boundaries. To list events for local dates 25 Apr through 2 May inclusive, set `starts_after` to the day before the range start and `starts_before` to the day after the range end:
+
+| Goal | `starts_after` | `starts_before` |
+|---|---|---|
+| Events on 3–9 May | `2026-05-02` | `2026-05-10` |
+| Events this week (25 Apr – 1 May) | `2026-04-24` | `2026-05-02` |
+| Events on exactly 30 Apr | use `starts_on_local_date` | — |
+
+#### List events on one exact local date
+
+```json
+{
+  "resource_key": "events",
+  "starts_on_local_date": "2026-04-30",
+  "page": 1,
+  "per_page": 50
+}
+```
+
+Prefer `starts_on_local_date` over a same-day range for single-date queries.
+
+#### Summarize event results
+
+Event payloads are large. For user-facing summaries, prefer these fields:
+
+- `title`
+- `attributes.starts_on_local_date`
+- `attributes.timing_display` ← best for user-facing time, includes prayer-relative labels
+- `attributes.end_time_display`
+- `attributes.event_type_label`
+- `attributes.institution.name`
+- `attributes.institution.address_line`
+- `attributes.reference_study_subtitle`
+
+Use `meta.pagination.total` for the total result count and `meta.pagination.has_more` to know whether additional pages exist.
+
+Avoid dumping large media payloads or raw UTC timestamps unless specifically requested.
+
+#### User-facing time display
+
+Event records expose multiple time representations:
+
+| Field | Use for |
+|---|---|
+| `timing_display` | User-facing summaries — includes prayer-relative labels like "Selepas Maghrib" |
+| `end_time_display` | User-facing end time |
+| `starts_on_local_date` | Date-only display or filtering |
+| `starts_at_local` | Local datetime when precise display is needed |
+| `starts_at` | Machine processing only — stored in UTC |
+
+For prayer-relative events, `timing_display` is always better than converting `starts_at`.
+
+#### List my contribution requests
+
+Use `member-list-contribution-requests` to see pending and historical contribution requests for the authenticated member:
+
+```json
+{
+  "tool": "member-list-contribution-requests"
+}
+```
+
+Key fields in each result:
+
+- `status` — `pending`, `approved`, `rejected`, or `cancelled`
+- `resource_key` / `record_key` — the target resource and record
+- `payload_summary` — human-readable summary of the proposed change
+- `submitted_at`
+
+To act on a pending request, use `member-approve-contribution-request`, `member-reject-contribution-request`, or `member-cancel-contribution-request` with the `request_id` parameter. Note that `reason_code` is **required** (not optional) when calling `member-reject-contribution-request`.
+
+#### List my membership claims
+
+Use `member-list-membership-claims` to see the authenticated member's claims:
+
+```json
+{
+  "tool": "member-list-membership-claims"
+}
+```
+
+Key fields: `status`, `institution.name`, `submitted_at`, `id`.
+
+To cancel a pending claim, use `member-cancel-membership-claim` with the `claim_id` parameter (pass the `id` value returned by the list tool).
+
+---
+
 ## What MCP Means in MajlisIlmu
 
 MajlisIlmu exposes the member MCP server for Ahli-scoped resource access. Treat the live MCP tool descriptors as the source of truth for what the member agent can do.
@@ -44,7 +181,7 @@ The prompt tells the model to:
 
 Before any MajlisIlmu member MCP read, search, query, lookup, list, fetch, write, update, create, relation traversal, schema discovery, or workflow action, the client must ensure the verified member guide is already in context. If it is not, fetch `docs-member-mcp-guide` first, or use `search` then `fetch` when the topic is still fuzzy.
 
-The member MCP server enforces a transport-level version of this rule for operational `tools/call` requests: those calls are rejected until `docs-member-mcp-guide` has been fetched through the MCP `fetch` tool or the guide resource has been read through MCP `resources/read` in the same initialized MCP session.
+The member MCP server enforces a transport-level version of this rule for operational `tools/call` requests: those calls are rejected until `docs-member-mcp-guide` has been fetched through the MCP `fetch` tool or the guide resource has been read through MCP `resources/read` in the same initialized MCP session. When the guard fires, the server auto-injects the guide and returns a `documentation_preflight_injected` action — see the **Quick Start** section above for the retry pattern.
 
 Apply this before operational tools such as:
 
@@ -66,7 +203,7 @@ The client may skip a fresh docs fetch only when the verified guide is already a
 
 Even then, re-check live write schemas or explicit workflow schema/tool guidance before update, preview, or workflow mutations.
 
-Because the server cannot safely infer conversational shortcuts such as “the user already supplied the exact resource and tool with zero interpretation needed”, the runtime MCP guard remains stricter and still requires a same-session guide fetch or read before operational tool execution.
+Because the server cannot safely infer conversational shortcuts such as “the user already supplied the exact resource and tool with zero interpretation needed”, the runtime MCP guard remains stricter and still requires a same-session guide fetch or read before operational tool execution. When the guard fires, the server auto-injects the guide and returns a `documentation_preflight_injected` action — see the **Quick Start** section above for the retry pattern.
 
 ## What this server exposes
 
@@ -159,24 +296,28 @@ When the user asks you to “look for” a named place, start with the most like
 
 - Use `record_key` values from prior MCP results; prefer returned route-key-style identifiers when the record payload exposes them.
 - Treat live write schemas as the field-level source of truth for payload structure, required fields, and media support.
-- Institution write schemas expose `nickname`, `address`, `contacts`, and `social_media` semantics. `address` updates deep-merge omitted nested keys, and `address: {}` is effectively a no-op when the record already has an address with a stored country.
-- Speaker write schemas expose `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media` semantics. If you send `address`, include `address.country_id`; `address: {}` is invalid on the write path, while array-style fields replace when present.
-- Reference write schemas expose `author`, `publication_year`, `publisher`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`.
-- Event write schemas expose `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`. Omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values.
+- Institution write schemas expose `nickname`, `address`, `contacts`, and `social_media` semantics. `address` updates deep-merge omitted nested keys, and `address: {}` is effectively a no-op when the record already has an address with a stored country. Omitted `contacts` / `social_media` preserve the existing collection, `null` or `[]` clear it, and any submitted array replaces the stored collection — safe clients should fetch the current record, modify the collection locally, then resend the full array. `nickname: null` preserves the current stored nickname while `nickname: ""` reaches the mutation layer and clears the stored nickname to `null`.
+- Speaker write schemas expose `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media` semantics. If you send `address`, include `address.country_id`; `address: {}` is invalid on the write path, while array-style fields replace when present. The visible region fields deep-merge when present; the hidden map fields (`line1`, `line2`, `postcode`, `lat`, `lng`, `google_maps_url`, `google_place_id`, `waze_url`) remain prohibited on the MCP write path.
+- Reference write schemas expose `author`, `publication_year`, `publisher`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `social_media` follows the same replacement and canonicalization rules as the other write-capable directory resources.
+- Event write schemas expose `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`. Omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values. Member event update schemas inherit the same event semantics because the member MCP surface delegates to the shared admin write service.
 - Event record detail payloads also expose the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` so MCP clients can reason about the same published replacement-chain behavior as the public/mobile event detail contract without following stale links.
 - Handle-style social platforms (`facebook`, `twitter`, `instagram`, `youtube`, `tiktok`, `telegram`, `whatsapp`, `linkedin`, `threads`) may canonicalize a submitted URL into stored `username`, so persisted `url` can come back as `null` after normalization.
 - Even though the schema advertises model-layer normalization notes for Twitter / X, validated MCP payloads should still use the canonical platform value `twitter`, not `x`.
 - Enum fields and filters use enum backing values, not display labels. For events, use values like `kuliah_ceramah`, `all_ages`, `prayer_relative`, `maghrib`, and `immediately` instead of labels like `Kuliah / Ceramah` or localized prayer text.
+- Generic user record payloads intentionally redact `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`.
+- Record lookups use `route_key` for record-specific paths; missing records return 404 rather than a generic server error.
+- Public/mobile surface additions do not automatically imply new MCP tools. The existing generic `member-list-records` flow is still the correct path for resources without a dedicated tool.
+- MCP event records come from the member resource service, not the public event controller. Public/mobile event detail payload changes do not automatically appear in `member-get-record` results.
 - This guide summarizes server-level capability only; actor-specific authorization still applies at runtime.
 
 ## Validate-only preview behavior
 
 - `validate_only=true` is supported on `member-update-record`.
 - Previews normalize descriptors into file summaries without persisting media.
-- `apply_defaults=true` enables server-side default application during preview flows where the schema advertises it.
 - schema-driven `feedback` issues may include suggested values, defaults, and conditional `required_because` context.
 - Validation failures in validate-only mode include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP schema may mention destructive media handling.
+- Update previews include the current record snapshot alongside the normalized payload so you can compare what would change before retrying without `validate_only`.
 
 ## MCP media/file upload contract
 
@@ -211,7 +352,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `fetch` | Fetch one verified member documentation page by id | MCP-only documentation fetch tool |
 | `member-list-resources` | List accessible member resources and their capability summary | `GET /api/v1/member/manifest` |
 | `member-get-resource-meta` | Read one member resource's metadata, pages, relations, abilities, and write-support flags | `GET /api/v1/member/{resourceKey}/meta` |
-| `member-list-records` | List records for one member resource with optional search, structured filters, date filters, and pagination | `GET /api/v1/member/{resourceKey}` |
+| `member-list-records` | List records for one member resource with optional search, date filters, and pagination | `GET /api/v1/member/{resourceKey}` |
 | `member-list-related-records` | Traverse a named relation on one member record | `GET /api/v1/member/{resourceKey}/{recordKey}/relations/{relation}` |
 | `member-get-record` | Read one member record and its permissions | `GET /api/v1/member/{resourceKey}/{recordKey}` |
 | `member-get-record-actions` | Get focused next-step MCP actions for one member record | MCP-only next-step action guidance tool |
@@ -229,22 +370,30 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 Member tool behavior notes:
 
 - `validate_only=true` is supported for member update previews.
-- `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries.
+- `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries. Unlike admin, `member-list-records` does **not** accept a `filters` object; use `search`, `starts_after`, `starts_before`, and `starts_on_local_date` to narrow results.
+- For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - The member surface intentionally does not expose admin-only moderation, triage, or create workflows.
 - Member update schemas reuse the same resource-level write semantics where the resource is shared, so clients should still fetch the current record and re-send the full intended collection when a field is replacement-based.
 - `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
-- Read-only member tools should be annotated as such so ChatGPT can safely prefer them during discovery.
+- All read-only member tools (discovery, list, get, schema, and workflow listing tools) carry read-only and idempotent metadata hints; MCP clients that honor these hints can call them without requiring confirmation.
 
-## Summary for agents
+## Agent Quick Rules
 
-1. Fetch `docs-member-mcp-guide` before the first operational tool call.
-2. Use `search` when the topic is fuzzy, `fetch` when the guide is obvious.
-3. Choose the right top-level resource first.
-4. Trust live write schemas and workflow schema tools before mutating anything.
-5. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.
+1. Before operational calls, ensure `docs-member-mcp-guide` is loaded via `fetch`.
+2. If an operational call returns `documentation_preflight_injected`, **repeat the exact same call** — the guide is now loaded and the call will succeed.
+3. For event lists by date range, use `resource_key: "events"` with `starts_after` and `starts_before` (exclusive date-only boundaries).
+4. For a single local date, prefer `starts_on_local_date` over a same-day range.
+5. For user-facing event summaries, prefer `timing_display`, `starts_on_local_date`, `end_time_display`, and `event_type_label` over raw UTC fields.
+6. For any update, call `member-get-write-schema` first and re-send the full intended value for replacement-based fields.
+7. Never guess relation names — use `member-get-resource-meta` to discover them.
+8. Member scope is limited to linked resources — do not assume the full record set is visible.
+9. Use `search` when the topic is fuzzy, `fetch` when the guide id is already known.
+10. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.
 
-## Explicit CRUD boundary
+## Explicit CRUD boundary and non-goals
 
 - Member MCP currently supports read flows and schema-guided updates on writable member-scoped resources.
 - Member MCP does **not** expose generic delete tools (for example `member-delete-record`).
 - Treat delete-like lifecycle actions as explicit workflows only where dedicated tools exist (for example claim or contribution cancellation).
+- This guide is not the raw HTTP member API contract. Do not infer HTTP endpoint shapes, destructive media flags, or raw schema semantics from MCP behavior.
+- This guide is not a Filament panel parity matrix. Do not infer panel capabilities from MCP tool availability or vice versa.
