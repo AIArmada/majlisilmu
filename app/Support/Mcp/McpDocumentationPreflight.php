@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Mcp;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -117,7 +118,11 @@ class McpDocumentationPreflight
      */
     private function contextKeysFromRequest(Request $request): array
     {
-        $contextKeys = [$request->sessionId(), ...$this->extractSessionIdsFromMeta($request->meta())];
+        $contextKeys = [
+            $request->sessionId(),
+            ...$this->extractSessionIdsFromMeta($request->meta()),
+            $this->actorContextKey($request->user()),
+        ];
 
         return array_values(array_unique(array_filter(
             array_map(fn (mixed $contextKey): ?string => is_string($contextKey) ? $this->normalizeSessionId($contextKey) : null, $contextKeys),
@@ -181,6 +186,21 @@ class McpDocumentationPreflight
     private function normalizeMetaSegment(string $segment): string
     {
         return preg_replace('/[^a-z0-9]+/', '', strtolower($segment)) ?? '';
+    }
+
+    private function actorContextKey(?Authenticatable $user): ?string
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        $identifier = trim((string) $user->getAuthIdentifier());
+
+        if ($identifier === '') {
+            return null;
+        }
+
+        return sprintf('user:%s:%s', strtolower($user::class), $identifier);
     }
 
     private function cacheKey(string $sessionId): string
