@@ -224,5 +224,6 @@ For member-scoped event reads, the same `data.record.attributes.active_change_no
 
 - Read-only tools are for discovery and preview.
 - Write tools are schema-guided.
+- Generic MCP delete tools are intentionally not exposed on admin/member servers.
 - Media/file fields use JSON base64 descriptors only when the write schema advertises them; destructive `clear_*` media flags are rejected.
 - If a capability is not listed in the server tool catalog, ChatGPT should not assume it exists.

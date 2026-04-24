@@ -1045,6 +1045,12 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
 
     expect($tools->keys()->all())->not->toContain('admin-list-resources', 'admin-list-records');
 
+    expect($tools->keys()->all())->not->toContain(
+        'member-delete-record',
+        'member-delete',
+        'member-remove-record',
+    );
+
     expect($tools->get('search')['securitySchemes'] ?? [])->toContainEqual([
         'type' => 'oauth2',
         'scopes' => ['mcp:use'],
@@ -1219,6 +1225,12 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'member-cancel-membership-claim',
         'member-create-github-issue',
         'member-update-record',
+    );
+
+    expect($toolNames)->not->toContain(
+        'member-delete-record',
+        'member-delete',
+        'member-remove-record',
     );
 });
 
