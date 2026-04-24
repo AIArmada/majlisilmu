@@ -3241,6 +3241,86 @@ it('rejects operational admin tool calls until the guide is fetched in the same 
     expect($allowedCall->json('result.structuredContent.data.resources'))->toBeArray();
 });
 
+it('accepts the admin guide preflight when the initialized MCP session is forwarded via request metadata', function () {
+    $admin = adminMcpUser('super_admin');
+    $token = $admin->createToken('mcp-admin-preflight-meta-test')->plainTextToken;
+
+    $initialize = $this->withToken($token)->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'initialize-admin-mcp-preflight-meta',
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => [
+                'name' => 'Pest',
+                'version' => '1.0.0',
+            ],
+        ],
+    ])->assertOk();
+
+    $sessionId = $initialize->headers->get('MCP-Session-Id');
+
+    expect($sessionId)->not->toBeNull();
+
+    $blockedCall = $this->withToken($token)->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'call-admin-list-records-without-docs-meta-session',
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'admin-list-records',
+            'arguments' => [
+                'resource_key' => 'events',
+            ],
+            '_meta' => [
+                'headers' => [
+                    'MCP-Session-Id' => (string) $sessionId,
+                ],
+            ],
+        ],
+    ])->assertOk();
+
+    expect($blockedCall->json('result.isError'))->toBeTrue();
+    expect($blockedCall->json('result.structuredContent.error.code'))->toBe('documentation_preflight_required');
+
+    $this->withToken($token)->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'fetch-admin-mcp-guide-for-preflight-meta-session',
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'fetch',
+            'arguments' => [
+                'id' => McpDocumentationPreflight::GUIDE_DOCUMENT_ID,
+            ],
+            '_meta' => [
+                'headers' => [
+                    'MCP-Session-Id' => (string) $sessionId,
+                ],
+            ],
+        ],
+    ])->assertOk();
+
+    $allowedCall = $this->withToken($token)->postJson('/mcp/admin', [
+        'jsonrpc' => '2.0',
+        'id' => 'call-admin-list-records-after-docs-meta-session',
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'admin-list-records',
+            'arguments' => [
+                'resource_key' => 'events',
+            ],
+            '_meta' => [
+                'headers' => [
+                    'MCP-Session-Id' => (string) $sessionId,
+                ],
+            ],
+        ],
+    ])->assertOk();
+
+    expect($allowedCall->json('result.isError'))->toBeFalse();
+    expect($allowedCall->json('result.structuredContent.data'))->toBeArray();
+});
+
 it('lists and reads the documentation routing prompt through the admin MCP server', function () {
     $admin = adminMcpUser('super_admin');
 

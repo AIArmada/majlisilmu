@@ -46,7 +46,7 @@ class ReadResourceWithDocumentationPreflight extends ReadResource
         if ($uri === McpDocumentationPreflight::GUIDE_RESOURCE_URI) {
             /** @var Request $mcpRequest */
             $mcpRequest = Container::getInstance()->make('mcp.request');
-            app(McpDocumentationPreflight::class)->markGuideInContext($mcpRequest->sessionId());
+            app(McpDocumentationPreflight::class)->markGuideInContext($mcpRequest);
         }
 
         return is_iterable($response)

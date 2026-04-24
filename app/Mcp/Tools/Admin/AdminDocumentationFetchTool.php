@@ -51,7 +51,7 @@ class AdminDocumentationFetchTool extends AbstractAdminTool
             }
 
             if ((string) $validated['id'] === McpDocumentationPreflight::GUIDE_DOCUMENT_ID) {
-                $this->documentationPreflight->markGuideInContext($request->sessionId());
+                $this->documentationPreflight->markGuideInContext($request);
             }
 
             return $document;
