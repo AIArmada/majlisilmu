@@ -60,7 +60,7 @@ Use `member-list-records` with `resource_key: "events"`. Date filters are **date
 | Goal | `starts_after` | `starts_before` |
 |---|---|---|
 | Events on 3–9 May | `2026-05-02` | `2026-05-10` |
-| Events this week (25 Apr – 1 May) | `2026-04-24` | `2026-05-02` |
+| Inclusive week example: 25 Apr – 1 May | `2026-04-24` | `2026-05-02` |
 | Events on exactly 30 Apr | use `starts_on_local_date` | — |
 
 #### List events on one exact local date
@@ -90,6 +90,8 @@ Event payloads are large. For user-facing summaries, prefer these fields:
 - `attributes.reference_study_subtitle`
 
 Use `meta.pagination.total` for the total result count and `meta.pagination.has_more` to know whether additional pages exist.
+
+If `data` is empty and `meta.pagination.total` is 0, the query succeeded but no records matched. Do not treat this as an error.
 
 Avoid dumping large media payloads or raw UTC timestamps unless specifically requested.
 
