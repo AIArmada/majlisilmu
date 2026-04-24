@@ -3149,7 +3149,7 @@ it('searches and fetches verified documentation through admin MCP tools', functi
         ]);
 });
 
-it('rejects operational admin tool calls until the guide is fetched in the same MCP session', function () {
+it('auto-injects guide on first operational call and allows the retry in the same MCP session', function () {
     $admin = adminMcpUser('super_admin');
     $token = $admin->createToken('mcp-admin-preflight-test')->plainTextToken;
 
@@ -3171,11 +3171,11 @@ it('rejects operational admin tool calls until the guide is fetched in the same 
 
     expect($sessionId)->not->toBeNull();
 
-    $blockedCall = $this->withToken($token)->withHeaders([
+    $firstCall = $this->withToken($token)->withHeaders([
         'MCP-Session-Id' => (string) $sessionId,
     ])->postJson('/mcp/admin', [
         'jsonrpc' => '2.0',
-        'id' => 'call-admin-list-resources-without-docs',
+        'id' => 'call-admin-list-resources-first-attempt',
         'method' => 'tools/call',
         'params' => [
             'name' => 'admin-list-resources',
@@ -3183,47 +3183,11 @@ it('rejects operational admin tool calls until the guide is fetched in the same 
         ],
     ])->assertOk();
 
-    expect($blockedCall->json('result.isError'))->toBeTrue();
-    expect($blockedCall->json('result.structuredContent'))->toMatchArray([
-        'error' => [
-            'code' => 'documentation_preflight_required',
-            'message' => 'Documentation preflight required before calling [admin-list-resources]. Fetch `docs-admin-mcp-guide` or read `file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md` in the current initialized MCP session, then retry the operational tool call.',
-        ],
-        'required_documentation' => [
-            'document_id' => McpDocumentationPreflight::GUIDE_DOCUMENT_ID,
-            'resource_uri' => McpDocumentationPreflight::GUIDE_RESOURCE_URI,
-            'preferred_tool' => 'fetch',
-            'preferred_arguments' => [
-                'id' => McpDocumentationPreflight::GUIDE_DOCUMENT_ID,
-            ],
-            'alternative_method' => 'resources/read',
-            'alternative_arguments' => [
-                'uri' => McpDocumentationPreflight::GUIDE_RESOURCE_URI,
-            ],
-            'routing_prompt' => 'documentation-tool-routing',
-        ],
-        'retry' => [
-            'tool_name' => 'admin-list-resources',
-            'after_documentation' => true,
-        ],
-        'can_retry' => true,
-        'requires_initialized_session' => true,
-    ]);
-    expect($blockedCall->json('result.content.0.text'))->toContain('Documentation preflight required before calling [admin-list-resources].');
-
-    $this->withToken($token)->withHeaders([
-        'MCP-Session-Id' => (string) $sessionId,
-    ])->postJson('/mcp/admin', [
-        'jsonrpc' => '2.0',
-        'id' => 'fetch-admin-mcp-guide-for-preflight',
-        'method' => 'tools/call',
-        'params' => [
-            'name' => 'fetch',
-            'arguments' => [
-                'id' => McpDocumentationPreflight::GUIDE_DOCUMENT_ID,
-            ],
-        ],
-    ])->assertOk();
+    expect($firstCall->json('result.isError'))->toBeFalse();
+    expect($firstCall->json('result.structuredContent.action'))->toBe('documentation_preflight_injected');
+    expect($firstCall->json('result.structuredContent.document.id'))->toBe(McpDocumentationPreflight::GUIDE_DOCUMENT_ID);
+    expect($firstCall->json('result.structuredContent.retry.tool_name'))->toBe('admin-list-resources');
+    expect($firstCall->json('result.content.0.text'))->toContain('Guide auto-loaded');
 
     $allowedCall = $this->withToken($token)->withHeaders([
         'MCP-Session-Id' => (string) $sessionId,
@@ -3241,7 +3205,7 @@ it('rejects operational admin tool calls until the guide is fetched in the same 
     expect($allowedCall->json('result.structuredContent.data.resources'))->toBeArray();
 });
 
-it('unlocks admin operational tools after guide fetch when session identity is carried in metadata', function () {
+it('auto-injects guide via meta-session identity and allows the retry', function () {
     $admin = adminMcpUser('super_admin');
     $token = $admin->createToken('mcp-admin-preflight-meta-session-test')->plainTextToken;
     $metaSessionId = 'meta-session-'.Str::lower((string) Str::uuid());
@@ -3262,7 +3226,7 @@ it('unlocks admin operational tools after guide fetch when session identity is c
 
     expect($initialize->headers->get('MCP-Session-Id'))->not->toBeNull();
 
-    $blockedCall = $this->withToken($token)->postJson('/mcp/admin', [
+    $firstCall = $this->withToken($token)->postJson('/mcp/admin', [
         'jsonrpc' => '2.0',
         'id' => 'call-admin-list-resources-without-header-session',
         'method' => 'tools/call',
@@ -3277,25 +3241,9 @@ it('unlocks admin operational tools after guide fetch when session identity is c
         ],
     ])->assertOk();
 
-    expect($blockedCall->json('result.isError'))->toBeTrue();
-    expect($blockedCall->json('result.structuredContent.error.code'))->toBe('documentation_preflight_required');
-
-    $this->withToken($token)->postJson('/mcp/admin', [
-        'jsonrpc' => '2.0',
-        'id' => 'fetch-admin-mcp-guide-with-meta-session',
-        'method' => 'tools/call',
-        'params' => [
-            'name' => 'fetch',
-            'arguments' => [
-                'id' => McpDocumentationPreflight::GUIDE_DOCUMENT_ID,
-            ],
-            '_meta' => [
-                'session' => [
-                    'id' => $metaSessionId,
-                ],
-            ],
-        ],
-    ])->assertOk();
+    expect($firstCall->json('result.isError'))->toBeFalse();
+    expect($firstCall->json('result.structuredContent.action'))->toBe('documentation_preflight_injected');
+    expect($firstCall->json('result.structuredContent.document.id'))->toBe(McpDocumentationPreflight::GUIDE_DOCUMENT_ID);
 
     $allowedCall = $this->withToken($token)->postJson('/mcp/admin', [
         'jsonrpc' => '2.0',
@@ -3316,7 +3264,7 @@ it('unlocks admin operational tools after guide fetch when session identity is c
     expect($allowedCall->json('result.structuredContent.data.resources'))->toBeArray();
 });
 
-it('unlocks admin operational tools after guide fetch even when session identity is not forwarded', function () {
+it('auto-injects guide when no session identity is forwarded and allows the retry', function () {
     $admin = adminMcpUser('super_admin');
     $token = $admin->createToken('mcp-admin-preflight-user-fallback-test')->plainTextToken;
 
@@ -3334,7 +3282,7 @@ it('unlocks admin operational tools after guide fetch even when session identity
         ],
     ])->assertOk();
 
-    $blockedCall = $this->withToken($token)->postJson('/mcp/admin', [
+    $firstCall = $this->withToken($token)->postJson('/mcp/admin', [
         'jsonrpc' => '2.0',
         'id' => 'call-admin-list-resources-without-session-identity',
         'method' => 'tools/call',
@@ -3344,20 +3292,9 @@ it('unlocks admin operational tools after guide fetch even when session identity
         ],
     ])->assertOk();
 
-    expect($blockedCall->json('result.isError'))->toBeTrue();
-    expect($blockedCall->json('result.structuredContent.error.code'))->toBe('documentation_preflight_required');
-
-    $this->withToken($token)->postJson('/mcp/admin', [
-        'jsonrpc' => '2.0',
-        'id' => 'fetch-admin-guide-without-session-identity',
-        'method' => 'tools/call',
-        'params' => [
-            'name' => 'fetch',
-            'arguments' => [
-                'id' => McpDocumentationPreflight::GUIDE_DOCUMENT_ID,
-            ],
-        ],
-    ])->assertOk();
+    expect($firstCall->json('result.isError'))->toBeFalse();
+    expect($firstCall->json('result.structuredContent.action'))->toBe('documentation_preflight_injected');
+    expect($firstCall->json('result.structuredContent.document.id'))->toBe(McpDocumentationPreflight::GUIDE_DOCUMENT_ID);
 
     $allowedCall = $this->withToken($token)->postJson('/mcp/admin', [
         'jsonrpc' => '2.0',
