@@ -14,6 +14,7 @@ use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
 use App\Models\User;
 use App\Support\Api\ApiPagination;
+use App\Support\Api\ResourceSearchDispatcher;
 use App\Support\Api\SurfaceSyncPolicy;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\Timezone\UserDateTimeFormatter;
@@ -36,6 +37,7 @@ class AdminResourceService
         private readonly AdminResourceRegistry $registry,
         private readonly AdminResourceMutationService $mutationService,
         private readonly ApiDocumentationUrlResolver $urlResolver,
+        private readonly ResourceSearchDispatcher $resourceSearchDispatcher,
     ) {}
 
     /**
@@ -585,6 +587,10 @@ class AdminResourceService
      */
     protected function applySearch(Builder $query, string $resourceClass, string $search): void
     {
+        if ($this->resourceSearchDispatcher->apply($query, $search)) {
+            return;
+        }
+
         $columns = $this->registry->searchableColumns($resourceClass);
 
         if ($columns === []) {

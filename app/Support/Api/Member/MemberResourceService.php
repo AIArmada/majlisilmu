@@ -6,6 +6,7 @@ namespace App\Support\Api\Member;
 
 use App\Models\User;
 use App\Support\Api\ApiPagination;
+use App\Support\Api\ResourceSearchDispatcher;
 use App\Support\ApiDocumentation\ApiDocumentationUrlResolver;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
@@ -26,6 +27,7 @@ class MemberResourceService
         private readonly MemberResourceRegistry $registry,
         private readonly MemberResourceMutationService $mutationService,
         private readonly ApiDocumentationUrlResolver $urlResolver,
+        private readonly ResourceSearchDispatcher $resourceSearchDispatcher,
     ) {}
 
     /**
@@ -487,6 +489,10 @@ class MemberResourceService
      */
     protected function applySearch(Builder $query, string $resourceClass, string $search): void
     {
+        if ($this->resourceSearchDispatcher->apply($query, $search)) {
+            return;
+        }
+
         $columns = $this->registry->searchableColumns($resourceClass);
 
         if ($columns === []) {

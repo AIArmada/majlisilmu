@@ -101,6 +101,37 @@ class SpeakerSearchService
 
     /**
      * @param  Builder<Speaker>  $query
+     * @return list<string>
+     */
+    public function scopedSearchIds(Builder $query, string $search): array
+    {
+        $normalizedSearch = $this->normalizedSearch($search);
+
+        if ($normalizedSearch === null) {
+            return [];
+        }
+
+        $model = $query->getModel();
+        $keyColumn = $model->qualifyColumn($model->getKeyName());
+
+        $ids = (clone $query)
+            ->select($keyColumn)
+            ->tap(fn (Builder $builder): Builder => $this->applyIndexedSearch($builder, $normalizedSearch))
+            ->orderBy($model->qualifyColumn('name'))
+            ->pluck($keyColumn)
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all();
+
+        if ($ids !== [] || mb_strlen($normalizedSearch) < 3) {
+            return $ids;
+        }
+
+        return $this->scopedFuzzySearchIds($query, $normalizedSearch);
+    }
+
+    /**
+     * @param  Builder<Speaker>  $query
      * @return Builder<Speaker>
      */
     private function applyIndexedSearchWithLocalIndex(Builder $query, string $search): Builder
@@ -310,6 +341,71 @@ class SpeakerSearchService
         });
 
         return $ids;
+    }
+
+    /**
+     * @param  Builder<Speaker>  $query
+     * @return list<string>
+     */
+    private function scopedFuzzySearchIds(Builder $query, string $normalizedSearch): array
+    {
+        $model = $query->getModel();
+        $keyColumn = $model->qualifyColumn($model->getKeyName());
+
+        $speakerQuery = (clone $query)
+            ->reorder()
+            ->select([$keyColumn])
+            ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateFilter($builder, $normalizedSearch))
+            ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateOrdering($builder, $normalizedSearch))
+            ->limit($this->typesenseResultLimit());
+
+        if ($this->hasSearchableNameColumn()) {
+            $speakerQuery->addSelect($model->qualifyColumn('searchable_name'));
+        } else {
+            $speakerQuery->addSelect([
+                $model->qualifyColumn('name'),
+                $model->qualifyColumn('honorific'),
+                $model->qualifyColumn('pre_nominal'),
+                $model->qualifyColumn('post_nominal'),
+            ]);
+        }
+
+        return $speakerQuery
+            ->get()
+            ->map(function (Speaker $speaker) use ($normalizedSearch): array {
+                $candidate = $this->speakerCandidateSearchableName($speaker);
+
+                if ($candidate === '') {
+                    return ['id' => (string) $speaker->id, 'score' => 0.0];
+                }
+
+                $scoreCandidates = [
+                    $this->fuzzyComparable($normalizedSearch, $candidate)
+                        ? $this->similarityScore($normalizedSearch, $candidate)
+                        : 0.0,
+                ];
+
+                $candidateTokens = array_values(array_filter(
+                    explode(' ', $candidate),
+                    static fn (string $token): bool => mb_strlen($token) >= 2,
+                ));
+
+                foreach ($candidateTokens as $token) {
+                    $scoreCandidates[] = $this->fuzzyComparable($normalizedSearch, $token)
+                        ? $this->similarityScore($normalizedSearch, $token)
+                        : 0.0;
+                }
+
+                return [
+                    'id' => (string) $speaker->id,
+                    'score' => max($scoreCandidates),
+                ];
+            })
+            ->filter(static fn (array $candidate): bool => $candidate['score'] >= 0.70)
+            ->sortByDesc('score')
+            ->pluck('id')
+            ->values()
+            ->all();
     }
 
     /**
