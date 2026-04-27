@@ -200,6 +200,7 @@
                 </div>
             </section>
 
+            {{-- Desktop/tablet planner calendar: intentionally hidden on mobile, visible on non-mobile (md+) only. --}}
             <div
                 x-data="{
                     locale: '{{ str_replace('_', '-', app()->getLocale()) }}',
@@ -244,7 +245,7 @@
                         return cells;
                     },
                 }"
-                class="hidden lg:block"
+                class="hidden md:block"
             >
                 <section id="planner-calendar" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
                     <div class="flex flex-col gap-5">
@@ -325,7 +326,7 @@
                 </section>
             </div>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:hidden">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:hidden">
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <p class="text-xs font-semibold text-emerald-700">{{ __('Overview Calendar') }}</p>
@@ -356,26 +357,67 @@
                 </div>
             </section>
 
-            <div class="flex flex-col gap-8 lg:flex-row lg:items-start">
+            <div
+                x-data="{
+                    plannerSections: ['planner-saved', 'planner-going', 'planner-speakers', 'planner-references', 'planner-institutions'],
+                    activePlannerSection: 'planner-saved',
+                    init() {
+                        const initialHash = window.location.hash.replace('#', '');
+
+                        if (this.plannerSections.includes(initialHash)) {
+                            this.activePlannerSection = initialHash;
+                        }
+
+                        window.addEventListener('hashchange', () => {
+                            const nextHash = window.location.hash.replace('#', '');
+
+                            if (this.plannerSections.includes(nextHash)) {
+                                this.activePlannerSection = nextHash;
+                            }
+                        });
+                    },
+                }"
+                class="flex flex-col gap-8 lg:flex-row lg:items-start"
+            >
                 <aside class="shrink-0 lg:sticky lg:top-6 lg:w-64">
                     <div class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm lg:hidden">
-                        <a href="#planner-saved" class="min-w-28 rounded-xl border border-amber-100 bg-amber-50 px-3 py-3 text-left text-sm font-semibold text-amber-800 transition hover:border-amber-200 hover:bg-amber-100">
+                        <a href="#planner-saved"
+                            @click="activePlannerSection = 'planner-saved'"
+                            :aria-current="activePlannerSection === 'planner-saved' ? 'page' : null"
+                            class="min-w-28 rounded-xl border border-amber-100 bg-amber-50 px-3 py-3 text-left text-sm font-semibold text-amber-800 transition hover:border-amber-200 hover:bg-amber-100"
+                            :class="activePlannerSection === 'planner-saved' ? 'ring-2 ring-amber-200 border-amber-300 bg-amber-100 shadow-sm' : ''">
                             <span class="block">{{ __('Saved') }}</span>
                             <span class="mt-1 inline-flex rounded bg-white px-2 py-0.5 text-xs font-bold text-amber-700">{{ $savedEvents->count() }}</span>
                         </a>
-                        <a href="#planner-going" class="min-w-28 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-left text-sm font-semibold text-emerald-800 transition hover:border-emerald-200 hover:bg-emerald-100">
+                        <a href="#planner-going"
+                            @click="activePlannerSection = 'planner-going'"
+                            :aria-current="activePlannerSection === 'planner-going' ? 'page' : null"
+                            class="min-w-28 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-left text-sm font-semibold text-emerald-800 transition hover:border-emerald-200 hover:bg-emerald-100"
+                            :class="activePlannerSection === 'planner-going' ? 'ring-2 ring-emerald-200 border-emerald-300 bg-emerald-100 shadow-sm' : ''">
                             <span class="block">{{ __('Going') }}</span>
                             <span class="mt-1 inline-flex rounded bg-white px-2 py-0.5 text-xs font-bold text-emerald-700">{{ $goingEvents->count() }}</span>
                         </a>
-                        <a href="#planner-speakers" class="min-w-28 rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 text-left text-sm font-semibold text-sky-800 transition hover:border-sky-200 hover:bg-sky-100">
+                        <a href="#planner-speakers"
+                            @click="activePlannerSection = 'planner-speakers'"
+                            :aria-current="activePlannerSection === 'planner-speakers' ? 'page' : null"
+                            class="min-w-28 rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 text-left text-sm font-semibold text-sky-800 transition hover:border-sky-200 hover:bg-sky-100"
+                            :class="activePlannerSection === 'planner-speakers' ? 'ring-2 ring-sky-200 border-sky-300 bg-sky-100 shadow-sm' : ''">
                             <span class="block">{{ __('Speakers') }}</span>
                             <span class="mt-1 inline-flex rounded bg-white px-2 py-0.5 text-xs font-bold text-sky-700">{{ $followingSpeakers->count() }}</span>
                         </a>
-                        <a href="#planner-references" class="min-w-28 rounded-xl border border-violet-100 bg-violet-50 px-3 py-3 text-left text-sm font-semibold text-violet-800 transition hover:border-violet-200 hover:bg-violet-100">
+                        <a href="#planner-references"
+                            @click="activePlannerSection = 'planner-references'"
+                            :aria-current="activePlannerSection === 'planner-references' ? 'page' : null"
+                            class="min-w-28 rounded-xl border border-violet-100 bg-violet-50 px-3 py-3 text-left text-sm font-semibold text-violet-800 transition hover:border-violet-200 hover:bg-violet-100"
+                            :class="activePlannerSection === 'planner-references' ? 'ring-2 ring-violet-200 border-violet-300 bg-violet-100 shadow-sm' : ''">
                             <span class="block">{{ __('References') }}</span>
                             <span class="mt-1 inline-flex rounded bg-white px-2 py-0.5 text-xs font-bold text-violet-700">{{ $followingReferences->count() }}</span>
                         </a>
-                        <a href="#planner-institutions" class="min-w-28 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-3 text-left text-sm font-semibold text-indigo-800 transition hover:border-indigo-200 hover:bg-indigo-100">
+                        <a href="#planner-institutions"
+                            @click="activePlannerSection = 'planner-institutions'"
+                            :aria-current="activePlannerSection === 'planner-institutions' ? 'page' : null"
+                            class="min-w-28 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-3 text-left text-sm font-semibold text-indigo-800 transition hover:border-indigo-200 hover:bg-indigo-100"
+                            :class="activePlannerSection === 'planner-institutions' ? 'ring-2 ring-indigo-200 border-indigo-300 bg-indigo-100 shadow-sm' : ''">
                             <span class="block">{{ __('Institutions') }}</span>
                             <span class="mt-1 inline-flex rounded bg-white px-2 py-0.5 text-xs font-bold text-indigo-700">{{ $followingInstitutions->count() }}</span>
                         </a>
@@ -388,7 +430,11 @@
                         </div>
 
                         <nav class="space-y-1 p-2">
-                            <a href="#planner-saved" class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-amber-50">
+                            <a href="#planner-saved"
+                                @click="activePlannerSection = 'planner-saved'"
+                                :aria-current="activePlannerSection === 'planner-saved' ? 'page' : null"
+                                class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-amber-50"
+                                :class="activePlannerSection === 'planner-saved' ? 'bg-amber-50 ring-1 ring-amber-200' : ''">
                                 <span class="flex items-center gap-3">
                                     <span class="flex size-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
                                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -402,7 +448,11 @@
                                 </span>
                                 <span class="rounded bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{{ $savedEvents->count() }}</span>
                             </a>
-                            <a href="#planner-going" class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-emerald-50">
+                            <a href="#planner-going"
+                                @click="activePlannerSection = 'planner-going'"
+                                :aria-current="activePlannerSection === 'planner-going' ? 'page' : null"
+                                class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-emerald-50"
+                                :class="activePlannerSection === 'planner-going' ? 'bg-emerald-50 ring-1 ring-emerald-200' : ''">
                                 <span class="flex items-center gap-3">
                                     <span class="flex size-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
                                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -416,7 +466,11 @@
                                 </span>
                                 <span class="rounded bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{{ $goingEvents->count() }}</span>
                             </a>
-                            <a href="#planner-speakers" class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-sky-50">
+                            <a href="#planner-speakers"
+                                @click="activePlannerSection = 'planner-speakers'"
+                                :aria-current="activePlannerSection === 'planner-speakers' ? 'page' : null"
+                                class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-sky-50"
+                                :class="activePlannerSection === 'planner-speakers' ? 'bg-sky-50 ring-1 ring-sky-200' : ''">
                                 <span class="flex items-center gap-3">
                                     <span class="flex size-10 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
                                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -430,7 +484,11 @@
                                 </span>
                                 <span class="rounded bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">{{ $followingSpeakers->count() }}</span>
                             </a>
-                            <a href="#planner-references" class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-violet-50">
+                            <a href="#planner-references"
+                                @click="activePlannerSection = 'planner-references'"
+                                :aria-current="activePlannerSection === 'planner-references' ? 'page' : null"
+                                class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-violet-50"
+                                :class="activePlannerSection === 'planner-references' ? 'bg-violet-50 ring-1 ring-violet-200' : ''">
                                 <span class="flex items-center gap-3">
                                     <span class="flex size-10 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
                                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -444,7 +502,11 @@
                                 </span>
                                 <span class="rounded bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">{{ $followingReferences->count() }}</span>
                             </a>
-                            <a href="#planner-institutions" class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-indigo-50">
+                            <a href="#planner-institutions"
+                                @click="activePlannerSection = 'planner-institutions'"
+                                :aria-current="activePlannerSection === 'planner-institutions' ? 'page' : null"
+                                class="group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition hover:bg-indigo-50"
+                                :class="activePlannerSection === 'planner-institutions' ? 'bg-indigo-50 ring-1 ring-indigo-200' : ''">
                                 <span class="flex items-center gap-3">
                                     <span class="flex size-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
                                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -463,7 +525,7 @@
                 </aside>
 
                 <div class="min-w-0 flex-1 space-y-6">
-                    <section id="planner-saved" class="rounded-2xl border border-amber-200/70 bg-white p-6 shadow-sm">
+                    <section id="planner-saved" x-show="activePlannerSection === 'planner-saved'" x-cloak class="rounded-2xl border border-amber-200/70 bg-white p-6 shadow-sm">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <h2 class="font-heading text-xl font-bold text-slate-950">{{ __('Saved') }}</h2>
@@ -509,7 +571,7 @@
                         @endif
                     </section>
 
-                    <section id="planner-going" class="rounded-2xl border border-emerald-200/70 bg-white p-6 shadow-sm">
+                    <section id="planner-going" x-show="activePlannerSection === 'planner-going'" x-cloak class="rounded-2xl border border-emerald-200/70 bg-white p-6 shadow-sm">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <h2 class="font-heading text-xl font-bold text-slate-950">{{ __('Going') }}</h2>
@@ -555,8 +617,8 @@
                         @endif
                     </section>
 
-                    <div class="grid gap-6 xl:grid-cols-3">
-                        <article id="planner-speakers" class="rounded-2xl border border-sky-200/70 bg-white p-6 shadow-sm">
+                    <div class="space-y-6">
+                        <article id="planner-speakers" x-show="activePlannerSection === 'planner-speakers'" x-cloak class="rounded-2xl border border-sky-200/70 bg-white p-6 shadow-sm">
                             <div class="flex items-start justify-between gap-4">
                                 <div>
                                     <h2 class="font-heading text-xl font-bold text-slate-950">{{ __('Following Speakers') }}</h2>
@@ -596,7 +658,7 @@
                             @endif
                         </article>
 
-                        <article id="planner-references" class="rounded-2xl border border-violet-200/70 bg-white p-6 shadow-sm">
+                        <article id="planner-references" x-show="activePlannerSection === 'planner-references'" x-cloak class="rounded-2xl border border-violet-200/70 bg-white p-6 shadow-sm">
                             <div class="flex items-start justify-between gap-4">
                                 <div>
                                     <h2 class="font-heading text-xl font-bold text-slate-950">{{ __('Following References') }}</h2>
@@ -645,7 +707,7 @@
                             @endif
                         </article>
 
-                        <article id="planner-institutions" class="rounded-2xl border border-indigo-200/70 bg-white p-6 shadow-sm">
+                        <article id="planner-institutions" x-show="activePlannerSection === 'planner-institutions'" x-cloak class="rounded-2xl border border-indigo-200/70 bg-white p-6 shadow-sm">
                             <div class="flex items-start justify-between gap-4">
                                 <div>
                                     <h2 class="font-heading text-xl font-bold text-slate-950">{{ __('Following Institutions') }}</h2>

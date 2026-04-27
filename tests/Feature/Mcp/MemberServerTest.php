@@ -1114,6 +1114,11 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'openWorldHint' => true,
     ]);
 
+    expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.type'))->toBe('array');
+    expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.type'))->toBe('object');
+    expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.required'))
+        ->toBe(['filename', 'mime_type', 'content_base64']);
+
     $githubIssueCategorySchema = data_get($tools->get('member-create-github-issue'), 'inputSchema.properties.category');
 
     expect($githubIssueCategorySchema['enum'] ?? null)->toBe(GitHubIssueReportContract::categories())

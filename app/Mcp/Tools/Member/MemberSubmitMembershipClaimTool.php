@@ -77,7 +77,15 @@ class MemberSubmitMembershipClaimTool extends AbstractMemberWriteTool
             'subject_type' => $schema->string()->required()->enum($this->subjectTypeValues()),
             'subject' => $schema->string()->required()->min(1),
             'justification' => $schema->string()->required(),
-            'evidence' => $schema->array()->required(),
+            'evidence' => $schema->array()->required()
+                ->items(
+                    $schema->object([
+                        'filename' => $schema->string()->required()->min(1),
+                        'mime_type' => $schema->string()->required()->min(1),
+                        'content_base64' => $schema->string()->required()->min(1),
+                    ])->withoutAdditionalProperties()
+                )
+                ->description('Array of MCP file descriptors. Each item must include filename, mime_type, and content_base64.'),
         ];
     }
 
