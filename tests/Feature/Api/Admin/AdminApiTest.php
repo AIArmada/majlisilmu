@@ -31,6 +31,7 @@ use App\Models\Subdistrict;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Venue;
+use App\Services\Signals\SignalsTracker;
 use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Search\SpeakerSearchService;
 use Illuminate\Support\Carbon;
@@ -193,6 +194,27 @@ it('returns admin speaker resource metadata and records', function () {
         ->assertJsonPath('data.record.route_key', $speakerRouteKey)
         ->assertJsonPath('data.record.attributes.name', 'Admin API Speaker')
         ->assertJsonPath('data.record.abilities.view', true);
+});
+
+it('redacts tracked property write keys in admin api payloads', function () {
+    $admin = adminApiUser('super_admin');
+    $trackedProperty = app(SignalsTracker::class)->defaultTrackedProperty();
+
+    expect($trackedProperty)->not->toBeNull();
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/v1/admin/tracked-properties?search='.urlencode((string) $trackedProperty?->name))
+        ->assertOk()
+        ->assertJsonPath('meta.resource.key', 'tracked-properties')
+        ->assertJsonPath('data.0.id', (string) $trackedProperty?->getKey())
+        ->assertJsonPath('data.0.attributes.write_key', 'present');
+
+    $this->getJson('/api/v1/admin/tracked-properties/'.(string) $trackedProperty?->getRouteKey())
+        ->assertOk()
+        ->assertJsonPath('data.resource.key', 'tracked-properties')
+        ->assertJsonPath('data.record.route_key', (string) $trackedProperty?->getRouteKey())
+        ->assertJsonPath('data.record.attributes.write_key', 'present');
 });
 
 it('filters admin speaker records by explicit query parameters', function () {

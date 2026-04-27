@@ -256,11 +256,11 @@
         registerOpen: false,
         shareModalOpen: false,
         copied: false,
-        shareData: @json($shareData),
-        copyMessage: @json($copyMessage),
-        copyPrompt: @json($copyPrompt),
-        trackEndpoint: @json(route('dawah-share.track')),
-        providerQueryParameter: @json(config('dawah-share.provider_query_parameter', 'channel')),
+        shareData: {{ Js::from($shareData) }},
+        copyMessage: {{ Js::from($copyMessage) }},
+        copyPrompt: {{ Js::from($copyPrompt) }},
+        trackEndpoint: {{ Js::from(route('dawah-share.track')) }},
+        providerQueryParameter: {{ Js::from(config('dawah-share.provider_query_parameter', 'channel')) }},
         attributedShareData: null,
         async resolveShareData() {
             if (this.attributedShareData) {

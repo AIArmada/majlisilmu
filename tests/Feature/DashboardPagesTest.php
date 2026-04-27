@@ -229,7 +229,7 @@ it('shows the planner sidebar and followed entity lists on the dashboard', funct
     $response->assertOk()
         ->assertSee('Planner menu')
         ->assertSee('Jump to a section')
-        ->assertSee('hidden lg:block', false)
+        ->assertSee('hidden md:block', false)
         ->assertSee('planner-calendar', false)
         ->assertSee('planner-saved', false)
         ->assertSee('planner-going', false)
@@ -339,7 +339,7 @@ it('translates the attendee dashboard in Malay with the lean attendee-first sect
         ->assertDontSee('Perancang Kehadiran')
         ->assertSee('Menu perancang')
         ->assertSee('Pergi ke bahagian')
-        ->assertSee('Dashboard Saya')
+        ->assertSee('Dashboard')
         ->assertSee('Urus Institusi')
         ->assertSee('Majlis Akan Hadir')
         ->assertDontSee('Majlis Dihantar Sendiri')
@@ -358,7 +358,7 @@ it('translates the attendee dashboard in Malay with the lean attendee-first sect
     $dashboardMenuText = trim(strip_tags($dashboardMenuMatch[1] ?? ''));
     $institutionDashboardMenuText = trim(strip_tags($institutionDashboardMenuMatch[1] ?? ''));
 
-    expect($dashboardMenuText)->toBe('Dashboard Saya')
+    expect($dashboardMenuText)->toBe('Dashboard')
         ->and($institutionDashboardMenuText)->toBe('Urus Institusi');
 });
 

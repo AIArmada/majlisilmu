@@ -395,6 +395,37 @@ it('returns resource metadata, record listings, and record detail for speakers',
             ->etc());
 });
 
+it('redacts tracked property write keys in admin MCP payloads', function () {
+    $admin = adminMcpUser('super_admin');
+    $trackedProperty = app(SignalsTracker::class)->defaultTrackedProperty();
+
+    expect($trackedProperty)->not->toBeNull();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'tracked-properties',
+            'search' => (string) $trackedProperty?->name,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.resource.key', 'tracked-properties')
+            ->where('data.0.id', (string) $trackedProperty?->getKey())
+            ->where('data.0.attributes.write_key', 'present')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetRecordTool::class, [
+            'resource_key' => 'tracked-properties',
+            'record_key' => (string) $trackedProperty?->getRouteKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'tracked-properties')
+            ->where('data.record.route_key', (string) $trackedProperty?->getRouteKey())
+            ->where('data.record.attributes.write_key', 'present')
+            ->etc());
+});
+
 it('returns focused next-step actions for admin records through the MCP server', function () {
     $admin = adminMcpUser('super_admin');
     $event = Event::factory()->create([

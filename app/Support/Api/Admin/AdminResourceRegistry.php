@@ -2,6 +2,7 @@
 
 namespace App\Support\Api\Admin;
 
+use AIArmada\Signals\Models\TrackedProperty;
 use App\Data\Api\Event\EventPayloadData;
 use App\Enums\EventFormat;
 use App\Enums\EventStructure;
@@ -685,6 +686,10 @@ class AdminResourceRegistry
     private function serializeAttributes(Model $record): array
     {
         $attributes = $record->toArray();
+
+        if ($record instanceof TrackedProperty) {
+            $attributes['write_key'] = filled($record->write_key) ? 'present' : null;
+        }
 
         if ($record instanceof User) {
             $attributes = Arr::except($attributes, [

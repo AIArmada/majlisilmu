@@ -6,6 +6,7 @@ namespace App\Mcp\Tools\Member;
 
 use App\Models\User;
 use App\Support\Mcp\McpAuthenticatedUserResolver;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -87,6 +88,12 @@ abstract class AbstractMemberTool extends Tool
                 $this->httpExceptionMessage($exception),
                 $this->httpExceptionCode($exception),
                 ['status' => $exception->getStatusCode()],
+            );
+        } catch (ModelNotFoundException $exception) {
+            return $this->errorResponse(
+                'Resource not found.',
+                'not_found',
+                ['status' => 404],
             );
         } catch (Throwable $exception) {
             report($exception);
