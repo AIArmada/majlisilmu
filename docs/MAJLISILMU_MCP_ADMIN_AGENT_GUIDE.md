@@ -335,6 +335,7 @@ When the user asks you to “look for” a named place, start with the most like
 - Even though the schema advertises model-layer normalization notes for Twitter / X, validated MCP payloads should still use the canonical platform value `twitter`, not `x`.
 - Enum fields and filters use enum backing values, not display labels. For events, use values like `kuliah_ceramah`, `all_ages`, `prayer_relative`, `maghrib`, and `immediately` instead of labels like `Kuliah / Ceramah` or localized prayer text.
 - Generic user record payloads intentionally redact `email`, `email_verified_at`, `phone`, `phone_verified_at`, `daily_prayer_institution_id`, and `friday_prayer_institution_id`.
+- `tracked-properties` payloads intentionally redact ingestion credentials: `attributes.write_key` is returned as `"present"` (or `null` when missing) on admin API and admin MCP list/get record responses. Do not request or emit raw `write_key` values in assistant summaries, logs, or generated reports.
 - Record lookups use `route_key` for record-specific paths; missing records return 404 rather than a generic server error.
 - Public/mobile surface additions do not automatically imply new MCP tools. For example, a new public directory endpoint does not mean a matching dedicated MCP tool was added; the existing generic `admin-list-records` flow is still the correct path.
 - MCP event records come from the admin resource service, not the public event controller. Public/mobile event detail payload changes do not automatically appear in `admin-get-record` results.
