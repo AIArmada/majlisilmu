@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Actions\References\GenerateReferenceSlugAction;
 use App\Enums\MemberSubjectType;
+use App\Enums\ReferencePartType;
+use App\Enums\ReferenceType;
 use App\Models\Concerns\AuditsModelChanges;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasSocialMedia;
@@ -13,9 +15,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Laravel\Scout\Searchable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 use Spatie\DeletedModels\Models\Concerns\KeepsDeletedModels;
@@ -35,14 +40,20 @@ class Reference extends Model implements AuditableContract, HasMedia
             if (blank($reference->slug)) {
                 $reference->slug = app(GenerateReferenceSlugAction::class)->handle($reference->title, (string) $reference->getKey());
             }
+
+            $reference->normalizeReferencePartFields();
         });
     }
 
     protected $fillable = [
         'title',
         'slug',
+        'parent_reference_id',
         'author',
         'type',
+        'part_type',
+        'part_number',
+        'part_label',
         'publication_year',
         'publisher',
         'description',
@@ -58,6 +69,47 @@ class Reference extends Model implements AuditableContract, HasMedia
             'is_canonical' => 'boolean',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * @param  list<string>  $referenceIds
+     * @return list<string>
+     */
+    public static function expandRootReferenceIdsForFiltering(array $referenceIds): array
+    {
+        $normalizedReferenceIds = collect($referenceIds)
+            ->map(static fn (string $referenceId): string => trim($referenceId))
+            ->filter(static fn (string $referenceId): bool => $referenceId !== '')
+            ->unique()
+            ->values();
+
+        if ($normalizedReferenceIds->isEmpty()) {
+            return [];
+        }
+
+        /** @var Collection<int, self> $selectedReferences */
+        $selectedReferences = self::query()
+            ->whereIn('id', $normalizedReferenceIds->all())
+            ->get(['id', 'parent_reference_id']);
+
+        $selectedRootIds = $selectedReferences
+            ->filter(static fn (self $reference): bool => blank($reference->parent_reference_id))
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values();
+
+        $expandedChildIds = $selectedRootIds->isEmpty()
+            ? collect()
+            : self::query()
+                ->whereIn('parent_reference_id', $selectedRootIds->all())
+                ->pluck('id')
+                ->map(static fn (mixed $id): string => (string) $id);
+
+        return $normalizedReferenceIds
+            ->merge($expandedChildIds)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     #[\Override]
@@ -89,6 +141,28 @@ class Reference extends Model implements AuditableContract, HasMedia
         $query->where('is_active', true);
     }
 
+    /**
+     * Scope a query to root references and standalone references.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function root(Builder $query): void
+    {
+        $query->whereNull('parent_reference_id');
+    }
+
+    /**
+     * Scope a query to child part references.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function part(Builder $query): void
+    {
+        $query->whereNotNull('parent_reference_id');
+    }
+
     public function shouldBeSearchable(): bool
     {
         return $this->is_active
@@ -101,6 +175,10 @@ class Reference extends Model implements AuditableContract, HasMedia
             'title',
             'author',
             'type',
+            'parent_reference_id',
+            'part_type',
+            'part_number',
+            'part_label',
             'publication_year',
             'publisher',
             'description',
@@ -140,6 +218,11 @@ class Reference extends Model implements AuditableContract, HasMedia
             'title' => (string) $this->title,
             'author' => filled($this->author) ? (string) $this->author : null,
             'type' => filled($this->type) ? (string) $this->type : null,
+            'parent_reference_id' => filled($this->parent_reference_id) ? (string) $this->parent_reference_id : null,
+            'part_type' => filled($this->part_type) ? (string) $this->part_type : null,
+            'part_number' => filled($this->part_number) ? (string) $this->part_number : null,
+            'part_label' => filled($this->part_label) ? (string) $this->part_label : null,
+            'display_title' => $this->displayTitle(),
             'publication_year' => $normalizedPublicationYear,
             'publisher' => filled($this->publisher) ? (string) $this->publisher : null,
             'description' => $description !== '' ? $description : null,
@@ -163,6 +246,9 @@ class Reference extends Model implements AuditableContract, HasMedia
             'title' => (string) $this->title,
             'author' => filled($this->author) ? (string) $this->author : null,
             'type' => filled($this->type) ? (string) $this->type : null,
+            'part_type' => filled($this->part_type) ? (string) $this->part_type : null,
+            'part_number' => filled($this->part_number) ? (string) $this->part_number : null,
+            'part_label' => filled($this->part_label) ? (string) $this->part_label : null,
             'publication_year' => $publicationYear,
             'publisher' => filled($this->publisher) ? (string) $this->publisher : null,
             'description' => $description !== '' ? $description : null,
@@ -179,10 +265,188 @@ class Reference extends Model implements AuditableContract, HasMedia
     {
         return trim(implode(' ', array_filter([
             trim((string) $this->title),
+            trim((string) $this->displayTitle()),
+            trim((string) $this->part_label),
+            trim((string) $this->part_number),
             trim((string) $this->author),
             trim((string) $this->publisher),
             trim(strip_tags((string) $this->description)),
         ])));
+    }
+
+    /**
+     * @return BelongsTo<Reference, $this>
+     */
+    public function parentReference(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_reference_id');
+    }
+
+    /**
+     * @return HasMany<Reference, $this>
+     */
+    public function childReferences(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_reference_id')
+            ->orderBy('part_type')
+            ->orderBy('part_number')
+            ->orderBy('title');
+    }
+
+    public function isPart(): bool
+    {
+        return filled($this->parent_reference_id);
+    }
+
+    public function isRootReference(): bool
+    {
+        return ! $this->isPart();
+    }
+
+    public function familyRootId(): ?string
+    {
+        if ($this->isPart()) {
+            return (string) $this->parent_reference_id;
+        }
+
+        $key = $this->getKey();
+
+        return is_string($key) && $key !== '' ? $key : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function familyReferenceIds(): array
+    {
+        $rootId = $this->familyRootId();
+
+        if ($rootId === null) {
+            return [];
+        }
+
+        return self::query()
+            ->where('id', $rootId)
+            ->orWhere('parent_reference_id', $rootId)
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function defaultEventReferenceIds(): array
+    {
+        if ($this->isPart()) {
+            $key = $this->getKey();
+
+            return is_string($key) && $key !== '' ? [$key] : [];
+        }
+
+        return $this->familyReferenceIds();
+    }
+
+    public function displayTitle(): string
+    {
+        $title = trim((string) $this->title);
+        $partLabel = $this->resolvedPartLabel();
+
+        if (! $this->isPart() || $partLabel === '') {
+            return $title;
+        }
+
+        if (str_contains(mb_strtolower($title), mb_strtolower($partLabel))) {
+            return $title;
+        }
+
+        return trim("{$title} — {$partLabel}");
+    }
+
+    public function getDisplayTitleAttribute(): string
+    {
+        return $this->displayTitle();
+    }
+
+    private function resolvedPartLabel(): string
+    {
+        $partLabel = trim((string) $this->part_label);
+
+        if ($partLabel !== '') {
+            return $partLabel;
+        }
+
+        $partType = ReferencePartType::tryFrom((string) $this->part_type);
+        $partNumber = trim((string) $this->part_number);
+
+        if (! $partType instanceof ReferencePartType) {
+            return $partNumber;
+        }
+
+        $label = $partType->getLabel();
+
+        return $partNumber !== '' ? "{$label} {$partNumber}" : $label;
+    }
+
+    private function normalizeReferencePartFields(): void
+    {
+        if ((string) $this->type !== ReferenceType::Book->value || blank($this->parent_reference_id)) {
+            $this->parent_reference_id = null;
+            $this->part_type = null;
+            $this->part_number = null;
+            $this->part_label = null;
+
+            return;
+        }
+
+        $this->part_type = (ReferencePartType::tryFrom((string) $this->part_type) ?? ReferencePartType::Jilid)->value;
+        $this->part_number = $this->nullableTrimmedString($this->part_number);
+        $this->part_label = $this->nullableTrimmedString($this->part_label);
+
+        $this->ensureValidParentReference();
+    }
+
+    private function ensureValidParentReference(): void
+    {
+        if ((string) $this->parent_reference_id === (string) $this->getKey()) {
+            throw ValidationException::withMessages([
+                'parent_reference_id' => __('A reference part cannot use itself as the parent book.'),
+            ]);
+        }
+
+        if ($this->exists && $this->childReferences()->exists()) {
+            throw ValidationException::withMessages([
+                'parent_reference_id' => __('A reference with child parts cannot itself become a child part.'),
+            ]);
+        }
+
+        $parentReference = self::query()
+            ->whereKey($this->parent_reference_id)
+            ->first(['id', 'parent_reference_id', 'type']);
+
+        if (! $parentReference instanceof self) {
+            throw ValidationException::withMessages([
+                'parent_reference_id' => __('The selected parent reference does not exist.'),
+            ]);
+        }
+
+        if ($parentReference->isPart() || (string) $parentReference->type !== ReferenceType::Book->value) {
+            throw ValidationException::withMessages([
+                'parent_reference_id' => __('Reference parts can only belong to a root book reference.'),
+            ]);
+        }
+    }
+
+    private function nullableTrimmedString(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $trimmed = trim((string) $value);
+
+        return $trimmed !== '' ? $trimmed : null;
     }
 
     /**

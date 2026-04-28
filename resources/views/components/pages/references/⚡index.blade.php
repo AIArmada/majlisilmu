@@ -27,6 +27,7 @@ new
 
             if ($search === null) {
                 return $this->baseReferencesQuery()
+                    ->root()
                     ->orderBy('references.title')
                     ->paginate(12)
                     ->withQueryString();
@@ -52,15 +53,21 @@ new
             $this->resetPage();
         }
 
-        private function baseReferencesQuery(): Builder
+        private function baseReferencesQuery(bool $includeParts = false): Builder
         {
-            return Reference::query()
+            $query = Reference::query()
                 ->active()
                 ->where('status', 'verified')
                 ->withCount(['events' => function (Builder $query): void {
                     $query->active();
                 }])
                 ->with('media');
+
+            if (! $includeParts) {
+                $query->root();
+            }
+
+            return $query;
         }
 
         private function directSearch(string $search): LengthAwarePaginatorContract
@@ -103,7 +110,7 @@ new
                 return new LengthAwarePaginator(collect(), count($orderedIds), $perPage, $currentPage, $paginationMeta);
             }
 
-            $references = $this->baseReferencesQuery()
+            $references = $this->baseReferencesQuery(includeParts: true)
                 ->whereIn('references.id', $paginatedIds)
                 ->get()
                 ->sortBy(static function (Reference $reference) use ($paginatedIds): int {
@@ -126,7 +133,7 @@ new
                 return [];
             }
 
-            $scopedIds = $this->baseReferencesQuery()
+            $scopedIds = $this->baseReferencesQuery(includeParts: true)
                 ->whereIn('references.id', $orderedIds)
                 ->pluck('references.id')
                 ->map(static fn (mixed $id): string => (string) $id)
@@ -199,7 +206,7 @@ new
         <div class="container relative mx-auto px-6 text-center lg:px-12">
             <h1 class="mb-6 text-balance font-heading text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl">
                 {{ __('Sources of') }} <br class="hidden md:block" />
-                <span class="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">{{ __('Knowledge & Guidance') }}</span>
+                <span class="bg-linear-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">{{ __('Knowledge & Guidance') }}</span>
             </h1>
             <p class="mx-auto max-w-2xl text-balance text-lg text-slate-600 md:text-xl">
                 {{ __('Books, articles, videos, and reference works used across the Majlis Ilmu community.') }}
@@ -279,10 +286,10 @@ new
                             wire:navigate
                             class="group relative flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-900/8"
                         >
-                            <div class="relative flex aspect-[4/5] items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 to-emerald-50">
+                            <div class="relative flex aspect-4/5 items-center justify-center overflow-hidden bg-linear-to-br from-slate-50 to-emerald-50">
                                 @if($coverUrl)
                                     <img src="{{ $coverUrl }}" alt="{{ $reference->title }}" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" width="200" height="280" loading="lazy">
-                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/55 via-slate-900/10 to-transparent"></div>
+                                    <div class="absolute inset-0 bg-linear-to-t from-slate-900/55 via-slate-900/10 to-transparent"></div>
                                 @else
                                     <svg class="h-20 w-20 text-emerald-200 transition-transform duration-700 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />

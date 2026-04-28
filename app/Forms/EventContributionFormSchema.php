@@ -219,7 +219,11 @@ class EventContributionFormSchema
                         ->createOptionUsing(fn (array $data): string => self::createPendingTag($data, TagType::Issue)),
                     Select::make('reference_ids')
                         ->label(__('Rujukan Kitab / Buku'))
-                        ->options(fn (): array => Reference::query()->orderBy('title')->pluck('title', 'id')->all())
+                        ->options(fn (): array => Reference::query()
+                            ->orderBy('title')
+                            ->get(['id', 'title', 'parent_reference_id', 'part_type', 'part_number', 'part_label'])
+                            ->mapWithKeys(fn (Reference $reference): array => [(string) $reference->id => $reference->displayTitle()])
+                            ->all())
                         ->multiple()
                         ->searchable()
                         ->preload()

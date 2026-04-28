@@ -31,6 +31,7 @@ use App\Enums\InspirationCategory;
 use App\Enums\InstitutionType;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
+use App\Enums\ReferencePartType;
 use App\Enums\ReferenceType;
 use App\Enums\RegistrationMode;
 use App\Enums\SocialMediaPlatform;
@@ -1310,6 +1311,20 @@ class AdminResourceMutationService
             $this->field('title', 'string', required: true, maxLength: 255),
             $this->field('author', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
             $this->field('type', 'string', required: true, default: ReferenceType::Book->value, allowedValues: $this->enumValues(ReferenceType::class)),
+            $this->field('parent_reference_id', 'string', required: false, meta: [
+                'relation' => 'references',
+                'accepted_parent_scope' => 'root_book_references_only',
+                'mutation_semantics' => 'replace_scalar',
+                'clear_semantics' => [
+                    'omitted' => 'preserve_existing',
+                    'explicit_null' => 'convert_to_root_reference_and_clear_part_fields',
+                ],
+            ]),
+            $this->field('part_type', 'string', required: false, default: ReferencePartType::Jilid->value, allowedValues: $this->enumValues(ReferencePartType::class), meta: [
+                'used_when' => 'parent_reference_id_is_present_and_type_is_book',
+            ]),
+            $this->field('part_number', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
+            $this->field('part_label', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
             $this->field('publication_year', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
             $this->field('publisher', 'string', required: false, maxLength: 255, meta: $this->trimmedStringMutationMeta()),
             $this->field('description', 'string', required: false),
@@ -2228,6 +2243,10 @@ class AdminResourceMutationService
             'title' => [$required, 'string', 'max:255'],
             'author' => ['nullable', 'string', 'max:255'],
             'type' => [$required, Rule::enum(ReferenceType::class)],
+            'parent_reference_id' => ['nullable', 'uuid', Rule::exists('references', 'id')->whereNull('parent_reference_id')->where('type', ReferenceType::Book->value)],
+            'part_type' => ['nullable', Rule::enum(ReferencePartType::class)],
+            'part_number' => ['nullable', 'string', 'max:255'],
+            'part_label' => ['nullable', 'string', 'max:255'],
             'publication_year' => ['nullable', 'string', 'max:255'],
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],

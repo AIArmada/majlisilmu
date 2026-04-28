@@ -19,6 +19,7 @@ use App\Enums\TimingMode;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventCheckin;
+use App\Models\Reference;
 use App\Models\Registration;
 use App\Models\User;
 use App\Services\Signals\ProductSignalsService;
@@ -337,7 +338,13 @@ class EventController extends Controller
                 });
             }),
             AllowedFilter::callback('reference_ids', function (Builder $query, mixed $value): void {
-                $referenceIds = $this->normalizeArrayFilter($value);
+                $referenceIds = Reference::expandRootReferenceIdsForFiltering(
+                    collect($this->normalizeArrayFilter($value))
+                        ->map(static fn (mixed $referenceId): string => (string) $referenceId)
+                        ->filter(static fn (string $referenceId): bool => $referenceId !== '')
+                        ->values()
+                        ->all(),
+                );
 
                 if ($referenceIds === []) {
                     return;
