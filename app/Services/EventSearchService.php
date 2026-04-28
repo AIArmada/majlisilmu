@@ -8,6 +8,7 @@ use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Venue;
 use App\Support\Cache\SafeModelCache;
 use App\Support\Timezone\UserDateTimeFormatter;
@@ -465,7 +466,7 @@ class EventSearchService
         }
 
         if (! empty($filters['reference_ids'])) {
-            $referenceIds = $this->normalizeArrayFilter($filters['reference_ids']);
+            $referenceIds = $this->expandedReferenceIdsForFiltering($filters['reference_ids']);
 
             if ($referenceIds !== []) {
                 $filterParts[] = 'reference_ids:['.implode(',', $referenceIds).']';
@@ -692,7 +693,7 @@ class EventSearchService
             });
         }
 
-        $referenceIds = $this->normalizeArrayFilter($filters['reference_ids'] ?? null);
+        $referenceIds = $this->expandedReferenceIdsForFiltering($filters['reference_ids'] ?? null);
 
         if ($referenceIds !== []) {
             $queryBuilder->whereHas('references', function (Builder $referenceQuery) use ($referenceIds): void {
@@ -1108,6 +1109,20 @@ class EventSearchService
         $values = is_array($value) ? $value : [$value];
 
         return array_values(array_filter($values, fn (mixed $item): bool => $item !== null && $item !== ''));
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function expandedReferenceIdsForFiltering(mixed $value): array
+    {
+        $referenceIds = collect($this->normalizeArrayFilter($value))
+            ->map(static fn (mixed $referenceId): string => (string) $referenceId)
+            ->filter(static fn (string $referenceId): bool => $referenceId !== '')
+            ->values()
+            ->all();
+
+        return Reference::expandRootReferenceIdsForFiltering($referenceIds);
     }
 
     /**

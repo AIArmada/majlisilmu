@@ -19,6 +19,7 @@ use App\Forms\VenueFormSchema;
 use App\Models\Event;
 use App\Models\EventSubmission;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\User;
@@ -269,6 +270,7 @@ class EventForm
                                         Select::make('references')
                                             ->label('Rujukan Kitab / Buku')
                                             ->relationship('references', 'title')
+                                            ->getOptionLabelFromRecordUsing(fn (Reference $record): string => $record->displayTitle())
                                             ->multiple()
                                             ->closeOnSelect()
                                             ->searchable()

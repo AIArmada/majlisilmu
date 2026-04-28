@@ -5,6 +5,7 @@ use App\Models\Event;
 use App\Models\Reference;
 use App\Services\ShareTrackingService;
 use App\Support\Auth\IntendedRedirect;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -23,6 +24,8 @@ new
         public int $upcomingPerPage = 10;
 
         public int $pastPerPage = 10;
+
+        public bool $includeAllParts = false;
 
         public function mount(Reference $reference): void
         {
@@ -70,7 +73,7 @@ new
 
         public function getUpcomingEventsProperty(): Collection
         {
-            return $this->reference->events()
+            return $this->referenceEventsQuery()
                 ->active()
                 ->where('starts_at', '>=', now())
                 ->with([
@@ -90,7 +93,7 @@ new
 
         public function getUpcomingTotalProperty(): int
         {
-            return $this->reference->events()
+            return $this->referenceEventsQuery()
                 ->active()
                 ->where('starts_at', '>=', now())
                 ->count();
@@ -101,7 +104,7 @@ new
          */
         public function getPastEventsProperty(): Collection
         {
-            return $this->reference->events()
+            return $this->referenceEventsQuery()
                 ->active()
                 ->where('starts_at', '<', now())
                 ->with([
@@ -121,10 +124,31 @@ new
 
         public function getPastTotalProperty(): int
         {
-            return $this->reference->events()
+            return $this->referenceEventsQuery()
                 ->active()
                 ->where('starts_at', '<', now())
                 ->count();
+        }
+
+        public function toggleAllParts(): void
+        {
+            if ($this->reference->isRootReference()) {
+                return;
+            }
+
+            $this->includeAllParts = ! $this->includeAllParts;
+        }
+
+        private function referenceEventsQuery(): Builder
+        {
+            $referenceIds = $this->reference->isRootReference() || $this->includeAllParts
+                ? $this->reference->familyReferenceIds()
+                : $this->reference->defaultEventReferenceIds();
+
+            return Event::query()
+                ->whereHas('references', function (Builder $referenceQuery) use ($referenceIds): void {
+                    $referenceQuery->whereIn('references.id', $referenceIds);
+                });
         }
 
         public function loadMoreUpcoming(): void
@@ -139,12 +163,12 @@ new
 
         public function rendering($view): void
         {
-            $view->title($this->reference->title.' - '.config('app.name'));
+            $view->title($this->reference->display_title.' - '.config('app.name'));
         }
     };
 ?>
 
-@section('title', $this->reference->title . ' - ' . config('app.name'))
+@section('title', $this->reference->display_title . ' - ' . config('app.name'))
 @section('meta_description', Str::limit(trim(strip_tags((string) $this->reference->description)) ?: __('Lihat rujukan ini, termasuk penerangan dan majlis berkaitan di :app.', ['app' => config('app.name')]), 160))
 @section('meta_robots', ($this->reference->is_active && $this->reference->status === 'verified') ? 'index, follow' : 'noindex, nofollow')
 @section('og_url', route('references.show', $this->reference))
@@ -158,14 +182,14 @@ new
     $upcomingTotal = $this->upcomingTotal;
     $pastTotal = $this->pastTotal;
     $referenceUrl = route('references.show', $reference);
-    $referenceShareText = trim($reference->title . ' - ' . config('app.name'));
+    $referenceShareText = trim($reference->display_title . ' - ' . config('app.name'));
     $referenceShareData = [
-        'title' => $reference->title,
+        'title' => $reference->display_title,
         'text' => Str::limit((string) $reference->description, 140) ?: __('Lihat rujukan ini di :app', ['app' => config('app.name')]),
         'url' => $referenceUrl,
         'sourceUrl' => $referenceUrl,
         'shareText' => $referenceShareText,
-        'fallbackTitle' => $reference->title,
+        'fallbackTitle' => $reference->display_title,
         'payloadEndpoint' => route('dawah-share.payload'),
     ];
     $referenceShareLinks = app(\App\Services\ShareTrackingService::class)->redirectLinks(
@@ -228,17 +252,17 @@ new
 
     {{-- ═══ HERO ═══ --}}
     <header
-        class="noise-overlay relative isolate overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950/70 to-slate-950">
+        class="noise-overlay relative isolate overflow-hidden bg-linear-to-br from-slate-950 via-indigo-950/70 to-slate-950">
         {{-- Ambient orbs --}}
         <div class="pointer-events-none absolute inset-0">
             <div
-                class="animate-float-drift absolute -top-24 left-[5%] h-[28rem] w-[28rem] rounded-full bg-indigo-500/25 blur-[110px]">
+                class="animate-float-drift absolute -top-24 left-[5%] h-112 w-md rounded-full bg-indigo-500/25 blur-[110px]">
             </div>
             <div
-                class="animate-float-drift-alt absolute -bottom-16 right-[8%] h-[22rem] w-[22rem] rounded-full bg-gold-400/15 blur-[90px]">
+                class="animate-float-drift-alt absolute -bottom-16 right-[8%] h-88 w-88 rounded-full bg-gold-400/15 blur-[90px]">
             </div>
             <div
-                class="animate-float-drift-slow absolute top-16 right-[40%] h-[18rem] w-[18rem] rounded-full bg-violet-400/15 blur-[80px]">
+                class="animate-float-drift-slow absolute top-16 right-[40%] h-72 w-72 rounded-full bg-violet-400/15 blur-[80px]">
             </div>
         </div>
         <div
@@ -246,8 +270,8 @@ new
         </div>
         <div class="absolute inset-0 opacity-[0.03]"
             style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 200px;"></div>
-        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent"></div>
-        <div class="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-slate-950/60 to-transparent"></div>
+        <div class="absolute inset-0 bg-linear-to-t from-slate-950/90 via-transparent to-transparent"></div>
+        <div class="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-slate-950/60 to-transparent"></div>
 
         <div
             class="container relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-8 px-6 pb-12 pt-14 sm:flex-row sm:items-end sm:gap-10 lg:px-8 lg:pb-16 lg:pt-20">
@@ -255,7 +279,7 @@ new
             {{-- Book cover --}}
             <div class="animate-scale-in relative shrink-0" style="animation-delay: 150ms; opacity: 0;">
                 <div
-                    class="animate-glow-breathe absolute -inset-3 rounded-2xl bg-gradient-to-br from-indigo-400/35 via-gold-400/15 to-indigo-600/30 blur-xl">
+                    class="animate-glow-breathe absolute -inset-3 rounded-2xl bg-linear-to-br from-indigo-400/35 via-gold-400/15 to-indigo-600/30 blur-xl">
                 </div>
                 @if($frontCover)
                     <div
@@ -283,10 +307,10 @@ new
                     </p>
                 @endif
                 <h1 class="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-                    {{ $reference->title }}
+                    {{ $reference->display_title }}
                 </h1>
                 <div
-                    class="shimmer-line mx-auto mt-3 h-0.5 w-20 rounded-full bg-gradient-to-r from-gold-400/80 via-gold-300/60 to-gold-600/30 sm:mx-0">
+                    class="shimmer-line mx-auto mt-3 h-0.5 w-20 rounded-full bg-linear-to-r from-gold-400/80 via-gold-300/60 to-gold-600/30 sm:mx-0">
                 </div>
 
                 <div
@@ -380,17 +404,17 @@ new
         </div>
 
         <div
-            class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent">
+            class="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-indigo-400/60 to-transparent">
         </div>
         <div
-            class="absolute inset-x-0 -bottom-0.5 h-1 bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent blur-sm">
+            class="absolute inset-x-0 -bottom-0.5 h-1 bg-linear-to-r from-transparent via-indigo-500/20 to-transparent blur-sm">
         </div>
     </header>
 
     {{-- ═══ MAIN CONTENT ═══ --}}
     <div class="relative">
         <div
-            class="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-indigo-50/60 via-slate-50/40 to-transparent">
+            class="pointer-events-none absolute inset-x-0 top-0 h-64 bg-linear-to-b from-indigo-50/60 via-slate-50/40 to-transparent">
         </div>
 
         <div class="container relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -429,7 +453,7 @@ new
                         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div class="flex items-center gap-3">
                                 <div
-                                    class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
+                                    class="flex size-10 items-center justify-center rounded-xl bg-linear-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
                                     <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                         stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -439,10 +463,18 @@ new
                                 <div>
                                     <h2 class="font-heading text-2xl font-bold text-slate-900">{{ __('Majlis') }}</h2>
                                     <div
-                                        class="mt-0.5 h-0.5 w-12 rounded-full bg-gradient-to-r from-emerald-500 to-transparent">
+                                        class="mt-0.5 h-0.5 w-12 rounded-full bg-linear-to-r from-emerald-500 to-transparent">
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                @if($reference->isPart())
+                                    <button type="button" wire:click="toggleAllParts"
+                                        class="inline-flex items-center rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50">
+                                        {{ $this->includeAllParts ? __('Showing all parts') : __('Show all parts') }}
+                                    </button>
+                                @endif
 
                             {{-- Tab toggle --}}
                             <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
@@ -471,6 +503,7 @@ new
                                     <span
                                         class="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600">{{ $pastTotal }}</span>
                                 </button>
+                            </div>
                             </div>
                         </div>
 
@@ -507,10 +540,10 @@ new
                                         @endphp
                                         <a href="{{ route('events.show', $event) }}" wire:navigate
                                             wire:key="upcoming-{{ $event->id }}"
-                                            class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200/80 hover:ring-emerald-100 hover:shadow-xl hover:shadow-emerald-500/[0.08]">
+                                            class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200/80 hover:ring-emerald-100 hover:shadow-xl hover:shadow-emerald-500/8">
                                             {{-- Date accent sidebar --}}
                                             <div
-                                                class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800') }} p-2.5 text-white sm:w-24 sm:p-3">
+                                                class="flex w-18 shrink-0 flex-col items-center justify-center bg-linear-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-emerald-600 to-emerald-800') }} p-2.5 text-white sm:w-24 sm:p-3">
                                                 <span
                                                     class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-emerald-200/80') }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
                                                 <span
@@ -630,9 +663,9 @@ new
                                         @endphp
                                         <a href="{{ route('events.show', $event) }}" wire:navigate
                                             wire:key="past-{{ $event->id }}"
-                                            class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:ring-slate-200 hover:shadow-xl hover:shadow-slate-500/[0.06]">
+                                            class="group relative flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-transparent transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:ring-slate-200 hover:shadow-xl hover:shadow-slate-500/6">
                                             <div
-                                                class="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-gradient-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700') }} p-2.5 text-white sm:w-24 sm:p-3">
+                                                class="flex w-18 shrink-0 flex-col items-center justify-center bg-linear-to-b {{ $isPendingEvent ? 'from-amber-600 to-amber-800' : ($isRemoteEvent ? 'from-sky-600 to-sky-800' : 'from-slate-500 to-slate-700') }} p-2.5 text-white sm:w-24 sm:p-3">
                                                 <span
                                                     class="text-[10px] font-bold uppercase tracking-widest {{ $isPendingEvent ? 'text-amber-200/80' : ($isRemoteEvent ? 'text-sky-200/80' : 'text-slate-300/80') }} sm:text-[11px]">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'l') }}</span>
                                                 <span

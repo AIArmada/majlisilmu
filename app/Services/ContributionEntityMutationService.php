@@ -19,6 +19,7 @@ use App\Enums\Honorific;
 use App\Enums\InstitutionType;
 use App\Enums\PostNominal;
 use App\Enums\PreNominal;
+use App\Enums\ReferencePartType;
 use App\Enums\ReferenceType;
 use App\Enums\SocialMediaPlatform;
 use App\Enums\TagType;
@@ -263,6 +264,10 @@ class ContributionEntityMutationService
                 'title' => ['sometimes', 'string', 'max:255'],
                 'author' => ['nullable', 'string', 'max:255'],
                 'type' => ['sometimes', Rule::in($this->enumValues(ReferenceType::class))],
+                'parent_reference_id' => ['nullable', 'uuid', Rule::exists('references', 'id')->whereNull('parent_reference_id')->where('type', ReferenceType::Book->value)],
+                'part_type' => ['nullable', Rule::in($this->enumValues(ReferencePartType::class))],
+                'part_number' => ['nullable', 'string', 'max:255'],
+                'part_label' => ['nullable', 'string', 'max:255'],
                 'publication_year' => ['nullable', 'string', 'max:255'],
                 'publisher' => ['nullable', 'string', 'max:255'],
                 'description' => ['nullable', 'string'],
@@ -529,6 +534,10 @@ class ContributionEntityMutationService
             'title' => $payload['title'] ?? $reference->title,
             'author' => array_key_exists('author', $payload) ? $this->normalizeOptionalString($payload['author']) : $reference->author,
             'type' => array_key_exists('type', $payload) ? $this->normalizeReferenceType($payload['type']) : $reference->type,
+            'parent_reference_id' => array_key_exists('parent_reference_id', $payload) ? $this->normalizeOptionalString($payload['parent_reference_id']) : $reference->parent_reference_id,
+            'part_type' => array_key_exists('part_type', $payload) ? $this->normalizeOptionalString($payload['part_type']) : $reference->part_type,
+            'part_number' => array_key_exists('part_number', $payload) ? $this->normalizeOptionalString($payload['part_number']) : $reference->part_number,
+            'part_label' => array_key_exists('part_label', $payload) ? $this->normalizeOptionalString($payload['part_label']) : $reference->part_label,
             'publication_year' => array_key_exists('publication_year', $payload) ? $this->normalizeOptionalString($payload['publication_year']) : $reference->publication_year,
             'publisher' => array_key_exists('publisher', $payload) ? $this->normalizeOptionalString($payload['publisher']) : $reference->publisher,
             'description' => array_key_exists('description', $payload) ? $payload['description'] : $reference->description,
@@ -685,6 +694,10 @@ class ContributionEntityMutationService
             'title' => $reference->title,
             'author' => $reference->author,
             'type' => $reference->type,
+            'parent_reference_id' => $reference->parent_reference_id,
+            'part_type' => $reference->part_type,
+            'part_number' => $reference->part_number,
+            'part_label' => $reference->part_label,
             'publication_year' => $reference->publication_year,
             'publisher' => $reference->publisher,
             'description' => $reference->description,

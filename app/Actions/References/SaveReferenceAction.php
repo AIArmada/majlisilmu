@@ -32,6 +32,12 @@ final readonly class SaveReferenceAction
             'title' => $this->normalizeRequiredString($data['title'] ?? $reference->title, 'Reference'),
             'author' => array_key_exists('author', $data) ? $this->normalizeOptionalString($data['author']) : $reference->author,
             'type' => array_key_exists('type', $data) ? $this->normalizeReferenceType($data['type']) : $this->normalizeReferenceType($reference->type),
+            'parent_reference_id' => array_key_exists('parent_reference_id', $data)
+                ? $this->normalizeOptionalString($data['parent_reference_id'])
+                : $reference->parent_reference_id,
+            'part_type' => array_key_exists('part_type', $data) ? $this->normalizeOptionalString($data['part_type']) : $reference->part_type,
+            'part_number' => array_key_exists('part_number', $data) ? $this->normalizeOptionalString($data['part_number']) : $reference->part_number,
+            'part_label' => array_key_exists('part_label', $data) ? $this->normalizeOptionalString($data['part_label']) : $reference->part_label,
             'publication_year' => array_key_exists('publication_year', $data)
                 ? $this->normalizeOptionalString($data['publication_year'])
                 : $reference->publication_year,

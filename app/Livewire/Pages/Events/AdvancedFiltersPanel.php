@@ -586,9 +586,8 @@ class AdvancedFiltersPanel extends Component implements HasForms
             return [];
         }
 
-        return $this->pluckOptions(
+        return $this->referenceOptionsFromQuery(
             Reference::query()->where('is_active', true)->whereIn('id', $values)->orderBy('title'),
-            'title',
             count($values),
         );
     }
@@ -875,14 +874,50 @@ class AdvancedFiltersPanel extends Component implements HasForms
      */
     private function searchReferenceOptions(string $search): array
     {
-        return $this->pluckOptions(
-            Reference::query()
-                ->where('is_active', true)
-                ->tap(fn (Builder $query): Builder => $this->applySearchConstraint($query, 'title', $search))
-                ->orderBy('title'),
-            'title',
-            50,
-        );
+        $query = Reference::query()
+            ->where('is_active', true)
+            ->tap(fn (Builder $query): Builder => $this->applyReferenceSearchConstraint($query, $search))
+            ->orderBy('title');
+
+        return $this->referenceOptionsFromQuery($query, 50);
+    }
+
+    /**
+     * @param  Builder<Reference>  $query
+     * @return array<string, string>
+     */
+    private function referenceOptionsFromQuery(Builder $query, int $limit): array
+    {
+        /** @var Collection<int, Reference> $references */
+        $references = $query
+            ->limit($limit)
+            ->get(['id', 'title', 'parent_reference_id', 'part_type', 'part_number', 'part_label']);
+
+        return $references
+            ->mapWithKeys(fn (Reference $reference): array => [(string) $reference->id => $reference->displayTitle()])
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Reference>  $query
+     * @return Builder<Reference>
+     */
+    private function applyReferenceSearchConstraint(Builder $query, string $search): Builder
+    {
+        $normalizedSearch = trim($search);
+
+        if ($normalizedSearch === '') {
+            return $query;
+        }
+
+        $operator = $this->databaseLikeOperator();
+
+        return $query->where(function (Builder $referenceQuery) use ($operator, $normalizedSearch): void {
+            $referenceQuery
+                ->where('title', $operator, "%{$normalizedSearch}%")
+                ->orWhere('part_label', $operator, "%{$normalizedSearch}%")
+                ->orWhere('part_number', $operator, "%{$normalizedSearch}%");
+        });
     }
 
     /**

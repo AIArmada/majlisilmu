@@ -91,8 +91,14 @@ class SearchController extends FrontendController
         'id',
         'slug',
         'title',
+        'display_title',
         'author',
         'type',
+        'parent_reference_id',
+        'part_type',
+        'part_number',
+        'part_label',
+        'is_part',
         'publisher',
         'publication_year',
         'is_active',
@@ -733,7 +739,7 @@ class SearchController extends FrontendController
         title: 'List public references',
         description: 'Returns a paginated directory of active, verified references. Supports search by title, author, or publisher, and a following filter.',
     )]
-    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, title, author, type, publisher, publication_year, is_active, events_count, front_cover_url, is_following.', required: false, type: 'string', infer: false, example: 'id,title,author,front_cover_url')]
+    #[QueryParameter('fields', 'Optional comma-separated top-level list fields to return. Supported fields: id, slug, title, display_title, author, type, parent_reference_id, part_type, part_number, part_label, is_part, publisher, publication_year, is_active, events_count, front_cover_url, is_following.', required: false, type: 'string', infer: false, example: 'id,display_title,author,front_cover_url')]
     #[QueryParameter('search', 'Optional free-text search across public reference titles, authors, and publishers.', required: false, type: 'string', infer: false, example: 'Riyadus Solihin')]
     #[QueryParameter('following', 'When authenticated, restrict results to references followed by the current user.', required: false, type: 'boolean', infer: false, example: false)]
     #[QueryParameter('page', 'Pagination page number.', required: false, type: 'integer', infer: false, default: 1, example: 1)]
@@ -795,6 +801,7 @@ class SearchController extends FrontendController
         title: 'Get a public reference',
         description: 'Returns the public reference detail payload by slug or UUID, including upcoming and past events linked to that reference.',
     )]
+    #[QueryParameter('include_all_parts', 'For a child book part, include events from the whole book family instead of only the exact part.', required: false, type: 'boolean', infer: false, example: false)]
     public function showReference(Request $request, string $referenceKey): JsonResponse
     {
         $user = $this->currentUser($request);
@@ -813,10 +820,17 @@ class SearchController extends FrontendController
 
         abort_unless($user instanceof User ? $user->can('view', $record) : ($record->is_active && $record->status === 'verified'), 404);
 
+        $referenceEventIds = $record->isRootReference() || $request->boolean('include_all_parts')
+            ? $record->familyReferenceIds()
+            : $record->defaultEventReferenceIds();
+
         $upcomingPerPage = max(1, min($request->integer('upcoming_per_page', 10), 50));
         $upcomingEvents = $this->limitedEventPayloadWithTotal(
-            $record->events()
+            Event::query()
                 ->active()
+                ->whereHas('references', function (Builder $referenceQuery) use ($referenceEventIds): void {
+                    $referenceQuery->whereIn('references.id', $referenceEventIds);
+                })
                 ->where('starts_at', '>=', $now)
                 ->with([
                     'institution',
@@ -836,8 +850,11 @@ class SearchController extends FrontendController
 
         $pastPerPage = max(1, min($request->integer('past_per_page', 10), 50));
         $pastEvents = $this->limitedEventPayloadWithTotal(
-            $record->events()
+            Event::query()
                 ->active()
+                ->whereHas('references', function (Builder $referenceQuery) use ($referenceEventIds): void {
+                    $referenceQuery->whereIn('references.id', $referenceEventIds);
+                })
                 ->where('starts_at', '<', $now)
                 ->with([
                     'institution',

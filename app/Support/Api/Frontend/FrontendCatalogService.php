@@ -175,15 +175,20 @@ class FrontendCatalogService
 
         if ($normalizedSearch !== '') {
             $operator = config('database.default') === 'pgsql' ? 'ILIKE' : 'LIKE';
-            $query->where('title', $operator, '%'.$normalizedSearch.'%');
+            $query->where(function (Builder $referenceQuery) use ($normalizedSearch, $operator): void {
+                $referenceQuery
+                    ->where('title', $operator, '%'.$normalizedSearch.'%')
+                    ->orWhere('part_label', $operator, '%'.$normalizedSearch.'%')
+                    ->orWhere('part_number', $operator, '%'.$normalizedSearch.'%');
+            });
         }
 
         return $query
             ->limit($limit)
-            ->get(['id', 'title'])
+            ->get(['id', 'title', 'parent_reference_id', 'part_type', 'part_number', 'part_label'])
             ->map(fn (Reference $reference): array => [
                 'id' => (string) $reference->id,
-                'label' => (string) $reference->title,
+                'label' => $reference->displayTitle(),
             ])
             ->all();
     }

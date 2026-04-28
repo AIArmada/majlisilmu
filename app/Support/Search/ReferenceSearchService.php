@@ -182,7 +182,7 @@ class ReferenceSearchService
         return Reference::query()
             ->active()
             ->where('status', 'verified')
-            ->select(['id', 'title', 'author', 'publisher', 'description', 'slug'])
+            ->select(['id', 'title', 'author', 'publisher', 'description', 'slug', 'part_type', 'part_number', 'part_label'])
             ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateFilter($query, $normalizedSearch))
             ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateOrdering($query, $normalizedSearch))
             ->limit($this->typesenseResultLimit())
@@ -190,6 +190,8 @@ class ReferenceSearchService
             ->map(function (Reference $reference) use ($normalizedSearch): array {
                 $candidates = array_values(array_filter([
                     $this->normalizeText((string) $reference->title),
+                    $this->normalizeText((string) $reference->part_label),
+                    $this->normalizeText((string) $reference->part_number),
                     $this->normalizeText((string) $reference->author),
                     $this->normalizeText((string) $reference->publisher),
                     $this->normalizeText((string) $reference->slug),
@@ -240,6 +242,9 @@ class ReferenceSearchService
                 $model->qualifyColumn('publisher'),
                 $model->qualifyColumn('description'),
                 $model->qualifyColumn('slug'),
+                $model->qualifyColumn('part_type'),
+                $model->qualifyColumn('part_number'),
+                $model->qualifyColumn('part_label'),
             ])
             ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateFilter($builder, $normalizedSearch))
             ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateOrdering($builder, $normalizedSearch))
@@ -248,6 +253,8 @@ class ReferenceSearchService
             ->map(function (Reference $reference) use ($normalizedSearch): array {
                 $candidates = array_values(array_filter([
                     $this->normalizeText((string) $reference->title),
+                    $this->normalizeText((string) $reference->part_label),
+                    $this->normalizeText((string) $reference->part_number),
                     $this->normalizeText((string) $reference->author),
                     $this->normalizeText((string) $reference->publisher),
                     $this->normalizeText((string) $reference->slug),
@@ -296,6 +303,8 @@ class ReferenceSearchService
                 ->where('references.title', $operator, "%{$normalizedSearch}%")
                 ->orWhere('references.author', $operator, "%{$normalizedSearch}%")
                 ->orWhere('references.publisher', $operator, "%{$normalizedSearch}%")
+                ->orWhere('references.part_label', $operator, "%{$normalizedSearch}%")
+                ->orWhere('references.part_number', $operator, "%{$normalizedSearch}%")
                 ->orWhere('references.slug', $operator, "%{$normalizedSearch}%")
                 ->orWhere('references.description', $operator, "%{$normalizedSearch}%")
                 ->orWhere('references.description', $operator, $collapsedWildcardSearch);
@@ -315,6 +324,8 @@ class ReferenceSearchService
                             ->where('references.title', $operator, "%{$token}%")
                             ->orWhere('references.author', $operator, "%{$token}%")
                             ->orWhere('references.publisher', $operator, "%{$token}%")
+                            ->orWhere('references.part_label', $operator, "%{$token}%")
+                            ->orWhere('references.part_number', $operator, "%{$token}%")
                             ->orWhere('references.slug', $operator, "%{$token}%")
                             ->orWhere('references.description', $operator, "%{$token}%");
                     });
@@ -343,6 +354,8 @@ class ReferenceSearchService
                     ->orWhere('references.title', $operator, $pattern)
                     ->orWhere('references.author', $operator, $pattern)
                     ->orWhere('references.publisher', $operator, $pattern)
+                    ->orWhere('references.part_label', $operator, $pattern)
+                    ->orWhere('references.part_number', $operator, $pattern)
                     ->orWhere('references.slug', $operator, $pattern)
                     ->orWhere('references.description', $operator, $pattern);
             }
@@ -385,7 +398,7 @@ class ReferenceSearchService
 
         $rawResults = Reference::search($search)
             ->options([
-                'query_by' => 'title,author,publisher,description,slug,search_text',
+                'query_by' => 'title,author,publisher,description,slug,part_label,part_number,search_text',
                 'per_page' => $this->typesenseResultLimit(),
                 ...$options,
             ])

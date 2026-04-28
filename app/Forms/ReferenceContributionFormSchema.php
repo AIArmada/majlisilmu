@@ -2,13 +2,16 @@
 
 namespace App\Forms;
 
+use App\Enums\ReferencePartType;
 use App\Enums\ReferenceType;
+use App\Models\Reference;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 
 class ReferenceContributionFormSchema
 {
@@ -31,7 +34,40 @@ class ReferenceContributionFormSchema
                         ->label(__('Reference Type'))
                         ->options(ReferenceType::class)
                         ->default(ReferenceType::Book->value)
-                        ->required(),
+                        ->required()
+                        ->live(),
+                    Select::make('parent_reference_id')
+                        ->label(__('Parent Book'))
+                        ->helperText(__('Use this when the reference is a specific jilid, bahagian, or volume of another book.'))
+                        ->options(fn (): array => Reference::query()
+                            ->where('type', ReferenceType::Book->value)
+                            ->whereNull('parent_reference_id')
+                            ->orderBy('title')
+                            ->pluck('title', 'id')
+                            ->all())
+                        ->searchable()
+                        ->preload()
+                        ->live()
+                        ->visible(fn (Get $get): bool => in_array($get('type'), [ReferenceType::Book, ReferenceType::Book->value], true))
+                        ->dehydrated(fn (Get $get): bool => in_array($get('type'), [ReferenceType::Book, ReferenceType::Book->value], true)),
+                    Select::make('part_type')
+                        ->label(__('Part Type'))
+                        ->options(ReferencePartType::class)
+                        ->default(ReferencePartType::Jilid->value)
+                        ->visible(fn (Get $get): bool => filled($get('parent_reference_id')))
+                        ->dehydrated(fn (Get $get): bool => filled($get('parent_reference_id'))),
+                    TextInput::make('part_number')
+                        ->label(__('Part Number'))
+                        ->placeholder('2')
+                        ->maxLength(255)
+                        ->visible(fn (Get $get): bool => filled($get('parent_reference_id')))
+                        ->dehydrated(fn (Get $get): bool => filled($get('parent_reference_id'))),
+                    TextInput::make('part_label')
+                        ->label(__('Part Label'))
+                        ->helperText(__('Optional display label, e.g. Jilid 2 or Bahagian Akhir.'))
+                        ->maxLength(255)
+                        ->visible(fn (Get $get): bool => filled($get('parent_reference_id')))
+                        ->dehydrated(fn (Get $get): bool => filled($get('parent_reference_id'))),
                     TextInput::make('publication_year')
                         ->label(__('Publication Year'))
                         ->maxLength(255),
