@@ -12,6 +12,7 @@ use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\EventSubmission;
 use App\Models\Institution;
+use App\Models\NotificationMessage;
 use App\Models\Reference;
 use App\Models\Registration;
 use App\Models\SavedSearch;
@@ -53,7 +54,7 @@ it('does not expose the legacy papan pemuka dashboard URL', function () {
         ->assertNotFound();
 });
 
-it('renders the attendee-first planner dashboard without saved search or digest panels', function () {
+it('renders the reference-inspired user dashboard with real saved search and notification panels', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
@@ -134,59 +135,69 @@ it('renders the attendee-first planner dashboard without saved search or digest 
         'name' => 'Other User Search',
     ]);
 
+    NotificationMessage::factory()->for($user, 'notifiable')->create([
+        'data' => [
+            'title' => 'Reminder majlis akan datang',
+            'body' => 'Kuliah Maghrib bermula dalam 2 jam lagi.',
+        ],
+        'action_url' => route('events.show', $goingEvent),
+        'occurred_at' => now()->subHour(),
+    ]);
+
     $response = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
         ->get('/dashboard');
 
     $response->assertOk()
         ->assertSee('Dashboard')
-        ->assertSee('Track saved events, attendance plans, and followed knowledge sources from one place.')
-        ->assertSee('Share outcomes')
-        ->assertSee('Private metrics from visits and responses after your shared links are opened.')
-        ->assertSee('Next on your planner')
-        ->assertDontSee('Attendee Planner')
+        ->assertSee('This is my knowledge journey.')
+        ->assertSee('Keep seeking knowledge steadily and share its benefit.')
+        ->assertSee('My Events')
+        ->assertSee('Latest Notifications')
+        ->assertSee('Quick Actions')
+        ->assertSee('Recommended for you')
         ->assertSee('Home')
         ->assertSee('Workspaces')
         ->assertSee('Account')
         ->assertSee('My Dashboard')
         ->assertSee('Inbox')
         ->assertSee('My Contributions')
-        ->assertDontSee('Jump to section')
-        ->assertSee('Overview Calendar')
+        ->assertDontSee('Planner menu')
+        ->assertDontSee('Overview Calendar')
         ->assertDontSee('Upcoming Agenda')
         ->assertDontSee('What needs your attention next')
-        ->assertDontSee('Find more')
-        ->assertSee('Settings')
         ->assertDontSee('Submitted Events')
         ->assertDontSee('Recent Check-ins')
         ->assertDontSee('Submitted + Check-ins')
         ->assertDontSee('Going + Registered')
-        ->assertDontSee('Saved Searches')
         ->assertSee('Saved Dashboard Event')
         ->assertSee('Going Dashboard Event')
-        ->assertSee('Browse speakers')
-        ->assertSee('Browse references')
-        ->assertSee('Browse institutions')
-        ->assertDontSee('Registered Dashboard Event')
-        ->assertDontSee('Submitted Dashboard Event')
+        ->assertSee('Kuliah KL Daily')
+        ->assertSee('Reminder majlis akan datang')
+        ->assertSee('Find nearby events')
+        ->assertSee('My Contribution')
         ->assertDontSee('Checked In Dashboard Event')
         ->assertDontSee('My Saved Searches')
-        ->assertDontSee('Notification Preferences')
-        ->assertDontSee('Kuliah KL Daily')
-        ->assertDontSee('Institution Managed Event')
-        ->assertDontSee('External Event');
+        ->assertDontSee('Notification Preferences');
 
-    expect(strpos((string) $response->getContent(), 'id="planner-saved"'))->toBeLessThan(strpos((string) $response->getContent(), 'id="planner-going"'));
+    $html = (string) $response->getContent();
+    $majlisSayaSection = str($html)->between('id="majlis-saya"', 'id="ikuti"')->toString();
+
+    expect($majlisSayaSection)
+        ->toContain('Saved Dashboard Event')
+        ->toContain('Going Dashboard Event')
+        ->not->toContain('Registered Dashboard Event')
+        ->not->toContain('Submitted Dashboard Event');
 
     $response->assertDontSee('Other User Search');
     $response->assertDontSee('x-show="cell.entries.length > 0"', false);
     $response->assertDontSee("entry.role_badges.map(badge => badge.label).join(' • ')", false);
     $response->assertDontSee('bg-emerald-50/80', false);
 
-    expect(substr_count((string) $response->getContent(), route('dashboard.dawah-impact')))->toBe(1);
+    expect($html)->toContain(route('dashboard.dawah-impact'));
 });
 
-it('shows the planner sidebar and followed entity lists on the dashboard', function () {
+it('shows the redesigned followed-entity category cards on the dashboard', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
@@ -227,34 +238,26 @@ it('shows the planner sidebar and followed entity lists on the dashboard', funct
         ->get('/dashboard');
 
     $response->assertOk()
-        ->assertSee('Planner menu')
-        ->assertSee('Jump to a section')
-        ->assertSee('hidden md:block', false)
-        ->assertSee('planner-calendar', false)
-        ->assertSee('planner-saved', false)
-        ->assertSee('planner-going', false)
-        ->assertSee('planner-speakers', false)
-        ->assertSee('planner-references', false)
-        ->assertSee('planner-institutions', false)
+        ->assertDontSee('Planner menu')
+        ->assertDontSee('planner-calendar', false)
+        ->assertSee('id="ikuti"', false)
+        ->assertSee('My Events')
+        ->assertSee('Follow')
+        ->assertSee('Institution')
+        ->assertSee('Speaker')
         ->assertSee('Saved')
         ->assertSee('Going')
-        ->assertSee('Following Speakers')
-        ->assertSee('Following References')
-        ->assertSee('Following Institutions')
         ->assertSee('Sidebar Saved Event')
-        ->assertSee('Sidebar Going Event')
-        ->assertSee('Menu Speaker')
-        ->assertSee('Menu Reference')
-        ->assertSee('Masjid Al-Makmur');
+        ->assertSee('Sidebar Going Event');
 
     $this->withSession(['locale' => 'ms'])
         ->actingAs($user)
         ->get('/dashboard')
         ->assertOk()
-        ->assertSee('Menu perancang')
-        ->assertSee('Pergi ke bahagian')
+        ->assertSee('Ikuti')
+        ->assertSee('Masjid dan surau yang saya ikuti')
+        ->assertSee('Kitab dan bahan bacaan yang saya ikuti')
         ->assertSee('Penceramah Diikuti')
-        ->assertSee('Rujukan Diikuti')
         ->assertSee('Institusi Diikuti');
 });
 
@@ -301,7 +304,7 @@ it('shows a featured next event without repeating it inside an otherwise empty a
         ->assertDontSee('No events are on your immediate agenda.');
 });
 
-it('translates the attendee dashboard in Malay with the lean attendee-first sections', function () {
+it('renders the redesigned dashboard in Malay with reference-inspired sections', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create();
     $otherUser = User::factory()->create();
@@ -333,19 +336,25 @@ it('translates the attendee dashboard in Malay with the lean attendee-first sect
 
     $response->assertOk()
         ->assertSee('Dashboard')
-        ->assertSee('Pantau majlis disimpan, rancangan kehadiran, dan sumber ilmu diikuti dari satu tempat.')
-        ->assertSee('Kesan perkongsian')
-        ->assertSee('Seterusnya dalam perancang')
+        ->assertSee('Ini perjalanan ilmu saya.')
+        ->assertSee('Teruskan istiqamah mencari ilmu dan sebarkan manfaatnya.')
+        ->assertSee('Majlis Saya')
+        ->assertSee('Notifikasi Terkini')
+        ->assertSee('Tindakan Pantas')
+        ->assertSee('Sumbangan Saya')
         ->assertDontSee('Perancang Kehadiran')
-        ->assertSee('Menu perancang')
-        ->assertSee('Pergi ke bahagian')
         ->assertSee('Dashboard')
         ->assertSee('Urus Institusi')
         ->assertSee('Majlis Akan Hadir')
-        ->assertDontSee('Majlis Dihantar Sendiri')
         ->assertDontSee('Yang perlu anda urus selepas ini')
         ->assertDontSee('Lihat lagi')
         ->assertDontSee('Approved');
+
+    $majlisSayaSection = str((string) $response->getContent())->between('id="majlis-saya"', 'id="ikuti"')->toString();
+
+    expect($majlisSayaSection)
+        ->toContain('Majlis Akan Hadir')
+        ->not->toContain('Majlis Dihantar Sendiri');
 
     $html = $response->getContent();
 
@@ -362,7 +371,7 @@ it('translates the attendee dashboard in Malay with the lean attendee-first sect
         ->and($institutionDashboardMenuText)->toBe('Urus Institusi');
 });
 
-it('paginates planner buckets when counts exceed the preview size', function () {
+it('paginates redesigned majlis cards when counts exceed the dashboard page size', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
     $institution = Institution::factory()->create();
@@ -380,25 +389,23 @@ it('paginates planner buckets when counts exceed the preview size', function () 
 
     $response = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
-        ->get('/dashboard?going_page=2');
+        ->get('/dashboard?majlis_page=2');
 
     $response->assertOk();
 
     $html = (string) $response->getContent();
 
-    $goingSectionText = str($html)
-        ->after('id="planner-going"')
+    $majlisSectionText = str($html)
+        ->after('id="majlis-saya"')
         ->toString();
 
     expect($html)->toContain('Going Page Event 8');
-    expect($goingSectionText)->toContain('Going Page Event 4')
-        ->toContain('Going Page Event 6')
+    expect($majlisSectionText)->toContain('Going Page Event 7')
+        ->toContain('Going Page Event 8')
         ->not->toContain('Going Page Event 1')
-        ->not->toContain('Going Page Event 7');
+        ->not->toContain('Going Page Event 6');
     expect($html)->toContain('window.scrollTo({ top: targetTop, left: 0, behavior: &#039;auto&#039; })')
         ->not->toContain('scrollIntoView()');
-
-    expect(strpos($html, 'id="planner-saved"'))->toBeLessThan(strpos($html, 'id="planner-going"'));
 });
 
 it('does not expose the removed legacy account settings urls', function () {

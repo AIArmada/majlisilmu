@@ -1,3 +1,28 @@
+# User Dashboard Full Visual Redesign
+
+- [x] Audit the current `/dashboard` route, Livewire component, Blade view, tests, and visual reference
+- [x] Rebuild the dashboard around the reference layout: hero, six stats, my events, following, saved searches, impact, notifications, actions, recommendation, and bottom CTA
+- [x] Keep the UI backed by real saved/going/following/search/notification/share-impact data
+- [x] Update focused dashboard tests and locale strings affected by the new structure
+- [x] Run formatter, focused dashboard tests, PHPStan, and browser verification
+- [x] Record final review notes and verification results
+
+## Review
+
+- Changes:
+  - Rebuilt the user dashboard into the reference-inspired layout with a soft hero, six KPI tiles, My Events card grid, following categories, saved searches, impact summary, notification panel, quick actions, invitation card, recommendation card, and bottom CTA.
+  - Added Livewire computed data for recent saved searches, recent notifications, unread notification count, recommended events, and paginated merged My Events cards.
+  - Added English translations for the new Malay-first dashboard copy and refreshed dashboard feature assertions for the new structure.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => 28 passed, 259 assertions
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `php artisan view:clear && php artisan view:cache` => pass
+  - `php -r 'json_decode(...)'` for `resources/lang/en.json`, `resources/lang/ms.json`, and `resources/lang/ms_MY.json` => pass
+  - `git diff --check` => pass
+  - `npm run build` => pass
+  - Browser smoke: logged into `https://majlisilmu.test/dashboard` as a disposable local Codex user and captured desktop plus narrow screenshots after the Vite rebuild
+
 # Dashboard End-To-End Polish
 
 - [x] Audit the current `/dashboard` route, Livewire component, view, translations, and regression tests

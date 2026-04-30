@@ -6,8 +6,10 @@ use App\Models\Event;
 use App\Models\EventCheckin;
 use App\Models\EventSubmission;
 use App\Models\Institution;
+use App\Models\NotificationMessage;
 use App\Models\Reference;
 use App\Models\Registration;
+use App\Models\SavedSearch;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ShareTrackingAnalyticsService;
@@ -30,6 +32,8 @@ class UserDashboard extends Component
     use WithPagination;
 
     private const int AGENDA_PER_PAGE = 6;
+
+    private const int MAJLIS_CARD_PER_PAGE = 6;
 
     private const int PLANNER_BUCKET_PER_PAGE = 3;
 
@@ -138,6 +142,128 @@ class UserDashboard extends Component
             ->get();
 
         return $speakers;
+    }
+
+    /**
+     * @return Collection<int, SavedSearch>
+     */
+    #[Computed]
+    public function recentSavedSearches(): Collection
+    {
+        /** @var Collection<int, SavedSearch> $savedSearches */
+        $savedSearches = $this->user()
+            ->savedSearches()
+            ->latest()
+            ->limit(3)
+            ->get();
+
+        return $savedSearches;
+    }
+
+    /**
+     * @return Collection<int, NotificationMessage>
+     */
+    #[Computed]
+    public function recentNotifications(): Collection
+    {
+        /** @var Collection<int, NotificationMessage> $notifications */
+        $notifications = $this->user()
+            ->notificationMessages()
+            ->visibleInInbox()
+            ->limit(3)
+            ->get();
+
+        return $notifications;
+    }
+
+    #[Computed]
+    public function unreadNotificationCount(): int
+    {
+        return $this->user()
+            ->notificationMessages()
+            ->visibleInInbox()
+            ->whereNull('read_at')
+            ->count();
+    }
+
+    #[Computed]
+    public function recommendedEvent(): ?Event
+    {
+        /** @var list<string> $excludedEventIds */
+        $excludedEventIds = $this->savedEvents()
+            ->pluck('id')
+            ->merge($this->goingEvents()->pluck('id'))
+            ->filter(fn (mixed $id): bool => is_string($id) && $id !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        /** @var ?Event $event */
+        $event = Event::query()
+            ->active()
+            ->with($this->plannerEventRelations())
+            ->when($excludedEventIds !== [], fn ($query) => $query->whereNotIn('id', $excludedEventIds))
+            ->where('starts_at', '>=', now('UTC'))
+            ->orderBy('starts_at')
+            ->first();
+
+        return $event;
+    }
+
+    /**
+     * @return Collection<int, array{event: Event, roles: list<string>}>
+     */
+    #[Computed]
+    public function majlisCards(): Collection
+    {
+        /** @var Collection<string, array{event: Event, roles: list<string>}> $cards */
+        $cards = collect();
+
+        foreach ($this->savedEvents() as $event) {
+            $roles = ['saved'];
+
+            if ($event->starts_at instanceof CarbonInterface && $event->starts_at->isFuture()) {
+                $roles[] = 'reminder';
+            }
+
+            $cards->put($event->id, [
+                'event' => $event,
+                'roles' => $roles,
+            ]);
+        }
+
+        foreach ($this->goingEvents() as $event) {
+            $card = $cards->get($event->id, [
+                'event' => $event,
+                'roles' => [],
+            ]);
+            $roles = $card['roles'];
+            $roles[] = 'going';
+
+            if ($event->starts_at instanceof CarbonInterface && $event->starts_at->isFuture()) {
+                $roles[] = 'reminder';
+            }
+
+            $card['roles'] = collect($roles)->unique()->values()->all();
+            $cards->put($event->id, $card);
+        }
+
+        /** @var Collection<int, array{event: Event, roles: list<string>}> $sorted */
+        $sorted = $cards
+            ->values()
+            ->sortBy(fn (array $card): int => $card['event']->starts_at?->getTimestamp() ?? PHP_INT_MAX)
+            ->values();
+
+        return $sorted;
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, array{event: Event, roles: list<string>}>
+     */
+    #[Computed]
+    public function paginatedMajlisCards(): LengthAwarePaginator
+    {
+        return $this->paginateCollection($this->majlisCards(), self::MAJLIS_CARD_PER_PAGE, 'majlis_page');
     }
 
     /**
