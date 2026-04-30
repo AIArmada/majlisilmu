@@ -7,6 +7,7 @@ namespace App\Support\Moderation;
 use App\Models\Event;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
+use App\States\EventStatus\Draft;
 use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
@@ -37,6 +38,13 @@ final class EventModerationWorkflow
     public static function availableActions(Event $event): array
     {
         $actions = [];
+
+        if ($event->status instanceof Draft) {
+            $actions['submit_for_moderation'] = self::definition(
+                label: 'Submit for Moderation',
+                description: 'Move this draft event to pending so moderators can review it.',
+            );
+        }
 
         if ($event->status instanceof Pending) {
             $actions['approve'] = self::definition(

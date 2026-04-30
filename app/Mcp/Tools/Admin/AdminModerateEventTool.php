@@ -60,6 +60,7 @@ class AdminModerateEventTool extends AbstractAdminTool
         return [
             'record_key' => $schema->string()->required()->min(1),
             'action' => $schema->string()->required()->enum([
+                'submit_for_moderation',
                 'approve',
                 'request_changes',
                 'reject',

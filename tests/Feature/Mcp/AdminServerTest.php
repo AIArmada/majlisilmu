@@ -1119,6 +1119,38 @@ it('moderates events through the admin MCP workflow tool', function () {
     expect($review?->decision)->toBe('remoderated');
 });
 
+it('submits draft events for moderation through the admin MCP workflow tool', function () {
+    $admin = adminMcpUser('super_admin');
+    $event = Event::factory()->create([
+        'status' => 'draft',
+        'published_at' => null,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetEventModerationSchemaTool::class, [
+            'record_key' => $event->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.defaults.action', 'submit_for_moderation')
+            ->where('data.schema.fields.0.allowed_values', ['submit_for_moderation'])
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminModerateEventTool::class, [
+            'record_key' => $event->getKey(),
+            'action' => 'submit_for_moderation',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.resource.key', 'events')
+            ->where('data.record.route_key', $event->getRouteKey())
+            ->where('data.record.attributes.status', 'pending')
+            ->etc());
+
+    expect((string) ($event->fresh()?->status))->toBe('pending');
+});
+
 it('reviews contribution requests through the admin MCP workflow tool', function () {
     $admin = adminMcpUser('super_admin');
     $speaker = Speaker::factory()->create([
@@ -2486,6 +2518,7 @@ it('emulates production yasin create flow with validate-only then actual create'
         'institution_id' => (string) $institution->getKey(),
         'registration_required' => false,
         'registration_mode' => RegistrationMode::Event->value,
+        'status' => 'pending',
         'is_featured' => false,
         'is_active' => true,
     ];
@@ -2517,14 +2550,108 @@ it('emulates production yasin create flow with validate-only then actual create'
             ->where('data.record.attributes.title', 'Majlis Bacaan Yasin')
             ->where('data.record.attributes.starts_on_local_date', '2026-05-07')
             ->where('data.record.attributes.prayer_display_text', 'Selepas Maghrib')
+            ->where('data.record.attributes.status', 'pending')
+            ->etc());
+
+    $createdEvent = Event::query()
+        ->where('title', 'Majlis Bacaan Yasin')
+        ->whereDate('starts_at', '2026-05-07')
+        ->firstOrFail();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetEventModerationSchemaTool::class, [
+            'record_key' => (string) $createdEvent->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.defaults.action', 'approve')
+            ->where('data.schema.fields.0.allowed_values', ['approve', 'request_changes', 'reject', 'cancel'])
             ->etc());
 
     expect(
-        Event::query()
-            ->where('title', 'Majlis Bacaan Yasin')
-            ->whereDate('starts_at', '2026-05-07')
-            ->exists()
-    )->toBeTrue();
+        (string) ($createdEvent->fresh()?->status)
+    )->toBe('pending');
+});
+
+it('allows admin event create payload to control workflow-ready status', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $basePayload = [
+        'description' => '<p>Workflow status payload test</p>',
+        'event_date' => '2026-05-08',
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'is_muslim_only' => false,
+        'event_type' => [EventType::BacaanYasin->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => (string) $institution->getKey(),
+        'institution_id' => (string) $institution->getKey(),
+        'registration_required' => false,
+        'registration_mode' => RegistrationMode::Event->value,
+        'is_featured' => false,
+        'is_active' => true,
+    ];
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetWriteSchemaTool::class, [
+            'resource_key' => 'events',
+            'operation' => 'create',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'status'), 'allowed_values') === ['draft', 'pending', 'approved'])
+            ->where('data.schema.fields', fn ($fields): bool => data_get(collect($fields)->firstWhere('name', 'status'), 'default') === 'draft')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'payload' => array_replace($basePayload, [
+                'title' => 'Admin MCP Draft Status Payload Event',
+                'status' => 'draft',
+            ]),
+        ])
+        ->assertOk();
+
+    $draftEvent = Event::query()->where('title', 'Admin MCP Draft Status Payload Event')->firstOrFail();
+
+    expect((string) $draftEvent->status)->toBe('draft')
+        ->and($draftEvent->published_at)->toBeNull();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetEventModerationSchemaTool::class, [
+            'record_key' => (string) $draftEvent->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.fields.0.allowed_values', ['submit_for_moderation'])
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'payload' => array_replace($basePayload, [
+                'title' => 'Admin MCP Approved Status Payload Event',
+                'status' => 'approved',
+            ]),
+        ])
+        ->assertOk();
+
+    $approvedEvent = Event::query()->where('title', 'Admin MCP Approved Status Payload Event')->firstOrFail();
+
+    expect((string) $approvedEvent->status)->toBe('approved')
+        ->and($approvedEvent->published_at)->not->toBeNull();
 });
 
 it('surfaces admin event validation failures through MCP write tools', function () {

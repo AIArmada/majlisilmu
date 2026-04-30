@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\ModerationService;
 use App\States\EventStatus\Approved;
 use App\States\EventStatus\Cancelled;
+use App\States\EventStatus\Draft;
 use App\States\EventStatus\NeedsChanges;
 use App\States\EventStatus\Pending;
 use App\States\EventStatus\Rejected;
@@ -37,6 +38,7 @@ class ViewEvent extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->getSubmitForModerationAction(),
             $this->getApproveAction(),
             $this->getRequestChangesAction(),
             $this->getCancelAction(),
@@ -125,6 +127,28 @@ class ViewEvent extends ViewRecord
                 $this->refreshFormData(['status', 'published_at']);
             })
             ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Pending);
+    }
+
+    protected function getSubmitForModerationAction(): Action
+    {
+        return Action::make('submit_for_moderation')
+            ->label('Submit for Moderation')
+            ->icon(Heroicon::OutlinedArrowPath)
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Submit Event for Moderation')
+            ->modalDescription('Move this draft event to pending so moderators can review it.')
+            ->action(function (ModerationService $service): void {
+                $service->submitForModeration($this->eventRecord());
+
+                Notification::make()
+                    ->title('Event submitted for moderation')
+                    ->success()
+                    ->send();
+
+                $this->refreshFormData(['status']);
+            })
+            ->visible(fn (): bool => $this->canModerate() && $this->eventRecord()->status instanceof Draft);
     }
 
     protected function getRequestChangesAction(): Action

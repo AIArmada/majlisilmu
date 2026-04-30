@@ -963,6 +963,7 @@ Nested collection item contracts for institutions:
 ### Event-specific update rules
 
 - Event `PUT` is sparse on the raw admin API. Core fields such as `title`, `event_date`, `prayer_time`, `timezone`, `event_format`, `visibility`, `gender`, `age_group`, and `event_type` are required on create, but they may be omitted on update.
+- Admin event writes accept `status` values `draft`, `pending`, and `approved`. When omitted on create, the default is `draft`. `approved` sets `published_at`, while `draft` and `pending` clear it.
 - Event enum write values must use backing values from the schema. Do not submit display labels for `event_type`, `age_group`, `timing_mode`, `prayer_reference`, or `prayer_offset`.
 - Optional URL scalars like `event_url`, `live_url`, and `recording_url` preserve the current value when omitted and clear to `null` when you send `null` or `""`.
 - The relation arrays `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, and `issue_tags` use server-merged replacement semantics on update: omit to preserve the current set, send `null` or `[]` to clear, and send the full replacement list when changing them.

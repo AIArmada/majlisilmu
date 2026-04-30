@@ -17,6 +17,7 @@ use App\Models\Speaker;
 use App\Models\User;
 use App\Support\Events\AdminEventTimeMapper;
 use App\Support\Media\ModelMediaSyncService;
+use App\Services\ModerationService;
 use BackedEnum;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -32,6 +33,7 @@ final readonly class SaveAdminEventAction
         private GenerateEventSlugAction $generateEventSlugAction,
         private ModelMediaSyncService $mediaSyncService,
         private SyncEventResourceRelationsAction $syncEventResourceRelationsAction,
+        private ModerationService $moderationService,
     ) {}
 
     /**
@@ -40,6 +42,7 @@ final readonly class SaveAdminEventAction
     public function defaultsForCreate(): array
     {
         return [
+            'status' => 'draft',
             'timezone' => 'Asia/Kuala_Lumpur',
             'prayer_time' => EventPrayerTime::LainWaktu->value,
             'event_format' => EventFormat::Physical->value,
@@ -87,6 +90,7 @@ final readonly class SaveAdminEventAction
         $groupedTags = $event->tags->groupBy('type');
 
         return array_replace($this->defaultsForCreate(), [
+            'status' => (string) $event->status,
             'title' => $event->title,
             'description' => $event->description,
             'event_date' => $timeFields['event_date'] ?? null,
@@ -167,6 +171,10 @@ final readonly class SaveAdminEventAction
 
         $persistence = AdminEventTimeMapper::normalizeForPersistence($state);
         [$institutionId, $venueId, $spaceId] = $this->resolveLocationState($state);
+        $requestedStatus = $this->normalizeEventStatus(
+            $state['status'] ?? ($creating ? null : (string) $event->status),
+            $creating ? 'draft' : (string) $event->status,
+        );
 
         $attributes = [
             'title' => $this->normalizeRequiredString($state['title'] ?? $event->title, 'Event'),
@@ -221,6 +229,7 @@ final readonly class SaveAdminEventAction
             'is_featured' => array_key_exists('is_featured', $state) ? (bool) $state['is_featured'] : (bool) $event->is_featured,
             'is_active' => array_key_exists('is_active', $state) ? (bool) $state['is_active'] : ($creating ? true : (bool) $event->is_active),
             'status' => $creating ? 'draft' : (string) $event->status,
+            'published_at' => $creating ? null : $event->published_at,
             'escalated_at' => $this->normalizeOptionalDateTime($state['escalated_at'] ?? $event->escalated_at),
         ];
 
@@ -242,6 +251,17 @@ final readonly class SaveAdminEventAction
             syncKeyPeople: true,
         );
         $this->syncMedia($event, $data);
+
+        if ($creating) {
+            if ($requestedStatus === 'pending') {
+                $this->moderationService->submitForModeration($event);
+            }
+
+            if ($requestedStatus === 'approved') {
+                $this->moderationService->submitForModeration($event);
+                $this->moderationService->approve($event, $actor);
+            }
+        }
 
         return $event->fresh([
             'settings',
@@ -549,4 +569,18 @@ final readonly class SaveAdminEventAction
 
         return Carbon::parse((string) $value)->utc();
     }
+
+    private function normalizeEventStatus(mixed $value, string $fallback): string
+    {
+        if (! is_scalar($value)) {
+            return $fallback;
+        }
+
+        $normalized = trim((string) $value);
+
+        return in_array($normalized, ['draft', 'pending', 'approved'], true)
+            ? $normalized
+            : $fallback;
+    }
+
 }
