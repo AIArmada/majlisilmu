@@ -2,6 +2,11 @@
 
 Updated: February 12, 2026
 
+> Historical snapshot: this document records a specific audit pass from February 2026.
+> For current runtime truth, use `docs/MAJLISILMU_TECHNICAL_DOCUMENTATION.md`,
+> `docs/MAJLISILMU_MOBILE_API_REFERENCE.md`,
+> `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md`, and the verification tests.
+
 ## 0. Implementation Progress (Current Pass)
 Completed in code:
 

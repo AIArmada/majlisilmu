@@ -6,6 +6,7 @@ namespace App\Support\Mcp;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -145,9 +146,13 @@ final class McpFilePayloadNormalizer
 
         /** @var array<string, mixed> $descriptor */
         $descriptor = $value;
-        $fileName = $this->stringValue($descriptor, ['filename', 'file_name', 'name']);
-        $base64 = $this->stringValue($descriptor, ['content_base64', 'base64', 'data']);
-        $mimeType = $this->stringValue($descriptor, ['mime_type', 'mime']);
+        $fileName = $this->stringValue($descriptor, ['filename', 'file_name', 'fileName', 'name']);
+        $base64 = $this->stringValue($descriptor, ['content_base64', 'contentBase64', 'base64', 'data']);
+        // Support both content_url and ChatGPT's download_url for fetching files
+        $contentUrl = $this->stringValue($descriptor, ['content_url', 'contentUrl', 'url', 'download_url', 'downloadUrl']);
+        $mimeType = $this->stringValue($descriptor, ['mime_type', 'mimeType', 'mime']);
+        // file_id is metadata from ChatGPT file params (ignored, used for reference only)
+        $fileId = $this->stringValue($descriptor, ['file_id', 'fileId']);
 
         if ($fileName === null) {
             throw ValidationException::withMessages([
@@ -155,22 +160,74 @@ final class McpFilePayloadNormalizer
             ]);
         }
 
-        if ($base64 === null) {
+        if ($base64 === null && $contentUrl === null) {
             throw ValidationException::withMessages([
-                $field => ['The MCP file descriptor must include content_base64.'],
+                $field => ['The MCP file descriptor must include either content_base64, content_url, or download_url. MCP tools do not accept multipart/form-data payloads. ChatGPT connectors may pass {download_url, file_id}.'],
             ]);
         }
 
-        if (preg_match('/^data:([^;]+);base64,(.*)$/s', $base64, $matches) === 1) {
-            $mimeType ??= $matches[1];
-            $base64 = $matches[2];
+        $decoded = null;
+
+        if ($base64 !== null) {
+            if (preg_match('/^data:([^;]+);base64,(.*)$/s', $base64, $matches) === 1) {
+                $mimeType ??= $matches[1];
+                $base64 = $matches[2];
+            }
+
+            $decoded = base64_decode((string) preg_replace('/\s+/', '', $base64), true);
+
+            if (! is_string($decoded)) {
+                throw ValidationException::withMessages([
+                    $field => ['The MCP file descriptor content_base64 is not valid base64.'],
+                ]);
+            }
+        } elseif ($contentUrl !== null) {
+            $this->assertSafeContentUrl($field, $contentUrl);
+
+            try {
+                $response = Http::accept('*/*')
+                    ->connectTimeout(5)
+                    ->timeout(20)
+                    ->withOptions([
+                        'allow_redirects' => false,
+                    ])
+                    ->get($contentUrl);
+            } catch (Throwable $exception) {
+                throw ValidationException::withMessages([
+                    $field => ['The MCP file descriptor content_url could not be fetched.'],
+                ]);
+            }
+
+            if ($response->redirect()) {
+                throw ValidationException::withMessages([
+                    $field => ['The MCP file descriptor content_url must not redirect.'],
+                ]);
+            }
+
+            if (! $response->successful()) {
+                throw ValidationException::withMessages([
+                    $field => ['The MCP file descriptor content_url did not return a successful response.'],
+                ]);
+            }
+
+            $decoded = $response->body();
+
+            if (! is_string($decoded) || $decoded === '') {
+                throw ValidationException::withMessages([
+                    $field => ['The MCP file descriptor content_url returned an empty body.'],
+                ]);
+            }
+
+            $mimeType ??= $response->header('Content-Type');
         }
 
-        $decoded = base64_decode((string) preg_replace('/\s+/', '', $base64), true);
+        $mimeType = $this->normalizeMimeType($mimeType);
 
         if (! is_string($decoded)) {
             throw ValidationException::withMessages([
-                $field => ['The MCP file descriptor content_base64 is not valid base64.'],
+                $field => is_string($fileId)
+                    ? ["The MCP file descriptor (file_id: {$fileId}) could not be decoded."]
+                    : ['The MCP file descriptor could not be decoded.'],
             ]);
         }
 
@@ -260,6 +317,17 @@ final class McpFilePayloadNormalizer
         };
     }
 
+    private function normalizeMimeType(?string $mimeType): ?string
+    {
+        if (! is_string($mimeType)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim(explode(';', $mimeType)[0] ?? ''));
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
     /**
      * @param  array<string, mixed>  $contract
      * @return list<string>
@@ -272,7 +340,119 @@ final class McpFilePayloadNormalizer
             return [];
         }
 
-        return array_values(array_filter($mimeTypes, static fn (mixed $mimeType): bool => is_string($mimeType) && $mimeType !== ''));
+        return array_values(array_filter(array_map(function (mixed $mimeType): ?string {
+            if (! is_string($mimeType) || trim($mimeType) === '') {
+                return null;
+            }
+
+            return $this->normalizeMimeType($mimeType);
+        }, $mimeTypes), static fn (mixed $mimeType): bool => is_string($mimeType) && $mimeType !== ''));
+    }
+
+    private function assertSafeContentUrl(string $field, string $contentUrl): void
+    {
+        $parts = parse_url($contentUrl);
+
+        if (! is_array($parts)) {
+            throw ValidationException::withMessages([
+                $field => ['The MCP file descriptor content_url must be a valid absolute http(s) URL.'],
+            ]);
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $user = $parts['user'] ?? null;
+        $pass = $parts['pass'] ?? null;
+
+        if (($scheme !== 'http' && $scheme !== 'https') || $host === '') {
+            throw ValidationException::withMessages([
+                $field => ['The MCP file descriptor content_url must be an absolute http(s) URL.'],
+            ]);
+        }
+
+        if ((is_string($user) && $user !== '') || (is_string($pass) && $pass !== '')) {
+            throw ValidationException::withMessages([
+                $field => ['The MCP file descriptor content_url must not include user credentials.'],
+            ]);
+        }
+
+        if ($host === 'localhost' || str_ends_with($host, '.localhost')) {
+            throw ValidationException::withMessages([
+                $field => ['The MCP file descriptor content_url host is not allowed.'],
+            ]);
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            if (! $this->isPublicIpAddress($host)) {
+                throw ValidationException::withMessages([
+                    $field => ['The MCP file descriptor content_url host is not allowed.'],
+                ]);
+            }
+
+            return;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false) {
+            throw ValidationException::withMessages([
+                $field => ['The MCP file descriptor content_url host is not allowed.'],
+            ]);
+        }
+
+        foreach ($this->resolvedHostIpAddresses($host) as $ipAddress) {
+            if (! $this->isPublicIpAddress($ipAddress)) {
+                throw ValidationException::withMessages([
+                    $field => ['The MCP file descriptor content_url host is not allowed.'],
+                ]);
+            }
+        }
+    }
+
+    private function isPublicIpAddress(string $ipAddress): bool
+    {
+        return filter_var(
+            $ipAddress,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
+        ) !== false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function resolvedHostIpAddresses(string $host): array
+    {
+        $ipAddresses = [];
+
+        $ipv4Addresses = gethostbynamel($host);
+
+        if (is_array($ipv4Addresses)) {
+            foreach ($ipv4Addresses as $ipAddress) {
+                if (filter_var($ipAddress, FILTER_VALIDATE_IP) !== false) {
+                    $ipAddresses[] = $ipAddress;
+                }
+            }
+        }
+
+        if (function_exists('dns_get_record')) {
+            $records = @dns_get_record($host, DNS_A + DNS_AAAA);
+
+            if (is_array($records)) {
+                foreach ($records as $record) {
+                    $ipv4 = $record['ip'] ?? null;
+                    $ipv6 = $record['ipv6'] ?? null;
+
+                    if (is_string($ipv4) && filter_var($ipv4, FILTER_VALIDATE_IP) !== false) {
+                        $ipAddresses[] = $ipv4;
+                    }
+
+                    if (is_string($ipv6) && filter_var($ipv6, FILTER_VALIDATE_IP) !== false) {
+                        $ipAddresses[] = $ipv6;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($ipAddresses));
     }
 
     /**

@@ -1,6 +1,6 @@
 {
   "schema_version": "2.4.0",
-  "verified_at": "2026-04-25",
+  "verified_at": "2026-04-28",
   "title": "API / MCP / Filament Capability Matrix",
   "markdown_companion": "docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md",
   "purpose": "Canonical parity map for public workflow API, generic admin HTTP API, admin/member MCP, and the Filament admin/Ahli panels.",

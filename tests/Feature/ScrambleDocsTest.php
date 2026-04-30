@@ -218,7 +218,14 @@ it('publishes named speaker institution and reference schemas for the public dir
         ->and(data_get($schemas, 'InstitutionListItem.properties.distance_km'))->not->toBeNull()
         ->and(data_get($schemas, 'InstitutionListItem.properties.type'))->not->toBeNull()
         ->and(data_get($schemas, 'InstitutionDirectoryItem.properties.type'))->not->toBeNull()
+        ->and(data_get($schemas, 'ReferenceListItem.properties.display_title.type'))->toBe('string')
+        ->and(data_get($schemas, 'ReferenceListItem.properties.parent_reference_id'))->not->toBeNull()
+        ->and(data_get($schemas, 'ReferenceListItem.properties.part_type'))->not->toBeNull()
+        ->and(data_get($schemas, 'ReferenceListItem.properties.part_number'))->not->toBeNull()
+        ->and(data_get($schemas, 'ReferenceListItem.properties.part_label'))->not->toBeNull()
+        ->and(data_get($schemas, 'ReferenceListItem.properties.is_part.type'))->toBe('boolean')
         ->and(data_get($schemas, 'ReferenceListItem.properties.front_cover_url'))->not->toBeNull()
+        ->and(data_get($schemas, 'ReferenceDirectoryItem.properties.display_title.type'))->toBe('string')
         ->and(data_get($schemas, 'ReferenceDirectoryItem.properties.publication_year'))->not->toBeNull()
         ->and(collect(data_get($paths, '/institutions.get.parameters', []))->pluck('name')->all())->toContain('lat', 'lng', 'near', 'radius_km', 'fields')
         ->and(collect(data_get($paths, '/institutions/near.get.parameters', []))->pluck('name')->all())->toContain('near', 'radius_km', 'fields')
@@ -226,6 +233,7 @@ it('publishes named speaker institution and reference schemas for the public dir
         ->and(data_get($institutionsNearParameters->get('lng'), 'schema.type'))->toBe('number')
         ->and(collect(data_get($paths, '/speakers.get.parameters', []))->pluck('name')->all())->toContain('fields')
         ->and(collect(data_get($paths, '/references.get.parameters', []))->pluck('name')->all())->toContain('fields', 'search', 'following', 'page', 'per_page')
+        ->and(collect(data_get($paths, '/references/{referenceKey}.get.parameters', []))->pluck('name')->all())->toContain('include_all_parts')
         ->and(data_get($paths, '/speakers.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/speakers/{speakerKey}.get.responses.200.content.application/json.schema'))->not->toBeNull()
         ->and(data_get($paths, '/institutions.get.responses.200.content.application/json.schema'))->not->toBeNull()
@@ -718,6 +726,7 @@ it('publishes explicit schemas for search manifest and public form contracts', f
 
     $paths = $response->json('paths');
     $schemas = $response->json('components.schemas');
+    $searchParameters = collect(data_get($paths, '/search.get.parameters', []))->pluck('name')->all();
 
     expect($schemas)->toHaveKeys([
         'SearchIndexResponse',

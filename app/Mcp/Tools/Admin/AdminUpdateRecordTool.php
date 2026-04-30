@@ -103,4 +103,25 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
             'apply_defaults' => $schema->boolean()->default(false),
         ];
     }
+
+    /**
+     * Add ChatGPT file params metadata.
+     * Note: Media fields are dynamic and depend on resource_key; file params work via the payload object.
+     *
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    public function toArray(): array
+    {
+        $tool = parent::toArray();
+
+        $tool['_meta'] = array_merge(
+            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
+            [
+                'openai/note' => 'Media file descriptors (with download_url or file_id) are passed inside the payload object field for media-capable resources (Event, Institution, Reference, Report, Speaker, Venue, Series, DonationChannel, Inspiration, Space).',
+            ],
+        );
+
+        return $tool;
+    }
 }

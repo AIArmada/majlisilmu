@@ -28,7 +28,7 @@ When you are comparing a report, a Filament page, an HTTP admin endpoint, and an
 Key rules:
 
 - `GET /api/v1/admin/{resourceKey}/schema` documents the raw HTTP admin contract.
-- `GET /mcp/admin` uses a separate MCP write-schema formatter; destructive `clear_*` media flags are removed there, while supported media/file fields are advertised with JSON base64 descriptor metadata.
+- `GET /mcp/admin` uses a separate MCP write-schema formatter; destructive `clear_*` media flags are removed there, while supported media/file fields are advertised with file descriptor metadata supporting `content_base64`, `content_url`, or ChatGPT `download_url` / `file_id` parameters.
 - Public/mobile event detail payload changes do not automatically imply MCP event-record changes. For example, the public `GET /api/v1/events/{event}` surface now exposes normalized reference cover aliases for native clients, but MCP event records still come from the admin/member resource services rather than `App\Http\Controllers\Api\EventController`.
 - Event record detail through `admin-get-record` and `member-get-record` now embeds the same public change-surface projections as the public event detail payload under `data.record.attributes.active_change_notice`, `data.record.attributes.change_announcements`, and `data.record.attributes.replacement_event`.
 - Those MCP event-detail projections resolve replacement chains to the latest still-reachable public or unlisted target and omit stale unreachable replacements rather than exposing dead public links.

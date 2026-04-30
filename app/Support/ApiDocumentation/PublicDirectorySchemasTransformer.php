@@ -153,8 +153,14 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
             ->addProperty('id', new StringType)
             ->addProperty('slug', new StringType)
             ->addProperty('title', new StringType)
+            ->addProperty('display_title', new StringType)
             ->addProperty('author', (new StringType)->nullable(true))
             ->addProperty('type', (new StringType)->nullable(true))
+            ->addProperty('parent_reference_id', (new StringType)->nullable(true))
+            ->addProperty('part_type', (new StringType)->nullable(true))
+            ->addProperty('part_number', (new StringType)->nullable(true))
+            ->addProperty('part_label', (new StringType)->nullable(true))
+            ->addProperty('is_part', new BooleanType)
             ->addProperty('publisher', (new StringType)->nullable(true))
             ->addProperty('publication_year', (new StringType)->nullable(true))
             ->addProperty('is_active', new BooleanType)
@@ -167,8 +173,14 @@ final class PublicDirectorySchemasTransformer implements DocumentTransformer
                 'id',
                 'slug',
                 'title',
+                'display_title',
                 'author',
                 'type',
+                'parent_reference_id',
+                'part_type',
+                'part_number',
+                'part_label',
+                'is_part',
                 'publisher',
                 'publication_year',
                 'is_active',

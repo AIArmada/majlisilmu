@@ -1,6 +1,6 @@
 # MajlisIlmu Developer Technical Documentation
 
-Updated: February 12, 2026
+Updated: April 28, 2026
 Audience: Engineers onboarding to build, maintain, and extend MajlisIlmu.
 
 ---
@@ -26,11 +26,13 @@ Core architecture style is modular monolith:
 
 ### 2.1 Runtime
 - PHP 8.4
-- Laravel 12
+- Laravel 13.6
 - Postgres (primary relational store)
 - Laravel Scout + Typesense (search)
 - Livewire (via app stack)
 - Filament v5 (admin + form/table system)
+- Laravel AI SDK (`laravel/ai`)
+- Laravel MCP (`laravel/mcp`)
 
 ### 2.2 Security/Auth/Access
 - Laravel Fortify (auth flows)
@@ -79,7 +81,7 @@ Top-level directories of interest:
 - `Speaker`: profile + media + affiliation to institutions.
 - `Venue`: physical location object with address context.
 - `Series`: grouping recurring/related events.
-- `Reference`: books/sources used in events.
+- `Reference`: books/sources used in events, including root books and optional child parts (for example jilid, bahagian, or volume records).
 - `Tag`: unified topic taxonomy (domains/discipline/source/issue).
 - `Report`: public/user reporting of suspicious/problematic content.
 - `SavedSearch`, `Registration`, `DonationChannel`, `ModerationReview`.
@@ -87,6 +89,7 @@ Top-level directories of interest:
 ## 4.2 Important relationships
 - Event belongs to Institution/Venue and has many Speakers.
 - Event has many Tags, References, Languages.
+- Reference can belong to a parent root reference and can have many child part references.
 - Speaker belongsToMany Institutions through `institution_speaker` pivot.
 - Institution belongsToMany Speakers through same pivot.
 - `institution_speaker` pivot includes:
@@ -107,15 +110,17 @@ Searchability and active rendering are gated by:
 ## 5. Public Surface Architecture
 
 ## 5.1 Public routes
-Defined in `routes/web.php`:
+Defined in `routes/web.php` (Malay slugs in production URLs):
 - Home: `/`
-- Events index/detail: `/events`, `/events/{slug}`
-- Event calendar export: `/events/{slug}/calendar.ics`
-- Institutions index/detail: `/institutions`, `/institutions/{slug}`
-- Speakers index/detail: `/speakers`, `/speakers/{slug}`
-- Series detail: `/series/{slug}`
-- Submit-event flow: `/submit-event`, `/submit-event/success`
-- Sitemap endpoints
+- Events index/detail: `/majlis`, `/majlis/{slug}`
+- Event calendar export: `/majlis/{slug}/kalendar.ics`
+- Institutions index/detail: `/institusi`, `/institusi/{slug}`
+- Speakers index/detail: `/penceramah`, `/penceramah/{slug}`
+- Venues index/detail: `/tempat`, `/lokasi/{slug}`
+- References index/detail: `/rujukan`, `/rujukan/{slug}`
+- Series detail: `/siri/{slug}`
+- Submit-event flow: `/hantar-majlis`, `/hantar-majlis/berjaya`
+- Sitemap endpoints under `/peta-laman*.xml`
 
 ## 5.2 Submit-event flow
 The submit wizard is in:
@@ -160,16 +165,17 @@ Capabilities:
 - Top navigation, custom theme, auth middleware, and FilamentAuthz plugin.
 
 ## 7.2 Resources currently registered
-Under `app/Filament/Resources`:
-- EventResource
-- InstitutionResource
-- SpeakerResource
-- VenueResource
-- SeriesResource
-- ReferenceResource
-- DonationChannelResource
-- ReportResource
-- TagResource
+Resource registration is runtime-driven and includes app + vendor/plugin resources.
+
+Current verified inventory is documented in:
+- `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md`
+- `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.json`
+
+At the time of this update:
+- Admin panel runtime resources: `30`
+- Ahli panel runtime resources: `4`
+
+Use the parity docs test (`tests/Unit/CrudComparisonDocsTest.php`) as the canonical guardrail for these counts.
 
 ## 7.3 Moderation queue
 - Page: `app/Filament/Pages/ModerationQueue.php`
@@ -273,6 +279,7 @@ Notes:
 - `DELETE /user` now keeps a sanitized deleted-account snapshot for the admin grace-period restore flow while still revoking transient credentials immediately.
 - `GET /me/events/going` and `GET /me/events/saved` now use simple pagination metadata (`page`, `per_page`, `has_more`, `next_page`) and do not expose `total`.
 - `GET /events/{event}` now serializes linked references with normalized cover aliases (`media.front_cover_url`, `front_cover_url`, `cover_url`, `thumb_url`) so native clients can render reference cards without depending on a second reference-detail request.
+- Public reference reads now support family-aware behavior: root references aggregate linked child-part events, child references can opt into whole-family event aggregation, and directory/search payloads expose `display_title`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, and `is_part` so clients can distinguish a whole book from a specific part.
 
 Controllers:
 - `app/Http/Controllers/Api/*`
@@ -359,10 +366,10 @@ vendor/bin/pest --parallel --compact
 vendor/bin/pest --parallel --compact --filter='SubmitEventRateLimitTest|SpeakerCreateOptionSchemaTest'
 
 # Code style
-vendor/bin/pint --test
+vendor/bin/pint --dirty --format agent
 
 # Static analysis
-vendor/bin/phpstan analyse
+vendor/bin/phpstan analyse --ansi
 ```
 
 ## 15.3 Current suite scale
@@ -386,11 +393,11 @@ npm run build
 
 ## 16.2 Daily development
 ```bash
-# Backend server + queue + vite (if using composer script)
+# Herd serves the app URL; run worker/dev processes only.
+# Combined development process script
 composer run dev
 
 # Or run granular processes manually
-php artisan serve
 php artisan horizon
 npm run dev
 ```
@@ -441,7 +448,7 @@ php artisan horizon:terminate
 - Follow global media naming/path conventions; avoid ad-hoc file naming.
 
 ## 17.3 Recommended first-day checklist for new developers
-1. Run full setup and verify `/events`, `/submit-event`, `/admin`.
+1. Run full setup and verify `/majlis`, `/hantar-majlis`, `/admin`.
 2. Run focused tests on submit-event + search + public pages.
 3. Read MVP status doc: `docs/MAJLISILMU_MVP_STATUS.md`.
 4. Validate Typesense connectivity and run `search:index-events` if needed.

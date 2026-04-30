@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\Frontend;
 
-use App\Data\Api\Frontend\Search\CountryData;
 use App\Data\Api\Frontend\Search\EventListData;
 use App\Data\Api\Frontend\Search\InstitutionDetailData;
 use App\Data\Api\Frontend\Search\InstitutionDonationChannelData;
@@ -16,15 +15,11 @@ use App\Data\Api\Frontend\Search\SpeakerGalleryItemData;
 use App\Data\Api\Frontend\Search\SpeakerInstitutionData;
 use App\Data\Api\Frontend\Search\SpeakerListData;
 use App\Data\Api\Frontend\Search\VenueDetailData;
-use App\Enums\ContactCategory;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
 use App\Enums\InspirationCategory;
 use App\Enums\InstitutionType;
-use App\Enums\SocialMediaPlatform;
-use App\Models\Address;
-use App\Models\Contact;
 use App\Models\DonationChannel;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
@@ -32,20 +27,19 @@ use App\Models\Inspiration;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Series;
-use App\Models\SocialMedia;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Models\Venue;
 use App\Services\EventSearchService;
 use App\Support\Api\ApiPagination;
+use App\Support\Api\Frontend\SearchPayloadTransformer;
+use App\Support\Api\Frontend\SearchRequestNormalizer;
 use App\Support\ApiDocumentation\Schemas\InstitutionDetailResponse;
 use App\Support\ApiDocumentation\Schemas\InstitutionDirectoryResponse;
 use App\Support\ApiDocumentation\Schemas\ReferenceDirectoryResponse;
 use App\Support\ApiDocumentation\Schemas\SpeakerDetailResponse;
 use App\Support\ApiDocumentation\Schemas\SpeakerDirectoryResponse;
 use App\Support\Cache\PublicDirectoryCacheVersion;
-use App\Support\Location\AddressHierarchyFormatter;
-use App\Support\Location\PublicCountryRegistry;
 use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\ReferenceSearchService;
 use App\Support\Search\SpeakerSearchService;
@@ -128,6 +122,8 @@ class SearchController extends FrontendController
         private readonly ReferenceSearchService $referenceSearchService,
         private readonly SpeakerSearchService $speakerSearchService,
         private readonly PublicDirectoryCacheVersion $publicDirectoryCacheVersion,
+        private readonly SearchRequestNormalizer $searchRequestNormalizer,
+        private readonly SearchPayloadTransformer $searchPayloadTransformer,
     ) {}
 
     #[Group('Search', 'Public aggregate search endpoints across events, speakers, and institutions.')]
@@ -140,12 +136,12 @@ class SearchController extends FrontendController
     public function search(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
-        $search = $this->normalizedString($request->query('search'))
-            ?? $this->normalizedString($request->query('q'));
-        $coordinates = $this->resolvedNearbyCoordinates($request);
+        $search = $this->searchRequestNormalizer->normalizedString($request->query('search'))
+            ?? $this->searchRequestNormalizer->normalizedString($request->query('q'));
+        $coordinates = $this->searchRequestNormalizer->resolvedNearbyCoordinates($request);
         $lat = $coordinates['lat'];
         $lng = $coordinates['lng'];
-        $radius = $this->normalizedRadiusKm($request);
+        $radius = $this->searchRequestNormalizer->normalizedRadiusKm($request);
         $hasLocation = $lat !== null && $lng !== null;
 
         $eventPaginator = $hasLocation
@@ -231,17 +227,17 @@ class SearchController extends FrontendController
     public function institutions(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
-        $search = $this->normalizedString($request->query('search'));
-        $requestedFields = $this->requestedFields($request, self::INSTITUTION_LIST_FIELDS, 'institution');
-        $institutionType = $this->normalizedInstitutionType($request->query('type'));
-        $countryId = $this->requestedCountryId($request);
-        $stateId = $this->normalizedInt($request->query('state_id'));
-        $districtId = $this->normalizedInt($request->query('district_id'));
-        $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
-        $coordinates = $this->resolvedNearbyCoordinates($request);
+        $search = $this->searchRequestNormalizer->normalizedString($request->query('search'));
+        $requestedFields = $this->searchRequestNormalizer->requestedFields($request, self::INSTITUTION_LIST_FIELDS, 'institution');
+        $institutionType = $this->searchRequestNormalizer->normalizedInstitutionType($request->query('type'));
+        $countryId = $this->searchRequestNormalizer->requestedCountryId($request);
+        $stateId = $this->searchRequestNormalizer->normalizedInt($request->query('state_id'));
+        $districtId = $this->searchRequestNormalizer->normalizedInt($request->query('district_id'));
+        $subdistrictId = $this->searchRequestNormalizer->normalizedInt($request->query('subdistrict_id'));
+        $coordinates = $this->searchRequestNormalizer->resolvedNearbyCoordinates($request);
         $lat = $coordinates['lat'];
         $lng = $coordinates['lng'];
-        $radius = $this->normalizedRadiusKm($request);
+        $radius = $this->searchRequestNormalizer->normalizedRadiusKm($request);
         $hasNearbyLocation = $lat !== null && $lng !== null;
         $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
         $followingOnly = $request->boolean('following');
@@ -282,7 +278,7 @@ class SearchController extends FrontendController
 
         return response()->json([
             'data' => collect($institutions->items())
-                ->map(fn (Institution $institution): array => $this->sparsePayload($this->institutionListData($institution, $user), $requestedFields))
+                ->map(fn (Institution $institution): array => $this->searchRequestNormalizer->sparsePayload($this->institutionListData($institution, $user), $requestedFields))
                 ->all(),
             'meta' => [
                 'pagination' => [
@@ -322,7 +318,7 @@ class SearchController extends FrontendController
     )]
     public function institutionsNear(Request $request): JsonResponse
     {
-        $coordinates = $this->resolvedNearbyCoordinates($request);
+        $coordinates = $this->searchRequestNormalizer->resolvedNearbyCoordinates($request);
 
         if ($coordinates['lat'] === null || $coordinates['lng'] === null) {
             throw ValidationException::withMessages([
@@ -347,14 +343,14 @@ class SearchController extends FrontendController
     public function speakers(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
-        $search = $this->normalizedString($request->query('search'));
-        $requestedFields = $this->requestedFields($request, self::SPEAKER_LIST_FIELDS, 'speaker');
-        $directorySeed = $this->normalizedString($request->query('directory_seed'));
+        $search = $this->searchRequestNormalizer->normalizedString($request->query('search'));
+        $requestedFields = $this->searchRequestNormalizer->requestedFields($request, self::SPEAKER_LIST_FIELDS, 'speaker');
+        $directorySeed = $this->searchRequestNormalizer->normalizedString($request->query('directory_seed'));
         $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
-        $countryId = $this->requestedCountryId($request);
-        $stateId = $this->normalizedInt($request->query('state_id'));
-        $districtId = $this->normalizedInt($request->query('district_id'));
-        $subdistrictId = $this->normalizedInt($request->query('subdistrict_id'));
+        $countryId = $this->searchRequestNormalizer->requestedCountryId($request);
+        $stateId = $this->searchRequestNormalizer->normalizedInt($request->query('state_id'));
+        $districtId = $this->searchRequestNormalizer->normalizedInt($request->query('district_id'));
+        $subdistrictId = $this->searchRequestNormalizer->normalizedInt($request->query('subdistrict_id'));
         $gender = in_array($request->query('gender'), ['male', 'female'], true)
             ? $request->query('gender')
             : null;
@@ -396,7 +392,7 @@ class SearchController extends FrontendController
 
         return response()->json([
             'data' => collect($speakers->items())
-                ->map(fn (Speaker $speaker): array => $this->sparsePayload($this->speakerListData($speaker, $user), $requestedFields))
+                ->map(fn (Speaker $speaker): array => $this->searchRequestNormalizer->sparsePayload($this->speakerListData($speaker, $user), $requestedFields))
                 ->all(),
             'meta' => [
                 'pagination' => [
@@ -419,7 +415,7 @@ class SearchController extends FrontendController
     )]
     public function randomInspiration(Request $request): JsonResponse
     {
-        $locale = $this->normalizedString($request->query('locale'));
+        $locale = $this->searchRequestNormalizer->normalizedString($request->query('locale'));
         $record = Inspiration::query()
             ->with('media')
             ->active()
@@ -752,10 +748,10 @@ class SearchController extends FrontendController
     public function references(Request $request): JsonResponse
     {
         $user = $this->currentUser($request);
-        $search = $this->normalizedString($request->query('search'));
+        $search = $this->searchRequestNormalizer->normalizedString($request->query('search'));
         $followingOnly = $request->boolean('following');
         $perPage = ApiPagination::normalizePerPage($request->integer('per_page', 12), default: 12, max: 50);
-        $requestedFields = $this->requestedFields($request, self::REFERENCE_LIST_FIELDS, 'reference');
+        $requestedFields = $this->searchRequestNormalizer->requestedFields($request, self::REFERENCE_LIST_FIELDS, 'reference');
         $followingTotal = 0;
 
         $baseQuery = $this->baseReferenceQuery($user);
@@ -783,7 +779,7 @@ class SearchController extends FrontendController
         return response()->json([
             'data' => $paginator
                 ->getCollection()
-                ->map(fn (Reference $reference): array => $this->sparsePayload($this->referenceListData($reference, $user), $requestedFields))
+                ->map(fn (Reference $reference): array => $this->searchRequestNormalizer->sparsePayload($this->referenceListData($reference, $user), $requestedFields))
                 ->all(),
             'meta' => [
                 'pagination' => [
@@ -1498,8 +1494,8 @@ class SearchController extends FrontendController
     {
         return VenueDetailData::fromModel(
             venue: $venue,
-            contacts: $this->contactData($venue->contacts),
-            socialMedia: $this->socialMediaData($venue->socialMedia),
+            contacts: $this->searchPayloadTransformer->contactData($venue->contacts),
+            socialMedia: $this->searchPayloadTransformer->socialMediaData($venue->socialMedia),
         )->toArray();
     }
 
@@ -1511,7 +1507,7 @@ class SearchController extends FrontendController
         return ReferenceDetailData::fromModel(
             reference: $reference,
             user: $user,
-            socialMedia: $this->socialMediaData($reference->socialMedia),
+            socialMedia: $this->searchPayloadTransformer->socialMediaData($reference->socialMedia),
         )->toArray();
     }
 
@@ -1729,13 +1725,13 @@ class SearchController extends FrontendController
         return InstitutionDetailData::fromModel(
             institution: $institution,
             user: $user,
-            address: $this->addressFilterData($addressModel),
-            country: $this->countryData($addressModel),
-            addressLine: $this->addressLocation($addressModel),
+            address: $this->searchPayloadTransformer->addressFilterData($addressModel),
+            country: $this->searchPayloadTransformer->countryData($addressModel),
+            addressLine: $this->searchPayloadTransformer->addressLocation($addressModel),
             media: $institutionMedia,
             speakerCount: $this->institutionSpeakerCount($institution),
-            contacts: $this->contactData($institution->contacts),
-            socialMedia: $this->socialMediaData($institution->socialMedia),
+            contacts: $this->searchPayloadTransformer->contactData($institution->contacts),
+            socialMedia: $this->searchPayloadTransformer->socialMediaData($institution->socialMedia),
             donationChannels: $institution->donationChannels
                 ->where('status', 'verified')
                 ->sortByDesc('is_default')
@@ -1755,16 +1751,16 @@ class SearchController extends FrontendController
         return SpeakerDetailData::fromModel(
             speaker: $speaker,
             user: $user,
-            address: $this->addressFilterData($speaker->addressModel),
-            country: $this->countryData($speaker->addressModel),
-            location: $this->addressLocation($speaker->addressModel),
+            address: $this->searchPayloadTransformer->addressFilterData($speaker->addressModel),
+            country: $this->searchPayloadTransformer->countryData($speaker->addressModel),
+            location: $this->searchPayloadTransformer->addressLocation($speaker->addressModel),
             media: SpeakerDetailMediaData::fromModel($speaker, $coverUrl)->toArray(),
             gallery: $this->speakerGalleryData($speaker),
             institutions: $speaker->institutions
                 ->map(fn (Institution $institution): array => $this->speakerInstitutionData($institution))
                 ->all(),
-            contacts: $this->contactData($speaker->contacts),
-            socialMedia: $this->socialMediaData($speaker->socialMedia),
+            contacts: $this->searchPayloadTransformer->contactData($speaker->contacts),
+            socialMedia: $this->searchPayloadTransformer->socialMediaData($speaker->socialMedia),
         )->toArray();
     }
 
@@ -1784,7 +1780,7 @@ class SearchController extends FrontendController
         return [
             'id' => $keyPerson->id,
             'role' => $this->enumValue($keyPerson->role),
-            'role_label' => $this->keyPersonRoleLabel($keyPerson->role),
+            'role_label' => $this->searchPayloadTransformer->keyPersonRoleLabel($keyPerson->role),
             'display_name' => $keyPerson->display_name,
             'event' => $keyPerson->event ? $this->eventListData($keyPerson->event) : null,
         ];
@@ -1885,295 +1881,6 @@ class SearchController extends FrontendController
     private function institutionDonationChannelData(DonationChannel $channel): array
     {
         return InstitutionDonationChannelData::fromModel($channel)->toArray();
-    }
-
-    private function keyPersonRoleLabel(mixed $role): string
-    {
-        if ($role instanceof EventKeyPersonRole) {
-            return $role->getLabel();
-        }
-
-        if ($role instanceof \BackedEnum && is_string($role->value)) {
-            return EventKeyPersonRole::tryFrom($role->value)?->getLabel() ?? Str::headline($role->value);
-        }
-
-        if (is_string($role) && $role !== '') {
-            return EventKeyPersonRole::tryFrom($role)?->getLabel() ?? Str::headline($role);
-        }
-
-        return '';
-    }
-
-    /**
-     * @param  list<string>  $allowedFields
-     * @return list<string>|null
-     */
-    private function requestedFields(Request $request, array $allowedFields, string $resourceLabel): ?array
-    {
-        $fields = $this->normalizedString($request->query('fields'));
-
-        if ($fields === null) {
-            return null;
-        }
-
-        $requestedFields = collect(explode(',', $fields))
-            ->map(static fn (string $field): string => trim($field))
-            ->filter(static fn (string $field): bool => $field !== '')
-            ->unique()
-            ->values()
-            ->all();
-
-        if ($requestedFields === []) {
-            throw ValidationException::withMessages([
-                'fields' => 'Provide at least one valid comma-separated '.$resourceLabel.' field name.',
-            ]);
-        }
-
-        $unsupportedFields = array_values(array_diff($requestedFields, $allowedFields));
-
-        if ($unsupportedFields !== []) {
-            throw ValidationException::withMessages([
-                'fields' => 'Unsupported '.$resourceLabel.' fields: '.implode(', ', $unsupportedFields).'. Supported fields: '.implode(', ', $allowedFields).'.',
-            ]);
-        }
-
-        return $requestedFields;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @param  list<string>|null  $fields
-     * @return array<string, mixed>
-     */
-    private function sparsePayload(array $payload, ?array $fields): array
-    {
-        if ($fields === null) {
-            return $payload;
-        }
-
-        return collect($fields)
-            ->mapWithKeys(fn (string $field): array => array_key_exists($field, $payload) ? [$field => $payload[$field]] : [])
-            ->all();
-    }
-
-    /**
-     * @return array{lat: ?float, lng: ?float}
-     */
-    private function resolvedNearbyCoordinates(Request $request): array
-    {
-        $lat = $this->normalizedLatitude($request->query('lat'));
-        $lng = $this->normalizedLongitude($request->query('lng'));
-
-        if ($lat !== null && $lng !== null) {
-            return [
-                'lat' => $lat,
-                'lng' => $lng,
-            ];
-        }
-
-        $nearCoordinates = $this->normalizedNearCoordinates($request->query('near'));
-
-        return [
-            'lat' => $nearCoordinates['lat'] ?? null,
-            'lng' => $nearCoordinates['lng'] ?? null,
-        ];
-    }
-
-    /**
-     * @return array{lat: float, lng: float}|null
-     */
-    private function normalizedNearCoordinates(mixed $value): ?array
-    {
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $parts = preg_split('/\s*,\s*/', trim($value));
-
-        if (! is_array($parts) || count($parts) !== 2) {
-            return null;
-        }
-
-        $lat = $this->normalizedLatitude($parts[0]);
-        $lng = $this->normalizedLongitude($parts[1]);
-
-        if ($lat === null || $lng === null) {
-            return null;
-        }
-
-        return [
-            'lat' => $lat,
-            'lng' => $lng,
-        ];
-    }
-
-    private function normalizedString(mixed $value): ?string
-    {
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $normalized = trim($value);
-
-        return $normalized === '' ? null : $normalized;
-    }
-
-    private function normalizedFloat(mixed $value): ?float
-    {
-        if (! is_numeric($value)) {
-            return null;
-        }
-
-        return (float) $value;
-    }
-
-    private function normalizedLatitude(mixed $value): ?float
-    {
-        $latitude = $this->normalizedFloat($value);
-
-        return $latitude !== null && $latitude >= -90.0 && $latitude <= 90.0
-            ? $latitude
-            : null;
-    }
-
-    private function normalizedLongitude(mixed $value): ?float
-    {
-        $longitude = $this->normalizedFloat($value);
-
-        return $longitude !== null && $longitude >= -180.0 && $longitude <= 180.0
-            ? $longitude
-            : null;
-    }
-
-    private function normalizedRadiusKm(Request $request): int
-    {
-        return max(1, min($request->integer('radius_km', 15), 100));
-    }
-
-    private function normalizedInt(mixed $value): ?int
-    {
-        if (! is_scalar($value)) {
-            return null;
-        }
-
-        $normalized = trim((string) $value);
-
-        if ($normalized === '' || ! ctype_digit($normalized)) {
-            return null;
-        }
-
-        return (int) $normalized;
-    }
-
-    private function normalizedInstitutionType(mixed $value): ?InstitutionType
-    {
-        $normalized = $this->normalizedString($value);
-
-        if ($normalized === null) {
-            return null;
-        }
-
-        return InstitutionType::tryFrom($normalized);
-    }
-
-    private function requestedCountryId(Request $request): ?int
-    {
-        return app(PublicCountryRegistry::class)->resolveCountryId(
-            $request->query('country_id'),
-        );
-    }
-
-    /**
-     * @return array{country_id: ?int, state_id: ?int, district_id: ?int, subdistrict_id: ?int}|null
-     */
-    private function addressFilterData(?Address $address): ?array
-    {
-        if (! $address instanceof Address) {
-            return null;
-        }
-
-        return [
-            'country_id' => is_numeric($address->country_id) ? (int) $address->country_id : null,
-            'state_id' => is_numeric($address->state_id) ? (int) $address->state_id : null,
-            'district_id' => is_numeric($address->district_id) ? (int) $address->district_id : null,
-            'subdistrict_id' => is_numeric($address->subdistrict_id) ? (int) $address->subdistrict_id : null,
-        ];
-    }
-
-    /**
-     * @return array{id: int, name: string, iso2: string, key: ?string}|null
-     */
-    private function countryData(?Address $address): ?array
-    {
-        return CountryData::fromAddress($address)?->toArray();
-    }
-
-    /**
-     * @param  iterable<mixed>  $contacts
-     * @return list<array<string, mixed>>
-     */
-    private function contactData(iterable $contacts): array
-    {
-        $items = [];
-
-        foreach ($contacts as $contact) {
-            $category = $contact instanceof Contact ? $contact->category : data_get($contact, 'category');
-            $categoryValue = $this->enumValue($category);
-            $categoryEnum = ContactCategory::tryFrom($categoryValue);
-            $isPublic = (bool) data_get($contact, 'is_public', false);
-
-            if (! $isPublic) {
-                continue;
-            }
-
-            $items[] = [
-                'category' => $categoryValue,
-                'label' => $categoryEnum?->getLabel() ?? Str::headline($categoryValue),
-                'value' => (string) data_get($contact, 'value', ''),
-                'type' => $this->enumValue(data_get($contact, 'type')),
-                'is_public' => $isPublic,
-            ];
-        }
-
-        return $items;
-    }
-
-    /**
-     * @param  iterable<mixed>  $socialMediaItems
-     * @return list<array<string, mixed>>
-     */
-    private function socialMediaData(iterable $socialMediaItems): array
-    {
-        $items = [];
-
-        foreach ($socialMediaItems as $socialMedia) {
-            $platformValue = $this->enumValue($socialMedia instanceof SocialMedia ? $socialMedia->platform : data_get($socialMedia, 'platform'));
-            $platformEnum = SocialMediaPlatform::tryFrom($platformValue);
-            $resolvedUrl = (string) data_get($socialMedia, 'resolved_url', data_get($socialMedia, 'url', ''));
-
-            if ($platformValue === '' || $resolvedUrl === '') {
-                continue;
-            }
-
-            $items[] = [
-                'platform' => $platformValue,
-                'platform_label' => $platformEnum?->getLabel() ?? Str::headline($platformValue),
-                'url' => (string) data_get($socialMedia, 'url', ''),
-                'resolved_url' => $resolvedUrl,
-                'username' => (string) data_get($socialMedia, 'username', ''),
-                'display_username' => (string) data_get($socialMedia, 'display_username', ''),
-                'icon_url' => (string) data_get($socialMedia, 'icon_url', ''),
-            ];
-        }
-
-        return $items;
-    }
-
-    private function addressLocation(?Address $address): ?string
-    {
-        $location = AddressHierarchyFormatter::format($address);
-
-        return $location !== '' ? $location : null;
     }
 
     private function institutionSpeakerCount(Institution $institution): int

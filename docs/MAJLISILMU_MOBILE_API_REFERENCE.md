@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-25
+**Last Updated:** 2026-04-28
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -501,18 +501,20 @@ Interactive API docs are available on the API host under `/docs`, with the gener
 | `GET` | `/institutions/{institutionKey}` | Public institution detail by slug or UUID |
 | `GET` | `/speakers` | Public speaker listing filters; speaker directory items include `status` and `is_active` in the default payload |
 | `GET` | `/speakers/{speakerKey}` | Public speaker detail by slug or UUID |
-| `GET` | `/references` | Public reference listing filters; reference directory items include `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` in the default payload |
+| `GET` | `/references` | Public reference listing filters; default directory pages show root/standalone references, while searched child parts can also appear. Reference directory items include `display_title`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, `is_part`, `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` in the default payload |
 | `GET` | `/inspirations/random` | Random active inspiration payload with category and media metadata |
 | `GET` | `/venues/{venueKey}` | Public venue detail by slug or UUID |
-| `GET` | `/references/{referenceKey}` | Public reference detail by slug or UUID |
+| `GET` | `/references/{referenceKey}` | Public reference detail by slug or UUID; child-part detail accepts `include_all_parts=true` to aggregate the whole book family |
 | `GET` | `/series/{series}` | Public series detail |
 
 Notes:
 
 - **Visibility rule:** `/speakers`, `/institutions`, and `/references` return **only** records where `is_active = true` AND `status = 'verified'`. Inactive or unverified records are invisible on the public surface. To access all records including drafts, use the admin surface.
 - Public speaker directory list items expose `status` and `is_active` alongside the existing summary fields. Keep client logic aligned with those canonical fields instead of inferring alternate aliases.
-- Public reference directory list items expose `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` by default. `events_count` represents all linked public events, not just upcoming ones. Use `fields=` when the client only needs a smaller card payload.
-- The public event index supports `filter[reference_ids][]=<reference-uuid>` so native clients can paginate all public events for a given reference without relying on the capped preview lists from `GET /references/{referenceKey}`.
+- Public reference directory list items expose `display_title`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, `is_part`, `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` by default. `display_title` is the safest client-facing label because child parts can render as values like `Riyadhus Solihin — Jilid 2`.
+- Default `/references` pagination intentionally hides child parts unless the client is actively searching. Search queries can return both root books and matching child parts.
+- `GET /references/{referenceKey}` now returns the same part metadata in the `reference` payload. Root books aggregate events from the whole family by default. Child parts return only exact-part events by default, but clients can opt into whole-book aggregation with `include_all_parts=true`.
+- The public event index supports `filter[reference_ids][]=<reference-uuid>` so native clients can paginate all public events for a given reference without relying on the capped preview lists from `GET /references/{referenceKey}`. When the supplied UUID is a root book reference, the filter automatically expands to child parts; when it is already a child part reference, filtering remains exact to that part.
 - When clients need an exact timeline split around the current moment (for example, separating `Majlis Akan Datang` from `Majlis Terdahulu` on reference event screens), the public event index also accepts ISO 8601 timestamp filters through `filter[starts_at_after]` and `filter[starts_at_before]`.
 - These detail payloads now mirror the web client media collections and public-contact visibility rules.
 - Institution payloads expose `public_image_url` as the canonical cover -> logo -> placeholder image. Use that for cards and previews. Use `logo_url` or `cover_url` only when you need those explicit assets.

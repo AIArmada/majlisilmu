@@ -54,11 +54,14 @@ final class McpWriteSchemaFormatter
         $schema['endpoint'] = null;
         $schema['content_type'] = 'application/json';
         $schema['media_uploads_supported'] = $mediaFields !== [];
-        $schema['media_upload_transport'] = $mediaFields === [] ? null : 'json_base64_descriptor';
+        $schema['media_upload_transport'] = $mediaFields === [] ? null : 'json_base64_descriptor_or_download_url';
         $schema['file_descriptor_shape'] = $mediaFields === [] ? null : [
             'filename' => 'Original client filename. Include an extension when available; otherwise mime_type is used for the staged extension.',
-            'mime_type' => 'IANA media type, for example image/jpeg or application/pdf.',
-            'content_base64' => 'Raw base64 file bytes. Data URLs are also accepted.',
+            'mime_type' => 'Optional IANA media type, for example image/jpeg or application/pdf.',
+            'content_base64' => 'Raw base64 file bytes. Data URLs are also accepted. Use this or content_url or download_url.',
+            'content_url' => 'Optional absolute http(s) URL to download the file bytes. Use this or content_base64 or download_url. Multipart is not supported in MCP tool calls.',
+            'download_url' => 'ChatGPT file param: URL provided by ChatGPT connector for files uploaded or selected from library. Equivalent to content_url. Use this or content_base64 or content_url.',
+            'file_id' => 'ChatGPT file param: File identifier from ChatGPT. Used for reference/metadata only; ignored by server.',
         ];
         $schema['unsupported_fields'] = [];
         $schema['destructive_media_clear_fields_supported'] = false;
@@ -157,6 +160,7 @@ final class McpWriteSchemaFormatter
             'transport' => 'json_base64_descriptor',
             'shape' => $isMultiple ? 'array<file_descriptor>' : 'file_descriptor',
             'replacement_semantics' => $isMultiple ? 'submitted_array_replaces_collection' : 'submitted_file_replaces_collection',
+            'required_fields' => ['filename', 'content_base64_or_content_url'],
             'accepted_mime_types' => $field['accepted_mime_types'] ?? null,
             'max_file_size_kb' => $field['max_file_size_kb'] ?? null,
             'max_files' => $field['max_files'] ?? null,

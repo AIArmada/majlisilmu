@@ -5,6 +5,8 @@
 Date: 2026-04-26  
 Method: Repository-first analysis (`routes`, `models`, `services`, `tests`, `configs`, docs) + explicit founder hypothesis exploration.
 
+Update note: refreshed on 2026-04-28 to reflect stronger source/reference modeling across the product.
+
 ## What it is
 
 Ilmu360 is a trust-layer and coordination platform for Islamic knowledge gatherings: it helps people discover majlis, helps organizers publish and manage them, and helps moderators keep quality high.
@@ -27,6 +29,7 @@ Without strong mobile and notification loops, good events stay invisible beyond 
 
 - Public discovery/search routes and pages: `routes/web.php`, `/majlis`, `/institusi`, `/penceramah`, `/rujukan`  
 - Rich API discovery + catalogs + follows/saved searches/notifications: `routes/api.php`  
+- Reference/source modeling now supports root books plus child parts (for example jilid/bahagian/volume), with family-aware search and event linking: `app/Models/Reference.php`, `SearchController.php`, `EventSearchService.php`  
 - Event quality controls (moderation/review/report triage): admin API controllers + Filament resources + MCP tools  
 - Mobile client readiness signals: `/api/v1/forms/mobile-telemetry`, `/api/v1/mobile/telemetry/events` in `routes/api.php`  
 - Multilingual-at-event-data model: language catalogs and event language attributes (`CatalogController`, `Event` language handling)
@@ -79,6 +82,7 @@ Ilmu360 is not only a product workflow; it can be an **amal multiplier**:
 Turn Ilmu360 from “event discovery app” into **knowledge-mobility infrastructure** for the ummah:
 
 - discovery + trust + moderation (already strong)
+- knowledge-source structure that can distinguish a whole book from a specific part/volume
 - organizer operating workflows (needs simplification)
 - mobile engagement loops (high leverage)
 - recurring participation and invitation culture (behavioral moat)

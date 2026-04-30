@@ -81,11 +81,12 @@ class MemberSubmitMembershipClaimTool extends AbstractMemberWriteTool
                 ->items(
                     $schema->object([
                         'filename' => $schema->string()->required()->min(1),
-                        'mime_type' => $schema->string()->required()->min(1),
-                        'content_base64' => $schema->string()->required()->min(1),
+                        'mime_type' => $schema->string()->min(1),
+                        'content_base64' => $schema->string()->min(1),
+                        'content_url' => $schema->string()->min(1),
                     ])->withoutAdditionalProperties()
                 )
-                ->description('Array of MCP file descriptors. Each item must include filename, mime_type, and content_base64.'),
+                ->description('Array of MCP file descriptors. Each item must include filename plus either content_base64, content_url, or download_url (validated server-side). ChatGPT connectors may pass {download_url, file_id}. Multipart/form-data is not supported for MCP tools.'),
         ];
     }
 
@@ -101,6 +102,7 @@ class MemberSubmitMembershipClaimTool extends AbstractMemberWriteTool
                         [
                             'name' => 'evidence',
                             'type' => 'array<file>',
+                            'required_fields' => ['filename', 'content_base64_or_content_url'],
                             'accepted_mime_types' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
                             'max_file_size_kb' => $this->maxUploadSizeKb(),
                             'max_files' => 8,
@@ -120,6 +122,26 @@ class MemberSubmitMembershipClaimTool extends AbstractMemberWriteTool
             array_map(static fn (MemberSubjectType $type): string => $type->value, MemberSubjectType::claimableCases()),
             MemberSubjectType::claimableRouteSegments(),
         )));
+    }
+
+    /**
+     * Add ChatGPT file params metadata for connector compatibility.
+     *
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    public function toArray(): array
+    {
+        $tool = parent::toArray();
+
+        $tool['_meta'] = array_merge(
+            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
+            [
+                'openai/fileParams' => ['evidence'],
+            ],
+        );
+
+        return $tool;
     }
 
     #[\Override]
