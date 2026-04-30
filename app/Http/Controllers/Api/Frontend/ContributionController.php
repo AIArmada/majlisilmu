@@ -41,6 +41,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 #[Group(
     'Contribution',
@@ -297,6 +298,9 @@ class ContributionController extends FrontendController
                 'fields' => $context['contract']['fields'],
                 'conditional_rules' => $context['contract']['conditional_rules'],
                 'direct_edit_media_fields' => $canDirectEdit ? $context['contract']['direct_edit_media_fields'] : [],
+                'current_media' => $canDirectEdit
+                    ? $this->directEditCurrentMediaData($entity, $context['contract']['direct_edit_media_fields'] ?? [])
+                    : [],
                 'subject_presentation' => $resolveContributionSubjectPresentationAction->handle($entity),
                 'can_direct_edit' => $canDirectEdit,
                 'latest_pending_request' => ($latestPendingRequest = $resolveLatestPendingContributionRequestAction->handle($user, $entity)) instanceof ContributionRequest
@@ -753,5 +757,89 @@ class ContributionController extends FrontendController
                 'status' => (string) $entity->status,
             ],
         };
+    }
+
+    /**
+     * @param  list<string>  $directEditMediaFields
+     * @return array<string, list<array{id: string, name: string, url: string, thumb_url: string|null}>>
+     */
+    private function directEditCurrentMediaData(Event|Institution|Reference|Speaker $entity, array $directEditMediaFields): array
+    {
+        $entity->loadMissing('media');
+        $state = [];
+
+        foreach ($directEditMediaFields as $field) {
+            if ($field === 'gallery') {
+                $state[$field] = $this->multipleDirectEditMediaData(
+                    $entity->getMedia('gallery')->all(),
+                    $entity instanceof Event ? ['thumb'] : ['gallery_thumb', 'thumb'],
+                );
+
+                continue;
+            }
+
+            $state[$field] = $this->singleDirectEditMediaData($entity->getFirstMedia($field), match ($field) {
+                'avatar' => ['profile', 'thumb'],
+                'cover' => ['banner'],
+                'poster' => ['preview', 'thumb'],
+                default => ['thumb'],
+            });
+        }
+
+        return $state;
+    }
+
+    /**
+     * @param  list<string>  $preferredConversions
+     * @return list<array{id: string, name: string, url: string, thumb_url: string|null}>
+     */
+    private function singleDirectEditMediaData(?Media $media, array $preferredConversions = []): array
+    {
+        if (! $media instanceof Media) {
+            return [];
+        }
+
+        $url = $media->getAvailableUrl($preferredConversions);
+
+        if ($url === '') {
+            $url = $media->getUrl();
+        }
+
+        if ($url === '') {
+            return [];
+        }
+
+        return [[
+            'id' => (string) $media->getKey(),
+            'name' => $media->name,
+            'url' => $url,
+            'thumb_url' => $url,
+        ]];
+    }
+
+    /**
+     * @param  list<Media>  $mediaItems
+     * @param  list<string>  $preferredConversions
+     * @return list<array{id: string, name: string, url: string, thumb_url: string|null}>
+     */
+    private function multipleDirectEditMediaData(array $mediaItems, array $preferredConversions = []): array
+    {
+        return collect($mediaItems)
+            ->map(function (Media $media) use ($preferredConversions): array {
+                $thumbUrl = $media->getAvailableUrl($preferredConversions);
+
+                if ($thumbUrl === '') {
+                    $thumbUrl = $media->getUrl();
+                }
+
+                return [
+                    'id' => (string) $media->getKey(),
+                    'name' => $media->name,
+                    'url' => $media->getUrl(),
+                    'thumb_url' => $thumbUrl !== '' ? $thumbUrl : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }
