@@ -503,7 +503,7 @@ it('returns member update schema and updates institutions through member MCP wri
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
             ->where('data.schema.media_uploads_supported', true)
-            ->where('data.schema.media_upload_transport', 'json_base64_descriptor')
+            ->where('data.schema.media_upload_transport', 'json_base64_descriptor_or_download_url')
             ->where('data.schema.unsupported_fields', [])
             ->where('data.schema.fields', function ($fields): bool {
                 $fieldMap = collect($fields)->keyBy('name');
@@ -1117,7 +1117,11 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
     expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.type'))->toBe('array');
     expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.type'))->toBe('object');
     expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.required'))
-        ->toBe(['filename', 'mime_type', 'content_base64']);
+        ->toBe(['filename']);
+    expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.properties.content_base64.type'))
+        ->toBe('string');
+    expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.properties.content_url.type'))
+        ->toBe('string');
 
     $githubIssueCategorySchema = data_get($tools->get('member-create-github-issue'), 'inputSchema.properties.category');
 

@@ -1,6 +1,6 @@
 # MajlisIlmu Member MCP Agent Guide
 
-Updated: April 25, 2026
+Updated: April 28, 2026
 Audience: model-facing member MCP agents and tool clients.
 
 This guide is for the member MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The admin guide is separate and is not exposed through this server.
@@ -300,7 +300,8 @@ When the user asks you to “look for” a named place, start with the most like
 - Treat live write schemas as the field-level source of truth for payload structure, required fields, and media support.
 - Institution write schemas expose `nickname`, `address`, `contacts`, and `social_media` semantics. `address` updates deep-merge omitted nested keys, and `address: {}` is effectively a no-op when the record already has an address with a stored country. Omitted `contacts` / `social_media` preserve the existing collection, `null` or `[]` clear it, and any submitted array replaces the stored collection — safe clients should fetch the current record, modify the collection locally, then resend the full array. `nickname: null` preserves the current stored nickname while `nickname: ""` reaches the mutation layer and clears the stored nickname to `null`.
 - Speaker write schemas expose `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media` semantics. If you send `address`, include `address.country_id`; `address: {}` is invalid on the write path, while array-style fields replace when present. The visible region fields deep-merge when present; the hidden map fields (`line1`, `line2`, `postcode`, `lat`, `lng`, `google_maps_url`, `google_place_id`, `waze_url`) remain prohibited on the MCP write path.
-- Reference write schemas expose `author`, `publication_year`, `publisher`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `social_media` follows the same replacement and canonicalization rules as the other write-capable directory resources.
+- Reference write schemas expose `author`, `publication_year`, `publisher`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `parent_reference_id` can point only to a root book reference; `null` converts the record back to a root/standalone reference and clears the part fields. `part_type`, `part_number`, and `part_label` are used only when the record remains a child book part, and blank part values normalize to `null`.
+- Reference record payloads and list results can now surface `display_title`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, and `is_part`. Use `display_title` for member-facing labels when the linked record is a specific jilid/bahagian/volume.
 - Event write schemas expose `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`. Omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values. Member event update schemas inherit the same event semantics because the member MCP surface delegates to the shared admin write service.
 - Event record detail payloads also expose the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` so MCP clients can reason about the same published replacement-chain behavior as the public/mobile event detail contract without following stale links.
 - Handle-style social platforms (`facebook`, `twitter`, `instagram`, `youtube`, `tiktok`, `telegram`, `whatsapp`, `linkedin`, `threads`) may canonicalize a submitted URL into stored `username`, so persisted `url` can come back as `null` after normalization.
@@ -323,6 +324,25 @@ When the user asks you to “look for” a named place, start with the most like
 
 ## MCP media/file upload contract
 
+Member tools like `member-submit-membership-claim` accept media/file descriptors in JSON format. File uploads work identically to the admin MCP surface; see `docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md#mcp-mediafile-upload-contract` for full descriptor shape, aliases, and security rules.
+
+**Quick reference** — all of these descriptor formats are accepted:
+
+```json
+// Base64 (always supported)
+{ "filename": "proof.pdf", "content_base64": "...", "mime_type": "application/pdf" }
+
+// Content URL
+{ "filename": "proof.pdf", "content_url": "https://example.com/file.pdf" }
+
+// ChatGPT file params (from file widget)
+{ "filename": "proof.pdf", "download_url": "https://api.openai.com/files/...", "file_id": "file_xyz" }
+```
+
+For field-specific rules, inspect the tool's `file_descriptor_shape` in the schema after calling `member-get-write-schema`.
+
+## Member media/file upload contract (detailed)
+
 MCP write tools are JSON tools, not multipart HTTP endpoints. When a schema advertises a media/file field, send a descriptor object instead of a browser file upload:
 
 ```json
@@ -333,7 +353,27 @@ MCP write tools are JSON tools, not multipart HTTP endpoints. When a schema adve
 }
 ```
 
-Accepted aliases are `file_name` or `name` for `filename`, `mime` for `mime_type`, and `base64` or `data` for `content_base64`. Data URLs are accepted for `content_base64`. Filename extensions are recommended; when they are omitted, the server derives the staged extension from `mime_type`.
+You can also provide a URL-based descriptor when base64 content is unavailable:
+
+```json
+{
+  "filename": "poster.png",
+  "content_url": "https://example.com/uploads/poster.png"
+}
+```
+
+**ChatGPT file params** are also supported as an alternative to `content_url`:
+
+```json
+{
+  "filename": "poster.png",
+  "download_url": "https://api.openai.com/files/file_id/content",
+  "file_id": "file_12345",
+  "mime_type": "image/png"
+}
+```
+
+Accepted aliases are `file_name`, `fileName`, or `name` for `filename`; `mime` or `mimeType` for `mime_type`; and `base64`, `contentBase64`, or `data` for `content_base64`. URL aliases `contentUrl` and `url` are accepted for `content_url`. ChatGPT file params: `downloadUrl` or `download_url` for content URL, and `fileId` or `file_id` for metadata (ignored by server). Data URLs are accepted for `content_base64`. Filename extensions are recommended; when they are omitted, the server derives the staged extension from `mime_type` or the fetched response content type. For safety, URL-based descriptors (`content_url` or `download_url`) must be absolute `http(s)` URLs without embedded credentials, must resolve to public hosts only, and must not redirect.
 
 Schema fields describe the exact upload rules:
 

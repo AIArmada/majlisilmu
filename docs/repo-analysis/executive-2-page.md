@@ -3,6 +3,8 @@
 Date: 2026-04-26  
 Method: Repository reverse-engineering (code, routes, models, services, tests, configs, docs) without founder-first interviews.
 
+Update note: refreshed on 2026-04-28 to reflect stronger reference/source modeling (root books + child parts such as jilid/bahagian/volume) across web, API, and MCP surfaces.
+
 ---
 
 ## 1) What this product is
@@ -28,6 +30,7 @@ Two linked problems:
 
 ### Evidence
 - Rich search with location/filtering: `app/Http/Controllers/Api/Frontend/SearchController.php`, `app/Services/EventSearchService.php`  
+- Structured reference/source discovery now supports book families and part-aware search/filter behavior: `app/Models/Reference.php`, `SearchController.php`, `EventSearchService.php`, `ReferenceSearchService.php`
 - Contribution and moderation pipelines: `ContributionController.php`, admin moderation/review controllers, report triage controllers  
 - Engagement loops: `SavedSearchController.php`, `FollowController.php`, notification controllers
 
@@ -63,9 +66,11 @@ Medium-High.
 2. **Trust/governance layer exists** (moderation, claims, reviews, triage).  
 3. **Cross-surface platform maturity** (web + API + admin/member MCP + parity tests).  
 4. **Retention primitives are implemented** (saved searches, follows, notifications, digests).
+5. **Knowledge-source modeling is maturing** (references are no longer just flat book records; the platform now understands whole books versus specific parts/volumes, which improves search precision and event-source context).
 
 ### Evidence
 - `SearchController.php`, `EventSearchService.php`  
+- `Reference.php`, `ReferenceSearchService.php`, reference web/API pages and schemas
 - `AdminEventModerationController.php`, `AdminReportTriageController.php`, review controllers  
 - `routes/ai.php`, `app/Mcp/Servers/*`, `tests/Feature/Mcp/*`  
 - `SavedSearchController.php`, `Notification*Controller.php`

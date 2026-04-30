@@ -1,6 +1,6 @@
 # MajlisIlmu Admin MCP Agent Guide
 
-Updated: April 25, 2026
+Updated: April 28, 2026
 Audience: model-facing admin MCP agents and tool clients.
 
 This guide is for the admin MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The member guide is separate and is not exposed through this server.
@@ -321,7 +321,8 @@ When the user asks you to “look for” a named place, start with the most like
 - Institution write schemas expose `nickname`, `address`, `contacts`, and `social_media` semantics. `address` updates deep-merge omitted nested keys, and `address: {}` is effectively a no-op when the record already has an address with a stored country. Omitted `contacts` / `social_media` preserve the existing collection, `null` or `[]` clear it, and any submitted array replaces the stored collection — safe clients should fetch the current record, modify the collection locally, then resend the full array. `nickname: null` preserves the current stored nickname while `nickname: ""` reaches the mutation layer and clears the stored nickname to `null`.
 - Speaker write schemas expose `address`, `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, `language_ids`, `contacts`, and `social_media` semantics. If you send `address`, include `address.country_id`; `address: {}` is invalid on the write path, while array-style fields replace when present. The visible region fields deep-merge when present; the hidden map fields (`line1`, `line2`, `postcode`, `lat`, `lng`, `google_maps_url`, `google_place_id`, `waze_url`) remain prohibited on the MCP write path.
 - Venue write schemas expose `address`, `facilities`, `contacts`, and `social_media` semantics. Omitted address keys preserve the existing nested values, but `address: {}` deletes the stored venue address on the shared save path. `facilities`, `contacts`, and `social_media` are replacement collections; `facilities` input is normalized into the stored boolean facility map, so safe clients should resend the full enabled facility set.
-- Reference write schemas expose `author`, `publication_year`, `publisher`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `social_media` follows the same replacement and canonicalization rules as the other write-capable directory resources.
+- Reference write schemas expose `author`, `publication_year`, `publisher`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `parent_reference_id` turns a book reference into a child part only when it points at a root book reference; `null` converts the record back to a root/standalone reference and clears the part fields. `part_type`, `part_number`, and `part_label` are used only when the reference remains a child book part, and the shared mutation layer normalizes blank part values to `null`. `social_media` follows the same replacement and canonicalization rules as the other write-capable directory resources.
+- Reference record payloads and list results can now surface `display_title`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, and `is_part`. Use `display_title` for human-facing labels when a record may be a specific jilid/bahagian/volume.
 - Event write schemas expose `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, and `registration_mode`. Omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values.
 - Event record detail payloads also expose the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` so MCP clients can reason about the same published replacement-chain behavior as the public/mobile event detail contract without following stale links.
 - Series write schemas expose `description`, `languages`, and `slug` semantics. `title`, `slug`, and `visibility` remain required on update; `description` clears on `null` / trimmed empty input and `languages` follows omit-preserve / null-clear / array-replace semantics.
@@ -363,7 +364,27 @@ MCP write tools are JSON tools, not multipart HTTP endpoints. When a schema adve
 }
 ```
 
-Accepted aliases are `file_name` or `name` for `filename`, `mime` for `mime_type`, and `base64` or `data` for `content_base64`. Data URLs are accepted for `content_base64`. Filename extensions are recommended; when they are omitted, the server derives the staged extension from `mime_type`.
+You can provide a URL-based descriptor when base64 content is unavailable:
+
+```json
+{
+  "filename": "poster.png",
+  "content_url": "https://example.com/uploads/poster.png"
+}
+```
+
+**ChatGPT file params** are also supported as an alternative to `content_url`:
+
+```json
+{
+  "filename": "poster.png",
+  "download_url": "https://api.openai.com/files/file_id/content",
+  "file_id": "file_12345",
+  "mime_type": "image/png"
+}
+```
+
+Accepted aliases: `file_name`, `fileName`, or `name` for `filename`; `mime` or `mimeType` for `mime_type`; `base64`, `contentBase64`, or `data` for `content_base64`; and `contentUrl` or `url` for `content_url`. ChatGPT file params: `downloadUrl` or `download_url` for content URL, and `fileId` or `file_id` for metadata (ignored by server). Data URLs are accepted for `content_base64`. Filename extensions are recommended; when omitted, the server derives the staged extension from `mime_type` or response Content-Type header. For safety, URL-based descriptors (`content_url` or `download_url`) must be absolute `http(s)` URLs without embedded credentials, must resolve to public hosts only, and must not redirect.
 
 Schema fields describe the exact upload rules:
 

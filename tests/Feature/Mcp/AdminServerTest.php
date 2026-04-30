@@ -1707,7 +1707,7 @@ it('returns write schema for supported resources and rejects unknown resources',
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
             ->where('data.schema.media_uploads_supported', true)
-            ->where('data.schema.media_upload_transport', 'json_base64_descriptor')
+            ->where('data.schema.media_upload_transport', 'json_base64_descriptor_or_download_url')
             ->where('data.schema.unsupported_fields', [])
             ->where('data.schema.fields', fn ($fields): bool => collect($fields)
                 ->pluck('name')

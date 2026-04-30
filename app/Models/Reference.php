@@ -9,6 +9,7 @@ use App\Enums\ReferenceType;
 use App\Models\Concerns\AuditsModelChanges;
 use App\Models\Concerns\HasFollowers;
 use App\Models\Concerns\HasSocialMedia;
+use BackedEnum;
 use Database\Factories\ReferenceFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -215,16 +216,16 @@ class Reference extends Model implements AuditableContract, HasMedia
 
         return [
             'id' => (string) $this->getKey(),
-            'title' => (string) $this->title,
-            'author' => filled($this->author) ? (string) $this->author : null,
-            'type' => filled($this->type) ? (string) $this->type : null,
-            'parent_reference_id' => filled($this->parent_reference_id) ? (string) $this->parent_reference_id : null,
-            'part_type' => filled($this->part_type) ? (string) $this->part_type : null,
-            'part_number' => filled($this->part_number) ? (string) $this->part_number : null,
-            'part_label' => filled($this->part_label) ? (string) $this->part_label : null,
+            'title' => (string) $this->titleValue(),
+            'author' => $this->authorValue(),
+            'type' => $this->typeValue(),
+            'parent_reference_id' => $this->parentReferenceIdValue(),
+            'part_type' => $this->partTypeValue(),
+            'part_number' => $this->partNumberValue(),
+            'part_label' => $this->partLabelValue(),
             'display_title' => $this->displayTitle(),
             'publication_year' => $normalizedPublicationYear,
-            'publisher' => filled($this->publisher) ? (string) $this->publisher : null,
+            'publisher' => $this->publisherValue(),
             'description' => $description !== '' ? $description : null,
             'search_text' => $this->searchableText(),
             'slug' => (string) $this->slug,
@@ -243,14 +244,14 @@ class Reference extends Model implements AuditableContract, HasMedia
         $publicationYear = is_numeric($this->publication_year) ? (int) $this->publication_year : null;
 
         return array_filter([
-            'title' => (string) $this->title,
-            'author' => filled($this->author) ? (string) $this->author : null,
-            'type' => filled($this->type) ? (string) $this->type : null,
-            'part_type' => filled($this->part_type) ? (string) $this->part_type : null,
-            'part_number' => filled($this->part_number) ? (string) $this->part_number : null,
-            'part_label' => filled($this->part_label) ? (string) $this->part_label : null,
+            'title' => (string) $this->titleValue(),
+            'author' => $this->authorValue(),
+            'type' => $this->typeValue(),
+            'part_type' => $this->partTypeValue(),
+            'part_number' => $this->partNumberValue(),
+            'part_label' => $this->partLabelValue(),
             'publication_year' => $publicationYear,
-            'publisher' => filled($this->publisher) ? (string) $this->publisher : null,
+            'publisher' => $this->publisherValue(),
             'description' => $description !== '' ? $description : null,
             'slug' => (string) $this->slug,
         ], static fn (mixed $value): bool => (is_string($value) && $value !== '') || is_int($value));
@@ -264,13 +265,13 @@ class Reference extends Model implements AuditableContract, HasMedia
     private function searchableText(): string
     {
         return trim(implode(' ', array_filter([
-            trim((string) $this->title),
+            trim((string) $this->titleValue()),
             trim((string) $this->displayTitle()),
-            trim((string) $this->part_label),
-            trim((string) $this->part_number),
-            trim((string) $this->author),
-            trim((string) $this->publisher),
-            trim(strip_tags((string) $this->description)),
+            trim((string) $this->partLabelValue()),
+            trim((string) $this->partNumberValue()),
+            trim((string) $this->authorValue()),
+            trim((string) $this->publisherValue()),
+            trim(strip_tags((string) $this->descriptionValue())),
         ])));
     }
 
@@ -295,7 +296,7 @@ class Reference extends Model implements AuditableContract, HasMedia
 
     public function isPart(): bool
     {
-        return filled($this->parent_reference_id);
+        return filled($this->parentReferenceIdValue());
     }
 
     public function isRootReference(): bool
@@ -306,7 +307,7 @@ class Reference extends Model implements AuditableContract, HasMedia
     public function familyRootId(): ?string
     {
         if ($this->isPart()) {
-            return (string) $this->parent_reference_id;
+            return $this->parentReferenceIdValue();
         }
 
         $key = $this->getKey();
@@ -350,7 +351,7 @@ class Reference extends Model implements AuditableContract, HasMedia
 
     public function displayTitle(): string
     {
-        $title = trim((string) $this->title);
+        $title = trim((string) $this->titleValue());
         $partLabel = $this->resolvedPartLabel();
 
         if (! $this->isPart() || $partLabel === '') {
@@ -369,16 +370,61 @@ class Reference extends Model implements AuditableContract, HasMedia
         return $this->displayTitle();
     }
 
+    public function typeValue(): ?string
+    {
+        return $this->optionalStringAttribute('type');
+    }
+
+    public function parentReferenceIdValue(): ?string
+    {
+        return $this->optionalStringAttribute('parent_reference_id');
+    }
+
+    public function partTypeValue(): ?string
+    {
+        return $this->optionalStringAttribute('part_type');
+    }
+
+    public function partNumberValue(): ?string
+    {
+        return $this->optionalStringAttribute('part_number');
+    }
+
+    public function partLabelValue(): ?string
+    {
+        return $this->optionalStringAttribute('part_label');
+    }
+
+    public function titleValue(): ?string
+    {
+        return $this->optionalStringAttribute('title');
+    }
+
+    public function authorValue(): ?string
+    {
+        return $this->optionalStringAttribute('author');
+    }
+
+    public function publisherValue(): ?string
+    {
+        return $this->optionalStringAttribute('publisher');
+    }
+
+    public function descriptionValue(): ?string
+    {
+        return $this->optionalStringAttribute('description');
+    }
+
     private function resolvedPartLabel(): string
     {
-        $partLabel = trim((string) $this->part_label);
+        $partLabel = trim((string) $this->partLabelValue());
 
         if ($partLabel !== '') {
             return $partLabel;
         }
 
-        $partType = ReferencePartType::tryFrom((string) $this->part_type);
-        $partNumber = trim((string) $this->part_number);
+        $partType = ReferencePartType::tryFrom((string) $this->partTypeValue());
+        $partNumber = trim((string) $this->partNumberValue());
 
         if (! $partType instanceof ReferencePartType) {
             return $partNumber;
@@ -391,7 +437,7 @@ class Reference extends Model implements AuditableContract, HasMedia
 
     private function normalizeReferencePartFields(): void
     {
-        if ((string) $this->type !== ReferenceType::Book->value || blank($this->parent_reference_id)) {
+        if ($this->typeValue() !== ReferenceType::Book->value || blank($this->parentReferenceIdValue())) {
             $this->parent_reference_id = null;
             $this->part_type = null;
             $this->part_number = null;
@@ -400,7 +446,7 @@ class Reference extends Model implements AuditableContract, HasMedia
             return;
         }
 
-        $this->part_type = (ReferencePartType::tryFrom((string) $this->part_type) ?? ReferencePartType::Jilid)->value;
+        $this->part_type = (ReferencePartType::tryFrom((string) $this->partTypeValue()) ?? ReferencePartType::Jilid)->value;
         $this->part_number = $this->nullableTrimmedString($this->part_number);
         $this->part_label = $this->nullableTrimmedString($this->part_label);
 
@@ -409,7 +455,7 @@ class Reference extends Model implements AuditableContract, HasMedia
 
     private function ensureValidParentReference(): void
     {
-        if ((string) $this->parent_reference_id === (string) $this->getKey()) {
+        if ($this->parentReferenceIdValue() === (string) $this->getKey()) {
             throw ValidationException::withMessages([
                 'parent_reference_id' => __('A reference part cannot use itself as the parent book.'),
             ]);
@@ -431,15 +477,51 @@ class Reference extends Model implements AuditableContract, HasMedia
             ]);
         }
 
-        if ($parentReference->isPart() || (string) $parentReference->type !== ReferenceType::Book->value) {
+        if ($parentReference->isPart() || $parentReference->typeValue() !== ReferenceType::Book->value) {
             throw ValidationException::withMessages([
                 'parent_reference_id' => __('Reference parts can only belong to a root book reference.'),
             ]);
         }
     }
 
+    private function optionalStringAttribute(string $key): ?string
+    {
+        $attributes = $this->getAttributes();
+
+        if (! array_key_exists($key, $attributes)) {
+            return null;
+        }
+
+        return $this->normalizeStringValue($attributes[$key]);
+    }
+
+    private function normalizeStringValue(mixed $value): ?string
+    {
+        if ($value instanceof BackedEnum) {
+            $value = $value->value;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        return null;
+    }
+
     private function nullableTrimmedString(mixed $value): ?string
     {
+        if ($value instanceof BackedEnum) {
+            $value = $value->value;
+        }
+
         if (! is_string($value) && ! is_numeric($value)) {
             return null;
         }

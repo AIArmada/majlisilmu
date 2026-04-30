@@ -1,6 +1,6 @@
 # MajlisIlmu MVP Status (Fresh)
 
-Updated: February 12, 2026  
+Updated: April 28, 2026  
 Source references: `MVP_CHECKLIST.md`, current routes/resources/tests in codebase.
 
 ## 1. Scope and Interpretation
@@ -20,9 +20,9 @@ It intentionally corrects drift from older checklist entries when product decisi
 
 | Pillar | Status | Notes |
 |---|---|---|
-| Public Event Discovery Pages | DONE | `/events`, `/events/{slug}`, map/navigation links, related events, share, add-to-calendar are available. |
-| Public Directory Pages | DONE | `/institutions`, `/institutions/{slug}`, `/speakers`, `/speakers/{slug}`, `/series/{slug}` available. |
-| Public Event Submission | DONE | `/submit-event` wizard is live with media, references, organizer/location logic, captcha integration. |
+| Public Event Discovery Pages | DONE | `/majlis`, `/majlis/{slug}`, map/navigation links, related events, share, add-to-calendar are available. |
+| Public Directory Pages | DONE | `/institusi`, `/institusi/{slug}`, `/penceramah`, `/penceramah/{slug}`, `/siri/{slug}`, `/rujukan`, and `/tempat`/`/lokasi/{slug}` are available. |
+| Public Event Submission | DONE | `/hantar-majlis` wizard is live with media, references, organizer/location logic, captcha integration. |
 | Submission Abuse Controls | PARTIAL | Captcha + reports throttling + search throttling exist; submit-event route intentionally unthrottled by policy. |
 | User Auth + Basic Account | DONE | Registration/login/reset/social login (Google) and authenticated user routes are present. |
 | Saved Searches + Digests | DONE | Saved search CRUD API + UI and daily/weekly digest jobs are implemented. |

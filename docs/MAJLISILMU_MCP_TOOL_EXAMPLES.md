@@ -96,7 +96,9 @@ Use enum backing values in `filters`, and use date-only `YYYY-MM-DD` values for 
 
 ### Write media descriptors
 
-Fetch the write schema first and follow the field-specific `mcp_upload`, `accepted_mime_types`, `max_file_size_kb`, and `max_files` metadata. Single-file fields use one descriptor object. Multi-file fields use an array of descriptor objects.
+Fetch the write schema first and follow the field-specific `mcp_upload`, `accepted_mime_types`, `max_file_size_kb`, and `max_files` metadata. Single-file fields use one descriptor object. Multi-file fields use an array of descriptor objects. Descriptors support `content_base64`, `content_url`, or ChatGPT `download_url` / `file_id` parameters.
+
+**Example with base64:**
 
 ```json
 {
@@ -112,14 +114,57 @@ Fetch the write schema first and follow the field-specific `mcp_upload`, `accept
         "filename": "avatar.png",
         "mime_type": "image/png",
         "content_base64": "iVBORw0KGgo..."
-      },
+      }
+    },
+    "validate_only": true
+  }
+}
+```
+
+**Example with ChatGPT file params (from file widget):**
+
+```json
+{
+  "tool": "admin-update-record",
+  "arguments": {
+    "resource_key": "speakers",
+    "record_key": "ahmad-fauzi-my",
+    "payload": {
       "gallery": [
         {
           "filename": "lecture-hall.webp",
           "mime_type": "image/webp",
-          "content_base64": "UklGRiQAAABXRUJQVlA4..."
+          "download_url": "https://api.openai.com/files/file_id/content",
+          "file_id": "file_12345"
         }
       ]
+    },
+    "validate_only": false
+  }
+}
+```
+
+### Create or update a book part reference
+
+Fetch the live schema first so the client sees the current enum values and allowed parent-book rules.
+
+```json
+{ "tool": "admin-get-write-schema", "arguments": { "resource_key": "references", "operation": "update", "record_key": "riyadhus-solihin-jilid-2" } }
+```
+
+```json
+{
+  "tool": "admin-update-record",
+  "arguments": {
+    "resource_key": "references",
+    "record_key": "riyadhus-solihin-jilid-2",
+    "payload": {
+      "title": "Riyadhus Solihin",
+      "type": "book",
+      "parent_reference_id": "0195f51f-70d6-70e5-bf9d-bc2e04b64f7a",
+      "part_type": "jilid",
+      "part_number": "2",
+      "part_label": "Jilid 2"
     },
     "validate_only": true
   }
@@ -182,6 +227,8 @@ For member-scoped event reads, the same `data.record.attributes.active_change_no
 
 ### Update member media descriptors
 
+**Example with base64:**
+
 ```json
 {
   "tool": "member-update-record",
@@ -197,6 +244,52 @@ For member-scoped event reads, the same `data.record.attributes.active_change_no
       }
     },
     "validate_only": false
+  }
+}
+```
+
+**Example with ChatGPT file params:**
+
+```json
+{
+  "tool": "member-submit-membership-claim",
+  "arguments": {
+    "subject_type": "speaker",
+    "subject_id": "019d5cb5-7de1-7055-a4d3-b57ab007331e",
+    "justification": "I am authorized to represent this speaker.",
+    "evidence": [
+      {
+        "filename": "authorization-letter.pdf",
+        "mime_type": "application/pdf",
+        "download_url": "https://api.openai.com/files/file_id/content",
+        "file_id": "file_xyz"
+      }
+    ]
+  }
+}
+```
+
+### Update a member-linked reference part label
+
+```json
+{ "tool": "member-get-write-schema", "arguments": { "resource_key": "references", "record_key": "019d5cb5-7de1-7055-a4d3-b57ab007331e" } }
+```
+
+```json
+{
+  "tool": "member-update-record",
+  "arguments": {
+    "resource_key": "references",
+    "record_key": "019d5cb5-7de1-7055-a4d3-b57ab007331e",
+    "payload": {
+      "title": "Riyadhus Solihin",
+      "type": "book",
+      "parent_reference_id": "0195f51f-70d6-70e5-bf9d-bc2e04b64f7a",
+      "part_type": "jilid",
+      "part_number": "2",
+      "part_label": "Jilid Kedua"
+    },
+    "validate_only": true
   }
 }
 ```
@@ -225,5 +318,5 @@ For member-scoped event reads, the same `data.record.attributes.active_change_no
 - Read-only tools are for discovery and preview.
 - Write tools are schema-guided.
 - Generic MCP delete tools are intentionally not exposed on admin/member servers.
-- Media/file fields use JSON base64 descriptors only when the write schema advertises them; destructive `clear_*` media flags are rejected.
+- Media/file fields use JSON file descriptors (base64, URL, or ChatGPT file params) only when the write schema advertises them; destructive `clear_*` media flags are rejected.
 - If a capability is not listed in the server tool catalog, ChatGPT should not assume it exists.

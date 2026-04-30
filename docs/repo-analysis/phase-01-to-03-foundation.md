@@ -10,12 +10,12 @@ This analysis is based on repository evidence first (code, routes, models, tests
 
 | Area | Files/Folders | What It Does | Product Meaning | Confidence |
 |---|---|---|---|---|
-| Runtime + stack | `composer.json`, `package.json`, `bootstrap/app.php`, `config/*.php` | Laravel 12+, Livewire 4, Filament 5, Scout/Typesense, Passport + Sanctum, MCP server support, notification center, AI SDK | Mature Laravel app with web + API + AI/MCP interfaces | High |
+| Runtime + stack | `composer.json`, `package.json`, `bootstrap/app.php`, `config/*.php` | Laravel 13+, Livewire 4, Filament 5, Scout/Typesense, Passport + Sanctum, MCP server support, notification center, AI SDK | Mature Laravel app with web + API + AI/MCP interfaces | High |
 | Public web entry points | `routes/web.php`, `resources/views/components/pages/⚡home.blade.php` | Public homepage, search/discovery, event detail/calendar, institution/speaker/reference/venue/series pages, submit-event flow | Core user-facing discovery + submission platform | High |
 | API surface | `routes/api.php`, `app/Http/Controllers/Api/Frontend/*`, `app/Http/Controllers/Api/*` | Public + authenticated API for search, catalogs, submissions, follows, registrations, saved searches, account settings, notification center, admin generic resource API | Product is designed for web + mobile/API clients, not only server-rendered pages | High |
 | MCP/agent surface | `routes/ai.php`, `app/Mcp/Servers/AdminServer.php`, `app/Mcp/Servers/MemberServer.php`, `app/Mcp/Tools/**` | Admin/member MCP endpoints + local MCP handles for inspector/debug | Product includes machine-facing operational interface (AI agents/automations) | High |
-| Domain model breadth | `app/Models/*`, `database/migrations/*`, database schema summary | Rich event ecosystem: events, institutions, speakers, venues, references, series, registrations, saved searches, follows, reports, moderation, membership claims | Focus is event discovery + organizer operations + governance | High |
-| Search/discovery engine | `app/Services/EventSearchService.php`, `app/Http/Controllers/Api/Frontend/SearchController.php`, `config/scout.php` | Full-text + geo + faceted filters, directory search, DB fallback | Discovery quality is a core product pillar | High |
+| Domain model breadth | `app/Models/*`, `database/migrations/*`, database schema summary | Rich event ecosystem: events, institutions, speakers, venues, references, series, registrations, saved searches, follows, reports, moderation, membership claims; references now support root/child families for whole books and specific parts | Focus is event discovery + organizer operations + governance | High |
+| Search/discovery engine | `app/Services/EventSearchService.php`, `app/Http/Controllers/Api/Frontend/SearchController.php`, `config/scout.php` | Full-text + geo + faceted filters, directory search, DB fallback, and family-aware reference search/filtering | Discovery quality is a core product pillar | High |
 | Moderation + trust workflows | `app/Http/Controllers/Api/Admin/*Moderation*`, `*ReviewController.php`, `app/Filament/Resources/*`, `docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md` | Admin moderation and review actions (event moderation, report triage, contribution/membership review) | Platform is not a passive listing site; it actively curates quality | High |
 | Contribution/supply pipelines | `resources/views/components/pages/submit-event/create.blade.php`, `app/Http/Controllers/Api/Frontend/ContributionController.php`, `MembershipClaimController.php` | Public submission + authenticated contribution/update/claim flows | Supply-side acquisition is central strategy | High |
 | Engagement + retention | `SavedSearchController.php`, `EventSaveController.php`, `EventGoingController.php`, `Notification*Controller.php`, scheduled jobs in `routes/console.php` | Save/follow/going, saved searches, digest + notifications | Product attempts recurring engagement loops | High |
@@ -42,6 +42,8 @@ This analysis is based on repository evidence first (code, routes, models, tests
 - **Authenticated API:** follows, saved-searches, registrations, account settings, notifications, contributions (`routes/api.php`)
 - **Admin API + MCP:** `/api/v1/admin/*`, `/mcp/admin`, `/mcp/member`, plus local handles in `routes/ai.php`
 
+Notable discovery detail: references are no longer treated purely as flat book cards. The repository now models a root source plus child parts (for example jilid/bahagian/volume), and public/API discovery can distinguish whole-book context from exact-part context.
+
 Confidence: High.
 
 ### Main user-facing flows
@@ -59,6 +61,7 @@ Confidence: High.
 ### Main backend capabilities
 
 - Search engine abstraction with fallback (`EventSearchService`, Scout config)
+- Reference-family modeling and search/filter expansion (`Reference`, `ReferenceSearchService`, reference directory/detail surfaces)
 - Rich moderation workflows (`AdminEventModerationController`, review/triage controllers)
 - Generic admin resource API and schemas (`AdminResourceController`, `AdminResourceRegistry`, `AdminResourceMutationService`)
 - MCP tooling for admin/member operations (`app/Mcp/Tools/*`)
@@ -93,6 +96,8 @@ MajlisIlmu is a Malaysian Islamic event discovery and contribution platform that
 ## Plain-English Description
 
 People can find nearby religious classes/lectures, follow speakers or institutions, register for events, and save searches. Organizers and contributors can submit new events or updates. Admins (and scoped members) can review, moderate, and manage records through both human UI (Filament) and machine interfaces (API/MCP).
+
+The product is also becoming more opinionated about knowledge-source structure: it can represent not just a book title, but a specific part or volume of that book, and then carry that distinction through discovery and event linkage.
 
 ## Ambitious Version
 
