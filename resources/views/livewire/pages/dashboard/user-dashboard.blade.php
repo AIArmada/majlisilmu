@@ -15,8 +15,6 @@
     $dawahImpactSummary = $this->dawahImpactSummary;
     $recommendedEvent = $this->recommendedEvent;
     $majlisCards = $this->paginatedMajlisCards;
-    $upcomingAgenda = $this->upcomingAgenda;
-    $reminderCount = $upcomingAgenda->count();
     $unreadNotificationCount = $this->unreadNotificationCount;
 
     $translateStatusLabel = static function (string $status): string {
@@ -74,12 +72,6 @@
             'value' => $summary['going_count'],
             'icon' => 'M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zm4 10l2 2 4-4',
             'class' => 'bg-emerald-50 text-emerald-700',
-        ],
-        [
-            'label' => __('Reminder Aktif'),
-            'value' => $reminderCount,
-            'icon' => 'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0',
-            'class' => 'bg-amber-50 text-amber-700',
         ],
         [
             'label' => __('Institusi Diikuti'),
@@ -160,11 +152,6 @@
             'url' => route('dashboard.dawah-impact'),
             'icon' => 'M12 21s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.6-7 10-7 10z',
         ],
-        [
-            'label' => __('Tetapkan reminder'),
-            'url' => route('dashboard.account-settings', ['tab' => 'notifications']),
-            'icon' => 'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0',
-        ],
     ];
 @endphp
 
@@ -191,10 +178,10 @@
             </div>
 
             <div class="relative z-10 mt-8 rounded-lg border border-[#eadfca] bg-white/95 p-4 shadow-xl shadow-amber-950/10 backdrop-blur">
-                <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
                     @foreach($dashboardStats as $stat)
-                        <a href="{{ $loop->index < 2 ? '#majlis-saya' : ($loop->index === 5 ? route('dashboard.dawah-impact') : '#ikuti') }}"
-                            @if($loop->index === 5) wire:navigate @endif
+                        <a href="{{ $loop->index < 2 ? '#majlis-saya' : ($loop->index === 4 ? route('dashboard.dawah-impact') : '#ikuti') }}"
+                            @if($loop->index === 4) wire:navigate @endif
                             class="group flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-[#eee4d3] bg-white px-3 py-4 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/5">
                             <span class="flex size-11 items-center justify-center rounded-full {{ $stat['class'] }}">
                                 <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -237,7 +224,6 @@
                             'all' => __('Semua'),
                             'saved' => __('Disimpan'),
                             'going' => __('Going'),
-                            'reminder' => __('Reminder'),
                         ] as $tabKey => $tabLabel)
                             <button type="button"
                                 @click="activeMajlisTab = '{{ $tabKey }}'"
@@ -267,6 +253,7 @@
                                         : (in_array('going', $cardRoles, true) ? __('Going') : __('Saved'));
                                     $cardAction = in_array('going', $cardRoles, true) ? __('View event') : __('Open event');
                                     $eventHasPoster = $event->hasMedia('poster');
+                                    $cardRoles = array_filter($cardRoles, fn($r) => $r !== 'reminder');
                                     $roleString = implode(' ', $cardRoles);
                                 @endphp
                                 <article

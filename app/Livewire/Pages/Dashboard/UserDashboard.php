@@ -222,10 +222,6 @@ class UserDashboard extends Component
         foreach ($this->savedEvents() as $event) {
             $roles = ['saved'];
 
-            if ($event->starts_at instanceof CarbonInterface && $event->starts_at->isFuture()) {
-                $roles[] = 'reminder';
-            }
-
             $cards->put($event->id, [
                 'event' => $event,
                 'roles' => $roles,
@@ -239,10 +235,6 @@ class UserDashboard extends Component
             ]);
             $roles = $card['roles'];
             $roles[] = 'going';
-
-            if ($event->starts_at instanceof CarbonInterface && $event->starts_at->isFuture()) {
-                $roles[] = 'reminder';
-            }
 
             $card['roles'] = collect($roles)->unique()->values()->all();
             $cards->put($event->id, $card);
