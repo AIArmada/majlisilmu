@@ -361,12 +361,17 @@ it('rejects unsupported public reference sparse fields', function () {
 });
 
 it('exposes authenticated contribution update contracts and permission-gated direct edit media support', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
     $owner = User::factory()->create();
     $visitor = User::factory()->create();
     $institution = Institution::factory()->create([
         'status' => 'verified',
         'description' => 'Community institution',
     ]);
+    $institution->addMedia(fakeGeneratedImageUpload('context-cover.jpg', 1600, 900))->toMediaCollection('cover');
+    $institution->addMedia(fakeGeneratedImageUpload('context-gallery.jpg', 1600, 900))->toMediaCollection('gallery');
 
     assignInstitutionOwnerForFrontendApi($owner, $institution);
 
@@ -390,6 +395,8 @@ it('exposes authenticated contribution update contracts and permission-gated dir
         ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
         ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
         ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['cover', 'gallery'])
+        ->and($ownerResponse->json('data.current_media.cover.0.url'))->not->toBeNull()
+        ->and($ownerResponse->json('data.current_media.gallery.0.url'))->not->toBeNull()
         ->and($fields->pluck('name')->all())->toContain('description', 'address', 'social_media')
         ->and($fields->firstWhere('name', 'type')['allowed_values'])->toContain('masjid')
         ->and($ownerResponse->json('data.initial_state.description'))->toBe('Community institution');
@@ -537,6 +544,9 @@ it('normalizes event update context to public organizer values and exposes looku
 });
 
 it('exposes event direct edit media support for authorized public updaters', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
     $owner = User::factory()->create();
     $visitor = User::factory()->create();
     $institution = Institution::factory()->create([
@@ -554,6 +564,8 @@ it('exposes event direct edit media support for authorized public updaters', fun
         'starts_at' => now()->addDays(4)->setTime(20, 0),
         'ends_at' => now()->addDays(4)->setTime(21, 0),
     ]);
+    $event->addMedia(fakeGeneratedImageUpload('context-poster.jpg', 1200, 1600))->toMediaCollection('poster');
+    $event->addMedia(fakeGeneratedImageUpload('context-gallery.jpg', 1600, 900))->toMediaCollection('gallery');
 
     assignInstitutionOwnerForFrontendApi($owner, $institution);
 
@@ -574,7 +586,9 @@ it('exposes event direct edit media support for authorized public updaters', fun
     expect($visitorResponse->json('data.can_direct_edit'))->toBeFalse()
         ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
         ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
-        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['poster', 'gallery']);
+        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['poster', 'gallery'])
+        ->and($ownerResponse->json('data.current_media.poster.0.url'))->not->toBeNull()
+        ->and($ownerResponse->json('data.current_media.gallery.0.thumb_url'))->not->toBeNull();
 });
 
 it('accepts helper-shaped event timing updates on public contribution suggestions', function () {
@@ -642,12 +656,18 @@ it('allows direct contribution updates to clear nullable institution fields', fu
 });
 
 it('exposes speaker avatar direct edit media support for authorized public updaters', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
     $owner = User::factory()->create();
     $visitor = User::factory()->create();
     $speaker = Speaker::factory()->create([
         'status' => 'verified',
         'is_active' => true,
     ]);
+    $speaker->addMedia(fakeGeneratedImageUpload('context-avatar.jpg', 1200, 1200))->toMediaCollection('avatar');
+    $speaker->addMedia(fakeGeneratedImageUpload('context-cover.jpg', 1200, 1500))->toMediaCollection('cover');
+    $speaker->addMedia(fakeGeneratedImageUpload('context-gallery.jpg', 1600, 900))->toMediaCollection('gallery');
 
     assignSpeakerOwnerForFrontendApi($owner, $speaker);
 
@@ -668,7 +688,10 @@ it('exposes speaker avatar direct edit media support for authorized public updat
     expect($visitorResponse->json('data.can_direct_edit'))->toBeFalse()
         ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
         ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
-        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['avatar', 'cover', 'gallery']);
+        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['avatar', 'cover', 'gallery'])
+        ->and($ownerResponse->json('data.current_media.avatar.0.url'))->not->toBeNull()
+        ->and($ownerResponse->json('data.current_media.cover.0.url'))->not->toBeNull()
+        ->and($ownerResponse->json('data.current_media.gallery.0.thumb_url'))->not->toBeNull();
 });
 
 it('allows direct institution gallery uploads on public contribution update suggestions', function () {
