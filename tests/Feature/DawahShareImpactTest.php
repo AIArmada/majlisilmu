@@ -253,6 +253,24 @@ test('share payload includes a tracking token for authenticated and anonymous sh
         ->and((string) data_get($guestPayload, 'url'))->not->toContain('origin=web');
 });
 
+test('share payload resolves reference slugs without UUID casting errors', function () {
+    $reference = Reference::factory()->create([
+        'slug' => 'al-bayan-fatwa-syeikh-ali-jumah',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($this->sharer)
+        ->getJson(route('dawah-share.payload', [
+            'url' => route('references.show', $reference),
+            'text' => 'Share this reference',
+            'title' => $reference->title,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('tracking_token', fn (mixed $token): bool => is_string($token) && $token !== '')
+        ->assertJsonPath('url', fn (mixed $url): bool => is_string($url) && str_contains($url, 'share='));
+});
+
 test('api share payload exposes origin-aware mobile and native share data', function () {
     $event = Event::factory()->create([
         'status' => 'approved',

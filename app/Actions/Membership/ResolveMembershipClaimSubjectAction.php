@@ -5,13 +5,17 @@ namespace App\Actions\Membership;
 use App\Enums\MemberSubjectType;
 use App\Models\Institution;
 use App\Models\Speaker;
+use App\Support\Models\SlugOrUuidResolver;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ResolveMembershipClaimSubjectAction
 {
     use AsAction;
+
+    public function __construct(
+        private readonly SlugOrUuidResolver $slugOrUuidResolver,
+    ) {}
 
     public function handle(string $subjectType, string $subjectId): Institution|Speaker
     {
@@ -34,12 +38,9 @@ class ResolveMembershipClaimSubjectAction
      */
     private function resolveSlugOrUuid(Builder $query, string $slugColumn, string $subjectId): Institution|Speaker
     {
-        $query->where($slugColumn, $subjectId);
+        /** @var Institution|Speaker $record */
+        $record = $this->slugOrUuidResolver->firstOrFail($query, $slugColumn, $subjectId);
 
-        if (Str::isUuid($subjectId)) {
-            $query->orWhere($query->getModel()->getQualifiedKeyName(), $subjectId);
-        }
-
-        return $query->firstOrFail();
+        return $record;
     }
 }

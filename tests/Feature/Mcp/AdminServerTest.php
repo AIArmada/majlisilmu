@@ -2459,6 +2459,74 @@ it('creates and updates events through MCP write tools', function () {
         ->assertRedirect(route('events.show', $event));
 });
 
+it('emulates production yasin create flow with validate-only then actual create', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $payload = [
+        'title' => 'Majlis Bacaan Yasin',
+        'description' => '<p></p>',
+        'event_date' => '2026-05-07',
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'is_muslim_only' => false,
+        'event_type' => [EventType::BacaanYasin->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => (string) $institution->getKey(),
+        'institution_id' => (string) $institution->getKey(),
+        'registration_required' => false,
+        'registration_mode' => RegistrationMode::Event->value,
+        'is_featured' => false,
+        'is_active' => true,
+    ];
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'validate_only' => true,
+            'apply_defaults' => false,
+            'payload' => $payload,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.preview.validate_only', true)
+            ->where('data.preview.operation', 'create')
+            ->where('data.preview.warnings', [])
+            ->where('data.preview.normalized_payload.title', 'Majlis Bacaan Yasin')
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateRecordTool::class, [
+            'resource_key' => 'events',
+            'validate_only' => false,
+            'apply_defaults' => false,
+            'payload' => $payload,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.title', 'Majlis Bacaan Yasin')
+            ->where('data.record.attributes.starts_on_local_date', '2026-05-07')
+            ->where('data.record.attributes.prayer_display_text', 'Selepas Maghrib')
+            ->etc());
+
+    expect(
+        Event::query()
+            ->where('title', 'Majlis Bacaan Yasin')
+            ->whereDate('starts_at', '2026-05-07')
+            ->exists()
+    )->toBeTrue();
+});
+
 it('surfaces admin event validation failures through MCP write tools', function () {
     ensureMcpMalaysiaCountryExists();
 

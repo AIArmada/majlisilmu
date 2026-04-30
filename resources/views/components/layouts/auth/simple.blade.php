@@ -191,8 +191,8 @@
                             <div
                                 class="absolute -inset-4 bg-emerald-500/10 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                             </div>
-                            <img src="{{ asset('images/milogo.webp') }}" alt="{{ config('app.name') }}"
-                                class="relative h-16 w-16 mx-auto rounded-2xl shadow-lg ring-2 ring-white transform transition-transform duration-500 group-hover:scale-105 group-hover:rotate-3">
+                            <img src="{{ asset('images/logo.png') }}" alt="{{ config('app.name') }}"
+                                class="relative h-16 w-auto mx-auto transform transition-transform duration-500 group-hover:scale-105">
                         </a>
 
                         <div class="mt-6 space-y-2">
