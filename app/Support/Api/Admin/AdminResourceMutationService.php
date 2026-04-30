@@ -1550,7 +1550,7 @@ class AdminResourceMutationService
      */
     private function eventFields(bool $updating): array
     {
-        return [
+        $fields = [
             $this->field('title', 'string', required: ! $updating, maxLength: 255),
             $this->field('description', 'rich_text', required: false),
             $this->field('event_date', 'date', required: ! $updating),
@@ -1741,6 +1741,12 @@ class AdminResourceMutationService
                 ],
             ]),
         ];
+
+        if (! $updating) {
+            $fields[] = $this->field('status', 'string', required: false, default: 'draft', allowedValues: ['draft', 'pending', 'approved']);
+        }
+
+        return $fields;
     }
 
     /**
@@ -2170,7 +2176,7 @@ class AdminResourceMutationService
         $required = $updating ? 'sometimes' : 'required';
         $maxUploadSize = 'max:'.$this->maxUploadSizeKb();
 
-        return [
+        $rules = [
             'title' => [$required, 'string', 'max:255'],
             'description' => ['nullable'],
             'event_date' => [$required, 'date'],
@@ -2229,6 +2235,12 @@ class AdminResourceMutationService
             'registration_required' => ['sometimes', 'boolean'],
             'registration_mode' => ['sometimes', Rule::enum(RegistrationMode::class)],
         ];
+
+        if (! $updating) {
+            $rules['status'] = ['sometimes', Rule::in(['draft', 'pending', 'approved'])];
+        }
+
+        return $rules;
     }
 
     /**

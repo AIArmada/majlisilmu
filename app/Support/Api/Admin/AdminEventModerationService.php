@@ -122,6 +122,7 @@ final readonly class AdminEventModerationService
         $reasonCode = filled($validated['reason_code'] ?? null) ? (string) $validated['reason_code'] : null;
 
         match ($action) {
+            'submit_for_moderation' => $this->moderationService->submitForModeration($event),
             'approve' => $this->moderationService->approve($event, $actor, $note),
             'request_changes' => $this->moderationService->requestChanges($event, $actor, (string) $reasonCode, (string) $note),
             'reject' => $this->moderationService->reject($event, $actor, (string) $reasonCode, (string) $note),

@@ -250,6 +250,40 @@ describe('Request Changes Action (ViewEvent)', function () {
     });
 });
 
+describe('Submit for Moderation Action (ViewEvent)', function () {
+    it('allows moderator to submit a draft event for moderation', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('super_admin');
+
+        $event = Event::factory()->create([
+            'status' => 'draft',
+            'published_at' => null,
+        ]);
+
+        $this->actingAs($moderator);
+
+        Livewire::test(ViewEvent::class, ['record' => $event->id])
+            ->assertActionVisible('submit_for_moderation')
+            ->callAction('submit_for_moderation')
+            ->assertNotified();
+
+        $event->refresh();
+        expect((string) $event->status)->toBe('pending');
+    });
+
+    it('hides submit for moderation action for non-draft events', function () {
+        $moderator = User::factory()->create();
+        $moderator->assignRole('super_admin');
+
+        $pendingEvent = Event::factory()->create(['status' => 'pending']);
+
+        $this->actingAs($moderator);
+
+        Livewire::test(ViewEvent::class, ['record' => $pendingEvent->id])
+            ->assertActionHidden('submit_for_moderation');
+    });
+});
+
 describe('Reconsider Action (ViewEvent)', function () {
     it('allows moderator to reconsider a rejected event', function () {
         $moderator = User::factory()->create();

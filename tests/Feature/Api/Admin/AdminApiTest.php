@@ -409,6 +409,78 @@ it('filters admin event records by explicit query parameters', function () {
         ->and(collect($eventTypeResponse->json('data'))->pluck('route_key')->all())->not->toContain($cancelledHybridEvent->getRouteKey());
 });
 
+it('allows admin api event create payload to control initial workflow status', function () {
+    $admin = adminApiUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $schema = $this->getJson('/api/v1/admin/events/schema?operation=create')
+        ->assertOk()
+        ->json('data.schema');
+
+    $statusField = collect($schema['fields'] ?? [])->firstWhere('name', 'status');
+
+    expect($statusField)->toBeArray()
+        ->and(data_get($statusField, 'default'))->toBe('draft')
+        ->and(data_get($statusField, 'allowed_values'))->toBe(['draft', 'pending', 'approved']);
+
+    $basePayload = [
+        'description' => '<p>Admin API event status payload test</p>',
+        'event_date' => '2026-05-09',
+        'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'event_format' => EventFormat::Physical->value,
+        'visibility' => EventVisibility::Public->value,
+        'gender' => EventGenderRestriction::All->value,
+        'age_group' => [EventAgeGroup::AllAges->value],
+        'children_allowed' => true,
+        'is_muslim_only' => false,
+        'event_type' => [EventType::BacaanYasin->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => (string) $institution->getKey(),
+        'institution_id' => (string) $institution->getKey(),
+        'registration_required' => false,
+        'registration_mode' => RegistrationMode::Event->value,
+        'is_featured' => false,
+        'is_active' => true,
+    ];
+
+    $draftResponse = $this->postJson('/api/v1/admin/events', array_replace($basePayload, [
+        'title' => 'Admin API Draft Status Payload Event',
+        'status' => 'draft',
+    ]))->assertCreated();
+
+    $draftRouteKey = (string) $draftResponse->json('data.record.route_key');
+    $draftEvent = Event::query()->findOrFail($draftRouteKey);
+
+    expect((string) $draftEvent->status)->toBe('draft')
+        ->and($draftEvent->published_at)->toBeNull();
+
+    $moderationSchemaResponse = $this->getJson('/api/v1/admin/events/'.$draftRouteKey.'/moderation-schema')
+        ->assertOk();
+
+    $actionField = collect($moderationSchemaResponse->json('data.schema.fields', []))
+        ->firstWhere('name', 'action');
+
+    expect($actionField['allowed_values'] ?? [])
+        ->toContain('submit_for_moderation');
+
+    $approvedResponse = $this->postJson('/api/v1/admin/events', array_replace($basePayload, [
+        'title' => 'Admin API Approved Status Payload Event',
+        'status' => 'approved',
+    ]))->assertCreated();
+
+    $approvedRouteKey = (string) $approvedResponse->json('data.record.route_key');
+    $approvedEvent = Event::query()->findOrFail($approvedRouteKey);
+
+    expect((string) $approvedEvent->status)->toBe('approved')
+        ->and($approvedEvent->published_at)->not->toBeNull();
+});
+
 it('filters admin event records by top-level date parameters and combines date filters with search', function () {
     $admin = adminApiUser('super_admin');
     $admin->forceFill([
