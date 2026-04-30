@@ -7,13 +7,17 @@ use App\Models\Event;
 use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Speaker;
+use App\Support\Models\SlugOrUuidResolver;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ResolveContributionSubjectAction
 {
     use AsAction;
+
+    public function __construct(
+        private readonly SlugOrUuidResolver $slugOrUuidResolver,
+    ) {}
 
     public function handle(string $subjectType, string $subjectId): Event|Institution|Reference|Speaker
     {
@@ -36,12 +40,9 @@ class ResolveContributionSubjectAction
      */
     private function resolveSlugOrUuid(Builder $query, string $slugColumn, string $subjectId): Event|Institution|Reference|Speaker
     {
-        $query->where($slugColumn, $subjectId);
+        /** @var Event|Institution|Reference|Speaker $record */
+        $record = $this->slugOrUuidResolver->firstOrFail($query, $slugColumn, $subjectId);
 
-        if (Str::isUuid($subjectId)) {
-            $query->orWhere($query->getModel()->getQualifiedKeyName(), $subjectId);
-        }
-
-        return $query->firstOrFail();
+        return $record;
     }
 }

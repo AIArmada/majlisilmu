@@ -1,1 +1,1 @@
-<img src="{{ asset('images/milogo.webp') }}" alt="{{ config('app.name') }}" {{ $attributes }}>
+<img src="{{ asset('images/logo.png') }}" alt="{{ config('app.name') }}" {{ $attributes }}>

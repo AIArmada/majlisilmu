@@ -8,16 +8,16 @@ use App\Models\Reference;
 use App\Models\SlugRedirect;
 use App\Models\Speaker;
 use App\Models\Venue;
+use App\Support\Models\SlugOrUuidResolver;
 use App\Support\Slugs\PublicSlugPathResolver;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Str;
 
 final readonly class ResolvePublicSlugAction
 {
     public function __construct(
         private PublicSlugPathResolver $publicSlugPathResolver,
+        private SlugOrUuidResolver $slugOrUuidResolver,
     ) {}
 
     /**
@@ -74,13 +74,11 @@ final readonly class ResolvePublicSlugAction
 
     private function resolveBySlugOrUuid(Model $model, string $value): ?Model
     {
-        return $model->newQuery()
-            ->where($model->qualifyColumn('slug'), $value)
-            ->when(
-                Str::isUuid($value),
-                fn (Builder $query) => $query->orWhere($model->getQualifiedKeyName(), $value),
-            )
-            ->first();
+        return $this->slugOrUuidResolver->first(
+            $model->newQuery(),
+            $model->qualifyColumn('slug'),
+            $value,
+        );
     }
 
     private function throwNotFound(string $parameter, string $value): never

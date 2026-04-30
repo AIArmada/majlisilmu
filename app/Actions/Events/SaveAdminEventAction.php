@@ -220,6 +220,7 @@ final readonly class SaveAdminEventAction
             'is_priority' => array_key_exists('is_priority', $state) ? (bool) $state['is_priority'] : (bool) $event->is_priority,
             'is_featured' => array_key_exists('is_featured', $state) ? (bool) $state['is_featured'] : (bool) $event->is_featured,
             'is_active' => array_key_exists('is_active', $state) ? (bool) $state['is_active'] : ($creating ? true : (bool) $event->is_active),
+            'status' => $creating ? 'draft' : (string) $event->status,
             'escalated_at' => $this->normalizeOptionalDateTime($state['escalated_at'] ?? $event->escalated_at),
         ];
 

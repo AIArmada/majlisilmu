@@ -40,6 +40,7 @@ use App\Support\ApiDocumentation\Schemas\ReferenceDirectoryResponse;
 use App\Support\ApiDocumentation\Schemas\SpeakerDetailResponse;
 use App\Support\ApiDocumentation\Schemas\SpeakerDirectoryResponse;
 use App\Support\Cache\PublicDirectoryCacheVersion;
+use App\Support\Models\SlugOrUuidResolver;
 use App\Support\Search\InstitutionSearchService;
 use App\Support\Search\ReferenceSearchService;
 use App\Support\Search\SpeakerSearchService;
@@ -124,6 +125,7 @@ class SearchController extends FrontendController
         private readonly PublicDirectoryCacheVersion $publicDirectoryCacheVersion,
         private readonly SearchRequestNormalizer $searchRequestNormalizer,
         private readonly SearchPayloadTransformer $searchPayloadTransformer,
+        private readonly SlugOrUuidResolver $slugOrUuidResolver,
     ) {}
 
     #[Group('Search', 'Public aggregate search endpoints across events, speakers, and institutions.')]
@@ -461,13 +463,7 @@ class SearchController extends FrontendController
                 'spaces' => fn ($query) => $query->where('is_active', true),
                 'languages',
             ])
-            ->where(function (Builder $query) use ($institutionKey): void {
-                $query->where('slug', $institutionKey);
-
-                if (Str::isUuid($institutionKey)) {
-                    $query->orWhere('id', $institutionKey);
-                }
-            })
+            ->tap(fn (Builder $query): Builder => $this->slugOrUuidResolver->apply($query, 'institutions.slug', $institutionKey))
             ->firstOrFail();
 
         abort_unless($user instanceof User ? $user->can('view', $record) : $record->status === 'verified', 404);
@@ -530,13 +526,7 @@ class SearchController extends FrontendController
                 'institutions' => fn ($query) => $query->orderByPivot('is_primary', 'desc')->limit(3),
                 'institutions.media',
             ])
-            ->where(function (Builder $query) use ($speakerKey): void {
-                $query->where('slug', $speakerKey);
-
-                if (Str::isUuid($speakerKey)) {
-                    $query->orWhere('id', $speakerKey);
-                }
-            })
+            ->tap(fn (Builder $query): Builder => $this->slugOrUuidResolver->apply($query, 'speakers.slug', $speakerKey))
             ->firstOrFail();
 
         abort_unless($user instanceof User ? $user->can('view', $record) : ($record->is_active && $record->status === 'verified'), 404);
@@ -668,13 +658,7 @@ class SearchController extends FrontendController
                 'contacts',
                 'socialMedia',
             ])
-            ->where(function (Builder $query) use ($venueKey): void {
-                $query->where('slug', $venueKey);
-
-                if (Str::isUuid($venueKey)) {
-                    $query->orWhere('id', $venueKey);
-                }
-            })
+            ->tap(fn (Builder $query): Builder => $this->slugOrUuidResolver->apply($query, 'venues.slug', $venueKey))
             ->firstOrFail();
 
         if (! $record->is_active || ($record->status !== 'verified' && ! $canBypassVisibility)) {
@@ -805,13 +789,7 @@ class SearchController extends FrontendController
 
         $record = Reference::query()
             ->with(['media', 'socialMedia'])
-            ->where(function (Builder $query) use ($referenceKey): void {
-                $query->where('slug', $referenceKey);
-
-                if (Str::isUuid($referenceKey)) {
-                    $query->orWhere('id', $referenceKey);
-                }
-            })
+            ->tap(fn (Builder $query): Builder => $this->slugOrUuidResolver->apply($query, 'references.slug', $referenceKey))
             ->firstOrFail();
 
         abort_unless($user instanceof User ? $user->can('view', $record) : ($record->is_active && $record->status === 'verified'), 404);
@@ -892,13 +870,7 @@ class SearchController extends FrontendController
 
         $record = Series::query()
             ->with(['media'])
-            ->where(function (Builder $query) use ($series): void {
-                $query->where('slug', $series);
-
-                if (Str::isUuid($series)) {
-                    $query->orWhere('id', $series);
-                }
-            })
+            ->tap(fn (Builder $query): Builder => $this->slugOrUuidResolver->apply($query, 'series.slug', $series))
             ->firstOrFail();
 
         if ($record->visibility !== 'public' && ! $canBypassVisibility) {

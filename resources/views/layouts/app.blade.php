@@ -164,14 +164,9 @@
                 class="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70 backdrop-blur-md transition-all"
                 x-data="{ mobileMenuOpen: false }">
                 <nav class="container mx-auto flex h-20 items-center justify-between px-6 lg:px-12">
-                    <a href="{{ route('home') }}" wire:navigate class="flex items-center gap-3 group">
-                        <img src="{{ asset('images/milogo.webp') }}" alt="Majlis Ilmu"
-                            class="h-12 w-12 rounded-xl shadow-lg transition-transform group-hover:scale-105">
-                        <div class="flex flex-col">
-                            <span
-                                class="font-heading text-xl font-bold tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">Majlis
-                                Ilmu</span>
-                        </div>
+                    <a href="{{ route('home') }}" wire:navigate class="flex items-center group">
+                        <img src="{{ asset('images/logo.png') }}" alt="{{ config('app.name') }}"
+                            class="h-12 w-auto transition-transform group-hover:scale-105">
                     </a>
 
                     <!-- Desktop Menu -->

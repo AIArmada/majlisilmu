@@ -10,19 +10,19 @@ use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\User;
 use App\Services\ShareTrackingService;
+use App\Support\Models\SlugOrUuidResolver;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\PathParameter;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 #[Group('Follow', 'Authenticated endpoints for reading and mutating follow state across public institutions, speakers, references, and series.')]
 class FollowController extends FrontendController
 {
     public function __construct(
         private readonly ShareTrackingService $shareTrackingService,
+        private readonly SlugOrUuidResolver $slugOrUuidResolver,
     ) {}
 
     #[PathParameter('type', 'Followable public resource type. Use singular values only: `institution`, `speaker`, `reference`, or `series`; plural list paths such as `/follows/speakers` are not valid.', example: 'institution')]
@@ -113,15 +113,12 @@ class FollowController extends FrontendController
 
     private function resolveInstitution(string $subject, User $user): Institution
     {
-        $record = Institution::query()
-            ->where(function (Builder $query) use ($subject): void {
-                $query->where('slug', $subject);
-
-                if (Str::isUuid($subject)) {
-                    $query->orWhere('id', $subject);
-                }
-            })
-            ->firstOrFail();
+        /** @var Institution $record */
+        $record = $this->slugOrUuidResolver->firstOrFail(
+            Institution::query(),
+            'institutions.slug',
+            $subject,
+        );
 
         if ($record->status !== 'verified' && ! $user->hasAnyRole(['super_admin', 'moderator'])) {
             abort(404);
@@ -132,15 +129,12 @@ class FollowController extends FrontendController
 
     private function resolveSpeaker(string $subject, User $user): Speaker
     {
-        $record = Speaker::query()
-            ->where(function (Builder $query) use ($subject): void {
-                $query->where('slug', $subject);
-
-                if (Str::isUuid($subject)) {
-                    $query->orWhere('id', $subject);
-                }
-            })
-            ->firstOrFail();
+        /** @var Speaker $record */
+        $record = $this->slugOrUuidResolver->firstOrFail(
+            Speaker::query(),
+            'speakers.slug',
+            $subject,
+        );
 
         if (! $record->is_active || ($record->status !== 'verified' && ! $user->hasAnyRole(['super_admin', 'moderator']))) {
             abort(404);
@@ -151,15 +145,12 @@ class FollowController extends FrontendController
 
     private function resolveReference(string $subject): Reference
     {
-        $record = Reference::query()
-            ->where(function (Builder $query) use ($subject): void {
-                $query->where('slug', $subject);
-
-                if (Str::isUuid($subject)) {
-                    $query->orWhere('id', $subject);
-                }
-            })
-            ->firstOrFail();
+        /** @var Reference $record */
+        $record = $this->slugOrUuidResolver->firstOrFail(
+            Reference::query(),
+            'references.slug',
+            $subject,
+        );
 
         abort_unless($record->is_active, 404);
 
@@ -168,15 +159,12 @@ class FollowController extends FrontendController
 
     private function resolveSeries(string $subject, User $user): Series
     {
-        $record = Series::query()
-            ->where(function (Builder $query) use ($subject): void {
-                $query->where('slug', $subject);
-
-                if (Str::isUuid($subject)) {
-                    $query->orWhere('id', $subject);
-                }
-            })
-            ->firstOrFail();
+        /** @var Series $record */
+        $record = $this->slugOrUuidResolver->firstOrFail(
+            Series::query(),
+            'series.slug',
+            $subject,
+        );
 
         if ($record->visibility !== 'public' && ! $user->hasAnyRole(['super_admin', 'moderator'])) {
             abort(404);

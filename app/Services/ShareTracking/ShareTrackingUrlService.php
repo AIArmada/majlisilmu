@@ -10,6 +10,7 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
+use App\Support\Models\SlugOrUuidResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -19,6 +20,10 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class ShareTrackingUrlService
 {
+    public function __construct(
+        private readonly SlugOrUuidResolver $slugOrUuidResolver,
+    ) {}
+
     /**
      * @return list<string>
      */
@@ -576,10 +581,11 @@ final class ShareTrackingUrlService
      */
     private function referenceTarget(string $referenceIdentifier): array
     {
-        $reference = Reference::query()
-            ->where('slug', $referenceIdentifier)
-            ->orWhere((new Reference)->getQualifiedKeyName(), $referenceIdentifier)
-            ->first();
+        $reference = $this->slugOrUuidResolver->first(
+            Reference::query(),
+            'references.slug',
+            $referenceIdentifier,
+        );
 
         if (! $reference instanceof Reference) {
             return $this->subjectResult(
