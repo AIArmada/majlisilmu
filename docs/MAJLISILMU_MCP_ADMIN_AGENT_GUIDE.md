@@ -243,6 +243,8 @@ Use this section as the quick admin-only capability summary.
   2. speaker `avatar`
   3. organizer institution media from `event->organizer` when it is an `Institution`
 - If speaker and organizer institution media are unavailable, the generation tool still proceeds.
+- Operational fallback: if generation fails while attaching reference media, retry with `include_existing_media=false` and `max_reference_media=0`.
+- Reference media listed in prompt context may be skipped from the actual image request when storage access cannot produce a supported attachment type at runtime.
 
 ## Writable resource matrix
 
@@ -399,6 +401,8 @@ You can provide a URL-based descriptor when base64 content is unavailable:
 ```
 
 Accepted aliases: `file_name`, `fileName`, or `name` for `filename`; `mime` or `mimeType` for `mime_type`; `base64`, `contentBase64`, or `data` for `content_base64`; and `contentUrl` or `url` for `content_url`. ChatGPT file params: `downloadUrl` or `download_url` for content URL, and `fileId` or `file_id` for metadata (ignored by server). Data URLs are accepted for `content_base64`. Filename extensions are recommended; when omitted, the server derives the staged extension from `mime_type` or response Content-Type header. For safety, URL-based descriptors (`content_url` or `download_url`) must be absolute `http(s)` URLs without embedded credentials, must resolve to public hosts only, and must not redirect.
+
+If a client bridge/proxy file-URL rewrite fails before request dispatch (for example mount-rewrite errors), use `content_base64` descriptors as the fallback path.
 
 Schema fields describe the exact upload rules:
 

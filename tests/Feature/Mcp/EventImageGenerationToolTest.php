@@ -14,6 +14,7 @@ use App\Mcp\Tools\Admin\AdminGenerateEventCoverImageTool;
 use App\Mcp\Tools\Admin\AdminGetRecordActionsTool;
 use App\Mcp\Tools\Member\MemberGenerateEventPosterImageTool;
 use App\Mcp\Tools\Member\MemberGetRecordActionsTool;
+use App\Support\Mcp\EventImageGenerationService;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Institution;
@@ -25,9 +26,12 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Laravel\Ai\Files\RemoteImage;
+use Laravel\Ai\Files\StoredImage;
 use Laravel\Ai\Image;
 use Laravel\Ai\Prompts\ImagePrompt;
 use Laravel\Mcp\Server\Testing\TestResponse as McpTestResponse;
+use ReflectionMethod;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -198,6 +202,36 @@ it('exposes mutating and open-world metadata for event image generation tools', 
     expect(data_get($adminTool, '_meta.openai/toolInvocation/invoking'))->toBe('Generating event cover image...')
         ->and(data_get($memberTool, 'inputSchema.properties.aspect_ratio'))->toBeNull()
         ->and(data_get($memberTool, 'inputSchema.properties.max_reference_media.maximum'))->toBe(8);
+});
+
+it('uses storage-backed image attachments instead of remote url attachments', function (): void {
+    Storage::fake('s3');
+
+    $event = Event::factory()->create([
+        'institution_id' => Institution::factory()->create()->getKey(),
+        'title' => 'Attachment Safety Event',
+        'slug' => 'attachment-safety-event',
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $event
+        ->addMedia(fakeGeneratedImageUpload('attachment-safety-cover.jpg', 1600, 900))
+        ->toMediaCollection('cover', 's3');
+
+    $media = $event->getFirstMedia('cover');
+
+    expect($media)->toBeInstanceOf(Media::class);
+
+    $service = app(EventImageGenerationService::class);
+    $method = new ReflectionMethod(EventImageGenerationService::class, 'attachmentForMedia');
+    $method->setAccessible(true);
+
+    $attachment = $method->invoke($service, $media);
+
+    expect($attachment)
+        ->toBeInstanceOf(StoredImage::class)
+        ->not->toBeInstanceOf(RemoteImage::class);
 });
 
 /**
