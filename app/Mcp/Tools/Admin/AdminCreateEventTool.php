@@ -19,6 +19,7 @@ use App\Support\Api\Admin\AdminResourceService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -224,20 +225,61 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
     {
         /** @var Model $model */
         $model = new $modelClass;
-        $routeKeyName = $model->getRouteKeyName();
 
-        $record = $modelClass::query()
-            ->whereKey($key)
-            ->orWhere($routeKeyName, $key)
-            ->first();
+        foreach ($this->lookupColumns($model) as $column) {
+            if (! $this->canLookupWithValue($model, $column, $key)) {
+                continue;
+            }
 
-        if (! $record instanceof Model) {
-            throw ValidationException::withMessages([
-                $field => __('The selected record key is invalid.'),
-            ]);
+            $record = $modelClass::query()->where($column, $key)->first();
+
+            if ($record instanceof Model) {
+                return (string) $record->getKey();
+            }
         }
 
-        return (string) $record->getKey();
+        throw ValidationException::withMessages([
+            $field => __('The selected record key is invalid.'),
+        ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function lookupColumns(Model $model): array
+    {
+        $columns = [];
+
+        if (in_array('slug', $model->getFillable(), true)) {
+            $columns[] = 'slug';
+        }
+
+        foreach ([$model->getRouteKeyName(), $model->getKeyName()] as $column) {
+            if (! in_array($column, $columns, true)) {
+                $columns[] = $column;
+            }
+        }
+
+        return $columns;
+    }
+
+    private function canLookupWithValue(Model $model, string $column, string $value): bool
+    {
+        $keyName = $model->getKeyName();
+
+        if ($column !== $keyName) {
+            return true;
+        }
+
+        if ($model->getKeyType() === 'int') {
+            return ctype_digit($value);
+        }
+
+        if ($keyName === 'id') {
+            return Str::isUuid($value) || Str::isUlid($value);
+        }
+
+        return true;
     }
 
     /**

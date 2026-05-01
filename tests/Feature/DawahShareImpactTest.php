@@ -271,6 +271,34 @@ test('share payload resolves reference slugs without UUID casting errors', funct
         ->assertJsonPath('url', fn (mixed $url): bool => is_string($url) && str_contains($url, 'share='));
 });
 
+test('share redirect resolves non uuid reference slugs without server errors', function () {
+    $reference = Reference::factory()->create([
+        'slug' => 'fiqh-muamalat',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $redirectResponse = $this->actingAs($this->sharer)
+        ->get(route('dawah-share.redirect', [
+            'provider' => 'whatsapp',
+            'url' => route('references.show', $reference),
+            'text' => 'Share this reference',
+            'title' => $reference->title,
+        ]));
+
+    $redirectResponse->assertRedirect();
+
+    $sharedUrl = dawahShareExtractSharedUrlFromWhatsAppRedirect($redirectResponse);
+
+    $this->get($sharedUrl)->assertOk();
+
+    $link = AffiliateLink::query()->firstOrFail();
+
+    expect($link->subject_type)->toBe('reference')
+        ->and($link->subject_identifier)->toBe('reference:'.$reference->id)
+        ->and($link->destination_url)->toBe(route('references.show', $reference));
+});
+
 test('api share payload exposes origin-aware mobile and native share data', function () {
     $event = Event::factory()->create([
         'status' => 'approved',
