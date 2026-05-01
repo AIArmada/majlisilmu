@@ -2396,6 +2396,7 @@ it('creates and updates events through MCP write tools', function () {
 
     $admin = adminMcpUser('super_admin');
     $institution = Institution::factory()->create([
+        'slug' => 'masjid-tengku-ampuan-jemaah-bukit-jelutong-petaling-selangor-my',
         'status' => 'verified',
         'is_active' => true,
     ]);
@@ -2527,8 +2528,8 @@ it('emulates production yasin create flow with validate-only then actual create'
         'is_muslim_only' => false,
         'event_type' => [EventType::BacaanYasin->value],
         'organizer_type' => 'institution',
-        'organizer_key' => (string) $institution->getRouteKey(),
-        'institution_key' => (string) $institution->getRouteKey(),
+        'organizer_key' => (string) $institution->slug,
+        'institution_key' => (string) $institution->slug,
         'registration_required' => false,
         'registration_mode' => RegistrationMode::Event->value,
         'status' => 'pending',
