@@ -1149,6 +1149,15 @@ it('submits draft events for moderation through the admin MCP workflow tool', fu
             ->etc());
 
     expect((string) ($event->fresh()?->status))->toBe('pending');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminGetEventModerationSchemaTool::class, [
+            'record_key' => $event->getKey(),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.schema.fields.0.allowed_values', ['approve', 'request_changes', 'reject', 'cancel'])
+            ->etc());
 });
 
 it('reviews contribution requests through the admin MCP workflow tool', function () {

@@ -25,7 +25,7 @@ class AdminModerateEventTool extends AbstractAdminTool
 {
     protected string $name = 'admin-moderate-event';
 
-    protected string $description = 'Run one explicit admin moderation action on an event, such as approve, request changes, reject, cancel, reconsider, remoderate, or revert to draft.';
+    protected string $description = 'Run one explicit admin moderation action on an event, such as submit for moderation, approve, request changes, reject, cancel, reconsider, remoderate, or revert to draft.';
 
     public function __construct(
         private readonly AdminEventModerationService $moderationService,
@@ -59,16 +59,7 @@ class AdminModerateEventTool extends AbstractAdminTool
     {
         return [
             'record_key' => $schema->string()->required()->min(1),
-            'action' => $schema->string()->required()->enum([
-                'submit_for_moderation',
-                'approve',
-                'request_changes',
-                'reject',
-                'cancel',
-                'reconsider',
-                'remoderate',
-                'revert_to_draft',
-            ]),
+            'action' => $schema->string()->required()->enum(EventModerationWorkflow::allActionKeys()),
             'reason_code' => $schema->string()->nullable()->enum(array_keys(EventModerationWorkflow::reasonOptions())),
             'note' => $schema->string()->nullable(),
         ];

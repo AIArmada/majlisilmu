@@ -36,7 +36,7 @@ class EventModerationController extends Controller
     #[PathParameter('recordKey', 'Existing event route key returned by the admin collection or record endpoints.', example: '0195b86a-3c15-73fa-a2d8-5a45f6a7f701')]
     #[Endpoint(
         title: 'Moderate an event',
-        description: 'Runs one explicit moderation action such as approve, request changes, reject, cancel, reconsider, remoderate, or revert to draft.',
+        description: 'Runs one explicit moderation action such as submit for moderation, approve, request changes, reject, cancel, reconsider, remoderate, or revert to draft.',
     )]
     public function moderate(string $recordKey, Request $request): JsonResponse
     {
