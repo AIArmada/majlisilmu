@@ -389,6 +389,8 @@ You can also provide a URL-based descriptor when base64 content is unavailable:
 
 Accepted aliases are `file_name`, `fileName`, or `name` for `filename`; `mime` or `mimeType` for `mime_type`; and `base64`, `contentBase64`, or `data` for `content_base64`. URL aliases `contentUrl` and `url` are accepted for `content_url`. ChatGPT file params: `downloadUrl` or `download_url` for content URL, and `fileId` or `file_id` for metadata (ignored by server). Data URLs are accepted for `content_base64`. Filename extensions are recommended; when they are omitted, the server derives the staged extension from `mime_type` or the fetched response content type. For safety, URL-based descriptors (`content_url` or `download_url`) must be absolute `http(s)` URLs without embedded credentials, must resolve to public hosts only, and must not redirect.
 
+If a client bridge/proxy file-URL rewrite fails before request dispatch (for example mount-rewrite errors), use `content_base64` descriptors as the fallback path.
+
 Schema fields describe the exact upload rules:
 
 - `mcp_upload.shape` is `file_descriptor` for a single file and `array<file_descriptor>` for multiple files.
@@ -431,6 +433,7 @@ Member tool behavior notes:
 - `validate_only=true` is supported for member update previews.
 - `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries. Unlike admin, `member-list-records` does **not** accept a `filters` object; use `search`, `starts_after`, `starts_before`, and `starts_on_local_date` to narrow results.
 - `member-generate-event-cover-image` and `member-generate-event-poster-image` mutate accessible event media collections within Ahli scope. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Both resolve one accessible event by `event_key`, build a prompt from event data, relation data, and selected available media, attach suitable reference images to the image request, normalize the output ratio, store the generated media, and return `prompt`, `upload_spec`, `reference_media`, `source_data`, `generated_media`, and generation metadata. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+- If generation fails while attaching reference media, retry with `include_existing_media=false` and `max_reference_media=0` to generate without reference attachments.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - The member surface intentionally does not expose admin-only moderation, triage, or create workflows.
 - Member update schemas reuse the same resource-level write semantics where the resource is shared, so clients should still fetch the current record and re-send the full intended collection when a field is replacement-based.

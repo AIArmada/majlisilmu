@@ -172,16 +172,15 @@ class EventImageGenerationService
         }
 
         $relativePath = $media->getPathRelativeToRoot();
+        $disk = is_string($media->disk) ? $media->disk : null;
 
-        if ($relativePath !== '') {
+        if ($relativePath !== '' && is_string($disk) && $disk !== '') {
             try {
-                $storagePath = Storage::disk((string) $media->disk)->path($relativePath);
-
-                if (is_file($storagePath)) {
-                    return ImageAttachment::fromPath($storagePath, $mimeType);
+                if (Storage::disk($disk)->exists($relativePath)) {
+                    return ImageAttachment::fromStorage($relativePath, $disk);
                 }
             } catch (Throwable) {
-                // Remote disks may not expose a local path; fall through to URL attachment.
+                // Skip unsupported storage adapters and continue with local path fallback.
             }
         }
 
@@ -189,12 +188,6 @@ class EventImageGenerationService
 
         if ($path !== '' && is_file($path)) {
             return ImageAttachment::fromPath($path, $mimeType);
-        }
-
-        $url = $media->getFullUrl();
-
-        if (filter_var($url, FILTER_VALIDATE_URL) !== false) {
-            return ImageAttachment::fromUrl($url);
         }
 
         return null;

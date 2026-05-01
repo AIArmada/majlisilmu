@@ -44,6 +44,20 @@ The tool generates, normalizes, and stores a 16:9 image in the Event `cover` med
 
 When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 
+If generation fails while attaching reference media, retry without reference attachments:
+
+```json
+{
+  "tool": "admin-generate-event-cover-image",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "creative_direction": "Premium editorial cover with deep emerald, warm gold, and strong Malay typography.",
+    "include_existing_media": false,
+    "max_reference_media": 0
+  }
+}
+```
+
 ### Generate an event poster image
 
 ```json
@@ -155,6 +169,26 @@ For event media writes, ratio checks are server-enforced on every write surface:
       }
     },
     "validate_only": true
+  }
+}
+```
+
+**Manual event cover replacement with base64 descriptor (fallback path):**
+
+```json
+{
+  "tool": "admin-update-record",
+  "arguments": {
+    "resource_key": "events",
+    "record_key": "weekly-kuliah-selasa",
+    "payload": {
+      "cover": {
+        "filename": "weekly-kuliah-selasa-cover.png",
+        "mime_type": "image/png",
+        "content_base64": "iVBORw0KGgo..."
+      }
+    },
+    "validate_only": false
   }
 }
 ```

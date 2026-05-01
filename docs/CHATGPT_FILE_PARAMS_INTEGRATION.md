@@ -206,6 +206,7 @@ $tool['_meta'] = ['openai/fileParams' => ['evidence']];
 3. Server is accessible from Laravel app environment
 4. File is non-empty (>0 bytes)
 5. Content-Type header is present and valid
+6. If the client/proxy layer throws rewrite/mount errors before MCP dispatch (e.g., "File arg rewrite paths are required when proxied mounts are present"), retry with `content_base64` instead of `download_url`.
 
 ### MIME Type Mismatch
 
@@ -216,5 +217,5 @@ $tool['_meta'] = ['openai/fileParams' => ['evidence']];
 
 ---
 
-**Last Updated**: April 2026  
+**Last Updated**: May 2026  
 **Status**: Implemented & Tested ✅

@@ -430,7 +430,8 @@ Admin tool behavior notes:
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
 - `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
 - The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
-- Media/file upload fields accept JSON base64 descriptors only when the matching write schema advertises them.
+- Media/file upload fields accept JSON file descriptors when the matching write schema advertises them; descriptor content may be provided via `content_base64`, `content_url`, or `download_url` (ChatGPT file params).
+- If generation fails while attaching reference media, retry with `include_existing_media=false` and `max_reference_media=0` to generate without reference attachments.
 - Event media writes enforce fixed ratios across MCP writes: `cover` must be `16:9` and `poster` must be `4:5`.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain. This tool is **conditionally registered** and only present when the GitHub issue reporter is configured; it will be absent from `tools/list` if GitHub issue reporting has not been set up.
@@ -478,7 +479,8 @@ Member tool behavior notes:
 - Contribution-request workflow tools cover listing, approving, rejecting, and cancelling queue items that the authenticated member can legitimately act on through the Ahli surface.
 - Membership-claim workflow tools cover listing, submitting with evidence uploads, and cancelling the member's own pending claims.
 - `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
-- Media/file upload fields accept JSON base64 descriptors only when the matching member write schema advertises them.
+- Media/file upload fields accept JSON file descriptors when the matching member write schema advertises them; descriptor content may be provided via `content_base64`, `content_url`, or `download_url` (ChatGPT file params).
+- If generation fails while attaching reference media, retry with `include_existing_media=false` and `max_reference_media=0` to generate without reference attachments.
 - As with admin tools, ChatGPT only understands what the tool descriptor exposes; if a capability is not registered as a tool, the model will not assume it exists.
 
 ### MCP media/file upload contract
