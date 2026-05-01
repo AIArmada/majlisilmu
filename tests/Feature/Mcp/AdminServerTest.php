@@ -3238,6 +3238,22 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'openWorldHint' => false,
     ]);
 
+    expect($tools->get('admin-create-event')['annotations'] ?? [])->toMatchArray([
+        'readOnlyHint' => false,
+        'idempotentHint' => false,
+        'destructiveHint' => false,
+        'openWorldHint' => false,
+    ]);
+    expect(data_get($tools->get('admin-create-event'), 'title'))->toBe('Create Event');
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.required'))->contains('title'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.required'))->contains('event_date'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.required'))->contains('prayer_time'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.required'))->contains('event_type'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.organizer_key.type'))->contains('string'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.institution_key.type'))->contains('string'))->toBeTrue();
+    expect(data_get($tools->get('admin-create-event'), 'inputSchema.properties.organizer_id'))->toBeNull();
+    expect(data_get($tools->get('admin-create-event'), 'inputSchema.properties.institution_id'))->toBeNull();
+
     expect(data_get($tools->get('admin-create-record'), 'inputSchema.properties.payload.type'))->toBe('object');
     expect(collect((array) data_get($tools->get('admin-create-record'), 'inputSchema.required'))->contains('payload'))->toBeTrue();
 
