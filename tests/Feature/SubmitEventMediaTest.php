@@ -61,12 +61,12 @@ function submitEventMediaFormData(array $fixtures, array $overrides = []): array
     ], $overrides);
 }
 
-function submitEventMediaUpload(string $targetName): UploadedFile
+function submitEventMediaUpload(string $targetName, int $width = 1600, int $height = 900): UploadedFile
 {
-    return UploadedFile::fake()->image($targetName, 1600, 900);
+    return UploadedFile::fake()->image($targetName, $width, $height);
 }
 
-it('stores poster and gallery uploads when submitting an event', function () {
+it('stores cover, poster, and gallery uploads when submitting an event', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
 
@@ -79,7 +79,8 @@ it('stores poster and gallery uploads when submitting an event', function () {
 
     $component
         ->fillForm([
-            'poster' => submitEventMediaUpload('poster.png'),
+            'cover' => submitEventMediaUpload('cover.png'),
+            'poster' => submitEventMediaUpload('poster.png', 1200, 1500),
             'gallery' => [
                 submitEventMediaUpload('gallery-1.png'),
                 submitEventMediaUpload('gallery-2.png'),
@@ -94,6 +95,7 @@ it('stores poster and gallery uploads when submitting an event', function () {
         ->map(fn (string $speakerId): string => Speaker::query()->findOrFail($speakerId)->slug)
         ->all();
 
+    expect($event->getMedia('cover'))->toHaveCount(1);
     expect($event->getMedia('poster'))->toHaveCount(1);
     expect($event->getMedia('gallery'))->toHaveCount(2);
     expect($event->tags)->toHaveCount(3)
@@ -102,16 +104,24 @@ it('stores poster and gallery uploads when submitting an event', function () {
             implode('-', $speakerSlugSegments),
             $expectedSuffix,
         ))
-        ->and($event->poster_display_aspect_ratio)->toBe('16:9');
+        ->and($event->poster_display_aspect_ratio)->toBe('4:5');
 });
 
-it('allows only 16:9 and 4:5 poster ratio options on the public submit-event form', function () {
+it('uses fixed cover and poster ratios on the public submit-event form', function () {
     Livewire::test('pages.submit-event.create')
+        ->assertFormFieldExists('cover', function (FileUpload $upload): bool {
+            expect($upload->getImageAspectRatio())
+                ->toBe('16:9')
+                ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
+                ->toBe([]);
+
+            return true;
+        })
         ->assertFormFieldExists('poster', function (FileUpload $upload): bool {
             expect($upload->getImageAspectRatio())
-                ->toBe(['16:9', '4:5'])
+                ->toBe('4:5')
                 ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
-                ->toBe(['16:9', '4:5']);
+                ->toBe([]);
 
             return true;
         });

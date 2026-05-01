@@ -781,6 +781,7 @@ it('shows the richer event update controls for maintainers', function () {
         ->assertFormFieldVisible('event_date')
         ->assertFormFieldVisible('prayer_time')
         ->assertFormFieldVisible('organizer_institution_id')
+        ->assertFormFieldVisible('cover')
         ->assertFormFieldVisible('poster')
         ->assertFormFieldVisible('gallery');
 });

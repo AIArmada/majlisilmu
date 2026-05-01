@@ -1,6 +1,6 @@
 # MajlisIlmu Admin MCP Agent Guide
 
-Updated: April 28, 2026
+Updated: May 2, 2026
 Audience: model-facing admin MCP agents and tool clients.
 
 This guide is for the admin MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The member guide is separate and is not exposed through this server.
@@ -226,9 +226,23 @@ Use this section as the quick admin-only capability summary.
 | Report triage | `admin-triage-report` |
 | Contribution-request workflows | `admin-review-contribution-request` |
 | Membership-claim workflows | `admin-review-membership-claim` |
+| Event image generation | `admin-generate-event-cover-image`, `admin-generate-event-poster-image` |
 | Create | `admin-create-record` |
 | Update | `admin-update-record` |
 | Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` |
+
+## Event cover/poster image generation
+
+- Use `admin-generate-event-cover-image` for the website/app event visual.
+- Use `admin-generate-event-poster-image` for the external-distribution flyer visual.
+- Target ratio is fixed and server-enforced:
+  - `cover` = `16:9`
+  - `poster` = `4:5`
+- Reference-media selection for speaker likeness/context follows:
+  1. speaker `cover`
+  2. speaker `avatar`
+  3. organizer institution media from `event->organizer` when it is an `Institution`
+- If speaker and organizer institution media are unavailable, the generation tool still proceeds.
 
 ## Writable resource matrix
 
@@ -390,6 +404,7 @@ Schema fields describe the exact upload rules:
 
 - `mcp_upload.shape` is `file_descriptor` for a single file and `array<file_descriptor>` for multiple files.
 - `accepted_mime_types`, `max_file_size_kb`, and `max_files` are authoritative for that field.
+- For event media fields, server validation enforces `cover = 16:9` and `poster = 4:5`.
 - `mcp_upload.replacement_semantics` describes whether the submitted descriptor or descriptor array replaces the target media collection.
 - When a write tool supports `validate_only=true`, previews normalize descriptors into file summaries without persisting media.
 - `current_media` stays metadata-only and does not expose signed or temporary URLs.
@@ -409,7 +424,8 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | MCP-only next-step action guidance tool |
-| `admin-generate-event-cover-prompt` | Build a ready image-generation prompt plus selected event relation/media references for one event poster | MCP-only creative prompt/media preparation tool |
+| `admin-generate-event-cover-image` | Generate and save a 16:9 website/app cover image for one event using event data plus selected relation/media references | MCP-only creative image generation tool |
+| `admin-generate-event-poster-image` | Generate and save a 4:5 portrait marketing poster for one event using event data plus selected relation/media references | MCP-only creative image generation tool |
 | `admin-get-write-schema` | Discover the create/update contract for a writable admin record | `GET /api/v1/admin/{resourceKey}/schema` |
 | `admin-get-event-moderation-schema` | Read the explicit moderation schema for one event | `GET /api/v1/admin/events/{recordKey}/moderation-schema` |
 | `admin-get-report-triage-schema` | Read the explicit triage schema for one report | `GET /api/v1/admin/reports/{recordKey}/triage-schema` |
@@ -430,7 +446,7 @@ Admin tool behavior notes:
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
-- `admin-generate-event-cover-prompt` is read-only. It resolves one event by `event_key`, returns `prompt`, `upload_spec`, `reference_media`, and `source_data`, and embeds selected image media when available so ChatGPT can pass them to an image-generation model.
+- `admin-generate-event-cover-image` and `admin-generate-event-poster-image` mutate the event media collections. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Both resolve one event by `event_key`, build a prompt from event data, relation data, and selected available media, attach suitable reference images to the image request, normalize the output ratio, store the generated media, and return `prompt`, `upload_spec`, `reference_media`, `source_data`, `generated_media`, and generation metadata. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.

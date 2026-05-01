@@ -15,9 +15,9 @@ use App\Models\Institution;
 use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Services\ModerationService;
 use App\Support\Events\AdminEventTimeMapper;
 use App\Support\Media\ModelMediaSyncService;
-use App\Services\ModerationService;
 use BackedEnum;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -66,6 +66,7 @@ final readonly class SaveAdminEventAction
             'is_priority' => false,
             'is_featured' => false,
             'is_active' => true,
+            'clear_cover' => false,
             'clear_poster' => false,
             'clear_gallery' => false,
         ];
@@ -149,6 +150,7 @@ final readonly class SaveAdminEventAction
             'escalated_at' => $event->escalated_at instanceof Carbon
                 ? $event->escalated_at->toDateTimeString()
                 : null,
+            'clear_cover' => false,
             'clear_poster' => false,
             'clear_gallery' => false,
         ]);
@@ -423,6 +425,10 @@ final readonly class SaveAdminEventAction
      */
     private function syncMedia(Event $event, array $data): void
     {
+        if (($data['clear_cover'] ?? false) === true) {
+            $this->mediaSyncService->clearCollection($event, 'cover');
+        }
+
         if (($data['clear_poster'] ?? false) === true) {
             $this->mediaSyncService->clearCollection($event, 'poster');
         }
@@ -431,9 +437,15 @@ final readonly class SaveAdminEventAction
             $this->mediaSyncService->clearCollection($event, 'gallery');
         }
 
+        $cover = $data['cover'] ?? null;
         $poster = $data['poster'] ?? null;
         $gallery = $data['gallery'] ?? null;
 
+        $this->mediaSyncService->syncSingle(
+            $event,
+            $cover instanceof UploadedFile ? $cover : null,
+            'cover',
+        );
         $this->mediaSyncService->syncSingle(
             $event,
             $poster instanceof UploadedFile ? $poster : null,
@@ -582,5 +594,4 @@ final readonly class SaveAdminEventAction
             ? $normalized
             : $fallback;
     }
-
 }

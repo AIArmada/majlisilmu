@@ -163,7 +163,7 @@ final readonly class AdminRecordActionService
         $actions = [];
 
         if ($resourceClass === EventResource::class && $record instanceof Event) {
-            $actions[] = $this->eventCoverPromptAction($recordKey);
+            $actions = [...$actions, ...$this->eventImageGenerationActions($recordKey)];
             $actions = [...$actions, ...$this->eventWorkflowActions($recordKey, $actor)];
         }
 
@@ -183,23 +183,36 @@ final readonly class AdminRecordActionService
     }
 
     /**
-     * @return array<string, mixed>
+     * @return list<array<string, mixed>>
      */
-    private function eventCoverPromptAction(string $recordKey): array
+    private function eventImageGenerationActions(string $recordKey): array
     {
         return [
-            'key' => 'generate_event_cover_prompt',
-            'label' => 'Generate event cover prompt',
-            'category' => 'creative_asset',
-            'description' => 'Build a ready image-generation prompt plus selected event, relation, and media references for a new event poster.',
-            'tool' => 'admin-generate-event-cover-prompt',
-            'arguments' => [
-                'event_key' => $recordKey,
-                'aspect_ratio' => 'auto',
-                'creative_direction' => null,
-                'include_existing_poster' => true,
-                'embed_selected_media' => true,
-                'max_embedded_media' => 6,
+            [
+                'key' => 'generate_event_cover_image',
+                'label' => 'Generate event cover image',
+                'category' => 'creative_asset',
+                'description' => 'Generate and save a 16:9 website/app cover image using event, relation, and selected media references.',
+                'tool' => 'admin-generate-event-cover-image',
+                'arguments' => [
+                    'event_key' => $recordKey,
+                    'creative_direction' => null,
+                    'include_existing_media' => true,
+                    'max_reference_media' => 6,
+                ],
+            ],
+            [
+                'key' => 'generate_event_poster_image',
+                'label' => 'Generate event poster image',
+                'category' => 'creative_asset',
+                'description' => 'Generate and save a 4:5 portrait marketing poster using event, relation, and selected media references.',
+                'tool' => 'admin-generate-event-poster-image',
+                'arguments' => [
+                    'event_key' => $recordKey,
+                    'creative_direction' => null,
+                    'include_existing_media' => true,
+                    'max_reference_media' => 6,
+                ],
             ],
         ];
     }
@@ -471,7 +484,7 @@ final readonly class AdminRecordActionService
     {
         $recommended = [];
 
-        foreach (['get_event_moderation_schema', 'moderate_event', 'generate_event_cover_prompt', 'get_report_triage_schema', 'triage_report', 'get_contribution_request_review_schema', 'review_contribution_request', 'get_membership_claim_review_schema', 'review_membership_claim', 'get_update_schema', 'list_related_records'] as $actionKey) {
+        foreach (['get_event_moderation_schema', 'moderate_event', 'generate_event_cover_image', 'generate_event_poster_image', 'get_report_triage_schema', 'triage_report', 'get_contribution_request_review_schema', 'review_contribution_request', 'get_membership_claim_review_schema', 'review_membership_claim', 'get_update_schema', 'list_related_records'] as $actionKey) {
             if ($this->hasAction($actions, $actionKey)) {
                 $recommended[] = $actionKey;
             }
@@ -502,8 +515,8 @@ final readonly class AdminRecordActionService
             $notes[] = 'For relation traversal, set relation to one of the available relation names exposed on this resource.';
         }
 
-        if ($this->hasAction($actions, 'generate_event_cover_prompt')) {
-            $notes[] = 'For event poster generation, call the cover prompt tool first; it is read-only and returns the upload spec plus selected reference media.';
+        if ($this->hasAction($actions, 'generate_event_cover_image') || $this->hasAction($actions, 'generate_event_poster_image')) {
+            $notes[] = 'For event image generation, use the cover tool for 16:9 website/app covers and the poster tool for 4:5 external distribution posters.';
         }
 
         if ($this->hasWorkflowSchemaAction($actions)) {

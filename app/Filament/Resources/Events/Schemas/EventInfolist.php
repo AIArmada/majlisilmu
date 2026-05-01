@@ -254,8 +254,13 @@ class EventInfolist
                                     ]),
                                 Section::make('Media')
                                     ->schema([
+                                        SpatieMediaLibraryImageEntry::make('cover')
+                                            ->label('Gambar Cover Majlis')
+                                            ->collection('cover')
+                                            ->conversion('preview')
+                                            ->columnSpanFull(),
                                         SpatieMediaLibraryImageEntry::make('poster')
-                                            ->label('Gambar Utama')
+                                            ->label('Poster Hebahan')
                                             ->collection('poster')
                                             ->conversion('preview')
                                             ->columnSpanFull(),

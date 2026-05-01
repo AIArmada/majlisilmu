@@ -34,7 +34,8 @@ class EventSubmissionController extends FrontendController
         description: 'Creates a new event submission. '
             .'This route is create-only; use the contribution suggestion endpoints for later event updates. '
             .'Clients must provide an explicit submission country using `submission_country_id`. '
-            .'Fetch `GET /forms/submit-event` first to resolve required versus optional fields, conditional rules, catalogs, and guest-contact requirements.',
+            .'Fetch `GET /forms/submit-event` first to resolve required versus optional fields, conditional rules, catalogs, and guest-contact requirements. '
+            .'Event media roles are strict: `cover` is the 16:9 website/app image, while `poster` is the 4:5 external flyer image.',
     )]
     public function store(
         Request $request,
@@ -98,7 +99,8 @@ class EventSubmissionController extends FrontendController
             'submitter_phone' => ['nullable', 'string', 'max:20'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'captcha_token' => ['nullable', 'string'],
-            'poster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
+            'cover' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'dimensions:ratio=16/9', "max:{$maxUploadSizeKb}"],
+            'poster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'dimensions:ratio=4/5', "max:{$maxUploadSizeKb}"],
             'gallery' => ['nullable', 'array', 'max:10'],
             'gallery.*' => ['image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"],
         ]);
@@ -115,6 +117,7 @@ class EventSubmissionController extends FrontendController
             parentEvent: $parentEvent,
             scopedInstitution: $scopedInstitution,
             persistRelationships: function (Event $event) use ($request, $frontendMediaSyncService): void {
+                $frontendMediaSyncService->syncSingle($event, $request->file('cover'), 'cover');
                 $frontendMediaSyncService->syncSingle($event, $request->file('poster'), 'poster');
                 $frontendMediaSyncService->syncMultiple(
                     $event,

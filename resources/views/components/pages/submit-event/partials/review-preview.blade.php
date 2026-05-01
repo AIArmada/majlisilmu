@@ -277,6 +277,7 @@
     }
 
     $galleryCount = count($asList($get('gallery')));
+    $hasCover = filled($get('cover'));
     $hasPoster = filled($get('poster'));
 @endphp
 
@@ -411,7 +412,11 @@
         <h4 class="text-sm font-semibold text-slate-900">{{ __('Penceramah & Media') }}</h4>
         <dl class="mt-3 grid gap-3 text-sm md:grid-cols-2">
             <div>
-                <dt class="text-slate-500">{{ __('Gambar Utama') }}</dt>
+                <dt class="text-slate-500">{{ __('Gambar Cover Majlis') }}</dt>
+                <dd class="font-medium text-slate-900">{{ $hasCover ? __('Ya') : __('Tidak') }}</dd>
+            </div>
+            <div>
+                <dt class="text-slate-500">{{ __('Poster Hebahan') }}</dt>
                 <dd class="font-medium text-slate-900">{{ $hasPoster ? __('Ya') : __('Tidak') }}</dd>
             </div>
             <div>

@@ -441,18 +441,34 @@ class SuggestUpdate extends Component implements HasActions, HasForms
     {
         $components = [];
 
-        if (in_array('poster', $this->directEditMediaFields, true)) {
-            $components[] = SpatieMediaLibraryFileUpload::make('poster')
-                ->label(__('Gambar Utama'))
-                ->collection('poster')
+        if (in_array('cover', $this->directEditMediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('cover')
+                ->label(__('Gambar Cover Majlis'))
+                ->collection('cover')
                 ->image()
                 ->imageEditor()
-                ->imageAspectRatio(['16:9', '4:5'])
-                ->imageEditorAspectRatioOptions(['16:9', '4:5'])
+                ->imageAspectRatio('16:9')
+                ->imageEditorAspectRatioOptions(['16:9'])
+                ->rules(['dimensions:ratio=16/9'])
                 ->conversion('thumb')
                 ->responsiveImages()
                 ->deletable(false)
-                ->helperText(__('Gambar utama untuk paparan majlis.'));
+                ->helperText(__('Untuk paparan laman web dan aplikasi. Wajib 16:9, tanpa maklumat yang terlalu padat.'));
+        }
+
+        if (in_array('poster', $this->directEditMediaFields, true)) {
+            $components[] = SpatieMediaLibraryFileUpload::make('poster')
+                ->label(__('Poster Hebahan'))
+                ->collection('poster')
+                ->image()
+                ->imageEditor()
+                ->imageAspectRatio('4:5')
+                ->imageEditorAspectRatioOptions(['4:5'])
+                ->rules(['dimensions:ratio=4/5'])
+                ->conversion('thumb')
+                ->responsiveImages()
+                ->deletable(false)
+                ->helperText(__('Untuk hebahan WhatsApp, Instagram, Facebook, dan saluran luar. Wajib portrait 4:5 dan boleh mengandungi maklumat penuh.'));
         }
 
         if (in_array('gallery', $this->directEditMediaFields, true)) {

@@ -44,13 +44,14 @@ class EventCoverPromptBuilder
     /**
      * @var list<string>
      */
-    public const array ASPECT_RATIOS = ['auto', '16:9', '4:5'];
+    public const array TARGET_COLLECTIONS = ['cover', 'poster'];
 
     /**
      * @var array<class-string<Model>, array<string, list<string>>>
      */
     private const array MEDIA_COLLECTIONS = [
         Event::class => [
+            'cover' => ['preview', 'card', 'thumb'],
             'poster' => ['preview', 'card', 'thumb'],
             'gallery' => ['thumb'],
         ],
@@ -84,9 +85,9 @@ class EventCoverPromptBuilder
 
     /**
      * @param  array{
-     *   aspect_ratio?: string|null,
+     *   target_collection?: string|null,
      *   creative_direction?: string|null,
-     *   include_existing_poster?: bool|null
+     *   include_existing_media?: bool|null
      * }  $options
      * @return array{
      *   payload: array<string, mixed>,
@@ -97,19 +98,19 @@ class EventCoverPromptBuilder
     {
         $this->loadPromptContext($event);
 
-        $aspectRatio = $this->resolveAspectRatio($event, $options['aspect_ratio'] ?? null);
+        $target = $this->targetSpec($options['target_collection'] ?? 'cover');
         $creativeDirection = $this->optionalString($options['creative_direction'] ?? null);
-        $includeExistingPoster = $options['include_existing_poster'] ?? true;
-        $includeExistingPoster = is_bool($includeExistingPoster) ? $includeExistingPoster : true;
+        $includeExistingMedia = $options['include_existing_media'] ?? true;
+        $includeExistingMedia = is_bool($includeExistingMedia) ? $includeExistingMedia : true;
 
-        $selectedMedia = $this->selectedMedia($event, $includeExistingPoster);
+        $selectedMedia = $this->selectedMedia($event, $target['collection'], $includeExistingMedia);
         $referenceMedia = array_map(
             fn (array $candidate): array => $candidate['payload'],
             $selectedMedia,
         );
 
         $sourceData = $this->sourceData($event);
-        $prompt = $this->prompt($event, $aspectRatio, $referenceMedia, $creativeDirection);
+        $prompt = $this->prompt($event, $target, $referenceMedia, $creativeDirection);
 
         return [
             'payload' => [
@@ -120,18 +121,17 @@ class EventCoverPromptBuilder
                     'title' => (string) $event->title,
                     'public_url' => route('events.show', ['event' => $event->slug], false),
                 ],
+                'target' => $target,
                 'prompt' => $prompt,
-                'upload_spec' => $this->uploadSpec($aspectRatio),
+                'upload_spec' => $this->uploadSpec($target),
                 'reference_media' => $referenceMedia,
                 'source_data' => $sourceData,
                 'usage' => [
-                    'intended_next_step' => 'Use the prompt as the image-generation prompt. Attach the embedded/selected reference_media images when the image model supports image inputs.',
-                    'poster_save_target' => [
+                    'intended_next_step' => 'This prompt is intended for the MCP image-generation tool. Attach selected reference_media images when the image model supports image inputs.',
+                    'save_target' => [
                         'model' => Event::class,
                         'record_key' => (string) $event->getRouteKey(),
-                        'collection' => 'poster',
-                        'admin_update_tool' => 'admin-update-record',
-                        'member_update_tool' => 'member-update-record',
+                        'collection' => $target['collection'],
                     ],
                     'safety_notes' => [
                         'Do not invent speaker likenesses when no actual speaker image is provided.',
@@ -182,41 +182,82 @@ class EventCoverPromptBuilder
             'childEvents.institution.media',
             'childEvents.venue.media',
         ]);
-    }
 
-    private function resolveAspectRatio(Event $event, mixed $requested): string
-    {
-        $requestedRatio = is_string($requested) ? trim($requested) : '';
-
-        if (in_array($requestedRatio, ['16:9', '4:5'], true)) {
-            return $requestedRatio;
-        }
-
-        if ($event->hasMedia('poster')) {
-            $existingRatio = (string) $event->poster_display_aspect_ratio;
-
-            if (in_array($existingRatio, ['16:9', '4:5'], true)) {
-                return $existingRatio;
-            }
-        }
-
-        return '16:9';
+        $event->loadMorph('organizer', [
+            Institution::class => ['media'],
+            Speaker::class => ['media'],
+        ]);
     }
 
     /**
+     * @return array{
+     *   collection: 'cover'|'poster',
+     *   label: string,
+     *   aspect_ratio: string,
+     *   ratio_width: int,
+     *   ratio_height: int,
+     *   ai_size: string,
+     *   output_width: int,
+     *   output_height: int
+     * }
+     */
+    private function targetSpec(mixed $requested): array
+    {
+        $collection = is_string($requested) && in_array($requested, self::TARGET_COLLECTIONS, true)
+            ? $requested
+            : 'cover';
+
+        if ($collection === 'poster') {
+            return [
+                'collection' => 'poster',
+                'label' => 'Event Poster Image',
+                'aspect_ratio' => '4:5',
+                'ratio_width' => 4,
+                'ratio_height' => 5,
+                'ai_size' => '2:3',
+                'output_width' => 1600,
+                'output_height' => 2000,
+            ];
+        }
+
+        return [
+            'collection' => 'cover',
+            'label' => 'Event Cover Image',
+            'aspect_ratio' => '16:9',
+            'ratio_width' => 16,
+            'ratio_height' => 9,
+            'ai_size' => '3:2',
+            'output_width' => 1600,
+            'output_height' => 900,
+        ];
+    }
+
+    /**
+     * @param  array{
+     *   collection: 'cover'|'poster',
+     *   label: string,
+     *   aspect_ratio: string,
+     *   ratio_width: int,
+     *   ratio_height: int,
+     *   ai_size: string,
+     *   output_width: int,
+     *   output_height: int
+     * }  $target
      * @return array<string, mixed>
      */
-    private function uploadSpec(string $aspectRatio): array
+    private function uploadSpec(array $target): array
     {
         return [
             'target_model' => Event::class,
-            'target_collection' => 'poster',
+            'target_collection' => $target['collection'],
             'single_file' => true,
             'responsive_images' => true,
             'accepted_mime_types' => ['image/jpeg', 'image/png', 'image/webp'],
             'max_file_size_kb' => (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024),
-            'recommended_aspect_ratio' => $aspectRatio,
-            'allowed_aspect_ratios' => ['16:9', '4:5'],
+            'required_aspect_ratio' => $target['aspect_ratio'],
+            'allowed_aspect_ratios' => [$target['aspect_ratio']],
+            'output_width' => $target['output_width'],
+            'output_height' => $target['output_height'],
             'conversions' => [
                 'thumb' => '600x400 cropped webp, sharpened',
                 'card' => 'max 960x1200 webp',
@@ -229,22 +270,29 @@ class EventCoverPromptBuilder
     /**
      * @return list<array{media: Media, payload: array<string, mixed>}>
      */
-    private function selectedMedia(Event $event, bool $includeExistingPoster): array
+    private function selectedMedia(Event $event, string $targetCollection, bool $includeExistingMedia): array
     {
         $selected = [];
         $seen = [];
 
-        if ($includeExistingPoster) {
-            $this->pushMediaCandidates($selected, $seen, $event, 'poster', ['preview', 'card', 'thumb'], 'existing_event_poster', 'Use for continuity with the current event poster. Improve it; do not copy low-quality text artifacts.', 1);
+        if ($includeExistingMedia) {
+            $existingRole = $targetCollection === 'cover' ? 'existing_event_cover' : 'existing_event_poster';
+            $existingReason = $targetCollection === 'cover'
+                ? 'Use for continuity with the current event cover. Improve composition without copying artifacts.'
+                : 'Use for continuity with the current event poster. Improve it; do not copy low-quality text artifacts.';
+
+            $this->pushMediaCandidates($selected, $seen, $event, $targetCollection, ['preview', 'card', 'thumb'], $existingRole, $existingReason, 1);
+        }
+
+        if ($targetCollection === 'cover') {
+            $this->pushMediaCandidates($selected, $seen, $event, 'poster', ['preview', 'card', 'thumb'], 'event_poster_reference', 'Use only for factual and visual continuity; do not import cluttered flyer layout into the cover.', 1);
+        }
+
+        if ($targetCollection === 'poster') {
+            $this->pushMediaCandidates($selected, $seen, $event, 'cover', ['preview', 'card', 'thumb'], 'event_cover_reference', 'Use for visual continuity with the website/app cover while making the poster information-rich.', 1);
         }
 
         $this->pushMediaCandidates($selected, $seen, $event, 'gallery', ['thumb'], 'event_gallery', 'Use as real event/location atmosphere if visually helpful.', 3);
-
-        if ($event->institution instanceof Institution) {
-            $this->pushMediaCandidates($selected, $seen, $event->institution, 'cover', ['banner'], 'institution_cover', 'Use as the primary venue/organizer environment reference.', 1);
-            $this->pushMediaCandidates($selected, $seen, $event->institution, 'logo', ['thumb'], 'institution_logo', 'Use only if a small authentic organizer mark is helpful.', 1);
-            $this->pushMediaCandidates($selected, $seen, $event->institution, 'gallery', ['gallery_thumb'], 'institution_gallery', 'Use for mosque/institution visual atmosphere.', 2);
-        }
 
         if ($event->venue instanceof Venue) {
             $this->pushMediaCandidates($selected, $seen, $event->venue, 'cover', ['banner', 'thumb'], 'venue_cover', 'Use as the physical location reference.', 1);
@@ -261,12 +309,29 @@ class EventCoverPromptBuilder
                 $selected,
                 $seen,
                 $keyPerson->speaker,
+                'cover',
+                ['banner', 'thumb'],
+                "speaker_cover:{$role}",
+                "Use as the primary likeness/context reference for {$keyPerson->display_name} ({$this->roleLabel($keyPerson->role)}).",
+                1,
+            );
+
+            $this->pushMediaCandidates(
+                $selected,
+                $seen,
+                $keyPerson->speaker,
                 'avatar',
                 ['profile', 'thumb'],
                 "speaker_avatar:{$role}",
-                "Use as the likeness reference for {$keyPerson->display_name} ({$this->roleLabel($keyPerson->role)}).",
+                "Use as fallback likeness reference for {$keyPerson->display_name} ({$this->roleLabel($keyPerson->role)}) when speaker cover is unavailable.",
                 1,
             );
+        }
+
+        if ($event->organizer instanceof Institution) {
+            $this->pushMediaCandidates($selected, $seen, $event->organizer, 'cover', ['banner'], 'institution_cover', 'Fallback environment reference from the event organizer institution when speaker media is unavailable.', 1);
+            $this->pushMediaCandidates($selected, $seen, $event->organizer, 'logo', ['thumb'], 'institution_logo', 'Fallback organizer identity mark from the event organizer institution.', 1);
+            $this->pushMediaCandidates($selected, $seen, $event->organizer, 'gallery', ['gallery_thumb'], 'institution_gallery', 'Fallback atmosphere references from the event organizer institution.', 2);
         }
 
         foreach ($event->references as $reference) {
@@ -330,37 +395,59 @@ class EventCoverPromptBuilder
     /**
      * @param  list<array<string, mixed>>  $referenceMedia
      */
-    private function prompt(Event $event, string $aspectRatio, array $referenceMedia, ?string $creativeDirection): string
+    /**
+     * @param  array{
+     *   collection: 'cover'|'poster',
+     *   label: string,
+     *   aspect_ratio: string,
+     *   ratio_width: int,
+     *   ratio_height: int,
+     *   ai_size: string,
+     *   output_width: int,
+     *   output_height: int
+     * }  $target
+     * @param  list<array<string, mixed>>  $referenceMedia
+     */
+    private function prompt(Event $event, array $target, array $referenceMedia, ?string $creativeDirection): string
     {
+        $isCover = $target['collection'] === 'cover';
         $lines = [
-            'Create a stunning, premium Majlis Ilmu event cover image.',
+            $isCover
+                ? 'Create a stunning, premium Majlis Ilmu event cover image for website and mobile app display.'
+                : 'Create a stunning, premium Majlis Ilmu event poster image for WhatsApp, Instagram, Facebook, TikTok, and external distribution.',
             '',
             'Output target:',
-            '- Event poster for the `poster` media collection.',
-            "- Aspect ratio: {$aspectRatio}.",
+            "- Event {$target['collection']} for the `{$target['collection']}` media collection.",
+            "- Required aspect ratio: {$target['aspect_ratio']}.",
+            "- Final image must be cleanly crop-safe at {$target['output_width']}x{$target['output_height']} pixels.",
             '- Must be suitable for upload as image/jpeg, image/png, or image/webp.',
-            '- Keep composition readable on mobile event cards and detail pages.',
+            $isCover
+                ? '- This is not the full marketing flyer; the website and app already display event facts beside the image.'
+                : '- This is the shareable marketing poster; include enough event facts for the image to stand alone outside the app.',
             '',
-            'Required visible event facts:',
+            $isCover ? 'Core event facts for design context:' : 'Required visible event facts:',
             "- Title: {$event->title}",
-            "- Date and time: {$this->dateTimeLine($event)}",
         ];
+
+        if (! $isCover) {
+            $lines[] = "- Date and time: {$this->dateTimeLine($event)}";
+        }
 
         $location = $this->locationLine($event);
 
-        if ($location !== null) {
+        if ($location !== null && ! $isCover) {
             $lines[] = "- Location: {$location}";
         }
 
         $speakerNames = $this->speakerNames($event);
 
-        if ($speakerNames !== []) {
+        if ($speakerNames !== [] && ! $isCover) {
             $lines[] = '- Speaker(s): '.implode(', ', $speakerNames);
         }
 
         $keyPeople = $this->nonSpeakerKeyPeopleLine($event);
 
-        if ($keyPeople !== null) {
+        if ($keyPeople !== null && ! $isCover) {
             $lines[] = "- Other roles: {$keyPeople}";
         }
 
@@ -389,7 +476,9 @@ class EventCoverPromptBuilder
             '- If speaker reference images are provided, preserve likeness respectfully. If no actual speaker media is provided, use text-only speaker treatment and do not invent faces.',
             '- If book/reference cover images are provided, use them as subtle study-material cues rather than copying the full cover as the poster.',
             '- Avoid clutter, fake logos, fake QR codes, fake sponsors, fake phone numbers, and unprovided claims.',
-            '- Keep the exact event facts above legible; do not add extra event details not present in source_data.',
+            $isCover
+                ? '- Keep visible text minimal: title plus at most one short supporting cue such as date, institution, speaker, or kitab when it improves the design.'
+                : '- Keep the exact event facts above legible; do not add extra event details not present in source_data.',
         ];
 
         if ($referenceMedia !== []) {

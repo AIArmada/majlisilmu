@@ -1,5 +1,6 @@
 # Lessons
 
+- When a public media field has conflicting display and distribution jobs, model those jobs as distinct named collections instead of asking one upload to satisfy incompatible aspect-ratio and information-density needs.
 - When adding secondary public directory links, avoid promoting them into the primary header by default; keep lower-priority discovery links in the footer/bottom menu unless the user explicitly asks for top navigation placement.
 - On PostgreSQL, do not rely on `ofMany()` tie-breaks for UUID primary keys at all; even an added `orderByDesc('id')` can still be folded back into `MAX(id)`. Use a UUID-safe latest-row strategy such as excluding newer candidates by timestamp and id instead.
 - When you harden saved-search API validation, harden the shared action/Livewire filter normalizer in the same pass; otherwise tampered page query params can still persist raw filter values even though the API path is strict.

@@ -1,6 +1,6 @@
 # MajlisIlmu Member MCP Agent Guide
 
-Updated: April 28, 2026
+Updated: May 2, 2026
 Audience: model-facing member MCP agents and tool clients.
 
 This guide is for the member MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The admin guide is separate and is not exposed through this server.
@@ -232,8 +232,22 @@ Use this section as the quick member-only capability summary.
 | GitHub issue reporting | `member-create-github-issue` |
 | Contribution-request workflows | `member-list-contribution-requests`, `member-approve-contribution-request`, `member-reject-contribution-request`, `member-cancel-contribution-request` |
 | Membership-claim workflows | `member-list-membership-claims`, `member-submit-membership-claim`, `member-cancel-membership-claim` |
+| Event image generation | `member-generate-event-cover-image`, `member-generate-event-poster-image` |
 | Update | `member-update-record` |
 | Validate-only preview | Yes, on `member-update-record` |
+
+## Event cover/poster image generation
+
+- Use `member-generate-event-cover-image` for the website/app event visual.
+- Use `member-generate-event-poster-image` for the external-distribution flyer visual.
+- Target ratio is fixed and server-enforced:
+  - `cover` = `16:9`
+  - `poster` = `4:5`
+- Reference-media selection for speaker likeness/context follows:
+  1. speaker `cover`
+  2. speaker `avatar`
+  3. organizer institution media from `event->organizer` when it is an `Institution`
+- If speaker and organizer institution media are unavailable, the generation tool still proceeds.
 
 ## Writable resource matrix
 
@@ -379,6 +393,7 @@ Schema fields describe the exact upload rules:
 
 - `mcp_upload.shape` is `file_descriptor` for a single file and `array<file_descriptor>` for multiple files.
 - `accepted_mime_types`, `max_file_size_kb`, and `max_files` are authoritative for that field.
+- For event media fields, server validation enforces `cover = 16:9` and `poster = 4:5`.
 - `mcp_upload.replacement_semantics` describes whether the submitted descriptor or descriptor array replaces the target media collection.
 - When a write tool supports `validate_only=true`, previews normalize descriptors into file summaries without persisting media.
 - `current_media` stays metadata-only and does not expose signed or temporary URLs.
@@ -398,7 +413,8 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-related-records` | Traverse a named relation on one member record | `GET /api/v1/member/{resourceKey}/{recordKey}/relations/{relation}` |
 | `member-get-record` | Read one member record and its permissions | `GET /api/v1/member/{resourceKey}/{recordKey}` |
 | `member-get-record-actions` | Get focused next-step MCP actions for one member record | MCP-only next-step action guidance tool |
-| `member-generate-event-cover-prompt` | Build a ready image-generation prompt plus selected event relation/media references for one accessible event poster | MCP-only creative prompt/media preparation tool |
+| `member-generate-event-cover-image` | Generate and save a 16:9 website/app cover image for one accessible event using event data plus selected relation/media references | MCP-only creative image generation tool |
+| `member-generate-event-poster-image` | Generate and save a 4:5 portrait marketing poster for one accessible event using event data plus selected relation/media references | MCP-only creative image generation tool |
 | `member-get-write-schema` | Discover the update contract for a writable member record | `GET /api/v1/member/{resourceKey}/schema` |
 | `member-create-github-issue` | Create a GitHub issue in the configured repository | `POST /api/v1/github-issues` (member caller path) |
 | `member-update-record` | Update or preview a writable member record | `PUT /api/v1/member/{resourceKey}/{recordKey}` |
@@ -414,7 +430,7 @@ Member tool behavior notes:
 
 - `validate_only=true` is supported for member update previews.
 - `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries. Unlike admin, `member-list-records` does **not** accept a `filters` object; use `search`, `starts_after`, `starts_before`, and `starts_on_local_date` to narrow results.
-- `member-generate-event-cover-prompt` is read-only. It resolves one accessible event by `event_key`, returns `prompt`, `upload_spec`, `reference_media`, and `source_data`, and embeds selected image media when available so ChatGPT can pass them to an image-generation model.
+- `member-generate-event-cover-image` and `member-generate-event-poster-image` mutate accessible event media collections within Ahli scope. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Both resolve one accessible event by `event_key`, build a prompt from event data, relation data, and selected available media, attach suitable reference images to the image request, normalize the output ratio, store the generated media, and return `prompt`, `upload_spec`, `reference_media`, `source_data`, `generated_media`, and generation metadata. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - The member surface intentionally does not expose admin-only moderation, triage, or create workflows.
 - Member update schemas reuse the same resource-level write semantics where the resource is shared, so clients should still fetch the current record and re-send the full intended collection when a field is replacement-based.

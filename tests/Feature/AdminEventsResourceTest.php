@@ -235,7 +235,7 @@ it('persists registration-required changes for existing admin events without reg
         ->and($event->fresh()->settings?->registration_required)->toBeFalse();
 });
 
-it('allows only 16:9 and 4:5 poster ratio options on the admin event form', function () {
+it('uses fixed cover and poster ratios on the admin event form', function () {
     $this->seed(PermissionSeeder::class);
     $this->seed(RoleSeeder::class);
 
@@ -248,17 +248,25 @@ it('allows only 16:9 and 4:5 poster ratio options on the admin event form', func
 
     Livewire::actingAs($administrator)
         ->test(EditEvent::class, ['record' => $event->id])
+        ->assertFormFieldExists('cover', function (FileUpload $upload): bool {
+            expect($upload->getImageAspectRatio())
+                ->toBe('16:9')
+                ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
+                ->toBe([]);
+
+            return true;
+        })
         ->assertFormFieldExists('poster', function (FileUpload $upload): bool {
             expect($upload->getImageAspectRatio())
-                ->toBe(['16:9', '4:5'])
+                ->toBe('4:5')
                 ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
-                ->toBe(['16:9', '4:5']);
+                ->toBe([]);
 
             return true;
         });
 });
 
-it('accepts a 16:9 poster upload on the admin event edit form', function () {
+it('accepts cover and poster uploads on the admin event edit form', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
 
@@ -283,13 +291,15 @@ it('accepts a 16:9 poster upload on the admin event edit form', function () {
             'prayer_time' => EventPrayerTime::LainWaktu->value,
             'custom_time' => '20:00',
             'end_time' => '22:00',
-            'poster' => UploadedFile::fake()->image('poster-wide.jpg', 320, 180),
+            'cover' => UploadedFile::fake()->image('cover-wide.jpg', 320, 180),
+            'poster' => UploadedFile::fake()->image('poster-portrait.jpg', 320, 400),
         ])
         ->call('save')
         ->assertHasNoErrors();
 
-    expect($event->fresh()->hasMedia('poster'))->toBeTrue()
-        ->and($event->fresh()->poster_display_aspect_ratio)->toBe('16:9');
+    expect($event->fresh()->hasMedia('cover'))->toBeTrue()
+        ->and($event->fresh()->hasMedia('poster'))->toBeTrue()
+        ->and($event->fresh()->poster_display_aspect_ratio)->toBe('4:5');
 });
 
 it('renders the admin event view page with infolist tabs', function () {

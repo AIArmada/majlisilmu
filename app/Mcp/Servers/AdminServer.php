@@ -13,7 +13,8 @@ use App\Mcp\Tools\Admin\AdminCreateEventTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
 use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
 use App\Mcp\Tools\Admin\AdminDocumentationSearchTool;
-use App\Mcp\Tools\Admin\AdminGenerateEventCoverPromptTool;
+use App\Mcp\Tools\Admin\AdminGenerateEventCoverImageTool;
+use App\Mcp\Tools\Admin\AdminGenerateEventPosterImageTool;
 use App\Mcp\Tools\Admin\AdminGetContributionRequestReviewSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetEventModerationSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetMembershipClaimReviewSchemaTool;
@@ -36,7 +37,7 @@ use Laravel\Mcp\Server\Attributes\Version;
 
 #[Name('majlisilmu-admin')]
 #[Version('1.0.0')]
-#[Instructions('Authenticated admin MCP server with parity to the Filament admin resource API for listing resources, reading records, traversing relations, getting record-specific next-step MCP actions, discovering MCP write schemas, generating image-generation prompts plus selected reference media for event cover/poster creation, getting explicit workflow schema descriptors for event moderation, report triage, contribution-request review, and membership-claim review, writing supported fields for donation-channel, event, inspiration, institution, report, speaker, venue, reference, subdistrict, tag, series, and space records, and running explicit workflow actions for those admin review surfaces. Media fields use JSON base64 file descriptors when advertised by the schema. Entity-selection hint for record search: institution-type nouns (`masjid`, `surau`, `madrasah`, `maahad`, `pondok`, `sekolah`, `kolej`, `universiti`) should be searched as `institutions` first; venue-type nouns (`dewan`, `auditorium`, `stadium`, `perpustakaan`, `padang`, `hotel`) should be searched as `venues` first; `spaces` are finer-grained sublocations inside institutions and should not be the default first lookup for named mosques or surau. The server exposes one verified admin MCP guide as a raw markdown resource, read-only `search` / `fetch` documentation tools for tool-centric clients such as ChatGPT and the OpenAI Responses MCP integration, plus a `documentation-tool-routing` prompt that explains when to use the guide and the documentation tools. Operational MCP tool calls are rejected until `docs-admin-mcp-guide` has been fetched or the guide resource has been read in the current initialized MCP session.')]
+#[Instructions('Authenticated admin MCP server with parity to the Filament admin resource API for listing resources, reading records, traversing relations, getting record-specific next-step MCP actions, discovering MCP write schemas, generating and saving event cover/poster images from event data plus selected reference media, getting explicit workflow schema descriptors for event moderation, report triage, contribution-request review, and membership-claim review, writing supported fields for donation-channel, event, inspiration, institution, report, speaker, venue, reference, subdistrict, tag, series, and space records, and running explicit workflow actions for those admin review surfaces. Event cover images are fixed at 16:9 and event poster images are fixed at 4:5. Media fields use JSON base64 file descriptors when advertised by the schema. Entity-selection hint for record search: institution-type nouns (`masjid`, `surau`, `madrasah`, `maahad`, `pondok`, `sekolah`, `kolej`, `universiti`) should be searched as `institutions` first; venue-type nouns (`dewan`, `auditorium`, `stadium`, `perpustakaan`, `padang`, `hotel`) should be searched as `venues` first; `spaces` are finer-grained sublocations inside institutions and should not be the default first lookup for named mosques or surau. The server exposes one verified admin MCP guide as a raw markdown resource, read-only `search` / `fetch` documentation tools for tool-centric clients such as ChatGPT and the OpenAI Responses MCP integration, plus a `documentation-tool-routing` prompt that explains when to use the guide and the documentation tools. Operational MCP tool calls are rejected until `docs-admin-mcp-guide` has been fetched or the guide resource has been read in the current initialized MCP session.')]
 class AdminServer extends MajlisIlmuServer
 {
     public int $defaultPaginationLength = 50;
@@ -60,7 +61,8 @@ class AdminServer extends MajlisIlmuServer
     protected array $tools = [
         AdminDocumentationSearchTool::class,
         AdminDocumentationFetchTool::class,
-        AdminGenerateEventCoverPromptTool::class,
+        AdminGenerateEventCoverImageTool::class,
+        AdminGenerateEventPosterImageTool::class,
         AdminListResourcesTool::class,
         AdminGetResourceMetaTool::class,
         AdminListRecordsTool::class,

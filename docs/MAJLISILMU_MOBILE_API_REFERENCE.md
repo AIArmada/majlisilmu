@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-04-28
+**Last Updated:** 2026-05-02
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -21,10 +21,15 @@ If you are building an AI client, use this read order:
 4. Before any write, fetch the exact contract first: `GET /forms/*` for public flows, or `GET /admin/{resourceKey}/schema` for admin writes.
 5. Use the admin record `route_key` returned by admin collection or detail payloads for record-specific schema and mutation paths.
 6. Send raw timestamp fields in UTC. For date-only filters, send the user's local calendar date together with timezone context so the server can convert it to UTC boundaries.
-7. For any file field, read `accepted_mime_types`, `max_file_size_kb`, and `max_files` from the form/schema response before uploading.
+7. For any file field, read `accepted_mime_types`, `max_file_size_kb`, and `max_files` from the form/schema response before uploading. For event media, also honor `required_aspect_ratio`: `cover` is `16:9` and `poster` is `4:5`.
 8. Treat `error.code` as the machine-readable failure classifier and `meta.request_id` as the trace identifier for retries and support.
 
 If you are evaluating the MCP connector rather than the raw HTTP admin API, switch to `docs/MAJLISILMU_MCP_GUIDE.md`. The MCP server is intentionally sanitized and uses its own write-schema surface; when it advertises media/file fields, clients send JSON base64 file descriptors instead of multipart files.
+
+Event image generation over MCP is target-specific (not prompt-only and not ratio-selectable):
+
+- `*-generate-event-cover-image` writes the Event `cover` collection at `16:9`.
+- `*-generate-event-poster-image` writes the Event `poster` collection at `4:5`.
 
 ---
 
@@ -532,7 +537,7 @@ Notes:
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/mobile/telemetry/events` | Record batched UI telemetry from real iOS, iPadOS, or Android app sessions |
-| `POST` | `/submit-event` | Submit the public/authenticated event form, including poster/gallery uploads |
+| `POST` | `/submit-event` | Submit the public/authenticated event form, including cover/poster/gallery uploads |
 | `POST` | `/share/track` | Record a guest or authenticated outbound share action for analytics |
 | `GET` | `/share/analytics` | Fetch the authenticated Dawah impact dashboard for mobile clients |
 | `GET` | `/share/analytics/links/{link}` | Fetch detailed performance for one tracked share link |
@@ -553,6 +558,11 @@ Notes:
 | `POST` | `/advanced-events` | Create an advanced parent program submission |
 | `GET` | `/follows/{type}/{subject}` | Return follow state for the current user |
 | `POST` | `/follows/{type}/{subject}` | Follow a public institution, speaker, reference, or series |
+
+Event media upload contract:
+- `cover` is the website/mobile-app image and must be 16:9.
+- `poster` is the external-distribution image and must be 4:5 portrait.
+- `gallery` accepts normal image uploads without a fixed aspect-ratio requirement.
 | `DELETE` | `/follows/{type}/{subject}` | Unfollow a record |
 | `GET` | `/institution-workspace` | Institution dashboard payload for events, members, and role options |
 | `POST` | `/institution-workspace/{institutionId}/members` | Add an institution member |
@@ -733,14 +743,16 @@ Assignment behavior:
 - `can_direct_edit = false` means the same endpoint will create a review request instead.
 - `direct_edit_media_fields` is the only allowed file-upload contract for direct edits.
 - Current direct-edit media sets are:
-  - Events: `['poster', 'gallery']`
+  - Events: `['cover', 'poster', 'gallery']`
   - Institutions: `['cover', 'gallery']`
   - Speakers: `['avatar', 'cover', 'gallery']`
   - References and non-maintainers: `[]`
 
 Public upload metadata:
 
-- Public event submissions accept `poster` and `gallery`.
+- Public event submissions accept `cover`, `poster`, and `gallery`.
+- Event `cover` uploads are validated as `16:9`.
+- Event `poster` uploads are validated as `4:5`.
 - Membership claims accept `evidence` files.
 - Reports accept `evidence` files.
 - Image upload fields accept `image/jpeg`, `image/png`, and `image/webp`.
@@ -965,6 +977,7 @@ Nested collection item contracts for institutions:
 - Event `PUT` is sparse on the raw admin API. Core fields such as `title`, `event_date`, `prayer_time`, `timezone`, `event_format`, `visibility`, `gender`, `age_group`, and `event_type` are required on create, but they may be omitted on update.
 - Admin event writes accept `status` values `draft`, `pending`, and `approved`. When omitted on create, the default is `draft`. `approved` sets `published_at`, while `draft` and `pending` clear it.
 - Event enum write values must use backing values from the schema. Do not submit display labels for `event_type`, `age_group`, `timing_mode`, `prayer_reference`, or `prayer_offset`.
+- Event `cover` uploads are validated as `16:9`, and event `poster` uploads are validated as `4:5` on admin write paths.
 - Optional URL scalars like `event_url`, `live_url`, and `recording_url` preserve the current value when omitted and clear to `null` when you send `null` or `""`.
 - The relation arrays `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, and `issue_tags` use server-merged replacement semantics on update: omit to preserve the current set, send `null` or `[]` to clear, and send the full replacement list when changing them.
 - `speakers` and `other_key_people` also preserve on omission, but any submitted array rebuilds the underlying `key_people` rows. Stable item ids are not preserved, and payload order becomes the new `order_column` sequence (speaker rows first, then `other_key_people`).
