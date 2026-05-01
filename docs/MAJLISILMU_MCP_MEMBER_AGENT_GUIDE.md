@@ -398,6 +398,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-related-records` | Traverse a named relation on one member record | `GET /api/v1/member/{resourceKey}/{recordKey}/relations/{relation}` |
 | `member-get-record` | Read one member record and its permissions | `GET /api/v1/member/{resourceKey}/{recordKey}` |
 | `member-get-record-actions` | Get focused next-step MCP actions for one member record | MCP-only next-step action guidance tool |
+| `member-generate-event-cover-prompt` | Build a ready image-generation prompt plus selected event relation/media references for one accessible event poster | MCP-only creative prompt/media preparation tool |
 | `member-get-write-schema` | Discover the update contract for a writable member record | `GET /api/v1/member/{resourceKey}/schema` |
 | `member-create-github-issue` | Create a GitHub issue in the configured repository | `POST /api/v1/github-issues` (member caller path) |
 | `member-update-record` | Update or preview a writable member record | `PUT /api/v1/member/{resourceKey}/{recordKey}` |
@@ -413,6 +414,7 @@ Member tool behavior notes:
 
 - `validate_only=true` is supported for member update previews.
 - `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries. Unlike admin, `member-list-records` does **not** accept a `filters` object; use `search`, `starts_after`, `starts_before`, and `starts_on_local_date` to narrow results.
+- `member-generate-event-cover-prompt` is read-only. It resolves one accessible event by `event_key`, returns `prompt`, `upload_spec`, `reference_media`, and `source_data`, and embeds selected image media when available so ChatGPT can pass them to an image-generation model.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - The member surface intentionally does not expose admin-only moderation, triage, or create workflows.
 - Member update schemas reuse the same resource-level write semantics where the resource is shared, so clients should still fetch the current record and re-send the full intended collection when a field is replacement-based.

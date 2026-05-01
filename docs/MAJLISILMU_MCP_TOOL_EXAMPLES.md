@@ -26,6 +26,24 @@ For the full connector rules, tool catalog, and API mappings, see `docs/MAJLISIL
 
 Event record detail for `events` now includes the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` inside `data.record.attributes`.
 
+### Generate an event cover prompt
+
+```json
+{
+  "tool": "admin-generate-event-cover-prompt",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "aspect_ratio": "auto",
+    "creative_direction": "Premium editorial poster with deep emerald, warm gold, and strong Malay typography.",
+    "include_existing_poster": true,
+    "embed_selected_media": true,
+    "max_embedded_media": 6
+  }
+}
+```
+
+The response includes `prompt`, `upload_spec`, `reference_media`, and `source_data`. Use the generated image as the Event `poster` media after user approval.
+
 ### Filter an event list
 
 Use enum backing values in `filters`, and use date-only `YYYY-MM-DD` values for `starts_after`, `starts_before`, and `starts_on_local_date`.
@@ -204,6 +222,24 @@ Fetch the live schema first so the client sees the current enum values and allow
 ```
 
 For member-scoped event reads, the same `data.record.attributes.active_change_notice`, `change_announcements`, and `replacement_event` fields are available on `member-get-record` when `resource_key` is `events`.
+
+### Generate an accessible event cover prompt
+
+```json
+{
+  "tool": "member-generate-event-cover-prompt",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "aspect_ratio": "4:5",
+    "creative_direction": null,
+    "include_existing_poster": true,
+    "embed_selected_media": true,
+    "max_embedded_media": 6
+  }
+}
+```
+
+The response is read-only prompt/media preparation. Persist the final poster through `member-update-record` only after the user approves the generated image.
 
 ### Preview a write
 
