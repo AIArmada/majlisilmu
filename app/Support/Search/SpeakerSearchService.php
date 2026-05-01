@@ -342,7 +342,7 @@ class SpeakerSearchService
                         explode(' ', $candidate),
                         static fn (string $token): bool => mb_strlen($token) >= 2
                     ));
-                                if ($this->shouldUseTypesenseSearch() && $this->healthCheck->isAvailable()) {
+
                     foreach ($candidateTokens as $token) {
                         $scoreCandidates[] = $this->fuzzyComparable($normalizedSearch, $token)
                             ? $this->similarityScore($normalizedSearch, $token)
@@ -410,7 +410,7 @@ class SpeakerSearchService
                     explode(' ', $candidate),
                     static fn (string $token): bool => mb_strlen($token) >= 2,
                 ));
-                            if ($this->shouldUseTypesenseSearch() && $this->healthCheck->isAvailable()) {
+
                 foreach ($candidateTokens as $token) {
                     $scoreCandidates[] = $this->fuzzyComparable($normalizedSearch, $token)
                         ? $this->similarityScore($normalizedSearch, $token)

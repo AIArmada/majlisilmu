@@ -270,7 +270,7 @@ class ContributionController extends FrontendController
         title: 'Get editable contribution context',
         description: 'Returns the current editable state, presentation metadata, and permission flags for an existing subject. '
             .'Call this before submitting an update so you know whether the caller can edit directly, which sparse top-level fields are supported, and whether a pending request already exists. '
-            .'Only direct-edit media fields exposed in `direct_edit_media_fields` are uploadable, currently institution `cover`/`gallery`, speaker `avatar`/`cover`/`gallery`, and event `poster`/`gallery`.',
+            .'Only direct-edit media fields exposed in `direct_edit_media_fields` are uploadable, currently institution `cover`/`gallery`, speaker `avatar`/`cover`/`gallery`, and event `cover`/`poster`/`gallery`.',
     )]
     public function suggestContext(
         string $subjectType,
@@ -298,6 +298,9 @@ class ContributionController extends FrontendController
                 'fields' => $context['contract']['fields'],
                 'conditional_rules' => $context['contract']['conditional_rules'],
                 'direct_edit_media_fields' => $canDirectEdit ? $context['contract']['direct_edit_media_fields'] : [],
+                'direct_edit_media_contract' => $canDirectEdit
+                    ? $this->directEditMediaContract($entity, $context['contract']['direct_edit_media_fields'] ?? [])
+                    : [],
                 'current_media' => $canDirectEdit
                     ? $this->directEditCurrentMediaData($entity, $context['contract']['direct_edit_media_fields'] ?? [])
                     : [],
@@ -381,7 +384,7 @@ class ContributionController extends FrontendController
                 ]);
             }
 
-            validator($request->all(), $this->directEditMediaValidationRules($directEditMediaFields))->validate();
+            validator($request->all(), $this->directEditMediaValidationRules($entity, $directEditMediaFields))->validate();
         }
 
         $payload = collect($request->all())
@@ -633,7 +636,7 @@ class ContributionController extends FrontendController
      * @param  list<string>  $directEditMediaFields
      * @return array<string, mixed>
      */
-    private function directEditMediaValidationRules(array $directEditMediaFields): array
+    private function directEditMediaValidationRules(Event|Institution|Reference|Speaker $entity, array $directEditMediaFields): array
     {
         $rules = [];
         $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
@@ -643,11 +646,13 @@ class ContributionController extends FrontendController
         }
 
         if (in_array('cover', $directEditMediaFields, true)) {
-            $rules['cover'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"];
+            $rules['cover'] = $entity instanceof Event
+                ? ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'dimensions:ratio=16/9', "max:{$maxUploadSizeKb}"]
+                : ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"];
         }
 
         if (in_array('poster', $directEditMediaFields, true)) {
-            $rules['poster'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', "max:{$maxUploadSizeKb}"];
+            $rules['poster'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'dimensions:ratio=4/5', "max:{$maxUploadSizeKb}"];
         }
 
         if (in_array('gallery', $directEditMediaFields, true)) {
@@ -656,6 +661,39 @@ class ContributionController extends FrontendController
         }
 
         return $rules;
+    }
+
+    /**
+     * @param  list<string>  $directEditMediaFields
+     * @return array<string, array<string, mixed>>
+     */
+    private function directEditMediaContract(Event|Institution|Reference|Speaker $entity, array $directEditMediaFields): array
+    {
+        $maxUploadSizeKb = (int) ceil(((int) config('media-library.max_file_size', 10 * 1024 * 1024)) / 1024);
+        $contract = [];
+
+        foreach ($directEditMediaFields as $field) {
+            $contract[$field] = [
+                'accepted_mime_types' => ['image/jpeg', 'image/png', 'image/webp'],
+                'max_file_size_kb' => $maxUploadSizeKb,
+            ];
+
+            if ($entity instanceof Event && $field === 'cover') {
+                $contract[$field]['required_aspect_ratio'] = '16:9';
+                $contract[$field]['media_role'] = 'website_app_cover';
+            }
+
+            if ($entity instanceof Event && $field === 'poster') {
+                $contract[$field]['required_aspect_ratio'] = '4:5';
+                $contract[$field]['media_role'] = 'external_distribution_poster';
+            }
+
+            if ($field === 'gallery') {
+                $contract[$field]['max_files'] = 10;
+            }
+        }
+
+        return $contract;
     }
 
     /**

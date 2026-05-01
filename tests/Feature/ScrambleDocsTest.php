@@ -584,7 +584,7 @@ it('adds workflow summaries to public contract and mutation endpoints', function
         ->and($paths['/contributions/speakers']['post']['description'] ?? null)->toContain('address.country_id')
         ->and($paths['/contributions/speakers']['post']['description'] ?? null)->not->toContain('address.country_code')
         ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['summary'] ?? null)->toBe('Get editable contribution context')
-        ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['description'] ?? null)->toContain('event `poster`/`gallery`')
+        ->and($paths['/forms/contributions/{subjectType}/{subject}/suggest']['get']['description'] ?? null)->toContain('event `cover`/`poster`/`gallery`')
         ->and($paths['/forms/institution-workspace']['get']['description'] ?? null)->toContain('workspace endpoint')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['summary'] ?? null)->toBe('Submit a contribution update')
         ->and($paths['/contributions/{subjectType}/{subject}/suggest']['post']['description'] ?? null)->toContain('direct_edit')

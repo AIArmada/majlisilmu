@@ -26,23 +26,41 @@ For the full connector rules, tool catalog, and API mappings, see `docs/MAJLISIL
 
 Event record detail for `events` now includes the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` inside `data.record.attributes`.
 
-### Generate an event cover prompt
+### Generate an event cover image
 
 ```json
 {
-  "tool": "admin-generate-event-cover-prompt",
+  "tool": "admin-generate-event-cover-image",
   "arguments": {
     "event_key": "weekly-kuliah-selasa",
-    "aspect_ratio": "auto",
-    "creative_direction": "Premium editorial poster with deep emerald, warm gold, and strong Malay typography.",
-    "include_existing_poster": true,
-    "embed_selected_media": true,
-    "max_embedded_media": 6
+    "creative_direction": "Premium editorial cover with deep emerald, warm gold, and strong Malay typography.",
+    "include_existing_media": true,
+    "max_reference_media": 6
   }
 }
 ```
 
-The response includes `prompt`, `upload_spec`, `reference_media`, and `source_data`. Use the generated image as the Event `poster` media after user approval.
+The tool generates, normalizes, and stores a 16:9 image in the Event `cover` media collection. Use `admin-generate-event-poster-image` when the intended asset is the 4:5 external-distribution poster.
+
+When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+
+### Generate an event poster image
+
+```json
+{
+  "tool": "admin-generate-event-poster-image",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "creative_direction": "Information-rich social poster with clear hierarchy and strong readability.",
+    "include_existing_media": true,
+    "max_reference_media": 6
+  }
+}
+```
+
+The tool generates, normalizes, and stores a 4:5 portrait image in the Event `poster` media collection.
+
+When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 
 ### Filter an event list
 
@@ -115,6 +133,8 @@ Use enum backing values in `filters`, and use date-only `YYYY-MM-DD` values for 
 ### Write media descriptors
 
 Fetch the write schema first and follow the field-specific `mcp_upload`, `accepted_mime_types`, `max_file_size_kb`, and `max_files` metadata. Single-file fields use one descriptor object. Multi-file fields use an array of descriptor objects. Descriptors support `content_base64`, `content_url`, or ChatGPT `download_url` / `file_id` parameters.
+
+For event media writes, ratio checks are server-enforced on every write surface: `cover` must be `16:9` and `poster` must be `4:5`.
 
 **Example with base64:**
 
@@ -223,23 +243,41 @@ Fetch the live schema first so the client sees the current enum values and allow
 
 For member-scoped event reads, the same `data.record.attributes.active_change_notice`, `change_announcements`, and `replacement_event` fields are available on `member-get-record` when `resource_key` is `events`.
 
-### Generate an accessible event cover prompt
+### Generate an accessible event cover image
 
 ```json
 {
-  "tool": "member-generate-event-cover-prompt",
+  "tool": "member-generate-event-cover-image",
   "arguments": {
     "event_key": "weekly-kuliah-selasa",
-    "aspect_ratio": "4:5",
     "creative_direction": null,
-    "include_existing_poster": true,
-    "embed_selected_media": true,
-    "max_embedded_media": 6
+    "include_existing_media": true,
+    "max_reference_media": 6
   }
 }
 ```
 
-The response is read-only prompt/media preparation. Persist the final poster through `member-update-record` only after the user approves the generated image.
+The tool generates, normalizes, and stores a 16:9 image in the accessible Event `cover` media collection.
+
+When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+
+### Generate an accessible event poster image
+
+```json
+{
+  "tool": "member-generate-event-poster-image",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "creative_direction": null,
+    "include_existing_media": true,
+    "max_reference_media": 6
+  }
+}
+```
+
+The tool generates, normalizes, and stores a 4:5 image in the accessible Event `poster` media collection. Use `member-generate-event-cover-image` when the intended asset is the 16:9 website/app cover.
+
+When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 
 ### Preview a write
 

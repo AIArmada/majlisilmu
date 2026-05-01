@@ -374,8 +374,16 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
         $mimeType = (string) $file->getMimeType();
 
-        if (str_starts_with($mimeType, 'image/') && blank($mergedState['poster'] ?? null)) {
-            $mergedState['poster'] = $file;
+        if (str_starts_with($mimeType, 'image/')) {
+            $sourceRatio = $this->uploadedImageAspectRatio($file);
+
+            if ($sourceRatio === '4:5' && blank($mergedState['poster'] ?? null)) {
+                $mergedState['poster'] = $file;
+            }
+
+            if ($sourceRatio === '16:9' && blank($mergedState['cover'] ?? null)) {
+                $mergedState['cover'] = $file;
+            }
         }
 
         $this->eventForm()->fill($mergedState);
@@ -398,6 +406,30 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
             ->title(__('Maklumat majlis berjaya diekstrak dengan AI.'))
             ->success()
             ->send();
+    }
+
+    private function uploadedImageAspectRatio(TemporaryUploadedFile $file): ?string
+    {
+        $path = $file->getRealPath();
+
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        $dimensions = @getimagesize($path);
+
+        if (! is_array($dimensions) || ! isset($dimensions[0], $dimensions[1])) {
+            return null;
+        }
+
+        $width = (int) $dimensions[0];
+        $height = (int) $dimensions[1];
+
+        return match (true) {
+            $width > 0 && $height > 0 && abs(($width / $height) - (16 / 9)) < 0.01 => '16:9',
+            $width > 0 && $height > 0 && abs(($width / $height) - (4 / 5)) < 0.01 => '4:5',
+            default => null,
+        };
     }
 
     public function form(Schema $schema): Schema
@@ -1322,16 +1354,28 @@ new #[Layout('layouts.app')] class extends Component implements HasActions, HasF
 
                     Section::make(__('Media'))
                         ->schema([
+                            SpatieMediaLibraryFileUpload::make('cover')
+                                ->label(__('Gambar Cover Majlis'))
+                                ->collection('cover')
+                                ->image()
+                                ->imageEditor()
+                                ->imageAspectRatio('16:9')
+                                ->imageEditorAspectRatioOptions(['16:9'])
+                                ->rules(['dimensions:ratio=16/9'])
+                                ->conversion('thumb')
+                                ->responsiveImages()
+                                ->helperText(__('Untuk paparan laman web dan aplikasi. Wajib 16:9, tanpa maklumat yang terlalu padat.')),
                             SpatieMediaLibraryFileUpload::make('poster')
-                                ->label(__('Gambar Utama'))
+                                ->label(__('Poster Hebahan'))
                                 ->collection('poster')
                                 ->image()
                                 ->imageEditor()
-                                ->imageAspectRatio(['16:9', '4:5'])
-                                ->imageEditorAspectRatioOptions(['16:9', '4:5'])
+                                ->imageAspectRatio('4:5')
+                                ->imageEditorAspectRatioOptions(['4:5'])
+                                ->rules(['dimensions:ratio=4/5'])
                                 ->conversion('thumb')
                                 ->responsiveImages()
-                                ->helperText(__('Gambar utama untuk paparan majlis.')),
+                                ->helperText(__('Untuk hebahan WhatsApp, Instagram, Facebook, dan saluran luar. Wajib portrait 4:5 dan boleh mengandungi maklumat penuh.')),
                             SpatieMediaLibraryFileUpload::make('gallery')
                                 ->label(__('Galeri'))
                                 ->collection('gallery')

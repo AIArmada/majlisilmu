@@ -395,7 +395,14 @@ class FrontendFormContractService
                 $this->field('submitter_phone', 'string', required: false),
                 $this->field('notes', 'string', required: false, maxLength: 1000),
                 $this->field('captcha_token', 'string', required: false),
-                $this->field('poster', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb()),
+                $this->field('cover', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), meta: [
+                    'required_aspect_ratio' => '16:9',
+                    'media_role' => 'website_app_cover',
+                ]),
+                $this->field('poster', 'file', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), meta: [
+                    'required_aspect_ratio' => '4:5',
+                    'media_role' => 'external_distribution_poster',
+                ]),
                 $this->field('gallery', 'array<file>', required: false, acceptedMimeTypes: $this->imageMimeTypes(), maxFileSizeKb: $this->maxUploadSizeKb(), maxFiles: 10),
             ],
             'conditional_rules' => [
@@ -772,19 +779,23 @@ class FrontendFormContractService
         ?array $acceptedMimeTypes = null,
         ?int $maxFileSizeKb = null,
         ?int $maxFiles = null,
+        array $meta = [],
     ): array {
-        return array_filter([
-            'name' => $name,
-            'type' => $type,
-            'required' => $required,
-            'default' => $default,
-            'max_length' => $maxLength,
-            'allowed_values' => $allowedValues,
-            'catalog' => $catalog,
-            'accepted_mime_types' => $acceptedMimeTypes,
-            'max_file_size_kb' => $maxFileSizeKb,
-            'max_files' => $maxFiles,
-        ], static fn (mixed $value): bool => $value !== null);
+        return array_merge(
+            array_filter([
+                'name' => $name,
+                'type' => $type,
+                'required' => $required,
+                'default' => $default,
+                'max_length' => $maxLength,
+                'allowed_values' => $allowedValues,
+                'catalog' => $catalog,
+                'accepted_mime_types' => $acceptedMimeTypes,
+                'max_file_size_kb' => $maxFileSizeKb,
+                'max_files' => $maxFiles,
+            ], static fn (mixed $value): bool => $value !== null),
+            array_filter($meta, static fn (mixed $value): bool => $value !== null),
+        );
     }
 
     /**

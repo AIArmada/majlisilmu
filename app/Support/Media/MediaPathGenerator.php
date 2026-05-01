@@ -22,7 +22,7 @@ use Spatie\MediaLibrary\Support\PathGenerator\PathGenerator;
  * - UUID shard (first 4 chars): prevents filesystem bottlenecks from thousands
  *   of subdirectories in a single folder (max ~65k shards per type).
  * - Full model UUID: unique per record, ties media to its owner unambiguously.
- * - Collection: separates poster/gallery/avatar/logo within each model.
+ * - Collection: separates cover/poster/gallery/avatar/logo within each model.
  * - Conversions and responsive images nested inside the collection directory.
  */
 class MediaPathGenerator implements PathGenerator

@@ -4,6 +4,8 @@ namespace App\Support\Search;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Throwable;
+use Typesense\Client as TypesenseClient;
 
 class TypesenseHealthCheckService
 {
@@ -53,13 +55,19 @@ class TypesenseHealthCheckService
     private function checkTypesenseHealth(): bool
     {
         try {
-            $client = \Laravel\Scout\Engines\TypesenseEngine::client();
+            $settings = config('scout.typesense.client-settings');
+
+            if (! is_array($settings)) {
+                return false;
+            }
+
+            $client = new TypesenseClient($settings);
 
             // Attempt to fetch health - lightweight operation
             $client->health->retrieve();
 
             return true;
-        } catch (\Exception $e) {
+        } catch (Throwable $e) {
             Log::debug('Typesense health check failed', [
                 'error' => $e->getMessage(),
             ]);

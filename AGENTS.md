@@ -708,11 +708,13 @@ Configured in `config/media-library.php`.
 
 ### Event (`app/Models/Event.php`)
 
-- `poster`: image/jpeg,image/png,image/webp, responsive, single file, fallback placeholder
+- `cover`: image/jpeg,image/png,image/webp, responsive, single file, fallback placeholder, required 16:9 website/mobile-app cover
+- `poster`: image/jpeg,image/png,image/webp, responsive, single file, fallback placeholder, required 4:5 portrait external-distribution poster
 - `gallery`: image/jpeg,image/png,image/webp, responsive, multi file
 - Conversions:
-  - `thumb`: 368x232 webp sharpen(10) on `poster`,`gallery`
-  - `preview`: width 800 webp on `poster`
+  - `thumb`: 600x400 cropped webp sharpen(10) on `cover`,`poster`,`gallery`
+  - `card`: max 960x1200 webp on `cover`,`poster`
+  - `preview`: max 1400x1800 webp on `cover`,`poster`
 
 ### Institution (`app/Models/Institution.php`)
 
@@ -786,7 +788,8 @@ Common implemented options:
 ### Public submission
 
 `resources/views/components/pages/submit-event/create.blade.php` includes:
-- `poster` upload
+- `cover` upload for website/mobile app display, fixed to 16:9
+- `poster` upload for external/social distribution, fixed to 4:5 portrait
 - `gallery` upload with reorder support
 - image editor + responsive images + conversion wiring
 
@@ -827,10 +830,17 @@ Features:
 ## Card Image Fallback Chain
 
 `Event::getCardImageUrlAttribute()`:
-1. Event poster `thumb`
-2. Institution logo `thumb`
-3. First speaker avatar URL
+1. Event cover `card`/`preview`/`thumb`
+2. Event poster `card`/`preview`/`thumb`
+3. Institution logo `thumb`
 4. Global placeholder image
+
+## Event Aspect Ratio Contract
+
+- Event `cover` is the primary website/mobile-app visual and must be 16:9 on public submit forms, contribution update forms, admin forms, frontend/admin APIs, and MCP-generated images.
+- Event `poster` is the shareable external-distribution flyer and must be 4:5 portrait on public submit forms, contribution update forms, admin forms, frontend/admin APIs, and MCP-generated images.
+- MCP exposes separate event image tools: cover tools write the `cover` collection at 16:9; poster tools write the `poster` collection at 4:5. Do not add a generic ratio selector for event media generation.
+- MCP speaker-context reference selection must follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer` (when organizer type is `Institution`). If none are available, proceed without those references.
 
 Use this accessor for cards, previews, and social image fallback behavior.
 
@@ -878,7 +888,7 @@ These improve collection fetch ordering and maintenance/reporting queries.
 - Conversions are registered and used
 - Fallback URLs exist
 - Custom media config is active (`path_generator`, `file_namer`, lazy loading, versioned URLs)
-- Submit-event poster/gallery uploads persist correctly
+- Submit-event cover/poster/gallery uploads persist correctly
 
 ## AI Implementation Checklist (For New Media Features)
 

@@ -229,7 +229,7 @@ Global behavior includes:
 - consistent custom media properties
 
 Common media usage:
-- Event: poster/gallery
+- Event: cover/poster/gallery (`cover` is required 16:9 for website/mobile-app display; `poster` is required 4:5 portrait for external distribution)
 - Institution: logo/cover/gallery
 - Speaker: avatar/main/gallery
 - Reference/report/donation channel specific collections

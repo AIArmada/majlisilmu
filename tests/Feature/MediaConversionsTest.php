@@ -29,13 +29,24 @@ beforeEach(function () {
 it('registers media conversions for Event model', function () {
     $event = Event::factory()->create();
 
+    $event->addMedia(fakeGeneratedImageUpload('cover.png', 1600, 900))
+        ->toMediaCollection('cover');
+
     $event->addMedia(fakeGeneratedImageUpload('poster.png', 1200, 800))
         ->toMediaCollection('poster');
 
+    $coverMedia = $event->getFirstMedia('cover');
     $media = $event->getFirstMedia('poster');
 
+    expect($coverMedia)->not->toBeNull();
     expect($media)->not->toBeNull();
+    expect($event->hasMedia('cover'))->toBeTrue();
     expect($event->hasMedia('poster'))->toBeTrue();
+
+    $coverConversions = $coverMedia->getMediaConversionNames();
+    expect($coverConversions)->toContain('thumb');
+    expect($coverConversions)->toContain('card');
+    expect($coverConversions)->toContain('preview');
 
     $conversions = $media->getMediaConversionNames();
     expect($conversions)->toContain('thumb');
@@ -106,8 +117,11 @@ it('backfills missing poster dimensions after resolving the display aspect ratio
         ->and((int) (($storedDimensions['height'] ?? 0)))->toBe(900);
 });
 
-it('defines accepted MIME types for Event poster collection', function () {
+it('defines accepted MIME types for Event cover and poster collections', function () {
     $event = Event::factory()->create();
+
+    expect(fn () => $event->addMedia(UploadedFile::fake()->create('document.pdf', 100, 'application/pdf'))
+        ->toMediaCollection('cover'))->toThrow(FileUnacceptableForCollection::class);
 
     expect(fn () => $event->addMedia(UploadedFile::fake()->create('document.pdf', 100, 'application/pdf'))
         ->toMediaCollection('poster'))->toThrow(FileUnacceptableForCollection::class);
@@ -130,6 +144,17 @@ it('uses thumb conversion in Event card_image_url accessor', function () {
     $cardUrl = $event->card_image_url;
 
     expect($cardUrl)->toContain('poster');
+});
+
+it('prefers Event cover over poster in card_image_url accessor', function () {
+    $event = Event::factory()->create();
+
+    $event->addMedia(fakeGeneratedImageUpload('poster.png', 1200, 1500))
+        ->toMediaCollection('poster');
+    $event->addMedia(fakeGeneratedImageUpload('cover.png', 1600, 900))
+        ->toMediaCollection('cover');
+
+    expect($event->card_image_url)->toContain('cover');
 });
 
 it('uses institution logo when Event has no poster', function () {

@@ -134,6 +134,7 @@ it('exposes corrected frontend contract metadata', function () {
         ->and($manifest['rules'] ?? [])->toContain('Use the admin record route_key returned by admin collection or detail payloads for record-specific schema and mutation paths.')
         ->and($quickstart[0]['endpoint'] ?? null)->toBe('https://api.majlisilmu.test/docs.json')
         ->and($submitEventFields)->toContain('parent_event_id', 'scoped_institution_id')
+        ->and($submitEventFields)->toContain('cover', 'poster', 'gallery')
         ->and($submitEventFields)->toContain('submission_country_id')
         ->and($submitEventFields)->not->toContain('submission_country_code', 'submission_country_key')
         ->not->toContain('timezone')
@@ -564,6 +565,7 @@ it('exposes event direct edit media support for authorized public updaters', fun
         'starts_at' => now()->addDays(4)->setTime(20, 0),
         'ends_at' => now()->addDays(4)->setTime(21, 0),
     ]);
+    $event->addMedia(fakeGeneratedImageUpload('context-cover.jpg', 1600, 900))->toMediaCollection('cover');
     $event->addMedia(fakeGeneratedImageUpload('context-poster.jpg', 1200, 1600))->toMediaCollection('poster');
     $event->addMedia(fakeGeneratedImageUpload('context-gallery.jpg', 1600, 900))->toMediaCollection('gallery');
 
@@ -586,7 +588,8 @@ it('exposes event direct edit media support for authorized public updaters', fun
     expect($visitorResponse->json('data.can_direct_edit'))->toBeFalse()
         ->and($visitorResponse->json('data.direct_edit_media_fields'))->toBe([])
         ->and($ownerResponse->json('data.can_direct_edit'))->toBeTrue()
-        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['poster', 'gallery'])
+        ->and($ownerResponse->json('data.direct_edit_media_fields'))->toBe(['cover', 'poster', 'gallery'])
+        ->and($ownerResponse->json('data.current_media.cover.0.url'))->not->toBeNull()
         ->and($ownerResponse->json('data.current_media.poster.0.url'))->not->toBeNull()
         ->and($ownerResponse->json('data.current_media.gallery.0.thumb_url'))->not->toBeNull();
 });
@@ -1047,7 +1050,7 @@ it('maps public event organizer values back to persistence classes during direct
         ->and($event->fresh()->live_url)->toBeNull();
 });
 
-it('allows direct event poster and gallery uploads on public contribution update suggestions', function () {
+it('allows direct event cover, poster, and gallery uploads on public contribution update suggestions', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
 
@@ -1072,7 +1075,8 @@ it('allows direct event poster and gallery uploads on public contribution update
         'subjectType' => 'majlis',
         'subject' => $event->slug,
     ]), [
-        'poster' => fakeGeneratedImageUpload('event-poster.jpg', 1200, 1600),
+        'cover' => fakeGeneratedImageUpload('event-cover.jpg', 1600, 900),
+        'poster' => fakeGeneratedImageUpload('event-poster.jpg', 1200, 1500),
         'gallery' => [fakeGeneratedImageUpload('event-gallery.jpg', 1200, 800)],
     ], [
         'Accept' => 'application/json',
@@ -1082,8 +1086,43 @@ it('allows direct event poster and gallery uploads on public contribution update
 
     $event = $event->fresh(['media']);
 
-    expect($event?->getMedia('poster'))->toHaveCount(1)
+    expect($event?->getMedia('cover'))->toHaveCount(1)
+        ->and($event?->getMedia('poster'))->toHaveCount(1)
         ->and($event?->getMedia('gallery'))->toHaveCount(1);
+});
+
+it('rejects direct event cover and poster uploads with invalid aspect ratios', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $owner = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->getKey(),
+        'institution_id' => $institution->getKey(),
+    ]);
+
+    assignInstitutionOwnerForFrontendApi($owner, $institution);
+    Sanctum::actingAs($owner);
+
+    $this->post(route('api.client.contributions.suggest.store', [
+        'subjectType' => 'majlis',
+        'subject' => $event->slug,
+    ]), [
+        'cover' => fakeGeneratedImageUpload('event-cover-invalid.jpg', 1200, 800),
+        'poster' => fakeGeneratedImageUpload('event-poster-invalid.jpg', 1600, 900),
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['cover', 'poster']);
 });
 
 it('searches speakers api by formatted title parts used on the public directory', function () {
@@ -3119,7 +3158,8 @@ it('submits events with media through the frontend api', function () {
         'organizer_institution_id' => $institution->getKey(),
         'speakers' => [$speaker->getKey()],
         'submission_country_id' => 132,
-        'poster' => fakeGeneratedImageUpload('poster.jpg'),
+        'cover' => fakeGeneratedImageUpload('cover.jpg', 1600, 900),
+        'poster' => fakeGeneratedImageUpload('poster.jpg', 1200, 1500),
         'gallery' => [fakeGeneratedImageUpload('gallery.jpg')],
     ], [
         'Accept' => 'application/json',
@@ -3131,8 +3171,43 @@ it('submits events with media through the frontend api', function () {
 
     $event = Event::query()->where('title', 'Frontend API Event')->firstOrFail();
 
-    expect($event->getMedia('poster'))->toHaveCount(1)
+    expect($event->getMedia('cover'))->toHaveCount(1)
+        ->and($event->getMedia('poster'))->toHaveCount(1)
         ->and($event->getMedia('gallery'))->toHaveCount(1);
+});
+
+it('rejects frontend event submission cover and poster uploads with invalid aspect ratios', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+        'allow_public_event_submission' => true,
+    ]);
+
+    $this->post(route('api.client.submit-event.store'), [
+        'title' => 'Invalid Ratio API Event',
+        'event_type' => ['kuliah_ceramah'],
+        'event_date' => now()->addDay()->toDateString(),
+        'prayer_time' => 'selepas_maghrib',
+        'event_format' => 'physical',
+        'visibility' => 'public',
+        'gender' => 'all',
+        'age_group' => ['all_ages'],
+        'languages' => [101],
+        'organizer_type' => 'institution',
+        'organizer_institution_id' => $institution->getKey(),
+        'submission_country_id' => 132,
+        'submitter_name' => 'Guest User',
+        'submitter_email' => 'guest@example.com',
+        'cover' => fakeGeneratedImageUpload('cover-invalid.jpg', 1200, 800),
+        'poster' => fakeGeneratedImageUpload('poster-invalid.jpg', 1600, 900),
+    ], [
+        'Accept' => 'application/json',
+    ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['cover', 'poster']);
 });
 
 it('requires explicit country input for frontend event submissions and accepts aliases', function () {

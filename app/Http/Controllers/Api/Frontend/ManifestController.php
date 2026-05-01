@@ -36,7 +36,8 @@ class ManifestController extends FrontendController
     #[Endpoint(
         title: 'Get submit-event field contract',
         description: 'Returns the canonical field contract for public event submission. '
-            .'Use `fields`, `defaults`, `conditional_rules`, and catalog URLs here before calling `POST /submit-event`.',
+            .'Use `fields`, `defaults`, `conditional_rules`, and catalog URLs here before calling `POST /submit-event`. '
+            .'Event media uses two distinct image roles: `cover` (16:9 website/app visual) and `poster` (4:5 external distribution visual).',
     )]
     public function submitEvent(Request $request): JsonResponse
     {

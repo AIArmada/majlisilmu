@@ -39,9 +39,9 @@ class EventsTable
     {
         return $table
             ->columns([
-                SpatieMediaLibraryImageColumn::make('poster')
-                    ->label('Poster')
-                    ->collection('poster')
+                SpatieMediaLibraryImageColumn::make('cover')
+                    ->label('Cover')
+                    ->collection('cover')
                     ->conversion('thumb')
                     ->square()
                     ->size(56),

@@ -11289,3 +11289,40 @@
   - `npm run build` => **pass**
   - `git diff --check` => **clean**
   - database rule checks => **no SoftDeletes matches** and **packages directory not present for package migration constraint scan**
+
+# Event Cover And Poster Form Todo
+
+- [x] Map Event media save/render/form surfaces
+- [x] Add Event cover media collection and conversions
+- [x] Add cover upload to public submit, kemas kini, and admin forms
+- [x] Update schemas/actions/tests/docs as needed
+- [x] Run focused Pest, PHPStan, Pint, and guard checks
+
+## Review
+- Changes:
+  - Added an Event `cover` media collection alongside the existing `poster` and `gallery` collections, with the same image MIME policy, responsive images, fallback, and webp conversions.
+  - Added `Gambar Cover Majlis`, `Poster Hebahan`, and `Galeri` upload fields to the public submit-event form, the public `kemas kini` direct-edit form, and the admin Event form.
+  - Wired `cover` through admin save handling, public API event submission, contribution direct-edit media contracts, admin write schemas/current-media payloads, docs, and regression tests.
+  - Fixed `TypesenseHealthCheckService` to instantiate the real Typesense PHP client instead of calling a nonexistent Scout static method, which was blocking frontend API parity tests and PHPStan.
+- Verification:
+  - `vendor/bin/pint --dirty` => pass
+  - `vendor/bin/pest --parallel --compact tests/Feature/SubmitEventMediaTest.php` => 3 passed, 22 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => 15 passed, 79 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ContributionPagesTest.php` => 53 passed, 369 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/MediaConversionsTest.php` => 34 passed, 72 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Api/Frontend/FrontendApiParityTest.php` => 98 passed, 699 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/ScrambleDocsTest.php` => 28 passed, 379 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/TypesenseHealthCheckServiceTest.php` => 3 passed, 1 skipped, 3 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/SearchServiceFallbackTest.php` => 17 passed, 26 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - database guard checks and `git diff --check` => clean
+# Event Media Ratio And Generation MCP Todo
+
+- [x] Audit current event media ratio validation and MCP prompt-generation tools
+- [ ] Enforce cover 16:9 and poster 4:5 across forms, public/admin APIs, and MCP schemas
+- [ ] Split MCP image generation into cover and poster tools that generate/store media directly
+- [ ] Update docs and tests for the new ratio and MCP contracts
+- [ ] Run focused Pest, PHPStan, Pint, and guard checks
+
+## Review
+- Pending.

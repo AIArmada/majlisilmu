@@ -176,7 +176,7 @@ class ContributionEntityMutationService
                     ['field' => 'location_institution_id', 'required_when' => ['location_type' => ['institution']]],
                     ['field' => 'location_venue_id', 'required_when' => ['location_type' => ['venue']]],
                 ],
-                'direct_edit_media_fields' => ['poster', 'gallery'],
+                'direct_edit_media_fields' => ['cover', 'poster', 'gallery'],
             ],
             default => throw new RuntimeException('Unsupported contribution entity type.'),
         };

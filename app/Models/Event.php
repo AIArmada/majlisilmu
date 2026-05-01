@@ -1057,6 +1057,13 @@ class Event extends Model implements AuditableContract, HasMedia
      */
     public function registerMediaCollections(): void
     {
+        $this->addMediaCollection('cover')
+            ->useDisk(config('media-library.disk_name'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->useFallbackUrl(asset('images/placeholders/event.png'))
+            ->withResponsiveImages()
+            ->singleFile();
+
         $this->addMediaCollection('poster')
             ->useDisk(config('media-library.disk_name'))
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
@@ -1076,18 +1083,18 @@ class Event extends Model implements AuditableContract, HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
-            ->performOnCollections('poster', 'gallery')
+            ->performOnCollections('cover', 'poster', 'gallery')
             ->fit(Fit::Crop, 600, 400)
             ->sharpen(10)
             ->format('webp');
 
         $this->addMediaConversion('card')
-            ->performOnCollections('poster')
+            ->performOnCollections('cover', 'poster')
             ->fit(Fit::Max, 960, 1200)
             ->format('webp');
 
         $this->addMediaConversion('preview')
-            ->performOnCollections('poster')
+            ->performOnCollections('cover', 'poster')
             ->fit(Fit::Max, 1400, 1800)
             ->format('webp');
     }
@@ -1246,10 +1253,16 @@ class Event extends Model implements AuditableContract, HasMedia
 
     /**
      * Get the card image URL for frontend.
-     * Priority: Poster thumb -> Institution logo thumb -> Default.
+     * Priority: Cover card -> Poster card -> Institution logo thumb -> Default.
      */
     public function getCardImageUrlAttribute(): string
     {
+        $coverUrl = $this->preferredMediaUrl($this->getFirstMedia('cover'), ['card', 'preview', 'thumb']);
+
+        if ($coverUrl !== null) {
+            return $coverUrl;
+        }
+
         $posterUrl = $this->preferredMediaUrl($this->getFirstMedia('poster'), ['card', 'preview', 'thumb']);
 
         if ($posterUrl !== null) {

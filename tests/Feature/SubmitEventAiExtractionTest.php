@@ -44,7 +44,7 @@ it('extracts media data with AI and moves the wizard to review step', function (
     });
 
     $component = Livewire::test('pages.submit-event.create')
-        ->set('event_source_attachment', UploadedFile::fake()->image('poster.jpg', 1200, 800))
+        ->set('event_source_attachment', UploadedFile::fake()->image('poster.jpg', 1200, 1500))
         ->call('extractEventFromMedia')
         ->assertHasNoErrors(['event_source_attachment'])
         ->assertSet('data.title', 'Daurah Fiqh Keluarga')

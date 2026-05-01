@@ -444,16 +444,25 @@ class AdminResourceRegistry
                     'record_key' => 'record',
                 ],
             ],
-            'generate_event_cover_prompt' => $key === 'events'
+            'generate_event_cover_image' => $key === 'events'
                 ? [
-                    'tool' => 'admin-generate-event-cover-prompt',
+                    'tool' => 'admin-generate-event-cover-image',
                     'arguments' => [
                         'event_key' => 'record',
-                        'aspect_ratio' => 'auto',
                         'creative_direction' => null,
-                        'include_existing_poster' => true,
-                        'embed_selected_media' => true,
-                        'max_embedded_media' => 6,
+                        'include_existing_media' => true,
+                        'max_reference_media' => 6,
+                    ],
+                ]
+                : null,
+            'generate_event_poster_image' => $key === 'events'
+                ? [
+                    'tool' => 'admin-generate-event-poster-image',
+                    'arguments' => [
+                        'event_key' => 'record',
+                        'creative_direction' => null,
+                        'include_existing_media' => true,
+                        'max_reference_media' => 6,
                     ],
                 ]
                 : null,
