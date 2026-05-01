@@ -33,6 +33,7 @@ class SpeakerSearchService
             ...$this->normalizedStringValues($honorific),
             ...$this->normalizedStringValues($preNominal),
             ...$this->normalizedStringValues($postNominal),
+
         ])
             ->map(static fn (string $value): string => str_replace(['_', '-'], ' ', $value))
             ->implode(' ');
@@ -84,7 +85,7 @@ class SpeakerSearchService
             return $query->whereRaw('1 = 0');
         }
 
-        if ($this->shouldUseScoutSearch()) {
+        if ($this->shouldUseScoutSearch() && app(TypesenseHealthCheckService::class)->isAvailable()) {
             try {
                 return $this->applyScoutSearch($query, $normalizedSearch);
             } catch (\Throwable $exception) {
@@ -190,7 +191,7 @@ class SpeakerSearchService
 
         /** @var list<string> $ids */
         $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
-            if ($this->shouldUseTypesenseSearch()) {
+            if ($this->shouldUseTypesenseSearch() && app(TypesenseHealthCheckService::class)->isAvailable()) {
                 try {
                     return $this->searchIdsWithScout($normalizedSearch, [
                         'filter_by' => 'is_active:=true && status:=verified',
@@ -297,7 +298,7 @@ class SpeakerSearchService
 
         /** @var list<string> $ids */
         $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
-            if ($this->shouldUseTypesenseSearch()) {
+            if ($this->shouldUseTypesenseSearch() && app(TypesenseHealthCheckService::class)->isAvailable()) {
                 try {
                     return $this->searchIdsWithScout($normalizedSearch, [
                         'filter_by' => 'is_active:=true && status:=verified',
@@ -341,7 +342,7 @@ class SpeakerSearchService
                         explode(' ', $candidate),
                         static fn (string $token): bool => mb_strlen($token) >= 2
                     ));
-
+                                if ($this->shouldUseTypesenseSearch() && $this->healthCheck->isAvailable()) {
                     foreach ($candidateTokens as $token) {
                         $scoreCandidates[] = $this->fuzzyComparable($normalizedSearch, $token)
                             ? $this->similarityScore($normalizedSearch, $token)
@@ -409,7 +410,7 @@ class SpeakerSearchService
                     explode(' ', $candidate),
                     static fn (string $token): bool => mb_strlen($token) >= 2,
                 ));
-
+                            if ($this->shouldUseTypesenseSearch() && $this->healthCheck->isAvailable()) {
                 foreach ($candidateTokens as $token) {
                     $scoreCandidates[] = $this->fuzzyComparable($normalizedSearch, $token)
                         ? $this->similarityScore($normalizedSearch, $token)

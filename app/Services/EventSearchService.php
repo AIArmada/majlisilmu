@@ -11,6 +11,7 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Venue;
 use App\Support\Cache\SafeModelCache;
+use App\Support\Search\TypesenseHealthCheckService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -22,6 +23,8 @@ use Illuminate\Support\Str;
 
 class EventSearchService
 {
+    public function __construct(private TypesenseHealthCheckService $healthCheck) {}
+
     /**
      * @return array<int|string, mixed>
      */
@@ -81,7 +84,7 @@ class EventSearchService
             return $this->searchWithDatabase($query, $filters, $perPage, $sort);
         }
 
-        if (config('scout.driver') === 'typesense') {
+        if (config('scout.driver') === 'typesense' && $this->healthCheck->isAvailable()) {
             try {
                 return $this->searchWithTypesense($query, $filters, $perPage, $sort);
             } catch (\Exception $e) {
@@ -296,7 +299,7 @@ class EventSearchService
             return $this->searchNearbyWithDatabaseQuery($normalizedQuery, $lat, $lng, $radiusKm, $filters, $perPage);
         }
 
-        if (config('scout.driver') === 'typesense') {
+        if (config('scout.driver') === 'typesense' && $this->healthCheck->isAvailable()) {
             try {
                 return $this->searchNearbyWithTypesenseQuery($normalizedQuery, $lat, $lng, $radiusKm, $filters, $perPage);
             } catch (\Exception $e) {

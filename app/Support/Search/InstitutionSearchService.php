@@ -27,7 +27,7 @@ class InstitutionSearchService
             return $query->whereRaw('1 = 0');
         }
 
-        if ($this->shouldUseScoutSearch()) {
+        if ($this->shouldUseScoutSearch() && app(TypesenseHealthCheckService::class)->isAvailable()) {
             try {
                 return $this->applyScoutSearch($query, $normalizedSearch);
             } catch (\Throwable $exception) {
@@ -123,7 +123,7 @@ class InstitutionSearchService
 
         /** @var list<string> $ids */
         $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
-            if ($this->shouldUseTypesenseSearch()) {
+            if ($this->shouldUseTypesenseSearch() && app(TypesenseHealthCheckService::class)->isAvailable()) {
                 try {
                     return $this->searchIdsWithScout($normalizedSearch, [
                         'filter_by' => 'is_active:=true && status:=verified',
@@ -219,7 +219,7 @@ class InstitutionSearchService
 
         /** @var list<string> $ids */
         $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($minimumScore, $normalizedSearch): array {
-            if ($this->shouldUseTypesenseSearch()) {
+            if ($this->shouldUseTypesenseSearch() && app(TypesenseHealthCheckService::class)->isAvailable()) {
                 try {
                     return $this->searchIdsWithScout($normalizedSearch, [
                         'filter_by' => 'is_active:=true && status:=verified',
