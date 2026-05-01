@@ -249,18 +249,24 @@ it('uses fixed cover and poster ratios on the admin event form', function () {
     Livewire::actingAs($administrator)
         ->test(EditEvent::class, ['record' => $event->id])
         ->assertFormFieldExists('cover', function (FileUpload $upload): bool {
+            $aspectRatioOptions = array_keys($upload->getImageEditorAspectRatioOptionsForJs());
+
             expect($upload->getImageAspectRatio())
                 ->toBe('16:9')
-                ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
-                ->toBe([]);
+                ->and($aspectRatioOptions)
+                ->toContain('16:9')
+                ->toHaveCount(2);
 
             return true;
         })
         ->assertFormFieldExists('poster', function (FileUpload $upload): bool {
+            $aspectRatioOptions = array_keys($upload->getImageEditorAspectRatioOptionsForJs());
+
             expect($upload->getImageAspectRatio())
                 ->toBe('4:5')
-                ->and(array_keys($upload->getImageEditorAspectRatioOptionsForJs()))
-                ->toBe([]);
+                ->and($aspectRatioOptions)
+                ->toContain('4:5')
+                ->toHaveCount(2);
 
             return true;
         });
