@@ -415,6 +415,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-get-report-triage-schema` | Read the explicit triage schema for one report | `GET /api/v1/admin/reports/{recordKey}/triage-schema` |
 | `admin-get-contribution-request-review-schema` | Read the explicit review schema for one contribution request | `GET /api/v1/admin/contribution-requests/{recordKey}/review-schema` |
 | `admin-get-membership-claim-review-schema` | Read the explicit review schema for one membership claim | `GET /api/v1/admin/membership-claims/{recordKey}/review-schema` |
+| `admin-create-event` | Create or preview an event with event-first arguments (`title`, `event_date`, `prayer_time`, `event_type`) plus relation route keys (`organizer_key`, `institution_key`) | MCP-only dedicated event create/preview tool |
 | `admin-create-github-issue` | Create a GitHub issue in the configured repository and auto-assign Copilot | `POST /api/v1/github-issues` (admin caller path) |
 | `admin-moderate-event` | Run one explicit moderation action on an event | `POST /api/v1/admin/events/{recordKey}/moderate` |
 | `admin-triage-report` | Run one explicit triage action on a report | `POST /api/v1/admin/reports/{recordKey}/triage` |
@@ -440,6 +441,7 @@ Admin tool behavior notes:
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain.
 - All read-only tools (discovery, list, get, schema, and workflow-schema tools) carry read-only and idempotent metadata hints; MCP clients that honor these hints can call them without requiring confirmation.
 - Write and workflow execution tools carry non-read-only and non-idempotent metadata hints; MCP clients may prompt for confirmation before calling them.
+- For event creation, prefer `admin-create-event` over `admin-create-record` to avoid raw UUID-heavy payloads and get event-specific confirmation text.
 
 ## Agent Quick Rules
 
