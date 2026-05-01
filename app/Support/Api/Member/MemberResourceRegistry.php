@@ -305,6 +305,19 @@ class MemberResourceRegistry
                     'record_key' => 'record',
                 ],
             ],
+            'generate_event_cover_prompt' => $key === 'events'
+                ? [
+                    'tool' => 'member-generate-event-cover-prompt',
+                    'arguments' => [
+                        'event_key' => 'record',
+                        'aspect_ratio' => 'auto',
+                        'creative_direction' => null,
+                        'include_existing_poster' => true,
+                        'embed_selected_media' => true,
+                        'max_embedded_media' => 6,
+                    ],
+                ]
+                : null,
             'get_update_schema' => $canWrite
                 ? [
                     'tool' => 'member-get-write-schema',

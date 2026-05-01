@@ -388,6 +388,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | MCP-only next-step action guidance tool |
+| `admin-generate-event-cover-prompt` | Build a ready image-generation prompt plus selected event relation/media references for one event poster | MCP-only creative prompt/media preparation tool |
 | `admin-get-write-schema` | Discover the create/update contract for a writable admin record | `GET /api/v1/admin/{resourceKey}/schema` |
 | `admin-get-event-moderation-schema` | Read the explicit moderation schema for one event | `GET /api/v1/admin/events/{recordKey}/moderation-schema` |
 | `admin-get-report-triage-schema` | Read the explicit triage schema for one report | `GET /api/v1/admin/reports/{recordKey}/triage-schema` |
@@ -407,6 +408,7 @@ Admin tool behavior notes:
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
+- `admin-generate-event-cover-prompt` is read-only. It resolves one event by `event_key`, returns `prompt`, `upload_spec`, `reference_media`, and `source_data`, and embeds selected image media when available so ChatGPT can pass them to an image-generation model.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search now reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
@@ -433,6 +435,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-related-records` | List related records for one member record |
 | `member-get-record` | Read one member record by resource key and record key |
 | `member-get-record-actions` | Get focused next-step MCP actions for one member record |
+| `member-generate-event-cover-prompt` | Build a ready image-generation prompt plus selected event relation/media references for one accessible event poster |
 | `member-get-write-schema` | Discover the writable update schema for one member record |
 | `member-list-contribution-requests` | List the authenticated member's own contribution requests plus any pending approvals |
 | `member-approve-contribution-request` | Approve one reviewable contribution request |
@@ -448,6 +451,7 @@ Member tool behavior notes:
 
 - Member tools are constrained to the Ahli workspace boundary and live membership relationships.
 - `member-get-record-actions` is read-only and returns record-specific next-step MCP tools for the Ahli surface, including update-schema and relation traversal follow-ups when they are available.
+- `member-generate-event-cover-prompt` is read-only. It resolves one accessible event by `event_key`, returns `prompt`, `upload_spec`, `reference_media`, and `source_data`, and embeds selected image media when available so ChatGPT can pass them to an image-generation model.
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
 - Member update tools support `validate_only=true` for preview-only member writes.
 - Member related-record traversal is limited to one level and only for relations exposed by member resource metadata.

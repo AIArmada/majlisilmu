@@ -11143,27 +11143,55 @@
   - `vendor/bin/pint --test ...` on touched files => **pass**
   - locale JSON validation => **json ok**
   - database rule checks => **no SoftDeletes matches** and **packages directory not present for package migration constraint scan**
-  - `git diff --check -- ...` on touched files => **clean**
 
-  ---
+---
 
-  # Institutions Search Clear Icon Parity
+# Event Cover MCP Prompt Tool Todo
 
-  - [x] Inspect `/institusi` and `/penceramah` search controls
-  - [x] Replace institutions clear-text action with speaker-style X icon button
-  - [x] Add a regression test for the icon clear button markup
-  - [x] Run formatting and focused verification
+- [x] Inventory event direct data, relations, and media available for cover prompt construction
+- [x] Research existing MCP server/tool conventions and choose the ChatGPT-facing registration point
+- [x] Design the tool input/output contract for selecting an event and returning a ready-to-run image prompt with media context
+- [x] Implement the event cover prompt builder and MCP tool using existing Eloquent/media patterns
+- [x] Add focused tests for direct data, relation data, media inclusion, and missing-event behavior
+- [x] Run targeted Pest, PHPStan, Pint, and database guard checks
 
-  ## Review
+## Review
+- Research:
+  - Event prompt context now covers direct event attributes, computed event labels/display values, relations, and media for event, institution, venue, speaker/key people, references, series, donation channel, media links, parent/child events, tags, languages, settings, and addresses.
+  - The specific public slug `tadabbur-isu-semasa-ummah-qdkhqqn` currently resolves to `Tadabbur: Isu Semasa Ummah`; it has no event media, no institution, placeholder speaker avatars, and two references without cover media in the local data.
+- Fix:
+  - Added admin/member MCP tools for read-only event cover prompt generation.
+  - Added a shared event prompt builder that selects useful reference media, embeds available images, and returns the Event `poster` upload spec.
+  - Added event record-action and resource metadata hints so ChatGPT can discover the cover prompt tool after reading an event.
+  - Updated MCP guides and examples.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/EventCoverPromptToolTest.php` => **3 passed (64 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php --filter='initializes and lists admin MCP tools over the HTTP endpoint'` => **2 passed (114 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/MemberServerTest.php --filter='initializes and lists member MCP tools over the HTTP endpoint'` => **2 passed (116 assertions)**
+  - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideDocsTest.php` => **2 passed (26 assertions)**
+  - `vendor/bin/phpstan analyse --ansi` => **No errors**
+  - `vendor/bin/pint ...` on touched PHP files => **pass**
+  - database guard checks => **no SoftDeletes matches** and **packages directory not present for package migration constraint scan**
 
-  - Updated `resources/views/components/pages/institutions/⚡index.blade.php` so the search clear control now matches `/penceramah`:
-    - icon-only red pill button
-    - `aria-label` and sr-only text for accessibility
-    - same X SVG path as the speaker page
-  - Added `tests/Feature/InstitutionIndexTest.php` coverage to confirm the clear icon button renders when `search=bitu`.
-  - Verification:
-    - `vendor/bin/pint --dirty --format agent` => **pass**
-    - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **24 passed (97 assertions)**
+---
+
+# Institutions Search Clear Icon Parity
+
+- [x] Inspect `/institusi` and `/penceramah` search controls
+- [x] Replace institutions clear-text action with speaker-style X icon button
+- [x] Add a regression test for the icon clear button markup
+- [x] Run formatting and focused verification
+
+## Review
+
+- Updated `resources/views/components/pages/institutions/⚡index.blade.php` so the search clear control now matches `/penceramah`:
+  - icon-only red pill button
+  - `aria-label` and sr-only text for accessibility
+  - same X SVG path as the speaker page
+- Added `tests/Feature/InstitutionIndexTest.php` coverage to confirm the clear icon button renders when `search=bitu`.
+- Verification:
+  - `vendor/bin/pint --dirty --format agent` => **pass**
+  - `vendor/bin/pest --parallel --compact tests/Feature/InstitutionIndexTest.php` => **24 passed (97 assertions)**
 
 ---
 

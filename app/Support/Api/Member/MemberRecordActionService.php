@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support\Api\Member;
 
-use App\Models\User;
 use Filament\Resources\Resource;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -84,6 +83,24 @@ final readonly class MemberRecordActionService
             ],
         ];
 
+        if ($resourceKey === 'events') {
+            $actions[] = [
+                'key' => 'generate_event_cover_prompt',
+                'label' => 'Generate event cover prompt',
+                'category' => 'creative_asset',
+                'description' => 'Build a ready image-generation prompt plus selected event, relation, and media references for a new event poster.',
+                'tool' => 'member-generate-event-cover-prompt',
+                'arguments' => [
+                    'event_key' => $recordKey,
+                    'aspect_ratio' => 'auto',
+                    'creative_direction' => null,
+                    'include_existing_poster' => true,
+                    'embed_selected_media' => true,
+                    'max_embedded_media' => 6,
+                ],
+            ];
+        }
+
         if ($relations !== []) {
             $actions[] = [
                 'key' => 'list_related_records',
@@ -142,7 +159,7 @@ final readonly class MemberRecordActionService
     {
         $recommended = [];
 
-        foreach (['get_update_schema', 'list_related_records'] as $actionKey) {
+        foreach (['generate_event_cover_prompt', 'get_update_schema', 'list_related_records'] as $actionKey) {
             if ($this->hasAction($actions, $actionKey)) {
                 $recommended[] = $actionKey;
             }
@@ -174,6 +191,10 @@ final readonly class MemberRecordActionService
             $notes[] = 'For relation traversal, set relation to one of the available relation names exposed on this resource.';
         }
 
+        if ($this->hasAction($actions, 'generate_event_cover_prompt')) {
+            $notes[] = 'For event poster generation, call the cover prompt tool first; it is read-only and returns the upload spec plus selected reference media.';
+        }
+
         return $notes;
     }
 
@@ -182,7 +203,7 @@ final readonly class MemberRecordActionService
      */
     private function hasAction(array $actions, string $key): bool
     {
-        return array_any($actions, fn($action) => ($action['key'] ?? null) === $key);
+        return array_any($actions, fn ($action) => ($action['key'] ?? null) === $key);
     }
 
     /**
