@@ -33,6 +33,7 @@ use App\Support\Authz\ScopedMemberRoleSeeder;
 use App\Support\Location\PublicCountryPreference;
 use App\Support\Location\PublicCountryRegistry;
 use Database\Seeders\PermissionSeeder;
+use Filament\Forms\Components\FileUpload;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -784,6 +785,53 @@ it('shows the richer event update controls for maintainers', function () {
         ->assertFormFieldVisible('cover')
         ->assertFormFieldVisible('poster')
         ->assertFormFieldVisible('gallery');
+});
+
+it('shows visible aspect ratio options for direct event media edits on the kemas kini page', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+    ]);
+    $event = Event::factory()->for($institution)->create([
+        'title' => 'Majlis Dengan Nisbah Media',
+        'status' => 'approved',
+        'event_type' => [EventType::Iftar->value],
+        'organizer_type' => Institution::class,
+        'organizer_id' => $institution->id,
+        'institution_id' => $institution->id,
+        'starts_at' => now()->addDays(4)->setTime(20, 0),
+    ]);
+
+    assignInstitutionOwner($user, $institution);
+
+    $this->actingAs($user);
+
+    Livewire::test(SuggestUpdate::class, [
+        'subjectType' => ContributionSubjectType::Event->publicRouteSegment(),
+        'subjectId' => $event->slug,
+    ])
+        ->assertFormFieldExists('cover', function (FileUpload $upload): bool {
+            $aspectRatioOptions = array_keys($upload->getImageEditorAspectRatioOptionsForJs());
+
+            expect($upload->getImageAspectRatio())
+                ->toBe('16:9')
+                ->and($aspectRatioOptions)
+                ->toContain('16:9')
+                ->toHaveCount(2);
+
+            return true;
+        })
+        ->assertFormFieldExists('poster', function (FileUpload $upload): bool {
+            $aspectRatioOptions = array_keys($upload->getImageEditorAspectRatioOptionsForJs());
+
+            expect($upload->getImageAspectRatio())
+                ->toBe('4:5')
+                ->and($aspectRatioOptions)
+                ->toContain('4:5')
+                ->toHaveCount(2);
+
+            return true;
+        });
 });
 
 it('renders the submit-style waktu field on the event update page', function () {
