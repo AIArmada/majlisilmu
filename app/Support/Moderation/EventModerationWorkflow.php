@@ -15,6 +15,23 @@ use App\States\EventStatus\Rejected;
 final class EventModerationWorkflow
 {
     /**
+     * @return list<string>
+     */
+    public static function allActionKeys(): array
+    {
+        return [
+            'submit_for_moderation',
+            'approve',
+            'request_changes',
+            'reject',
+            'cancel',
+            'reconsider',
+            'remoderate',
+            'revert_to_draft',
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function reasonOptions(): array
