@@ -54,9 +54,10 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
             if (is_array($response['data']['schema'] ?? null)) {
                 /** @var array<string, mixed> $schema */
                 $schema = $response['data']['schema'];
+                $toolName = $this->toolName($resourceKey, $operation);
                 $response['data']['schema'] = $this->schemaFormatter->formatSchema(
                     $schema,
-                    $operation === 'create' ? 'admin-create-record' : 'admin-update-record',
+                    $toolName,
                     $this->toolArguments($resourceKey, $operation, $recordKey),
                 );
             }
@@ -70,6 +71,20 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
      */
     private function toolArguments(string $resourceKey, string $operation, ?string $recordKey): array
     {
+        if ($operation === 'create' && $resourceKey === 'events') {
+            return [
+                'title' => 'string',
+                'event_date' => 'YYYY-MM-DD',
+                'prayer_time' => 'string',
+                'event_type' => 'array<string>',
+                'organizer_type' => 'institution|speaker',
+                'organizer_key' => 'route_key',
+                'institution_key' => 'route_key',
+                'validate_only' => false,
+                'apply_defaults' => false,
+            ];
+        }
+
         if ($operation === 'update') {
             return [
                 'resource_key' => $resourceKey,
@@ -86,6 +101,15 @@ class AdminGetWriteSchemaTool extends AbstractAdminWriteTool
             'validate_only' => false,
             'apply_defaults' => false,
         ];
+    }
+
+    private function toolName(string $resourceKey, string $operation): string
+    {
+        if ($operation === 'create' && $resourceKey === 'events') {
+            return 'admin-create-event';
+        }
+
+        return $operation === 'create' ? 'admin-create-record' : 'admin-update-record';
     }
 
     /**
