@@ -24,7 +24,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
 {
     protected string $name = 'admin-create-record';
 
-    protected string $description = 'Create or preview a supported writable admin resource record.';
+    protected string $description = 'Create or preview a supported writable admin resource record. Requires a payload object.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -93,7 +93,7 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
     {
         return [
             'resource_key' => $schema->string()->required()->min(1),
-            'payload' => $schema->object()->required(),
+            'payload' => $schema->object()->required()->description('Required object containing writable fields for the target resource.'),
             'validate_only' => $schema->boolean()->default(false),
             'apply_defaults' => $schema->boolean()->default(false),
         ];
@@ -109,6 +109,30 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
     public function toArray(): array
     {
         $tool = parent::toArray();
+        $inputSchema = is_array($tool['inputSchema'] ?? null) ? $tool['inputSchema'] : [];
+        $properties = is_array($inputSchema['properties'] ?? null) ? $inputSchema['properties'] : [];
+        $required = array_values(array_unique(array_filter(
+            [
+                ...array_values(is_array($inputSchema['required'] ?? null) ? $inputSchema['required'] : []),
+                'resource_key',
+                'payload',
+            ],
+            static fn (mixed $value): bool => is_string($value) && $value !== '',
+        )));
+
+        $properties['payload'] = array_merge(
+            [
+                'type' => 'object',
+                'description' => 'Required object containing writable fields for the target resource.',
+            ],
+            is_array($properties['payload'] ?? null) ? $properties['payload'] : [],
+        );
+
+        $tool['inputSchema'] = array_merge($inputSchema, [
+            'type' => 'object',
+            'properties' => $properties,
+            'required' => $required,
+        ]);
 
         $tool['_meta'] = array_merge(
             is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],

@@ -9,6 +9,7 @@ use App\Mcp\Methods\ReadResourceWithDocumentationPreflight;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
+use App\Mcp\Tools\Admin\AdminCreateEventTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
 use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
 use App\Mcp\Tools\Admin\AdminDocumentationSearchTool;
@@ -71,6 +72,7 @@ class AdminServer extends MajlisIlmuServer
         AdminGetReportTriageSchemaTool::class,
         AdminGetContributionRequestReviewSchemaTool::class,
         AdminGetMembershipClaimReviewSchemaTool::class,
+        AdminCreateEventTool::class,
         AdminCreateRecordTool::class,
         AdminCreateGitHubIssueTool::class,
         AdminModerateEventTool::class,

@@ -20,6 +20,7 @@ use App\Enums\RegistrationMode;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\AdminServer;
+use App\Mcp\Tools\Admin\AdminCreateEventTool;
 use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
 use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
@@ -1768,6 +1769,9 @@ it('returns write schema for supported resources and rejects unknown resources',
         ->assertStructuredContent(fn ($json) => $json
             ->where('data.schema.resource_key', 'events')
             ->where('data.schema.method', 'POST')
+            ->where('data.schema.tool', 'admin-create-event')
+            ->where('data.schema.tool_arguments.organizer_key', 'route_key')
+            ->where('data.schema.tool_arguments.institution_key', 'route_key')
             ->etc());
 
     AdminServer::actingAs($admin)
@@ -2509,7 +2513,7 @@ it('emulates production yasin create flow with validate-only then actual create'
         'is_active' => true,
     ]);
 
-    $payload = [
+    $arguments = [
         'title' => 'Majlis Bacaan Yasin',
         'description' => '<p></p>',
         'event_date' => '2026-05-07',
@@ -2522,9 +2526,9 @@ it('emulates production yasin create flow with validate-only then actual create'
         'children_allowed' => true,
         'is_muslim_only' => false,
         'event_type' => [EventType::BacaanYasin->value],
-        'organizer_type' => Institution::class,
-        'organizer_id' => (string) $institution->getKey(),
-        'institution_id' => (string) $institution->getKey(),
+        'organizer_type' => 'institution',
+        'organizer_key' => (string) $institution->getRouteKey(),
+        'institution_key' => (string) $institution->getRouteKey(),
         'registration_required' => false,
         'registration_mode' => RegistrationMode::Event->value,
         'status' => 'pending',
@@ -2533,11 +2537,10 @@ it('emulates production yasin create flow with validate-only then actual create'
     ];
 
     AdminServer::actingAs($admin)
-        ->tool(AdminCreateRecordTool::class, [
-            'resource_key' => 'events',
+        ->tool(AdminCreateEventTool::class, [
             'validate_only' => true,
             'apply_defaults' => false,
-            'payload' => $payload,
+            ...$arguments,
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
@@ -2548,11 +2551,10 @@ it('emulates production yasin create flow with validate-only then actual create'
             ->etc());
 
     AdminServer::actingAs($admin)
-        ->tool(AdminCreateRecordTool::class, [
-            'resource_key' => 'events',
+        ->tool(AdminCreateEventTool::class, [
             'validate_only' => false,
             'apply_defaults' => false,
-            'payload' => $payload,
+            ...$arguments,
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
@@ -3160,6 +3162,7 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-get-report-triage-schema',
         'admin-get-contribution-request-review-schema',
         'admin-get-membership-claim-review-schema',
+        'admin-create-event',
         'admin-create-record',
         'admin-create-github-issue',
         'admin-moderate-event',
@@ -3234,6 +3237,13 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'destructiveHint' => false,
         'openWorldHint' => false,
     ]);
+
+    expect(data_get($tools->get('admin-create-record'), 'inputSchema.properties.payload.type'))->toBe('object');
+    expect(collect((array) data_get($tools->get('admin-create-record'), 'inputSchema.required'))->contains('payload'))->toBeTrue();
+
+    expect(data_get($tools->get('admin-update-record'), 'inputSchema.properties.payload.type'))->toBe('object');
+    expect(collect((array) data_get($tools->get('admin-update-record'), 'inputSchema.required'))->contains('record_key'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-update-record'), 'inputSchema.required'))->contains('payload'))->toBeTrue();
 
     expect($tools->get('admin-create-github-issue')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => false,
@@ -3325,6 +3335,7 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-get-report-triage-schema',
         'admin-get-contribution-request-review-schema',
         'admin-get-membership-claim-review-schema',
+        'admin-create-event',
         'admin-create-record',
         'admin-create-github-issue',
         'admin-moderate-event',
