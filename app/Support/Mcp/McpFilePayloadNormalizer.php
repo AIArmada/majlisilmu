@@ -143,7 +143,6 @@ final class McpFilePayloadNormalizer
             Log::debug('mcp.image_upload: descriptor is not an associative array', [
                 'field' => $field,
                 'type' => gettype($value),
-                'is_list' => is_array($value) && array_is_list($value),
             ]);
 
             throw ValidationException::withMessages([

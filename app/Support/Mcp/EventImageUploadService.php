@@ -37,9 +37,6 @@ final class EventImageUploadService
             'event_slug' => $event->slug,
             'collection' => $collection,
             'descriptor_keys' => array_keys($descriptor),
-            'has_download_url' => isset($descriptor['download_url']) || isset($descriptor['downloadUrl']),
-            'has_content_base64' => isset($descriptor['content_base64']) || isset($descriptor['contentBase64']),
-            'has_file_id' => isset($descriptor['file_id']) || isset($descriptor['fileId']),
             'has_creative_direction' => $creativeDirection !== null,
         ]);
 
