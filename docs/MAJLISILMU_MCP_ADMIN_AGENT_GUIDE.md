@@ -234,15 +234,19 @@ Use this section as the quick admin-only capability summary.
 
 ## Event cover/poster image generation
 
-Event image generation uses a two-step workflow on the admin server:
+Event image generation uses a 3-step workflow on the admin server:
 
 1. Call the MCP prompt `admin-event-cover-image-prompt` (for `cover`) or `admin-event-poster-image-prompt` (for `poster`) with `event_key`, optional `creative_direction`, `include_existing_media`, and `max_reference_media` arguments. The prompt returns engineered prompt text and brand reference images.
-2. Use ChatGPT native image generation with the returned prompt and reference images.
-3. Upload the result with `admin-upload-event-cover-image` (writes `cover` at `16:9`) or `admin-upload-event-poster-image` (writes `poster` at `4:5`) by passing the `event_key` and an image descriptor.
+2. Generate the image using ChatGPT native image generation with the returned prompt and reference images.
+3. Upload the result with `admin-upload-event-cover-image` (writes `cover` at `16:9`) or `admin-upload-event-poster-image` (writes `poster` at `4:5`) by passing the `event_key` and an image descriptor (`{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images).
 
+- Use `admin-upload-event-cover-image` for the website/app event visual.
+- Use `admin-upload-event-poster-image` for the external-distribution flyer visual.
 - Target ratio is fixed and server-enforced:
   - `cover` = `16:9`
   - `poster` = `4:5`
+- The upload tool accepts `event_key`, `image` (file descriptor), and an optional `creative_direction` note.
+- The prompt's `include_existing_media` and `max_reference_media` arguments control reference-image selection at prompt time. If the prompt call fails while attaching references, retry with `include_existing_media=false` and `max_reference_media=0`.
 - Reference-media selection for speaker likeness/context follows:
   1. speaker `cover`
   2. speaker `avatar`
@@ -455,7 +459,8 @@ Admin tool behavior notes:
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
-- `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image descriptor (`content_base64`, `content_url`, or ChatGPT `download_url`/`file_id`) and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Use the MCP prompts `admin-event-cover-image-prompt` and `admin-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+- `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `admin-event-cover-image-prompt` and `admin-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+- If attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.

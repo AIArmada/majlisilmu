@@ -28,7 +28,7 @@ Event record detail for `events` now includes the public change-surface projecti
 
 ### Generate an event cover image
 
-Event image generation uses a two-step workflow. First, call the MCP prompt to get the engineered prompt text and brand reference images:
+Event image generation uses a 3-step workflow. First, call the MCP prompt to get the engineered prompt text and brand reference images:
 
 ```json
 {
@@ -56,7 +56,8 @@ Then upload the generated result:
       "mime_type": "image/png",
       "download_url": "https://api.openai.com/files/file_id/content",
       "file_id": "file_xyz"
-    }
+    },
+    "creative_direction": "Premium editorial cover with deep emerald, warm gold, and strong Malay typography."
   }
 }
 ```
@@ -321,7 +322,7 @@ For member-scoped event reads, the same `data.record.attributes.active_change_no
 
 ### Generate an accessible event cover image
 
-Event image generation uses a two-step workflow on the member server. Call the prompt first:
+Event image generation uses a 3-step workflow on the member server. First, call the prompt to get the engineered prompt text and brand reference images:
 
 ```json
 {
