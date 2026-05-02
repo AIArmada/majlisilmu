@@ -7,6 +7,7 @@ use App\Enums\MemberSubjectType;
 use App\Http\Controllers\Api\Admin\CatalogController as AdminCatalogController;
 use App\Http\Controllers\Api\Admin\ContributionRequestReviewController as AdminContributionRequestReviewController;
 use App\Http\Controllers\Api\Admin\EventModerationController as AdminEventModerationController;
+use App\Http\Controllers\Api\Admin\EventSearchController;
 use App\Http\Controllers\Api\Admin\ManifestController as AdminManifestController;
 use App\Http\Controllers\Api\Admin\MembershipClaimReviewController as AdminMembershipClaimReviewController;
 use App\Http\Controllers\Api\Admin\ReportTriageController as AdminReportTriageController;
@@ -133,6 +134,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
                 Route::get('/districts', [AdminCatalogController::class, 'districts'])->name('districts');
                 Route::get('/subdistricts', [AdminCatalogController::class, 'subdistricts'])->name('subdistricts');
             });
+            Route::get('/events/search', [EventSearchController::class, 'search'])->name('events.search');
             Route::get('/{resourceKey}', [AdminResourceController::class, 'indexRecords'])->name('resources.index');
             Route::post('/{resourceKey}', [AdminResourceController::class, 'storeRecord'])->name('resources.store');
             Route::get('/{resourceKey}/meta', [AdminResourceController::class, 'show'])->name('resources.meta');

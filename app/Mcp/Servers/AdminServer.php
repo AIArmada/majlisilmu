@@ -13,11 +13,8 @@ use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Tools\Admin\AdminCreateEventTool;
 use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
-use App\Mcp\Tools\Admin\AdminReadDebugLogTool;
 use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
 use App\Mcp\Tools\Admin\AdminDocumentationSearchTool;
-use App\Mcp\Tools\Admin\AdminUploadEventCoverImageTool;
-use App\Mcp\Tools\Admin\AdminUploadEventPosterImageTool;
 use App\Mcp\Tools\Admin\AdminGetContributionRequestReviewSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetEventModerationSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetMembershipClaimReviewSchemaTool;
@@ -30,10 +27,14 @@ use App\Mcp\Tools\Admin\AdminListRecordsTool;
 use App\Mcp\Tools\Admin\AdminListRelatedRecordsTool;
 use App\Mcp\Tools\Admin\AdminListResourcesTool;
 use App\Mcp\Tools\Admin\AdminModerateEventTool;
+use App\Mcp\Tools\Admin\AdminReadDebugLogTool;
 use App\Mcp\Tools\Admin\AdminReviewContributionRequestTool;
 use App\Mcp\Tools\Admin\AdminReviewMembershipClaimTool;
+use App\Mcp\Tools\Admin\AdminSearchEventsTool;
 use App\Mcp\Tools\Admin\AdminTriageReportTool;
 use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
+use App\Mcp\Tools\Admin\AdminUploadEventCoverImageTool;
+use App\Mcp\Tools\Admin\AdminUploadEventPosterImageTool;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
@@ -71,6 +72,7 @@ class AdminServer extends MajlisIlmuServer
         AdminUploadEventPosterImageTool::class,
         AdminListResourcesTool::class,
         AdminGetResourceMetaTool::class,
+        AdminSearchEventsTool::class,
         AdminListRecordsTool::class,
         AdminListRelatedRecordsTool::class,
         AdminGetRecordTool::class,

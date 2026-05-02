@@ -243,6 +243,7 @@ Use this section as the quick MCP-only capability summary.
 | Docs fetch | `fetch` | `fetch` |
 | Resource discovery | `admin-list-resources` | `member-list-resources` |
 | Resource metadata | `admin-get-resource-meta` | `member-get-resource-meta` |
+| Dedicated event discovery | `admin-search-events` | `member-search-events` |
 | Record list | `admin-list-records` | `member-list-records` |
 | Record read | `admin-get-record` | `member-get-record` |
 | Record action guidance | `admin-get-record-actions` | `member-get-record-actions` |
@@ -408,6 +409,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `fetch` | Fetch one verified MajlisIlmu documentation page by id | MCP-only documentation fetch tool |
 | `admin-list-resources` | List accessible admin resources and their capability summary | `GET /api/v1/admin/manifest` |
 | `admin-get-resource-meta` | Read one admin resource's metadata, pages, relations, abilities, and write-support flags | `GET /api/v1/admin/{resourceKey}/meta` |
+| `admin-search-events` | Search events with rich filters: keyword, geo/nearby, date range, clock-time or prayer-relative window, event type, format, language, audience (gender, age group, children, Muslim-only), institution/venue, key-person roles, topic/tag/reference UUIDs, and boolean flags (has_event_url, has_live_url) | `GET /api/v1/admin/events/search` (same filter contract) |
 | `admin-list-records` | List records for one admin resource with optional search, structured filters, date filters, and pagination | `GET /api/v1/admin/{resourceKey}` |
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
@@ -433,6 +435,7 @@ Admin tool behavior notes:
 - `validate_only=true` is supported for create/update preview flows.
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
+- `admin-search-events` is the dedicated event-discovery MCP path and is aligned with `GET /api/v1/admin/events/search`. It supports keyword search, geo-proximity sorting (`sort=distance` with `lat`, `lng`, `radius_km`), date range (`starts_after`, `starts_before`, `time_scope`), clock-time or prayer-relative windows (`timing_mode`, `starts_time_from/until`, `prayer_time`), event type and format arrays, audience and audience-boolean filters, institution/venue/speaker/role filters, and tag/reference UUID arrays. Each parameter includes an inline description of valid values in the tool schema.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
 - `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `admin-event-cover-image-prompt` and `admin-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - If attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.
@@ -460,6 +463,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `fetch` | Fetch one verified MajlisIlmu documentation page by id |
 | `member-list-resources` | List accessible Ahli-scoped member resources |
 | `member-get-resource-meta` | Read one member resource's metadata, permissions, and available write support |
+| `member-search-events` | Search events with rich filters: keyword, geo/nearby, date range, clock-time or prayer-relative window, event type, format, language, audience (gender, age group, children, Muslim-only), institution/venue, key-person roles, topic/tag/reference UUIDs, and boolean flags (has_event_url, has_live_url) |
 | `member-list-records` | List records for one member resource with optional search and pagination |
 | `member-list-related-records` | List related records for one member record |
 | `member-get-record` | Read one member record by resource key and record key |
@@ -480,6 +484,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 Member tool behavior notes:
 
 - Member tools are constrained to the Ahli workspace boundary and live membership relationships.
+- `member-search-events` is the dedicated event-discovery path for rich filtering while still respecting member MCP scope boundaries. Supports the same filter contract as `admin-search-events`: keyword, geo-proximity, date range, time window, event type/format arrays, audience and boolean filters, speaker/role IDs, and tag/reference UUID arrays.
 - `member-get-record-actions` is read-only and returns record-specific next-step MCP tools for the Ahli surface, including update-schema and relation traversal follow-ups when they are available.
 - `member-upload-event-cover-image` and `member-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the accessible event media collection within Ahli scope. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `member-event-cover-image-prompt` and `member-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - If attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.
@@ -612,6 +617,7 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `fetch` | Fetch the full text of one verified docs page | `id` |
 | `admin-list-resources` | Discover accessible admin resources | `verbose?`, `writable_only?` |
 | `admin-get-resource-meta` | Inspect one resource’s metadata, routes, relations, and abilities | `resource_key` |
+| `admin-search-events` | Run dedicated event discovery with rich filters | `query?`, `sort?` (time/relevance/distance), `time_scope?` (upcoming/past/all), `starts_after?`, `starts_before?`, `starts_time_from?`, `starts_time_until?`, `timing_mode?`, `prayer_time?`, `event_type?` (array), `event_format?` (array: physical/online/hybrid), `language_codes?` (array), `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `country_id?`, `state_id?`, `district_id?`, `subdistrict_id?`, `lat?`, `lng?`, `radius_km?`, `institution_id?`, `venue_id?`, `speaker_ids?` (array), `key_person_roles?` (array), `person_in_charge_ids?`, `moderator_ids?`, `imam_ids?`, `khatib_ids?`, `bilal_ids?`, `topic_ids?` (array), `domain_tag_ids?` (array), `source_tag_ids?` (array), `issue_tag_ids?` (array), `reference_ids?` (array), `has_event_url?`, `has_live_url?`, `has_end_time?`, `page?`, `per_page?` |
 | `admin-list-records` | Search and paginate records for one admin resource | `resource_key`, `search?`, `filters?`, `starts_after?`, `starts_before?`, `starts_on_local_date?`, `page?`, `per_page?` |
 | `admin-list-related-records` | Traverse a named relation on a record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `admin-get-record` | Read one admin record and its permissions | `resource_key`, `record_key` |
@@ -641,6 +647,7 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `fetch` | Fetch the full text of one verified docs page | `id` |
 | `member-list-resources` | Discover accessible Ahli-scoped resources | `verbose?` |
 | `member-get-resource-meta` | Inspect one member resource’s metadata and write support | `resource_key` |
+| `member-search-events` | Run dedicated event discovery with rich filters | `query?`, `sort?` (time/relevance/distance), `time_scope?` (upcoming/past/all), `starts_after?`, `starts_before?`, `starts_time_from?`, `starts_time_until?`, `timing_mode?`, `prayer_time?`, `event_type?` (array), `event_format?` (array: physical/online/hybrid), `language_codes?` (array), `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `country_id?`, `state_id?`, `district_id?`, `subdistrict_id?`, `lat?`, `lng?`, `radius_km?`, `institution_id?`, `venue_id?`, `speaker_ids?` (array), `key_person_roles?` (array), `person_in_charge_ids?`, `moderator_ids?`, `imam_ids?`, `khatib_ids?`, `bilal_ids?`, `topic_ids?` (array), `domain_tag_ids?` (array), `source_tag_ids?` (array), `issue_tag_ids?` (array), `reference_ids?` (array), `has_event_url?`, `has_live_url?`, `has_end_time?`, `page?`, `per_page?` |
 | `member-list-records` | Search and paginate records for one member resource | `resource_key`, `search?`, `page?`, `per_page?` |
 | `member-list-related-records` | Traverse a named relation on a member record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `member-get-record` | Read one member record | `resource_key`, `record_key` |

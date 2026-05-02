@@ -28,6 +28,7 @@ use App\Mcp\Tools\Member\MemberListRecordsTool;
 use App\Mcp\Tools\Member\MemberListRelatedRecordsTool;
 use App\Mcp\Tools\Member\MemberListResourcesTool;
 use App\Mcp\Tools\Member\MemberRejectContributionRequestTool;
+use App\Mcp\Tools\Member\MemberSearchEventsTool;
 use App\Mcp\Tools\Member\MemberSubmitMembershipClaimTool;
 use App\Mcp\Tools\Member\MemberUpdateRecordTool;
 use App\Models\ContributionRequest;
@@ -317,6 +318,50 @@ it('lists related events for institution members through the member MCP server',
             ->etc());
 });
 
+it('searches /majlis-style events through the dedicated member MCP tool', function () {
+    [$member] = institutionMemberMcpContext(role: 'admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    app(AddMemberToSubject::class)->handle($institution, $member, 'viewer');
+
+    $matchingEvent = Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'title' => 'Member MCP Majlis Search Match',
+        'status' => 'approved',
+        'is_active' => true,
+        'is_muslim_only' => true,
+        'starts_at' => Carbon::parse('2026-05-26 12:00:00', 'UTC'),
+    ]);
+
+    Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'title' => 'Member MCP Majlis Search Non Match',
+        'status' => 'approved',
+        'is_active' => true,
+        'is_muslim_only' => false,
+        'starts_at' => Carbon::parse('2026-05-26 12:00:00', 'UTC'),
+    ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberSearchEventsTool::class, [
+            'is_muslim_only' => true,
+            'time_scope' => 'all',
+            'per_page' => 10,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $matchingEvent->getKey())
+            ->where('meta.search.query', null)
+            ->where('meta.search.sort', 'time')
+            ->where('meta.search.filters.is_muslim_only', true)
+            ->where('meta.pagination.total', 1)
+            ->etc());
+});
+
 it('lists related records through the member MCP server', function () {
     [$member, $institution] = institutionMemberMcpContext(role: 'admin');
 
@@ -462,6 +507,17 @@ it('denies non-member users from member MCP tools', function () {
 
     MemberServer::actingAs($user)
         ->tool(MemberListResourcesTool::class)
+        ->assertHasErrors(['Forbidden.']);
+});
+
+it('denies non-member users from member event search tool', function () {
+    $user = User::factory()->create();
+
+    MemberServer::actingAs($user)
+        ->tool(MemberSearchEventsTool::class, [
+            'time_scope' => 'all',
+            'per_page' => 5,
+        ])
         ->assertHasErrors(['Forbidden.']);
 });
 
@@ -1027,6 +1083,7 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'fetch',
         'member-list-resources',
         'member-get-resource-meta',
+        'member-search-events',
         'member-list-records',
         'member-list-related-records',
         'member-get-record',
@@ -1224,6 +1281,7 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'fetch',
         'member-list-resources',
         'member-get-resource-meta',
+        'member-search-events',
         'member-list-records',
         'member-list-related-records',
         'member-get-record',

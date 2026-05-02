@@ -16,9 +16,6 @@ use App\Mcp\Tools\Member\MemberCancelMembershipClaimTool;
 use App\Mcp\Tools\Member\MemberCreateGitHubIssueTool;
 use App\Mcp\Tools\Member\MemberDocumentationFetchTool;
 use App\Mcp\Tools\Member\MemberDocumentationSearchTool;
-use App\Mcp\Tools\Member\MemberReadDebugLogTool;
-use App\Mcp\Tools\Member\MemberUploadEventCoverImageTool;
-use App\Mcp\Tools\Member\MemberUploadEventPosterImageTool;
 use App\Mcp\Tools\Member\MemberGetRecordActionsTool;
 use App\Mcp\Tools\Member\MemberGetRecordTool;
 use App\Mcp\Tools\Member\MemberGetResourceMetaTool;
@@ -28,9 +25,13 @@ use App\Mcp\Tools\Member\MemberListMembershipClaimsTool;
 use App\Mcp\Tools\Member\MemberListRecordsTool;
 use App\Mcp\Tools\Member\MemberListRelatedRecordsTool;
 use App\Mcp\Tools\Member\MemberListResourcesTool;
+use App\Mcp\Tools\Member\MemberReadDebugLogTool;
 use App\Mcp\Tools\Member\MemberRejectContributionRequestTool;
+use App\Mcp\Tools\Member\MemberSearchEventsTool;
 use App\Mcp\Tools\Member\MemberSubmitMembershipClaimTool;
 use App\Mcp\Tools\Member\MemberUpdateRecordTool;
+use App\Mcp\Tools\Member\MemberUploadEventCoverImageTool;
+use App\Mcp\Tools\Member\MemberUploadEventPosterImageTool;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
@@ -68,6 +69,7 @@ class MemberServer extends MajlisIlmuServer
         MemberUploadEventPosterImageTool::class,
         MemberListResourcesTool::class,
         MemberGetResourceMetaTool::class,
+        MemberSearchEventsTool::class,
         MemberListRecordsTool::class,
         MemberListRelatedRecordsTool::class,
         MemberGetRecordTool::class,

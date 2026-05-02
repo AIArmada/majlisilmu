@@ -69,11 +69,23 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
         ->values()
         ->all();
 
-    expect($document['schema_version'])->toBe('2.4.0')
+    expect($document['schema_version'])->toBe('2.6.0')
         ->and($document['markdown_companion'])->toBe('docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md')
+        ->and(data_get($document, 'mcp_specialized_tools'))->toBeArray()
+        ->and(data_get($document, 'mcp_specialized_tools.purpose'))->toContain('MCP-exclusive tools')
+        ->and(data_get($document, 'mcp_specialized_tools.ai_media_generation_tools.tools'))->toHaveCount(4)
+        ->and(collect(data_get($document, 'mcp_specialized_tools.ai_media_generation_tools.tools', []))
+            ->pluck('tool_name')
+            ->all())->toBe([
+                'AdminUploadEventCoverImageTool',
+                'AdminUploadEventPosterImageTool',
+                'MemberUploadEventCoverImageTool',
+                'MemberUploadEventPosterImageTool',
+            ])
         ->and(data_get($document, 'event_detail_parity_notes.0'))->toContain('active_change_notice')
-        ->and(data_get($document, 'search_parity_notes.0'))->toContain('speakers, institutions, and references')
-        ->and(data_get($document, 'search_parity_notes.1'))->toContain('active plus verified visibility')
+        ->and(data_get($document, 'search_parity_notes.0'))->toContain('/api/v1/admin/events/search')
+        ->and(data_get($document, 'search_parity_notes.1'))->toContain('speakers, institutions, and references')
+        ->and(data_get($document, 'search_parity_notes.2'))->toContain('active plus verified visibility')
         ->and(data_get($document, 'workflow_api_families.public_discovery_and_form_contracts'))->toContain('GET /api/v1/references*')
         ->and(data_get($document, 'surface_sync_contract'))->toEqual(SurfaceSyncPolicy::manifest())
         ->and(data_get($document, 'runtime_inventory.admin_panel.resource_count'))->toBe(count($runtimeAdminResources))
@@ -125,6 +137,7 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
         ->toContain('`GET /api/v1/references*`')
         ->toContain('Event detail parity note')
         ->toContain('Search parity note')
+        ->toContain('GET /api/v1/admin/events/search')
         ->toContain('active_change_notice')
         ->toContain('change_announcements')
         ->toContain('replacement_event')
@@ -148,6 +161,13 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
         ->toContain('Membership-claim review:')
         ->toContain('Contribution-request queue tools:')
         ->toContain('member-submit-membership-claim')
+        ->toContain('MCP Specialized Tools (AI and Workflow Extensions)')
+        ->toContain('AdminUploadEventCoverImageTool')
+        ->toContain('AdminUploadEventPosterImageTool')
+        ->toContain('MemberUploadEventCoverImageTool')
+        ->toContain('MemberUploadEventPosterImageTool')
+        ->toContain('AI Media Generation Tools')
+        ->toContain('Why MCP-only: Specialized AI workflow')
         ->toContain('public read/list/detail; authenticated suggest update; follows')
         ->toContain('public read/search/detail with event-change projections');
 });

@@ -1,16 +1,25 @@
 <?php
 
+use App\Actions\Membership\AddMemberToSubject;
 use App\Mcp\Servers\AdminServer;
 use App\Mcp\Servers\MemberServer;
 use App\Mcp\Tools\Admin\AdminReadDebugLogTool;
 use App\Mcp\Tools\Member\MemberReadDebugLogTool;
+use App\Models\Institution;
 use App\Models\User;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function (): void {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    // Ensure log file is cleaned and wait for filesystem to reflect changes
+    $logPath = storage_path('logs/laravel.log');
+    @unlink($logPath);
+    // Double-check deletion in case of filesystem delays
+    usleep(10000); // 10ms delay to allow filesystem to fully process deletion
 });
 
 it('returns mcp.image_upload log lines for admins', function (): void {
@@ -143,11 +152,11 @@ function debugLogMemberContext(): array
     ]);
 
     // Assign an institution membership so hasMemberMcpAccess() is satisfied
-    $institution = \App\Models\Institution::factory()->create([
+    $institution = Institution::factory()->create([
         'status' => 'verified',
         'is_active' => true,
     ]);
-    app(\App\Actions\Membership\AddMemberToSubject::class)->handle($institution, $member, 'admin');
+    app(AddMemberToSubject::class)->handle($institution, $member, 'admin');
 
     return [$member];
 }

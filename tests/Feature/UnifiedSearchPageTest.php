@@ -20,7 +20,7 @@ it('submits the homepage hero search to the unified search page', function () {
         ->assertSee('action="'.route('search.index').'"', false);
 });
 
-it('shows grouped event speaker and institution matches on the unified search page', function () {
+it('shows grouped event speaker reference and institution matches on the unified search page', function () {
     Storage::fake('public');
     config()->set('media-library.disk_name', 'public');
 
@@ -51,14 +51,22 @@ it('shows grouped event speaker and institution matches on the unified search pa
             'is_active' => true,
         ]);
 
+    $reference = Reference::factory()->create([
+        'title' => 'Nur Hikmah: Adab Menuntut Ilmu',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
     $this->get(route('search.index', ['search' => 'Nur Hikmah']))
         ->assertOk()
         ->assertSee('Kuliah Nur Hikmah')
         ->assertSee('Ustaz Nur Hikmah')
+        ->assertSee('Nur Hikmah: Adab Menuntut Ilmu')
         ->assertSee('Masjid Nur Hikmah')
         ->assertSee($speaker->public_avatar_url, false)
         ->assertSee(route('events.show', $event), false)
         ->assertSee(route('speakers.show', $speaker), false)
+        ->assertSee(route('references.show', $reference), false)
         ->assertSee(route('institutions.show', $institution), false);
 });
 
