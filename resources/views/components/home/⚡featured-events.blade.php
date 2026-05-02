@@ -21,7 +21,7 @@ new class extends Component
             ->with([
                 'references',
                 'media' => fn ($query) => $query
-                    ->where('collection_name', 'poster')
+                    ->where('collection_name', 'cover')
                     ->ordered(),
                 'institution.media' => fn ($query) => $query
                     ->where('collection_name', 'logo')
@@ -77,13 +77,7 @@ new class extends Component
             <div class="flex gap-6 overflow-x-auto pb-6 snap-x snap-mandatory scrollbar-hide" id="featuredCarousel">
                 @foreach($this->events as $event)
                     @php
-                        $eventHasPoster = $event->hasMedia('poster');
-                        $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
-                        $eventPosterAspectClass = match ($eventPosterAspectRatio) {
-                            '4:5' => 'aspect-[4/5]',
-                            '16:9' => 'aspect-[16/9]',
-                            default => 'aspect-[16/9]',
-                        };
+                        $eventCoverAspectClass = 'aspect-[16/9]';
                     @endphp
                     <div wire:key="featured-{{ $event->id }}" class="flex-shrink-0">
                         <article class="w-80 lg:w-96 snap-start">
@@ -91,10 +85,10 @@ new class extends Component
                                 class="group bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow border border-slate-100 h-full flex flex-col">
                                 <!-- Image -->
                                 <div
-                                    class="relative overflow-hidden bg-slate-100 {{ $eventPosterAspectClass }}"
-                                    data-poster-aspect="{{ $eventPosterAspectRatio }}">
+                                    class="relative overflow-hidden bg-slate-100 {{ $eventCoverAspectClass }}"
+                                    data-cover-aspect="16:9">
                                     <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" loading="lazy"
-                                        class="w-full h-full transition-transform duration-500 group-hover:scale-110 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
+                                        class="w-full h-full transition-transform duration-500 group-hover:scale-110 object-cover">
                                     <!-- Gradient Overlay -->
                                     <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                                     @if($event->isPrayerRelative() && $event->prayer_display_text)

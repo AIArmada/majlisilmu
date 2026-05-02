@@ -1082,17 +1082,10 @@
                 <div class="grid items-start md:grid-cols-2 lg:grid-cols-3 gap-8">
                     @foreach($events as $event)
                         @php
-                            $posterMedia = $event->getFirstMedia('poster');
-                            $eventHasPoster = $posterMedia !== null;
-                            $posterUrl = $eventHasPoster ? (string) $posterMedia->getAvailableUrl(['card', 'preview', 'thumb']) : '';
-                            $eventCardImageUrl = $posterUrl !== '' ? $posterUrl : $event->card_image_url;
+                            $coverMedia = $event->getFirstMedia('cover');
+                            $eventCardImageUrl = $coverMedia?->getAvailableUrl(['card', 'preview', 'thumb']) ?: $event->card_image_url;
                             $eventChangeBadgeLabel = $event->public_change_badge_label;
-                            $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
-                            $eventPosterAspectClass = match ($eventPosterAspectRatio) {
-                                '4:5' => 'aspect-[4/5]',
-                                '16:9' => 'aspect-[16/9]',
-                                default => 'aspect-[16/9]',
-                            };
+                            $eventCoverAspectClass = 'aspect-[16/9]';
                             $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
                             $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
                             $hierarchyText = \App\Support\Location\AddressHierarchyFormatter::format($addressModel);
@@ -1116,14 +1109,14 @@
                                 data-signal-control="event_card_image"
                                 data-signal-entity-type="event"
                                 data-signal-entity-id="{{ $event->id }}"
-                                class="relative overflow-hidden bg-slate-100 block {{ $eventPosterAspectClass }}"
-                                data-poster-aspect="{{ $eventPosterAspectRatio }}">
+                                class="relative overflow-hidden bg-slate-100 block {{ $eventCoverAspectClass }}"
+                                data-cover-aspect="16:9">
                                 <div
                                     class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 z-10 transition-opacity group-hover:opacity-70">
                                 </div>
                                 <div class="w-full h-full bg-slate-200 flex items-center justify-center text-slate-300">
                                     <img src="{{ $eventCardImageUrl }}" alt="{{ $event->title }}" loading="lazy"
-                                        class="w-full h-full transition-transform duration-700 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
+                                        class="w-full h-full transition-transform duration-700 group-hover:scale-105 object-cover">
                                 </div>
 
                                 @if($event->status instanceof \App\States\EventStatus\Pending || $eventChangeBadgeLabel)

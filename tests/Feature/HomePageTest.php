@@ -115,7 +115,7 @@ it('uses a 16:9 placeholder aspect ratio on featured home cards without posters'
 
     Livewire::test('home.featured-events')
         ->assertSee('Majlis Pilihan Tanpa Poster')
-        ->assertSee('data-poster-aspect="16:9"', false);
+        ->assertSee('data-cover-aspect="16:9"', false);
 });
 
 it('renders the featured homepage card date badge below the poster image', function () {
@@ -133,7 +133,7 @@ it('renders the featured homepage card date badge below the poster image', funct
         ->assertSee('data-testid="homepage-featured-card-meta-row"', false)
         ->assertSee('data-testid="homepage-featured-card-date-badge"', false)
         ->assertSeeInOrder([
-            'data-poster-aspect=',
+            'data-cover-aspect=',
             'data-testid="homepage-featured-card-meta-row"',
             'data-testid="homepage-featured-card-title-link"',
         ], false);

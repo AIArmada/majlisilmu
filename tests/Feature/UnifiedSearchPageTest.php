@@ -173,7 +173,7 @@ it('uses a 16:9 placeholder aspect ratio on unified search event cards without p
     $this->get(route('search.index', ['search' => 'Carian Tanpa Poster']))
         ->assertOk()
         ->assertSee('Kuliah Carian Tanpa Poster')
-        ->assertSee('data-poster-aspect="16:9"', false);
+        ->assertSee('data-cover-aspect="16:9"', false);
 });
 
 it('renders the book title only on book-backed search result cards without parentheses', function () {
