@@ -3730,6 +3730,37 @@ it('lists and reads verified documentation resources through the admin MCP serve
     ]);
 });
 
+it('finds admin event records by related speaker name when searching through the MCP server', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Nik Bakri Unique MCP Speaker',
+    ]);
+
+    $matchingEvent = Event::factory()->create([
+        'title' => 'MCP Event Without Speaker Name In Title',
+        'status' => 'approved',
+    ]);
+    $matchingEvent->speakers()->attach($speaker);
+
+    $unrelatedEvent = Event::factory()->create([
+        'title' => 'Completely Different MCP Unrelated Event',
+        'status' => 'approved',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminListRecordsTool::class, [
+            'resource_key' => 'events',
+            'search' => 'Nik Bakri Unique MCP',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('data', 1)
+            ->where('data.0.id', $matchingEvent->getKey())
+            ->where('data.0.title', 'MCP Event Without Speaker Name In Title')
+            ->etc());
+});
+
 function ensureMcpMalaysiaCountryExists(): int
 {
     $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
