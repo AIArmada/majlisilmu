@@ -7,6 +7,7 @@ namespace App\Mcp\Tools\Concerns;
 use App\Models\Event;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -62,6 +63,37 @@ trait UploadsEventImage
                 'size' => $schema->integer()->required(),
             ])->required()->description('The stored Spatie MediaLibrary item.'),
         ];
+    }
+
+    /**
+     * Normalize the raw `image` argument into a file descriptor array.
+     *
+     * Some MCP clients (e.g. ChatGPT with `openai/fileParams`) serialize object
+     * parameters as a JSON-encoded string instead of a JSON object. This method
+     * accepts both formats so upload tools work correctly regardless of the client.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ValidationException if the value is neither a valid descriptor array
+     *                             nor a JSON-encoded descriptor object
+     */
+    protected function normalizeImageDescriptor(mixed $value): array
+    {
+        if (is_array($value) && ! array_is_list($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+
+            if (is_array($decoded) && ! array_is_list($decoded)) {
+                return $decoded;
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'image' => ['The image must be a file descriptor object ({filename, download_url} or {filename, content_base64}).'],
+        ]);
     }
 
     protected function eventImageUploadResponse(Event $event, Media $media, string $collection): ResponseFactory
