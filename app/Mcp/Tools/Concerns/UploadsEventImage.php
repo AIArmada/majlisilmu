@@ -108,7 +108,6 @@ trait UploadsEventImage
         } else {
             Log::debug('mcp.image_upload: descriptor received with unexpected type', [
                 'type' => gettype($value),
-                'is_list' => is_array($value) && array_is_list($value),
             ]);
         }
 
