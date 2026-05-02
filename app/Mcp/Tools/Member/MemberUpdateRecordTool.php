@@ -23,7 +23,7 @@ class MemberUpdateRecordTool extends AbstractMemberWriteTool
 {
     protected string $name = 'member-update-record';
 
-    protected string $description = 'Update one writable Ahli-scoped member resource record.';
+    protected string $description = 'Update one writable Ahli-scoped member resource record. For event updates, payload can include cover/poster/gallery image descriptors together with regular fields.';
 
     public function __construct(
         private readonly MemberResourceService $resourceService,
@@ -82,5 +82,23 @@ class MemberUpdateRecordTool extends AbstractMemberWriteTool
             'payload' => $schema->object()->required(),
             'validate_only' => $schema->boolean()->default(false)->nullable(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    public function toArray(): array
+    {
+        $tool = parent::toArray();
+
+        $tool['_meta'] = array_merge(
+            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
+            [
+                'openai/note' => 'Media file descriptors are accepted inside payload for media-capable resources. For events, payload fields cover/poster/gallery accept {download_url, file_id, filename} or {content_base64, filename}.',
+            ],
+        );
+
+        return $tool;
     }
 }

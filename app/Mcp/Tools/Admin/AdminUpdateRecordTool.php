@@ -24,7 +24,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
 {
     protected string $name = 'admin-update-record';
 
-    protected string $description = 'Update or preview a supported writable admin resource record. Requires record_key and payload.';
+    protected string $description = 'Update or preview a supported writable admin resource record. Requires record_key and payload. For event updates, payload can include cover/poster/gallery image descriptors together with regular fields.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -144,6 +144,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
             is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
             [
                 'openai/note' => 'Media file descriptors (with download_url or file_id) are passed inside the payload object field for media-capable resources (Event, Institution, Reference, Report, Speaker, Venue, Series, DonationChannel, Inspiration, Space).',
+                'openai/mediaDescriptorFormat' => 'For event payload media fields cover/poster/gallery, pass {download_url, file_id, filename} or {content_base64, filename}.',
             ],
         );
 
