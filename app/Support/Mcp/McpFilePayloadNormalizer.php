@@ -7,6 +7,7 @@ namespace App\Support\Mcp;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -139,6 +140,12 @@ final class McpFilePayloadNormalizer
     private function uploadedFileFromDescriptor(string $field, mixed $value, array $contract, array &$temporaryPaths): UploadedFile
     {
         if (! is_array($value) || array_is_list($value)) {
+            Log::debug('mcp.image_upload: descriptor is not an associative array', [
+                'field' => $field,
+                'type' => gettype($value),
+                'is_list' => is_array($value) && array_is_list($value),
+            ]);
+
             throw ValidationException::withMessages([
                 $field => ['This MCP media field must be a file descriptor object.'],
             ]);
@@ -154,13 +161,31 @@ final class McpFilePayloadNormalizer
         // file_id is metadata from ChatGPT file params (ignored, used for reference only)
         $fileId = $this->stringValue($descriptor, ['file_id', 'fileId']);
 
+        Log::debug('mcp.image_upload: parsing descriptor', [
+            'field' => $field,
+            'filename' => $fileName,
+            'has_base64' => $base64 !== null,
+            'has_content_url' => $contentUrl !== null,
+            'has_file_id' => $fileId !== null,
+            'declared_mime_type' => $mimeType,
+            'descriptor_keys' => array_keys($descriptor),
+        ]);
+
         if ($fileName === null) {
+            Log::debug('mcp.image_upload: descriptor missing filename', ['field' => $field]);
+
             throw ValidationException::withMessages([
                 $field => ['The MCP file descriptor must include a filename.'],
             ]);
         }
 
         if ($base64 === null && $contentUrl === null) {
+            Log::debug('mcp.image_upload: descriptor missing content source (no base64 or url)', [
+                'field' => $field,
+                'filename' => $fileName,
+                'file_id' => $fileId,
+            ]);
+
             throw ValidationException::withMessages([
                 $field => ['The MCP file descriptor must include either content_base64, content_url, or download_url. MCP tools do not accept multipart/form-data payloads. ChatGPT connectors may pass {download_url, file_id}.'],
             ]);
@@ -177,12 +202,31 @@ final class McpFilePayloadNormalizer
             $decoded = base64_decode((string) preg_replace('/\s+/', '', $base64), true);
 
             if (! is_string($decoded)) {
+                Log::debug('mcp.image_upload: base64 decode failed', [
+                    'field' => $field,
+                    'filename' => $fileName,
+                    'base64_length' => strlen($base64),
+                ]);
+
                 throw ValidationException::withMessages([
                     $field => ['The MCP file descriptor content_base64 is not valid base64.'],
                 ]);
             }
+
+            Log::debug('mcp.image_upload: base64 decoded successfully', [
+                'field' => $field,
+                'filename' => $fileName,
+                'decoded_size_bytes' => strlen($decoded),
+                'resolved_mime_type' => $mimeType,
+            ]);
         } elseif ($contentUrl !== null) {
             $this->assertSafeContentUrl($field, $contentUrl);
+
+            Log::debug('mcp.image_upload: fetching content_url', [
+                'field' => $field,
+                'filename' => $fileName,
+                'url_host' => parse_url($contentUrl, PHP_URL_HOST),
+            ]);
 
             try {
                 $response = Http::accept('*/*')
@@ -193,18 +237,37 @@ final class McpFilePayloadNormalizer
                     ])
                     ->get($contentUrl);
             } catch (Throwable $exception) {
+                Log::debug('mcp.image_upload: content_url fetch threw exception', [
+                    'field' => $field,
+                    'filename' => $fileName,
+                    'error' => $exception->getMessage(),
+                ]);
+
                 throw ValidationException::withMessages([
                     $field => ['The MCP file descriptor content_url could not be fetched.'],
                 ]);
             }
 
             if ($response->redirect()) {
+                Log::debug('mcp.image_upload: content_url returned a redirect', [
+                    'field' => $field,
+                    'filename' => $fileName,
+                    'status' => $response->status(),
+                    'location' => $response->header('Location'),
+                ]);
+
                 throw ValidationException::withMessages([
                     $field => ['The MCP file descriptor content_url must not redirect.'],
                 ]);
             }
 
             if (! $response->successful()) {
+                Log::debug('mcp.image_upload: content_url returned non-2xx status', [
+                    'field' => $field,
+                    'filename' => $fileName,
+                    'status' => $response->status(),
+                ]);
+
                 throw ValidationException::withMessages([
                     $field => ['The MCP file descriptor content_url did not return a successful response.'],
                 ]);
@@ -213,17 +276,36 @@ final class McpFilePayloadNormalizer
             $decoded = $response->body();
 
             if (! is_string($decoded) || $decoded === '') {
+                Log::debug('mcp.image_upload: content_url returned empty body', [
+                    'field' => $field,
+                    'filename' => $fileName,
+                    'status' => $response->status(),
+                ]);
+
                 throw ValidationException::withMessages([
                     $field => ['The MCP file descriptor content_url returned an empty body.'],
                 ]);
             }
 
             $mimeType ??= $response->header('Content-Type');
+
+            Log::debug('mcp.image_upload: content_url fetched successfully', [
+                'field' => $field,
+                'filename' => $fileName,
+                'response_size_bytes' => strlen($decoded),
+                'resolved_mime_type' => $mimeType,
+            ]);
         }
 
         $mimeType = $this->normalizeMimeType($mimeType);
 
         if (! is_string($decoded)) {
+            Log::debug('mcp.image_upload: decoded content is not a string after processing', [
+                'field' => $field,
+                'filename' => $fileName,
+                'file_id' => $fileId,
+            ]);
+
             throw ValidationException::withMessages([
                 $field => is_string($fileId)
                     ? ["The MCP file descriptor (file_id: {$fileId}) could not be decoded."]
@@ -234,6 +316,13 @@ final class McpFilePayloadNormalizer
         $maxSizeBytes = $this->maxFileSizeKb($contract) * 1024;
 
         if (strlen($decoded) > $maxSizeBytes) {
+            Log::debug('mcp.image_upload: decoded file exceeds maximum size', [
+                'field' => $field,
+                'filename' => $fileName,
+                'size_bytes' => strlen($decoded),
+                'max_size_bytes' => $maxSizeBytes,
+            ]);
+
             throw ValidationException::withMessages([
                 $field => ['The MCP file descriptor exceeds the maximum upload size.'],
             ]);
@@ -242,6 +331,13 @@ final class McpFilePayloadNormalizer
         $acceptedMimeTypes = $this->acceptedMimeTypes($contract);
 
         if ($mimeType !== null && $acceptedMimeTypes !== [] && ! in_array($mimeType, $acceptedMimeTypes, true)) {
+            Log::debug('mcp.image_upload: mime type not in accepted list', [
+                'field' => $field,
+                'filename' => $fileName,
+                'mime_type' => $mimeType,
+                'accepted' => $acceptedMimeTypes,
+            ]);
+
             throw ValidationException::withMessages([
                 $field => ['The MCP file descriptor mime_type is not allowed for this field.'],
             ]);
@@ -250,6 +346,14 @@ final class McpFilePayloadNormalizer
         $temporaryFile = $this->writeTemporaryFile($fileName, $mimeType, $decoded);
         $path = $temporaryFile['path'];
         $temporaryPaths[] = $path;
+
+        Log::debug('mcp.image_upload: temporary file written, creating UploadedFile', [
+            'field' => $field,
+            'original_filename' => $fileName,
+            'stored_filename' => $temporaryFile['file_name'],
+            'mime_type' => $mimeType,
+            'size_bytes' => strlen($decoded),
+        ]);
 
         return new UploadedFile($path, $temporaryFile['file_name'], $mimeType, null, true);
     }
