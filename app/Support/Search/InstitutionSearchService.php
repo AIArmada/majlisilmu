@@ -134,10 +134,6 @@ class InstitutionSearchService
                 }
             }
 
-            if ($this->shouldUseScoutDatabaseSearch()) {
-                return $this->publicSearchIdsFromScoutDatabase($normalizedSearch);
-            }
-
             return $this->publicSearchIdsFromDatabase($normalizedSearch);
         });
 
@@ -162,23 +158,6 @@ class InstitutionSearchService
         }
 
         return $this->publicFuzzySearchIds($normalizedSearch);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function publicSearchIdsFromScoutDatabase(string $normalizedSearch): array
-    {
-        return Institution::search($normalizedSearch)
-            ->query(fn (Builder $query): Builder => $query
-                ->where('institutions.is_active', true)
-                ->where('status', 'verified')
-                ->limit($this->typesenseResultLimit()))
-            ->get()
-            ->pluck('id')
-            ->map(static fn (mixed $id): string => (string) $id)
-            ->values()
-            ->all();
     }
 
     /**
@@ -465,11 +444,6 @@ class InstitutionSearchService
     protected function shouldUseTypesenseSearch(): bool
     {
         return $this->scoutDriver() === 'typesense';
-    }
-
-    protected function shouldUseScoutDatabaseSearch(): bool
-    {
-        return $this->scoutDriver() === 'database';
     }
 
     /**
