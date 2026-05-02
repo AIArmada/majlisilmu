@@ -16,6 +16,7 @@ use App\Mcp\Tools\Member\MemberCancelMembershipClaimTool;
 use App\Mcp\Tools\Member\MemberCreateGitHubIssueTool;
 use App\Mcp\Tools\Member\MemberDocumentationFetchTool;
 use App\Mcp\Tools\Member\MemberDocumentationSearchTool;
+use App\Mcp\Tools\Member\MemberReadDebugLogTool;
 use App\Mcp\Tools\Member\MemberUploadEventCoverImageTool;
 use App\Mcp\Tools\Member\MemberUploadEventPosterImageTool;
 use App\Mcp\Tools\Member\MemberGetRecordActionsTool;
@@ -62,6 +63,7 @@ class MemberServer extends MajlisIlmuServer
     protected array $tools = [
         MemberDocumentationSearchTool::class,
         MemberDocumentationFetchTool::class,
+        MemberReadDebugLogTool::class,
         MemberUploadEventCoverImageTool::class,
         MemberUploadEventPosterImageTool::class,
         MemberListResourcesTool::class,
