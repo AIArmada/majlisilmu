@@ -7,6 +7,7 @@ namespace App\Mcp\Tools\Concerns;
 use App\Models\Event;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -80,6 +81,10 @@ trait UploadsEventImage
     protected function normalizeImageDescriptor(mixed $value): array
     {
         if (is_array($value) && ! array_is_list($value)) {
+            Log::debug('mcp.image_upload: descriptor received as associative array', [
+                'keys' => array_keys($value),
+            ]);
+
             return $value;
         }
 
@@ -87,8 +92,24 @@ trait UploadsEventImage
             $decoded = json_decode($value, true);
 
             if (is_array($decoded) && ! array_is_list($decoded)) {
+                Log::debug('mcp.image_upload: descriptor received as JSON-encoded string (openai/fileParams), decoded successfully', [
+                    'keys' => array_keys($decoded),
+                    'json_length' => strlen($value),
+                ]);
+
                 return $decoded;
             }
+
+            Log::debug('mcp.image_upload: descriptor received as string but could not be decoded as JSON object', [
+                'type' => gettype($value),
+                'json_error' => json_last_error_msg(),
+                'preview' => substr($value, 0, 100),
+            ]);
+        } else {
+            Log::debug('mcp.image_upload: descriptor received with unexpected type', [
+                'type' => gettype($value),
+                'is_list' => is_array($value) && array_is_list($value),
+            ]);
         }
 
         throw ValidationException::withMessages([
