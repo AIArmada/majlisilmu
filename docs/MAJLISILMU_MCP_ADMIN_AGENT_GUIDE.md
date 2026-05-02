@@ -226,15 +226,20 @@ Use this section as the quick admin-only capability summary.
 | Report triage | `admin-triage-report` |
 | Contribution-request workflows | `admin-review-contribution-request` |
 | Membership-claim workflows | `admin-review-membership-claim` |
-| Event image generation | `admin-generate-event-cover-image`, `admin-generate-event-poster-image` |
+| Event image prompts | `admin-event-cover-image-prompt` (prompt), `admin-event-poster-image-prompt` (prompt) |
+| Event image upload | `admin-upload-event-cover-image`, `admin-upload-event-poster-image` |
 | Create | `admin-create-record` |
 | Update | `admin-update-record` |
 | Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` |
 
 ## Event cover/poster image generation
 
-- Use `admin-generate-event-cover-image` for the website/app event visual.
-- Use `admin-generate-event-poster-image` for the external-distribution flyer visual.
+Event image generation uses a two-step workflow on the admin server:
+
+1. Call the MCP prompt `admin-event-cover-image-prompt` (for `cover`) or `admin-event-poster-image-prompt` (for `poster`) with `event_key`, optional `creative_direction`, `include_existing_media`, and `max_reference_media` arguments. The prompt returns engineered prompt text and brand reference images.
+2. Use ChatGPT native image generation with the returned prompt and reference images.
+3. Upload the result with `admin-upload-event-cover-image` (writes `cover` at `16:9`) or `admin-upload-event-poster-image` (writes `poster` at `4:5`) by passing the `event_key` and an image descriptor.
+
 - Target ratio is fixed and server-enforced:
   - `cover` = `16:9`
   - `poster` = `4:5`
@@ -242,9 +247,9 @@ Use this section as the quick admin-only capability summary.
   1. speaker `cover`
   2. speaker `avatar`
   3. organizer institution media from `event->organizer` when it is an `Institution`
-- If speaker and organizer institution media are unavailable, the generation tool still proceeds.
-- Operational fallback: if generation fails while attaching reference media, retry with `include_existing_media=false` and `max_reference_media=0`.
-- Reference media listed in prompt context may be skipped from the actual image request when storage access cannot produce a supported attachment type at runtime.
+- If speaker and organizer institution media are unavailable, the prompt still returns usable prompt text.
+- Operational fallback: if attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.
+- Reference media listed in prompt context may be omitted from the actual image request when storage access cannot produce a supported attachment type at runtime.
 
 ## Writable resource matrix
 
@@ -428,8 +433,8 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | MCP-only next-step action guidance tool |
-| `admin-generate-event-cover-image` | Generate and save a 16:9 website/app cover image for one event using event data plus selected relation/media references | MCP-only creative image generation tool |
-| `admin-generate-event-poster-image` | Generate and save a 4:5 portrait marketing poster for one event using event data plus selected relation/media references | MCP-only creative image generation tool |
+| `admin-upload-event-cover-image` | Upload and save a pre-generated 16:9 website/app cover image for one admin-accessible event. Use `admin-event-cover-image-prompt` to build the prompt and reference images first, then generate with ChatGPT, then call this tool with the image descriptor. | MCP-only event cover upload tool |
+| `admin-upload-event-poster-image` | Upload and save a pre-generated 4:5 portrait marketing poster for one admin-accessible event. Use `admin-event-poster-image-prompt` to build the prompt and reference images first, then generate with ChatGPT, then call this tool with the image descriptor. | MCP-only event poster upload tool |
 | `admin-get-write-schema` | Discover the create/update contract for a writable admin record | `GET /api/v1/admin/{resourceKey}/schema` |
 | `admin-get-event-moderation-schema` | Read the explicit moderation schema for one event | `GET /api/v1/admin/events/{recordKey}/moderation-schema` |
 | `admin-get-report-triage-schema` | Read the explicit triage schema for one report | `GET /api/v1/admin/reports/{recordKey}/triage-schema` |
@@ -450,7 +455,7 @@ Admin tool behavior notes:
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
-- `admin-generate-event-cover-image` and `admin-generate-event-poster-image` mutate the event media collections. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Both resolve one event by `event_key`, build a prompt from event data, relation data, and selected available media, attach suitable reference images to the image request, normalize the output ratio, store the generated media, and return `prompt`, `upload_spec`, `reference_media`, `source_data`, `generated_media`, and generation metadata. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+- `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image descriptor (`content_base64`, `content_url`, or ChatGPT `download_url`/`file_id`) and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Use the MCP prompts `admin-event-cover-image-prompt` and `admin-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.

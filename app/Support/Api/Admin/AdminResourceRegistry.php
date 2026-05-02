@@ -446,24 +446,20 @@ class AdminResourceRegistry
             ],
             'generate_event_cover_image' => $key === 'events'
                 ? [
-                    'tool' => 'admin-generate-event-cover-image',
+                    'tool' => 'admin-upload-event-cover-image',
                     'arguments' => [
                         'event_key' => 'record',
-                        'creative_direction' => null,
-                        'include_existing_media' => true,
-                        'max_reference_media' => 6,
                     ],
+                    'prerequisite_prompt' => 'admin-event-cover-image-prompt',
                 ]
                 : null,
             'generate_event_poster_image' => $key === 'events'
                 ? [
-                    'tool' => 'admin-generate-event-poster-image',
+                    'tool' => 'admin-upload-event-poster-image',
                     'arguments' => [
                         'event_key' => 'record',
-                        'creative_direction' => null,
-                        'include_existing_media' => true,
-                        'max_reference_media' => 6,
                     ],
+                    'prerequisite_prompt' => 'admin-event-poster-image-prompt',
                 ]
                 : null,
             'get_create_schema' => $supportsMutation

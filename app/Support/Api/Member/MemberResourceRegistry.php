@@ -307,24 +307,20 @@ class MemberResourceRegistry
             ],
             'generate_event_cover_image' => $key === 'events'
                 ? [
-                    'tool' => 'member-generate-event-cover-image',
+                    'tool' => 'member-upload-event-cover-image',
                     'arguments' => [
                         'event_key' => 'record',
-                        'creative_direction' => null,
-                        'include_existing_media' => true,
-                        'max_reference_media' => 6,
                     ],
+                    'prerequisite_prompt' => 'member-event-cover-image-prompt',
                 ]
                 : null,
             'generate_event_poster_image' => $key === 'events'
                 ? [
-                    'tool' => 'member-generate-event-poster-image',
+                    'tool' => 'member-upload-event-poster-image',
                     'arguments' => [
                         'event_key' => 'record',
-                        'creative_direction' => null,
-                        'include_existing_media' => true,
-                        'max_reference_media' => 6,
                     ],
+                    'prerequisite_prompt' => 'member-event-poster-image-prompt',
                 ]
                 : null,
             'get_update_schema' => $canWrite

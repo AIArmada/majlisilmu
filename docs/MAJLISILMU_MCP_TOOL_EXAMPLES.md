@@ -28,9 +28,11 @@ Event record detail for `events` now includes the public change-surface projecti
 
 ### Generate an event cover image
 
+Event image generation uses a two-step workflow. First, call the MCP prompt to get the engineered prompt text and brand reference images:
+
 ```json
 {
-  "tool": "admin-generate-event-cover-image",
+  "prompt": "admin-event-cover-image-prompt",
   "arguments": {
     "event_key": "weekly-kuliah-selasa",
     "creative_direction": "Premium editorial cover with deep emerald, warm gold, and strong Malay typography.",
@@ -40,15 +42,34 @@ Event record detail for `events` now includes the public change-surface projecti
 }
 ```
 
-The tool generates, normalizes, and stores a 16:9 image in the Event `cover` media collection. Use `admin-generate-event-poster-image` when the intended asset is the 4:5 external-distribution poster.
+The prompt returns engineered prompt text and brand reference images. Use these with ChatGPT native image generation (e.g. `gpt-image-1`) to generate the image.
 
-When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
-
-If generation fails while attaching reference media, retry without reference attachments:
+Then upload the generated result:
 
 ```json
 {
-  "tool": "admin-generate-event-cover-image",
+  "tool": "admin-upload-event-cover-image",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "image": {
+      "filename": "cover.png",
+      "mime_type": "image/png",
+      "download_url": "https://api.openai.com/files/file_id/content",
+      "file_id": "file_xyz"
+    }
+  }
+}
+```
+
+The upload tool saves the image as a 16:9 `cover` in the Event media collection. Use `admin-event-poster-image-prompt` and `admin-upload-event-poster-image` when the intended asset is the 4:5 external-distribution poster.
+
+When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+
+If attaching reference media fails, retry the prompt without reference media:
+
+```json
+{
+  "prompt": "admin-event-cover-image-prompt",
   "arguments": {
     "event_key": "weekly-kuliah-selasa",
     "creative_direction": "Premium editorial cover with deep emerald, warm gold, and strong Malay typography.",
@@ -58,11 +79,15 @@ If generation fails while attaching reference media, retry without reference att
 }
 ```
 
+Then regenerate the image and upload with `admin-upload-event-cover-image`.
+
 ### Generate an event poster image
+
+Event poster generation also uses the two-step workflow. Call the prompt first:
 
 ```json
 {
-  "tool": "admin-generate-event-poster-image",
+  "prompt": "admin-event-poster-image-prompt",
   "arguments": {
     "event_key": "weekly-kuliah-selasa",
     "creative_direction": "Information-rich social poster with clear hierarchy and strong readability.",
@@ -72,7 +97,24 @@ If generation fails while attaching reference media, retry without reference att
 }
 ```
 
-The tool generates, normalizes, and stores a 4:5 portrait image in the Event `poster` media collection.
+Use the returned prompt and reference images with ChatGPT native image generation, then upload the result:
+
+```json
+{
+  "tool": "admin-upload-event-poster-image",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "image": {
+      "filename": "poster.png",
+      "mime_type": "image/png",
+      "download_url": "https://api.openai.com/files/file_id/content",
+      "file_id": "file_xyz"
+    }
+  }
+}
+```
+
+The upload tool saves the image as a 4:5 `poster` in the Event media collection.
 
 When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 
@@ -279,9 +321,11 @@ For member-scoped event reads, the same `data.record.attributes.active_change_no
 
 ### Generate an accessible event cover image
 
+Event image generation uses a two-step workflow on the member server. Call the prompt first:
+
 ```json
 {
-  "tool": "member-generate-event-cover-image",
+  "prompt": "member-event-cover-image-prompt",
   "arguments": {
     "event_key": "weekly-kuliah-selasa",
     "creative_direction": null,
@@ -291,15 +335,34 @@ For member-scoped event reads, the same `data.record.attributes.active_change_no
 }
 ```
 
-The tool generates, normalizes, and stores a 16:9 image in the accessible Event `cover` media collection.
+Use the returned prompt and reference images with ChatGPT native image generation, then upload the result:
+
+```json
+{
+  "tool": "member-upload-event-cover-image",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "image": {
+      "filename": "cover.png",
+      "mime_type": "image/png",
+      "download_url": "https://api.openai.com/files/file_id/content",
+      "file_id": "file_xyz"
+    }
+  }
+}
+```
+
+The upload tool saves the image as a 16:9 `cover` in the accessible Event media collection.
 
 When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 
 ### Generate an accessible event poster image
 
+Call the poster prompt first:
+
 ```json
 {
-  "tool": "member-generate-event-poster-image",
+  "prompt": "member-event-poster-image-prompt",
   "arguments": {
     "event_key": "weekly-kuliah-selasa",
     "creative_direction": null,
@@ -309,7 +372,24 @@ When reference media is enabled, speaker context selection follows this fallback
 }
 ```
 
-The tool generates, normalizes, and stores a 4:5 image in the accessible Event `poster` media collection. Use `member-generate-event-cover-image` when the intended asset is the 16:9 website/app cover.
+Use the returned prompt and reference images with ChatGPT native image generation, then upload the result:
+
+```json
+{
+  "tool": "member-upload-event-poster-image",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "image": {
+      "filename": "poster.png",
+      "mime_type": "image/png",
+      "download_url": "https://api.openai.com/files/file_id/content",
+      "file_id": "file_xyz"
+    }
+  }
+}
+```
+
+The upload tool saves the image as a 4:5 `poster` in the accessible Event media collection. Use `member-event-cover-image-prompt` and `member-upload-event-cover-image` when the intended asset is the 16:9 website/app cover.
 
 When reference media is enabled, speaker context selection follows this fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 
