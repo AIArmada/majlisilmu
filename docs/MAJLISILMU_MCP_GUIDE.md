@@ -254,7 +254,7 @@ Use this section as the quick MCP-only capability summary.
 | Report triage | `admin-triage-report` | Not exposed |
 | Contribution-request workflows | `admin-review-contribution-request` | `member-list-contribution-requests`, `member-approve-contribution-request`, `member-reject-contribution-request`, `member-cancel-contribution-request` |
 | Membership-claim workflows | `admin-review-membership-claim` | `member-list-membership-claims`, `member-submit-membership-claim`, `member-cancel-membership-claim` |
-| Event image generation | `admin-generate-event-cover-image`, `admin-generate-event-poster-image` | `member-generate-event-cover-image`, `member-generate-event-poster-image` |
+| Event image generation | `admin-upload-event-cover-image`, `admin-upload-event-poster-image` | `member-upload-event-cover-image`, `member-upload-event-poster-image` |
 | Create | `admin-create-record` | Not exposed |
 | Update | `admin-update-record` | `member-update-record` |
 | Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` | Yes, on `member-update-record` |
@@ -263,17 +263,18 @@ Admin GitHub issue reports can skip Copilot assignment entirely by setting `GITH
 
 ### Event cover/poster image contract
 
-- Event image generation is intentionally split into two tools per surface:
-  - cover tools write `cover`
-  - poster tools write `poster`
-- Ratio is fixed by target and enforced server-side:
-  - `cover` = `16:9` (website/app visual)
-  - `poster` = `4:5` (external/social flyer visual)
-- For event prompt reference-media selection, speaker media fallback order is:
-  1. speaker `cover`
-  2. speaker `avatar`
-  3. organizer institution media from `event->organizer` (when organizer type is `Institution`)
-- If none are available, generation proceeds without those references.
+Event image generation uses a 3-step workflow per surface:
+
+1. Call the MCP **prompt** (`admin-event-cover-image-prompt` / `admin-event-poster-image-prompt`) to get the engineered prompt text and brand reference images.
+2. Generate the image using ChatGPT native image generation with the returned prompt and references.
+3. Upload the result with the MCP **upload tool** (`admin-upload-event-cover-image` / `admin-upload-event-poster-image`), passing the generated image as a `{download_url, file_id, filename}` or `{content_base64, filename}` descriptor.
+
+Key rules:
+- Image collections are split by target: `cover` for website/app (16:9) and `poster` for external/social (4:5). Do not mix them.
+- Ratio is fixed by target and enforced server-side.
+- The upload tool accepts `event_key`, `image` (file descriptor), and an optional `creative_direction` note.
+- The prompt's `include_existing_media` and `max_reference_media` arguments control reference-image selection at prompt time. If the prompt fails to attach references, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`.
+- Speaker reference media fallback order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 
 ### Writable resource matrix
 
@@ -403,8 +404,8 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | MCP-only next-step action guidance tool |
-| `admin-generate-event-cover-image` | Generate and save a 16:9 website/app cover image for one event using event data plus selected relation/media references | MCP-only creative image generation tool |
-| `admin-generate-event-poster-image` | Generate and save a 4:5 portrait marketing poster for one event using event data plus selected relation/media references | MCP-only creative image generation tool |
+| `admin-upload-event-cover-image` | Upload and save a ChatGPT-generated or base64-encoded 16:9 cover image for one event | MCP-only image upload tool |
+| `admin-upload-event-poster-image` | Upload and save a ChatGPT-generated or base64-encoded 4:5 portrait poster for one event | MCP-only image upload tool |
 | `admin-get-write-schema` | Discover the create/update contract for a writable admin record | `GET /api/v1/admin/{resourceKey}/schema` |
 | `admin-get-event-moderation-schema` | Read the explicit moderation schema for one event | `GET /api/v1/admin/events/{recordKey}/moderation-schema` |
 | `admin-get-report-triage-schema` | Read the explicit triage schema for one report | `GET /api/v1/admin/reports/{recordKey}/triage-schema` |
@@ -416,6 +417,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-review-contribution-request` | Approve or reject one pending contribution request | `POST /api/v1/admin/contribution-requests/{recordKey}/review` |
 | `admin-review-membership-claim` | Approve or reject a pending membership claim | `POST /api/v1/admin/membership-claims/{recordKey}/review` |
 | `admin-create-record` | Create or preview a writable admin record | `POST /api/v1/admin/{resourceKey}` |
+| `admin-create-event` | Create or preview a new event with event-first fields and relation route keys, optionally including cover, poster, or gallery image descriptors | MCP-only event creation tool |
 | `admin-update-record` | Update or preview a writable admin record | `PUT /api/v1/admin/{resourceKey}/{recordKey}` |
 
 Admin tool behavior notes:
@@ -424,14 +426,14 @@ Admin tool behavior notes:
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
-- `admin-generate-event-cover-image` and `admin-generate-event-poster-image` mutate the event media collections. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Both resolve one event by `event_key`, build a prompt from event data, relation data, and selected available media, attach suitable reference images to the image request, normalize the output ratio, store the generated media, and return `prompt`, `upload_spec`, `reference_media`, `source_data`, `generated_media`, and generation metadata. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+- `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. To get the recommended prompt text and brand reference images before generating, call the `admin-event-cover-image-prompt` or `admin-event-poster-image-prompt` MCP prompts. Speaker-context references (used at prompt time) follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search now reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
 - `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
 - The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
 - Media/file upload fields accept JSON file descriptors when the matching write schema advertises them; descriptor content may be provided via `content_base64`, `content_url`, or `download_url` (ChatGPT file params).
-- If generation fails while attaching reference media, retry with `include_existing_media=false` and `max_reference_media=0` to generate without reference attachments.
+- If the prompt call fails while attaching reference images, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`.
 - Event media writes enforce fixed ratios across MCP writes: `cover` must be `16:9` and `poster` must be `4:5`.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain. This tool is **conditionally registered** and only present when the GitHub issue reporter is configured; it will be absent from `tools/list` if GitHub issue reporting has not been set up.
@@ -453,8 +455,8 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-related-records` | List related records for one member record |
 | `member-get-record` | Read one member record by resource key and record key |
 | `member-get-record-actions` | Get focused next-step MCP actions for one member record |
-| `member-generate-event-cover-image` | Generate and save a 16:9 website/app cover image for one accessible event using event data plus selected relation/media references |
-| `member-generate-event-poster-image` | Generate and save a 4:5 portrait marketing poster for one accessible event using event data plus selected relation/media references |
+| `member-upload-event-cover-image` | Upload and save a ChatGPT-generated or base64-encoded 16:9 cover image for one accessible Ahli-scoped event |
+| `member-upload-event-poster-image` | Upload and save a ChatGPT-generated or base64-encoded 4:5 portrait poster for one accessible Ahli-scoped event |
 | `member-get-write-schema` | Discover the writable update schema for one member record |
 | `member-list-contribution-requests` | List the authenticated member's own contribution requests plus any pending approvals |
 | `member-approve-contribution-request` | Approve one reviewable contribution request |
@@ -470,7 +472,7 @@ Member tool behavior notes:
 
 - Member tools are constrained to the Ahli workspace boundary and live membership relationships.
 - `member-get-record-actions` is read-only and returns record-specific next-step MCP tools for the Ahli surface, including update-schema and relation traversal follow-ups when they are available.
-- `member-generate-event-cover-image` and `member-generate-event-poster-image` mutate accessible event media collections within Ahli scope. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Both resolve one accessible event by `event_key`, build a prompt from event data, relation data, and selected available media, attach suitable reference images to the image request, normalize the output ratio, store the generated media, and return `prompt`, `upload_spec`, `reference_media`, `source_data`, `generated_media`, and generation metadata. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+- `member-upload-event-cover-image` and `member-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the accessible event media collection within Ahli scope. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field accepts `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. To get the recommended prompt text and brand reference images before generating, call the `member-event-cover-image-prompt` or `member-event-poster-image-prompt` MCP prompts. Speaker-context references (used at prompt time) follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - Update tools are schema-guided and should be treated as the member-side API equivalent of the relevant HTTP workflow.
 - Event media writes enforce fixed ratios across MCP writes: `cover` must be `16:9` and `poster` must be `4:5`.
 - Member update tools support `validate_only=true` for preview-only member writes.
@@ -480,7 +482,7 @@ Member tool behavior notes:
 - Membership-claim workflow tools cover listing, submitting with evidence uploads, and cancelling the member's own pending claims.
 - `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
 - Media/file upload fields accept JSON file descriptors when the matching member write schema advertises them; descriptor content may be provided via `content_base64`, `content_url`, or `download_url` (ChatGPT file params).
-- If generation fails while attaching reference media, retry with `include_existing_media=false` and `max_reference_media=0` to generate without reference attachments.
+- If the prompt call fails while attaching reference images, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`.
 - As with admin tools, ChatGPT only understands what the tool descriptor exposes; if a capability is not registered as a tool, the model will not assume it exists.
 
 ### MCP media/file upload contract
@@ -604,8 +606,8 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `admin-list-related-records` | Traverse a named relation on a record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `admin-get-record` | Read one admin record and its permissions | `resource_key`, `record_key` |
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | `resource_key`, `record_key` |
-| `admin-generate-event-cover-image` | Generate and save one event `cover` image at `16:9` | `event_key`, `creative_direction?`, `include_existing_media?`, `max_reference_media?` |
-| `admin-generate-event-poster-image` | Generate and save one event `poster` image at `4:5` | `event_key`, `creative_direction?`, `include_existing_media?`, `max_reference_media?` |
+| `admin-upload-event-cover-image` | Upload and save a pre-generated event `cover` image at `16:9` | `event_key`, `image`, `creative_direction?` |
+| `admin-upload-event-poster-image` | Upload and save a pre-generated event `poster` image at `4:5` | `event_key`, `image`, `creative_direction?` |
 | `admin-get-write-schema` | Fetch the create/update contract for a writable admin record | `resource_key`, `operation`, `record_key?` |
 | `admin-get-event-moderation-schema` | Fetch the explicit moderation schema for one event | `record_key` |
 | `admin-get-report-triage-schema` | Fetch the explicit triage schema for one report | `record_key` |
@@ -616,6 +618,7 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `admin-review-contribution-request` | Approve or reject one pending contribution request | `record_key`, `action`, `reason_code?`, `reviewer_note?` |
 | `admin-review-membership-claim` | Approve or reject one pending membership claim | `record_key`, `action`, `granted_role_slug?`, `reviewer_note?` |
 | `admin-create-record` | Create or preview a writable admin record | `resource_key`, `payload`, `validate_only?`, `apply_defaults?` |
+| `admin-create-event` | Create or preview a new event with event-first fields and relation route keys | `title`, `event_date`, `prayer_time`, `event_type`, `validate_only?`, `cover?`, `poster?`, `gallery?` |
 | `admin-update-record` | Update or preview a writable admin record | `resource_key`, `record_key`, `payload`, `validate_only?`, `apply_defaults?` |
 
 ### Member MCP tools
@@ -630,8 +633,8 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `member-list-related-records` | Traverse a named relation on a member record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
 | `member-get-record` | Read one member record | `resource_key`, `record_key` |
 | `member-get-record-actions` | Get focused next-step MCP actions for one member record | `resource_key`, `record_key` |
-| `member-generate-event-cover-image` | Generate and save one accessible event `cover` image at `16:9` | `event_key`, `creative_direction?`, `include_existing_media?`, `max_reference_media?` |
-| `member-generate-event-poster-image` | Generate and save one accessible event `poster` image at `4:5` | `event_key`, `creative_direction?`, `include_existing_media?`, `max_reference_media?` |
+| `member-upload-event-cover-image` | Upload and save a pre-generated accessible event `cover` image at `16:9` | `event_key`, `image`, `creative_direction?` |
+| `member-upload-event-poster-image` | Upload and save a pre-generated accessible event `poster` image at `4:5` | `event_key`, `image`, `creative_direction?` |
 | `member-get-write-schema` | Fetch the writable update contract for one member record | `resource_key`, `record_key` |
 | `member-list-contribution-requests` | List the authenticated member's contribution queue and pending approvals | none |
 | `member-approve-contribution-request` | Approve one reviewable contribution request | `request_id`, `reviewer_note?` |
