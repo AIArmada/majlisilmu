@@ -21,7 +21,7 @@ trait ReadsDebugLog
      */
     protected function readFilteredDebugLog(string $filter, int $lines): array
     {
-        $logPath = storage_path('logs/laravel.log');
+        $logPath = config('logging.channels.single.path', storage_path('logs/laravel.log'));
 
         if (! File::exists($logPath)) {
             return [

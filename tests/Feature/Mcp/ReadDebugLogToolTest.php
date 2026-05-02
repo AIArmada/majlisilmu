@@ -12,20 +12,36 @@ use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
+/**
+ * Return the process-specific log path so parallel workers don't share a log file.
+ */
+function debugLogTestPath(): string
+{
+    $token = $_SERVER['TEST_TOKEN'] ?? null;
+    $suffix = $token ? "-test-{$token}" : '-test';
+
+    return storage_path("logs/laravel{$suffix}.log");
+}
+
 beforeEach(function (): void {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    // Ensure log file is cleaned and wait for filesystem to reflect changes
-    $logPath = storage_path('logs/laravel.log');
+    // Configure Laravel's single channel to write to a worker-specific log file
+    // so parallel processes don't contaminate each other's log assertions.
+    $logPath = debugLogTestPath();
+    config()->set('logging.channels.single.path', $logPath);
+
     @unlink($logPath);
-    // Double-check deletion in case of filesystem delays
-    usleep(10000); // 10ms delay to allow filesystem to fully process deletion
+});
+
+afterEach(function (): void {
+    @unlink(debugLogTestPath());
 });
 
 it('returns mcp.image_upload log lines for admins', function (): void {
     $admin = debugLogAdminUser();
 
-    $logPath = storage_path('logs/laravel.log');
+    $logPath = debugLogTestPath();
 
     file_put_contents($logPath, implode(PHP_EOL, [
         '[2026-05-02 12:00:00] local.DEBUG: mcp.image_upload: start {"event":"test-event"}',
@@ -42,12 +58,12 @@ it('returns mcp.image_upload log lines for admins', function (): void {
             ->where('lines.0', '[2026-05-02 12:00:00] local.DEBUG: mcp.image_upload: start {"event":"test-event"}')
             ->where('lines.1', '[2026-05-02 12:00:02] local.DEBUG: mcp.image_upload: complete {"media_id":"abc-123"}')
             ->etc());
-})->afterEach(fn () => @unlink(storage_path('logs/laravel.log')));
+});
 
 it('respects the lines limit', function (): void {
     $admin = debugLogAdminUser();
 
-    $logPath = storage_path('logs/laravel.log');
+    $logPath = debugLogTestPath();
     $allLines = array_map(
         fn (int $i): string => "[2026-05-02 12:00:{$i}] local.DEBUG: mcp.image_upload: entry {$i}",
         range(0, 9),
@@ -61,12 +77,12 @@ it('respects the lines limit', function (): void {
             ->where('total_matched', 10)
             ->count('lines', 3)
             ->etc());
-})->afterEach(fn () => @unlink(storage_path('logs/laravel.log')));
+});
 
 it('returns an empty result when no log file exists', function (): void {
     $admin = debugLogAdminUser();
 
-    @unlink(storage_path('logs/laravel.log'));
+    @unlink(debugLogTestPath());
 
     AdminServer::actingAs($admin)
         ->tool(AdminReadDebugLogTool::class)
@@ -81,7 +97,7 @@ it('returns an empty result when no log file exists', function (): void {
 it('accepts a custom filter string', function (): void {
     $admin = debugLogAdminUser();
 
-    $logPath = storage_path('logs/laravel.log');
+    $logPath = debugLogTestPath();
     file_put_contents($logPath, implode(PHP_EOL, [
         '[2026-05-02 12:00:00] local.DEBUG: mcp.image_upload: start',
         '[2026-05-02 12:00:01] local.DEBUG: custom.channel: my entry',
@@ -94,12 +110,12 @@ it('accepts a custom filter string', function (): void {
             ->where('filter', 'custom.channel')
             ->where('total_matched', 1)
             ->etc());
-})->afterEach(fn () => @unlink(storage_path('logs/laravel.log')));
+});
 
 it('returns mcp.image_upload log lines for members', function (): void {
     [$member] = debugLogMemberContext();
 
-    $logPath = storage_path('logs/laravel.log');
+    $logPath = debugLogTestPath();
     file_put_contents($logPath, implode(PHP_EOL, [
         '[2026-05-02 12:00:00] local.DEBUG: mcp.image_upload: start {"event":"member-event"}',
         '[2026-05-02 12:00:01] local.DEBUG: Some other entry',
@@ -112,7 +128,7 @@ it('returns mcp.image_upload log lines for members', function (): void {
             ->where('filter', 'mcp.image_upload')
             ->where('total_matched', 1)
             ->etc());
-})->afterEach(fn () => @unlink(storage_path('logs/laravel.log')));
+});
 
 it('tool is registered and marked read-only on both servers', function (): void {
     $adminTool = app(AdminReadDebugLogTool::class)->toArray();

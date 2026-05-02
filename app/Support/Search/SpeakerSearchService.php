@@ -151,7 +151,7 @@ class SpeakerSearchService
                     $termQuery->selectRaw('1')
                         ->from('speaker_search_terms')
                         ->whereColumn('speaker_search_terms.speaker_id', $qualifiedSpeakerId)
-                        ->where('speaker_search_terms.term', 'like', $token.'%');
+                        ->where('speaker_search_terms.term', 'like', '%'.$token.'%');
                 });
             }
         });
@@ -191,18 +191,22 @@ class SpeakerSearchService
 
         /** @var list<string> $ids */
         $ids = Cache::remember($cacheKey, self::PUBLIC_SEARCH_CACHE_TTL, function () use ($normalizedSearch): array {
+            $localIds = $this->publicSearchIdsFromLocalSearch($normalizedSearch);
+
             if ($this->shouldUseTypesenseSearch() && app(TypesenseHealthCheckService::class)->isAvailable()) {
                 try {
-                    return $this->searchIdsWithScout($normalizedSearch, [
+                    $scoutIds = $this->searchIdsWithScout($normalizedSearch, [
                         'filter_by' => 'is_active:=true && status:=verified',
                         'num_typos' => 0,
                     ]);
+
+                    return $this->mergeOrderedIds($scoutIds, $localIds);
                 } catch (\Throwable $exception) {
                     $this->logScoutFallback('Speaker Typesense public search failed, falling back to local search', $exception, $normalizedSearch);
                 }
             }
 
-            return $this->publicSearchIdsFromLocalSearch($normalizedSearch);
+            return $localIds;
         });
 
         return $ids;
@@ -885,5 +889,19 @@ class SpeakerSearchService
     private function hasSpeakerSearchTermsTable(): bool
     {
         return Schema::hasTable('speaker_search_terms');
+    }
+
+    /**
+     * @param  list<string>  $primaryIds
+     * @param  list<string>  $secondaryIds
+     * @return list<string>
+     */
+    private function mergeOrderedIds(array $primaryIds, array $secondaryIds): array
+    {
+        return collect([...$primaryIds, ...$secondaryIds])
+            ->filter(static fn (string $id): bool => $id !== '')
+            ->unique()
+            ->values()
+            ->all();
     }
 }
