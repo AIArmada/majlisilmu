@@ -119,12 +119,12 @@ This document describes how MajlisIlmu MCP tools now support **ChatGPT file para
 
 ### Admin-Facing (Dynamic Resource Media)
 - **admin-create-record** (payload object fields):
-  - `poster`, `gallery` (Event)
+  - `cover`, `poster`, `gallery` (Event)
   - `logo`, `cover`, `gallery` (Institution)
   - `front_cover`, `back_cover`, `gallery` (Reference)
   - `evidence` (Report)
-  - `avatar`, `main`, `gallery` (Speaker)
-  - `main`, `gallery` (Venue)
+  - `avatar`, `cover`, `gallery` (Speaker)
+  - `cover`, `gallery` (Venue)
   - `cover`, `gallery` (Series)
   - `qr` (DonationChannel)
   - `main` (Inspiration, Space)

@@ -51,7 +51,7 @@ class AdminUploadEventPosterImageTool extends AbstractAdminTool
 
             $validated = $this->validateArguments($request, [
                 'event_key' => ['required', 'string', 'min:1'],
-                'image' => ['required', 'array'],
+                'image' => ['required'],
                 'creative_direction' => ['nullable', 'string', 'max:2000'],
             ]);
 
@@ -59,8 +59,7 @@ class AdminUploadEventPosterImageTool extends AbstractAdminTool
 
             abort_unless($event instanceof Event, 404);
 
-            /** @var array<string, mixed> $imageDescriptor */
-            $imageDescriptor = $validated['image'];
+            $imageDescriptor = $this->normalizeImageDescriptor($validated['image']);
 
             $media = $this->uploadService->upload(
                 event: $event,

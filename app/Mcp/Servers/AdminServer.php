@@ -10,9 +10,10 @@ use App\Mcp\Prompts\AdminEventCoverImagePrompt;
 use App\Mcp\Prompts\AdminEventPosterImagePrompt;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
-use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateEventTool;
+use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
+use App\Mcp\Tools\Admin\AdminReadDebugLogTool;
 use App\Mcp\Tools\Admin\AdminDocumentationFetchTool;
 use App\Mcp\Tools\Admin\AdminDocumentationSearchTool;
 use App\Mcp\Tools\Admin\AdminUploadEventCoverImageTool;
@@ -65,6 +66,7 @@ class AdminServer extends MajlisIlmuServer
     protected array $tools = [
         AdminDocumentationSearchTool::class,
         AdminDocumentationFetchTool::class,
+        AdminReadDebugLogTool::class,
         AdminUploadEventCoverImageTool::class,
         AdminUploadEventPosterImageTool::class,
         AdminListResourcesTool::class,

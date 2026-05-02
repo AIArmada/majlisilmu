@@ -6,6 +6,7 @@ namespace App\Support\Mcp;
 
 use App\Models\Event;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final class EventImageUploadService
@@ -31,6 +32,14 @@ final class EventImageUploadService
     ): Media {
         abort_unless(in_array($collection, self::ACCEPTED_COLLECTIONS, true), 422, 'Collection must be one of: '.implode(', ', self::ACCEPTED_COLLECTIONS));
 
+        Log::debug('mcp.image_upload: upload started', [
+            'event_id' => $event->getKey(),
+            'event_slug' => $event->slug,
+            'collection' => $collection,
+            'descriptor_keys' => array_keys($descriptor),
+            'has_creative_direction' => $creativeDirection !== null,
+        ]);
+
         $normalizer = app(McpFilePayloadNormalizer::class);
 
         $contract = [
@@ -47,8 +56,27 @@ final class EventImageUploadService
         /** @var UploadedFile $uploadedFile */
         $uploadedFile = $result['payload'][$collection];
 
+        Log::debug('mcp.image_upload: file normalized, staging for media library', [
+            'event_id' => $event->getKey(),
+            'collection' => $collection,
+            'original_name' => $uploadedFile->getClientOriginalName(),
+            'mime_type' => $uploadedFile->getMimeType(),
+            'size_bytes' => $uploadedFile->getSize(),
+        ]);
+
         try {
-            return $this->storeMedia($event, $collection, $uploadedFile, $descriptor, $creativeDirection);
+            $media = $this->storeMedia($event, $collection, $uploadedFile, $descriptor, $creativeDirection);
+
+            Log::debug('mcp.image_upload: media stored successfully', [
+                'event_id' => $event->getKey(),
+                'collection' => $collection,
+                'media_id' => $media->getKey(),
+                'file_name' => $media->file_name,
+                'mime_type' => $media->mime_type,
+                'size_bytes' => $media->size,
+            ]);
+
+            return $media;
         } finally {
             $normalizer->cleanup($result['temporary_paths']);
         }

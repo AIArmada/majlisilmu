@@ -152,6 +152,47 @@ it('uploads and stores a member 4:5 event poster only for accessible events', fu
         ->assertSee('Resource not found.');
 });
 
+it('accepts a JSON-encoded string image descriptor (ChatGPT openai/fileParams serialization)', function (): void {
+    $admin = eventImageGenerationAdminUser();
+    [$event] = eventImageGenerationEventFixture();
+
+    $imageFixture = fakeGeneratedImageUpload('chatgpt-cover.jpg', 1200, 800);
+    $contents = file_get_contents($imageFixture->getRealPath());
+    expect($contents)->toBeString();
+
+    $descriptorString = json_encode([
+        'filename' => 'chatgpt-cover.jpg',
+        'content_base64' => base64_encode((string) $contents),
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUploadEventCoverImageTool::class, [
+            'event_key' => $event->slug,
+            'image' => $descriptorString,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('event.route_key', $event->getRouteKey())
+            ->where('collection', 'cover')
+            ->has('media.id')
+            ->etc());
+
+    expect($event->fresh()->getFirstMedia('cover'))->toBeInstanceOf(Media::class);
+});
+
+it('rejects an invalid image descriptor (neither array nor valid JSON object)', function (): void {
+    $admin = eventImageGenerationAdminUser();
+    [$event] = eventImageGenerationEventFixture();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUploadEventCoverImageTool::class, [
+            'event_key' => $event->slug,
+            'image' => 'not-valid-json',
+        ])
+        ->assertSee('The image must be a valid file descriptor object');
+});
+
 it('exposes mutating and open-world metadata for event image upload tools', function (): void {
     $adminTool = app(AdminUploadEventCoverImageTool::class)->toArray();
     $memberTool = app(MemberUploadEventCoverImageTool::class)->toArray();
