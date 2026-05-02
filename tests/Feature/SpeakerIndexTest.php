@@ -208,6 +208,24 @@ it('supports fuzzy search with minor typos', function () {
         ->assertDontSee('Sulaiman');
 });
 
+it('matches partial speaker names within a larger token', function () {
+    Speaker::factory()->create([
+        'name' => 'Datuk Ustazah Dr Norhafizah Musa',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Speaker::factory()->create([
+        'name' => 'Ustaz Hafiz Rahman',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    get('/penceramah?search=hafizah')
+        ->assertSuccessful()
+        ->assertSee('Datuk Ustazah Dr Norhafizah Musa');
+});
+
 it('shows the empty state when speaker search has no public matches', function () {
     Speaker::factory()->create([
         'name' => 'Ammar',
