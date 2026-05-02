@@ -92,7 +92,7 @@ trait UploadsEventImage
         }
 
         throw ValidationException::withMessages([
-            'image' => ['The image must be a file descriptor object ({filename, download_url} or {filename, content_base64}).'],
+            'image' => ['The image must be a valid file descriptor object.'],
         ]);
     }
 
