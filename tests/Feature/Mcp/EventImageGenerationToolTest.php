@@ -190,7 +190,7 @@ it('rejects an invalid image descriptor (neither array nor valid JSON object)', 
             'event_key' => $event->slug,
             'image' => 'not-valid-json',
         ])
-        ->assertSee('The image must be a file descriptor object');
+        ->assertSee('The image must be a valid file descriptor object');
 });
 
 it('exposes mutating and open-world metadata for event image upload tools', function (): void {
