@@ -313,6 +313,24 @@ it('uses scout database search for speakers when the database driver is configur
         ->not->toContain((string) $hiddenSpeaker->id);
 });
 
+it('keeps token-order-insensitive speaker search when the database driver is configured', function () {
+    config()->set('scout.driver', 'database');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Nurul Akma',
+        'honorific' => null,
+        'pre_nominal' => ['ustazah'],
+        'post_nominal' => [],
+        'qualifications' => [],
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $service = app(SpeakerSearchService::class);
+
+    expect($service->publicSearchIds('ustazah nurul'))->toContain((string) $speaker->id);
+});
+
 it('keeps local fuzzy speaker search when the database driver is configured', function () {
     config()->set('scout.driver', 'database');
 
@@ -365,6 +383,22 @@ it('uses scout database search for institutions when the database driver is conf
 
     expect($service->publicSearchIds('Masjid Biru'))->toContain((string) $institution->id)
         ->not->toContain((string) $hiddenInstitution->id);
+});
+
+it('keeps split-token institution search when the database driver is configured', function () {
+    config()->set('scout.driver', 'database');
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Sultan Salahuddin Abdul Aziz Shah',
+        'nickname' => null,
+        'description' => 'Pusat komuniti',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $service = app(InstitutionSearchService::class);
+
+    expect($service->publicSearchIds('Sultan Aziz'))->toContain((string) $institution->id);
 });
 
 it('keeps local fuzzy institution search when the database driver is configured', function () {
@@ -535,4 +569,19 @@ it('falls back to database reference fuzzy search when typesense lookup fails', 
     };
 
     expect($service->publicFuzzySearchIds('Bulugh al Mram'))->toContain((string) $reference->id);
+});
+
+it('keeps split-token reference search when the database driver is configured', function () {
+    config()->set('scout.driver', 'database');
+
+    $reference = Reference::factory()->create([
+        'title' => 'Bulugh al-Maram',
+        'author' => 'Ibn Hajar',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $service = app(ReferenceSearchService::class);
+
+    expect($service->publicSearchIds('Bulugh Maram'))->toContain((string) $reference->id);
 });
