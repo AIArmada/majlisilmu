@@ -23,7 +23,7 @@ class MemberCancelMembershipClaimTool extends AbstractMemberTool
 {
     protected string $name = 'member-cancel-membership-claim';
 
-    protected string $description = 'Cancel one pending membership claim owned by the authenticated Ahli/member.';
+    protected string $description = 'Use this when the authenticated Ahli/member needs to cancel a pending membership claim they own. Do not use for cancelling claims owned by other members.';
 
     public function __construct(
         private readonly MemberMembershipClaimWorkflowService $workflowService,

@@ -20,7 +20,7 @@ class AdminGetMembershipClaimReviewSchemaTool extends AbstractAdminTool
 {
     protected string $name = 'admin-get-membership-claim-review-schema';
 
-    protected string $description = 'Get the explicit admin review schema for one membership claim record, including defaults, available actions, and conditional rules.';
+    protected string $description = 'Use this when you need the review schema for a membership claim before submitting an approve or reject decision. Returns available actions, required fields, and conditional rules.';
 
     public function __construct(
         private readonly AdminMembershipClaimReviewService $reviewService,

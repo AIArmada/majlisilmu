@@ -1031,8 +1031,8 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'member-list-related-records',
         'member-get-record',
         'member-get-record-actions',
-        'member-generate-event-cover-image',
-        'member-generate-event-poster-image',
+        'member-upload-event-cover-image',
+        'member-upload-event-poster-image',
         'member-get-write-schema',
         'member-list-contribution-requests',
         'member-approve-contribution-request',
@@ -1044,6 +1044,8 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
         'member-create-github-issue',
         'member-update-record',
     );
+
+    expect($tools->keys()->all())->not->toContain('member-generate-event-cover-image', 'member-generate-event-poster-image');
 
     expect($tools->keys()->all())->not->toContain('admin-list-resources', 'admin-list-records');
 
@@ -1226,8 +1228,8 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'member-list-related-records',
         'member-get-record',
         'member-get-record-actions',
-        'member-generate-event-cover-image',
-        'member-generate-event-poster-image',
+        'member-upload-event-cover-image',
+        'member-upload-event-poster-image',
         'member-get-write-schema',
         'member-list-contribution-requests',
         'member-approve-contribution-request',
@@ -1239,6 +1241,8 @@ it('initializes and lists member MCP tools over the HTTP endpoint', function () 
         'member-create-github-issue',
         'member-update-record',
     );
+
+    expect($toolNames)->not->toContain('member-generate-event-cover-image', 'member-generate-event-poster-image');
 
     expect($toolNames)->not->toContain(
         'member-delete-record',

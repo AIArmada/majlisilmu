@@ -19,7 +19,7 @@ class AdminListResourcesTool extends AbstractAdminTool
 {
     protected string $name = 'admin-list-resources';
 
-    protected string $description = 'List accessible admin resources. Returns a compact summary by default; set verbose=true for full metadata.';
+    protected string $description = 'Use this when you need to discover which admin resources are available on this server. Returns a compact summary by default; set verbose=true for full field and filter metadata.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,

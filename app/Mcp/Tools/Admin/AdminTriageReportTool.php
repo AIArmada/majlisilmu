@@ -26,7 +26,7 @@ class AdminTriageReportTool extends AbstractAdminTool
 {
     protected string $name = 'admin-triage-report';
 
-    protected string $description = 'Run one explicit triage action on a report, such as triage, resolve, dismiss, or reopen.';
+    protected string $description = 'Use this when you need to apply a triage action to a report: triage, resolve, dismiss, or reopen. Fetch the triage schema first with admin-get-report-triage-schema. Do not use for reading report details; use admin-get-record for that.';
 
     public function __construct(
         private readonly AdminReportTriageService $triageService,

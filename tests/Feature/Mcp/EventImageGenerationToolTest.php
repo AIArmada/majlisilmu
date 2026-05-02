@@ -10,11 +10,11 @@ use App\Enums\EventVisibility;
 use App\Enums\ReferenceType;
 use App\Mcp\Servers\AdminServer;
 use App\Mcp\Servers\MemberServer;
-use App\Mcp\Tools\Admin\AdminGenerateEventCoverImageTool;
 use App\Mcp\Tools\Admin\AdminGetRecordActionsTool;
-use App\Mcp\Tools\Member\MemberGenerateEventPosterImageTool;
+use App\Mcp\Tools\Admin\AdminUploadEventCoverImageTool;
 use App\Mcp\Tools\Member\MemberGetRecordActionsTool;
-use App\Support\Mcp\EventImageGenerationService;
+use App\Mcp\Tools\Member\MemberUploadEventCoverImageTool;
+use App\Mcp\Tools\Member\MemberUploadEventPosterImageTool;
 use App\Models\Event;
 use App\Models\EventKeyPerson;
 use App\Models\Institution;
@@ -22,16 +22,14 @@ use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Mcp\EventImageGenerationService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Ai\Files\RemoteImage;
 use Laravel\Ai\Files\StoredImage;
-use Laravel\Ai\Image;
-use Laravel\Ai\Prompts\ImagePrompt;
-use Laravel\Mcp\Server\Testing\TestResponse as McpTestResponse;
-use ReflectionMethod;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -43,58 +41,37 @@ beforeEach(function (): void {
     Storage::fake('public');
 });
 
-it('generates and stores an admin 16:9 event cover image with selected relation media', function (): void {
-    Image::fake([eventImageBase64Fixture('generated-cover.png', 1200, 800)]);
-
+it('uploads and stores an admin 16:9 event cover image via base64 descriptor', function (): void {
     $admin = eventImageGenerationAdminUser();
-    [$event, $speaker, $reference] = eventImageGenerationEventFixture();
+    [$event] = eventImageGenerationEventFixture();
 
-    $response = AdminServer::actingAs($admin)
-        ->tool(AdminGenerateEventCoverImageTool::class, [
+    $imageFixture = fakeGeneratedImageUpload('generated-cover.jpg', 1200, 800);
+    $contents = file_get_contents($imageFixture->getRealPath());
+    expect($contents)->toBeString();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUploadEventCoverImageTool::class, [
             'event_key' => $event->slug,
-            'creative_direction' => 'Use deep emerald, warm gold, and premium Malay editorial typography.',
-            'max_reference_media' => 3,
+            'image' => [
+                'filename' => 'generated-cover.jpg',
+                'content_base64' => base64_encode((string) $contents),
+                'mime_type' => 'image/jpeg',
+            ],
+            'creative_direction' => 'Use deep emerald, warm gold.',
         ])
         ->assertOk()
-        ->assertSee('Generated cover image')
         ->assertStructuredContent(fn ($json) => $json
             ->where('event.route_key', $event->getRouteKey())
             ->where('event.slug', $event->slug)
-            ->where('target.collection', 'cover')
-            ->where('target.aspect_ratio', '16:9')
-            ->where('upload_spec.target_collection', 'cover')
-            ->where('upload_spec.required_aspect_ratio', '16:9')
-            ->where('generated_media.collection', 'cover')
-            ->where('generated_media.required_aspect_ratio', '16:9')
-            ->where('generation.requested_ai_size', '3:2')
-            ->where('prompt', fn (string $prompt): bool => str_contains($prompt, 'website and mobile app display')
-                && str_contains($prompt, 'not the full marketing flyer')
-                && str_contains($prompt, 'deep emerald')
-                && str_contains($prompt, 'Tadabbur: Isu Semasa Ummah'))
-            ->where('source_data.relations.references', fn (mixed $references): bool => collect($references)
-                ->contains(fn (mixed $item): bool => is_array($item)
-                    && str_contains((string) data_get($item, 'display_title'), 'Tafsir Ibn Kathir')))
-            ->where('reference_media', fn (mixed $media): bool => collect($media)
-                ->contains(fn (mixed $item): bool => is_array($item) && data_get($item, 'role') === 'institution_cover')
-                && collect($media)->contains(fn (mixed $item): bool => is_array($item) && data_get($item, 'role') === 'speaker_avatar:speaker')
-                && collect($media)->contains(fn (mixed $item): bool => is_array($item) && data_get($item, 'role') === 'reference_front_cover'))
+            ->where('collection', 'cover')
+            ->has('media.id')
+            ->has('media.url')
             ->etc());
-
-    $responseArray = eventImageGenerationMcpResponseArray($response);
-    $contentTypes = collect(data_get($responseArray, 'result.content', []))->pluck('type')->all();
-
-    expect($contentTypes)->toContain('text', 'image');
 
     $coverMedia = $event->fresh()->getFirstMedia('cover');
 
     expect($coverMedia)->toBeInstanceOf(Media::class)
-        ->and(eventImageDimensions($coverMedia))->toBe([1600, 900])
-        ->and($reference->getFirstMedia('front_cover'))->not->toBeNull();
-
-    Image::assertGenerated(fn (ImagePrompt $prompt): bool => $prompt->isLandscape()
-        && $prompt->quality === 'high'
-        && $prompt->attachments->count() === 3
-        && $prompt->contains('Required aspect ratio: 16:9'));
+        ->and((string) $coverMedia->collection_name)->toBe('cover');
 
     AdminServer::actingAs($admin)
         ->tool(AdminGetRecordActionsTool::class, [
@@ -106,49 +83,42 @@ it('generates and stores an admin 16:9 event cover image with selected relation 
             ->where('data.focus_actions.actions', fn (mixed $actions): bool => data_get(
                 collect($actions)->firstWhere('key', 'generate_event_cover_image'),
                 'tool',
-            ) === 'admin-generate-event-cover-image'
+            ) === 'admin-upload-event-cover-image'
                 && data_get(
                     collect($actions)->firstWhere('key', 'generate_event_poster_image'),
                     'tool',
-                ) === 'admin-generate-event-poster-image')
+                ) === 'admin-upload-event-poster-image')
             ->etc());
 });
 
-it('generates and stores a member 4:5 event poster only for accessible events', function (): void {
-    Image::fake([eventImageBase64Fixture('generated-poster.png', 1000, 1500)]);
-
+it('uploads and stores a member 4:5 event poster only for accessible events', function (): void {
     [$member, $institution] = eventImageGenerationMemberContext();
     [$event] = eventImageGenerationEventFixture($institution);
 
+    $imageFixture = fakeGeneratedImageUpload('generated-poster.jpg', 800, 1000);
+    $contents = file_get_contents($imageFixture->getRealPath());
+    expect($contents)->toBeString();
+
     MemberServer::actingAs($member)
-        ->tool(MemberGenerateEventPosterImageTool::class, [
+        ->tool(MemberUploadEventPosterImageTool::class, [
             'event_key' => $event->slug,
-            'creative_direction' => 'Make the social poster information-rich but still premium.',
-            'max_reference_media' => 2,
+            'image' => [
+                'filename' => 'generated-poster.jpg',
+                'content_base64' => base64_encode((string) $contents),
+                'mime_type' => 'image/jpeg',
+            ],
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
             ->where('event.route_key', $event->getRouteKey())
-            ->where('target.collection', 'poster')
-            ->where('target.aspect_ratio', '4:5')
-            ->where('upload_spec.target_collection', 'poster')
-            ->where('upload_spec.required_aspect_ratio', '4:5')
-            ->where('generated_media.collection', 'poster')
-            ->where('generation.requested_ai_size', '2:3')
-            ->where('prompt', fn (string $prompt): bool => str_contains($prompt, 'external distribution')
-                && str_contains($prompt, 'Required visible event facts')
-                && str_contains($prompt, 'Speaker(s):'))
+            ->where('collection', 'poster')
+            ->has('media.id')
             ->etc());
 
     $posterMedia = $event->fresh()->getFirstMedia('poster');
 
     expect($posterMedia)->toBeInstanceOf(Media::class)
-        ->and(eventImageDimensions($posterMedia))->toBe([1600, 2000]);
-
-    Image::assertGenerated(fn (ImagePrompt $prompt): bool => $prompt->isPortrait()
-        && $prompt->quality === 'high'
-        && $prompt->attachments->count() === 2
-        && $prompt->contains('Required aspect ratio: 4:5'));
+        ->and((string) $posterMedia->collection_name)->toBe('poster');
 
     MemberServer::actingAs($member)
         ->tool(MemberGetRecordActionsTool::class, [
@@ -160,11 +130,11 @@ it('generates and stores a member 4:5 event poster only for accessible events', 
             ->where('data.focus_actions.actions', fn (mixed $actions): bool => data_get(
                 collect($actions)->firstWhere('key', 'generate_event_cover_image'),
                 'tool',
-            ) === 'member-generate-event-cover-image'
+            ) === 'member-upload-event-cover-image'
                 && data_get(
                     collect($actions)->firstWhere('key', 'generate_event_poster_image'),
                     'tool',
-                ) === 'member-generate-event-poster-image')
+                ) === 'member-upload-event-poster-image')
             ->etc());
 
     $inaccessibleEvent = Event::factory()->create([
@@ -175,15 +145,16 @@ it('generates and stores a member 4:5 event poster only for accessible events', 
     ]);
 
     MemberServer::actingAs($member)
-        ->tool(MemberGenerateEventPosterImageTool::class, [
+        ->tool(MemberUploadEventPosterImageTool::class, [
             'event_key' => $inaccessibleEvent->slug,
+            'image' => ['filename' => 'x.jpg', 'content_base64' => 'dGVzdA==', 'mime_type' => 'image/jpeg'],
         ])
         ->assertSee('Resource not found.');
 });
 
-it('exposes mutating and open-world metadata for event image generation tools', function (): void {
-    $adminTool = app(AdminGenerateEventCoverImageTool::class)->toArray();
-    $memberTool = app(MemberGenerateEventPosterImageTool::class)->toArray();
+it('exposes mutating and open-world metadata for event image upload tools', function (): void {
+    $adminTool = app(AdminUploadEventCoverImageTool::class)->toArray();
+    $memberTool = app(MemberUploadEventCoverImageTool::class)->toArray();
 
     expect($adminTool['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => false,
@@ -199,9 +170,9 @@ it('exposes mutating and open-world metadata for event image generation tools', 
         'openWorldHint' => true,
     ]);
 
-    expect(data_get($adminTool, '_meta.openai/toolInvocation/invoking'))->toBe('Generating event cover image...')
-        ->and(data_get($memberTool, 'inputSchema.properties.aspect_ratio'))->toBeNull()
-        ->and(data_get($memberTool, 'inputSchema.properties.max_reference_media.maximum'))->toBe(8);
+    expect(data_get($adminTool, '_meta.openai/toolInvocation/invoking'))->toBe('Uploading event cover image...')
+        ->and(data_get($memberTool, '_meta.openai/toolInvocation/invoked'))->toBe('Event cover image uploaded.')
+        ->and(data_get($adminTool, 'inputSchema.properties.image'))->toBeArray();
 });
 
 it('uses storage-backed image attachments instead of remote url attachments', function (): void {
@@ -300,7 +271,7 @@ function eventImageGenerationEventFixture(?Institution $institution = null): arr
         'is_active' => true,
     ]);
 
-    /** @var MorphTo<\Illuminate\Database\Eloquent\Model, Event> $organizerRelation */
+    /** @var MorphTo<Model, Event> $organizerRelation */
     $organizerRelation = $event->organizer();
 
     expect($organizerRelation->getMorphType())->toBe('organizer_type')
@@ -360,41 +331,4 @@ function eventImageGenerationMemberContext(): array
     app(AddMemberToSubject::class)->handle($institution, $member, 'admin');
 
     return [$member, $institution];
-}
-
-function eventImageBase64Fixture(string $name, int $width, int $height): string
-{
-    $upload = fakeGeneratedImageUpload($name, $width, $height);
-    $contents = file_get_contents($upload->getRealPath());
-
-    if (! is_string($contents)) {
-        throw new RuntimeException('Unable to read generated image fixture.');
-    }
-
-    return base64_encode($contents);
-}
-
-/**
- * @return array{0: int, 1: int}
- */
-function eventImageDimensions(?Media $media): array
-{
-    expect($media)->toBeInstanceOf(Media::class);
-
-    $dimensions = getimagesize($media->getPath());
-
-    expect($dimensions)->toBeArray();
-
-    return [(int) $dimensions[0], (int) $dimensions[1]];
-}
-
-/**
- * @return array<string, mixed>
- */
-function eventImageGenerationMcpResponseArray(McpTestResponse $response): array
-{
-    /** @var array<string, mixed> $responseArray */
-    $responseArray = (fn (): array => $this->response->toArray())->call($response);
-
-    return $responseArray;
 }

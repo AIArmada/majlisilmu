@@ -3157,8 +3157,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-list-records',
         'admin-get-record',
         'admin-get-record-actions',
-        'admin-generate-event-cover-image',
-        'admin-generate-event-poster-image',
+        'admin-upload-event-cover-image',
+        'admin-upload-event-poster-image',
         'admin-get-write-schema',
         'admin-get-event-moderation-schema',
         'admin-get-report-triage-schema',
@@ -3173,6 +3173,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-review-membership-claim',
         'admin-update-record',
     );
+
+    expect($tools->keys()->all())->not->toContain('admin-generate-event-cover-image', 'admin-generate-event-poster-image');
 
     expect($tools->keys()->all())->not->toContain('member-list-resources', 'member-list-records');
 
@@ -3347,8 +3349,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-list-records',
         'admin-get-record',
         'admin-get-record-actions',
-        'admin-generate-event-cover-image',
-        'admin-generate-event-poster-image',
+        'admin-upload-event-cover-image',
+        'admin-upload-event-poster-image',
         'admin-get-write-schema',
         'admin-get-event-moderation-schema',
         'admin-get-report-triage-schema',
@@ -3363,6 +3365,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-review-membership-claim',
         'admin-update-record',
     );
+
+    expect($toolNames)->not->toContain('admin-generate-event-cover-image', 'admin-generate-event-poster-image');
 
     expect($toolNames)->not->toContain(
         'admin-delete-record',

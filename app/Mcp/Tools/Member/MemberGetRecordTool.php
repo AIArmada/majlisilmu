@@ -19,7 +19,7 @@ class MemberGetRecordTool extends AbstractMemberTool
 {
     protected string $name = 'member-get-record';
 
-    protected string $description = 'Get one Ahli-scoped member resource record by resource key and record key.';
+    protected string $description = 'Use this when you need the full details of one Ahli-scoped member record. Requires both resource_key and record_key. Do not use for listing multiple records; use member-list-records for that.';
 
     public function __construct(
         private readonly MemberResourceService $resourceService,

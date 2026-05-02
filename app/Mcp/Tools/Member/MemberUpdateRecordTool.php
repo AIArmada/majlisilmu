@@ -23,7 +23,7 @@ class MemberUpdateRecordTool extends AbstractMemberWriteTool
 {
     protected string $name = 'member-update-record';
 
-    protected string $description = 'Update one writable Ahli-scoped member resource record. For event updates, payload can include cover/poster/gallery image descriptors together with regular fields.';
+    protected string $description = 'Use this when you need to update an Ahli-scoped member resource record. For event records, the payload can include cover/poster/gallery image descriptors alongside regular fields. Do not use to create new records.';
 
     public function __construct(
         private readonly MemberResourceService $resourceService,

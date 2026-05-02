@@ -190,29 +190,25 @@ final readonly class AdminRecordActionService
         return [
             [
                 'key' => 'generate_event_cover_image',
-                'label' => 'Generate event cover image',
+                'label' => 'Upload event cover image',
                 'category' => 'creative_asset',
-                'description' => 'Generate and save a 16:9 website/app cover image using event, relation, and selected media references.',
-                'tool' => 'admin-generate-event-cover-image',
+                'description' => 'Use the admin-event-cover-image-prompt prompt to get the engineered prompt and reference images, generate with ChatGPT image generation, then upload the 16:9 result here.',
+                'tool' => 'admin-upload-event-cover-image',
                 'arguments' => [
                     'event_key' => $recordKey,
-                    'creative_direction' => null,
-                    'include_existing_media' => true,
-                    'max_reference_media' => 6,
                 ],
+                'prerequisite_prompt' => 'admin-event-cover-image-prompt',
             ],
             [
                 'key' => 'generate_event_poster_image',
-                'label' => 'Generate event poster image',
+                'label' => 'Upload event poster image',
                 'category' => 'creative_asset',
-                'description' => 'Generate and save a 4:5 portrait marketing poster using event, relation, and selected media references.',
-                'tool' => 'admin-generate-event-poster-image',
+                'description' => 'Use the admin-event-poster-image-prompt prompt to get the engineered prompt and reference images, generate with ChatGPT image generation, then upload the 4:5 result here.',
+                'tool' => 'admin-upload-event-poster-image',
                 'arguments' => [
                     'event_key' => $recordKey,
-                    'creative_direction' => null,
-                    'include_existing_media' => true,
-                    'max_reference_media' => 6,
                 ],
+                'prerequisite_prompt' => 'admin-event-poster-image-prompt',
             ],
         ];
     }

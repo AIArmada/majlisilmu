@@ -32,12 +32,67 @@ abstract class AbstractAdminTool extends Tool
 
         $tool['annotations'] = $annotations === [] ? (object) [] : $annotations;
         $tool['securitySchemes'] = $securitySchemes;
+
+        $existingMeta = is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [];
+        $invocationDefaults = isset($existingMeta['openai/toolInvocation/invoking'])
+            ? []
+            : $this->defaultToolInvocationMessages();
+
         $tool['_meta'] = array_merge(
-            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
+            $invocationDefaults,
+            $existingMeta,
             ['securitySchemes' => $securitySchemes],
         );
 
         return $tool;
+    }
+
+    /**
+     * Returns the default toolInvocation progress messages for ChatGPT.
+     * Individual tools override this by calling setMeta() in their constructor.
+     *
+     * @return array{'openai/toolInvocation/invoking': string, 'openai/toolInvocation/invoked': string}
+     */
+    protected function defaultToolInvocationMessages(): array
+    {
+        return match (true) {
+            str_starts_with($this->name, 'admin-list-') => [
+                'openai/toolInvocation/invoking' => 'Fetching list…',
+                'openai/toolInvocation/invoked' => 'List ready.',
+            ],
+            str_starts_with($this->name, 'admin-get-') => [
+                'openai/toolInvocation/invoking' => 'Loading…',
+                'openai/toolInvocation/invoked' => 'Done.',
+            ],
+            str_starts_with($this->name, 'admin-create-') => [
+                'openai/toolInvocation/invoking' => 'Creating record…',
+                'openai/toolInvocation/invoked' => 'Record created.',
+            ],
+            str_starts_with($this->name, 'admin-update-') => [
+                'openai/toolInvocation/invoking' => 'Saving changes…',
+                'openai/toolInvocation/invoked' => 'Changes saved.',
+            ],
+            str_starts_with($this->name, 'admin-upload-') => [
+                'openai/toolInvocation/invoking' => 'Uploading image…',
+                'openai/toolInvocation/invoked' => 'Image uploaded.',
+            ],
+            str_starts_with($this->name, 'admin-moderate-') => [
+                'openai/toolInvocation/invoking' => 'Applying moderation…',
+                'openai/toolInvocation/invoked' => 'Moderation applied.',
+            ],
+            str_starts_with($this->name, 'admin-review-') => [
+                'openai/toolInvocation/invoking' => 'Submitting review…',
+                'openai/toolInvocation/invoked' => 'Review submitted.',
+            ],
+            str_starts_with($this->name, 'admin-triage-') => [
+                'openai/toolInvocation/invoking' => 'Triaging report…',
+                'openai/toolInvocation/invoked' => 'Report triaged.',
+            ],
+            default => [
+                'openai/toolInvocation/invoking' => 'Working…',
+                'openai/toolInvocation/invoked' => 'Done.',
+            ],
+        };
     }
 
     /**

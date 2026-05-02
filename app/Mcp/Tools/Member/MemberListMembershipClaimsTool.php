@@ -19,7 +19,7 @@ class MemberListMembershipClaimsTool extends AbstractMemberTool
 {
     protected string $name = 'member-list-membership-claims';
 
-    protected string $description = 'List the authenticated member\'s membership claims through the Ahli/member workflow surface.';
+    protected string $description = 'Use this when you need to list the authenticated member\'s membership claims. Do not use for admin-level membership claim management.';
 
     public function __construct(
         private readonly MemberMembershipClaimWorkflowService $workflowService,

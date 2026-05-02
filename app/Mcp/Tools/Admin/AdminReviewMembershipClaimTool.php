@@ -24,7 +24,7 @@ class AdminReviewMembershipClaimTool extends AbstractAdminTool
 {
     protected string $name = 'admin-review-membership-claim';
 
-    protected string $description = 'Approve or reject one pending membership claim through the admin workflow surface.';
+    protected string $description = 'Use this when you need to approve or reject a pending membership claim. Fetch the review schema first with admin-get-membership-claim-review-schema. Do not use for reading claim details; use admin-get-record for that.';
 
     public function __construct(
         private readonly AdminMembershipClaimReviewService $reviewService,

@@ -25,7 +25,7 @@ class AdminReviewContributionRequestTool extends AbstractAdminTool
 {
     protected string $name = 'admin-review-contribution-request';
 
-    protected string $description = 'Approve or reject one pending contribution request through the admin workflow surface.';
+    protected string $description = 'Use this when you need to approve or reject a pending contribution request. Fetch the review schema first with admin-get-contribution-request-review-schema. Do not use for reading request details; use admin-get-record for that.';
 
     public function __construct(
         private readonly AdminContributionRequestReviewService $reviewService,

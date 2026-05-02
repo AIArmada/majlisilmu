@@ -20,7 +20,7 @@ class AdminGetContributionRequestReviewSchemaTool extends AbstractAdminTool
 {
     protected string $name = 'admin-get-contribution-request-review-schema';
 
-    protected string $description = 'Get the explicit admin review schema for one contribution request record, including defaults, available actions, and conditional rules.';
+    protected string $description = 'Use this when you need the review schema for a contribution request before submitting an approve or reject decision. Returns available actions, required fields, and conditional rules.';
 
     public function __construct(
         private readonly AdminContributionRequestReviewService $reviewService,

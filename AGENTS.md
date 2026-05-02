@@ -501,6 +501,12 @@ vendor/bin/phpstan analyse --ansi
 
 - If a public page is expected to show only approved records, explicitly constrain `status = approved` even when using broader reusable scopes.
 
+---
+
+# OpenAI Developer Docs MCP
+
+Always use the OpenAI developer documentation MCP server (`openaiDeveloperDocs`) if you need to work with the OpenAI API, ChatGPT Apps SDK, Codex, Responses API, or any other OpenAI product — without the user having to explicitly ask.
+
 === .ai/livewire rules ===
 
 - Installation: https://livewire.laravel.com/docs/4.x/installation
@@ -840,7 +846,6 @@ Features:
 - Event `cover` is the primary website/mobile-app visual and must be 16:9 on public submit forms, contribution update forms, admin forms, frontend/admin APIs, and MCP-generated images.
 - Event `poster` is the shareable external-distribution flyer and must be 4:5 portrait on public submit forms, contribution update forms, admin forms, frontend/admin APIs, and MCP-generated images.
 - MCP exposes separate event image tools: cover tools write the `cover` collection at 16:9; poster tools write the `poster` collection at 4:5. Do not add a generic ratio selector for event media generation.
-- MCP speaker-context reference selection must follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer` (when organizer type is `Institution`). If none are available, proceed without those references.
 
 Use this accessor for cards, previews, and social image fallback behavior.
 
