@@ -89,9 +89,7 @@ class ResourceSearchDispatcher
      */
     private function applyEventSearch(Builder $query, string $search): void
     {
-        $operator = DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'pgsql'
-            ? 'ILIKE'
-            : 'LIKE';
+        $operator = $this->likeOperator($query);
 
         $matchingSpeakerIds = $this->speakerSearchService->scopedSearchIds(
             Speaker::query()->select('id'),
@@ -121,5 +119,15 @@ class ResourceSearchDispatcher
                 );
             }
         });
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function likeOperator(Builder $query): string
+    {
+        return DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'pgsql'
+            ? 'ILIKE'
+            : 'LIKE';
     }
 }
