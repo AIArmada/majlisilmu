@@ -232,22 +232,30 @@ Use this section as the quick member-only capability summary.
 | GitHub issue reporting | `member-create-github-issue` |
 | Contribution-request workflows | `member-list-contribution-requests`, `member-approve-contribution-request`, `member-reject-contribution-request`, `member-cancel-contribution-request` |
 | Membership-claim workflows | `member-list-membership-claims`, `member-submit-membership-claim`, `member-cancel-membership-claim` |
-| Event image generation | `member-generate-event-cover-image`, `member-generate-event-poster-image` |
+| Event image generation | `member-upload-event-cover-image`, `member-upload-event-poster-image` |
 | Update | `member-update-record` |
 | Validate-only preview | Yes, on `member-update-record` |
 
 ## Event cover/poster image generation
 
-- Use `member-generate-event-cover-image` for the website/app event visual.
-- Use `member-generate-event-poster-image` for the external-distribution flyer visual.
+Event image generation uses a 3-step workflow:
+
+1. Call the MCP **prompt** (`member-event-cover-image-prompt` / `member-event-poster-image-prompt`) to get the engineered prompt text and brand reference images.
+2. Generate the image using ChatGPT native image generation with the returned prompt and references.
+3. Upload the result with the MCP **upload tool** (`member-upload-event-cover-image` / `member-upload-event-poster-image`), passing the generated image as a `{download_url, file_id, filename}` or `{content_base64, filename}` descriptor.
+
+- Use `member-upload-event-cover-image` for the website/app event visual.
+- Use `member-upload-event-poster-image` for the external-distribution flyer visual.
 - Target ratio is fixed and server-enforced:
   - `cover` = `16:9`
   - `poster` = `4:5`
+- The upload tool accepts `event_key`, `image` (file descriptor), and an optional `creative_direction` note.
+- The prompt's `include_existing_media` and `max_reference_media` arguments control reference-image selection at prompt time. If the prompt call fails while attaching references, retry with `include_existing_media=false` and `max_reference_media=0`.
 - Reference-media selection for speaker likeness/context follows:
   1. speaker `cover`
   2. speaker `avatar`
   3. organizer institution media from `event->organizer` when it is an `Institution`
-- If speaker and organizer institution media are unavailable, the generation tool still proceeds.
+- If speaker and organizer institution media are unavailable, the prompt still proceeds.
 
 ## Writable resource matrix
 
@@ -415,8 +423,8 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-related-records` | Traverse a named relation on one member record | `GET /api/v1/member/{resourceKey}/{recordKey}/relations/{relation}` |
 | `member-get-record` | Read one member record and its permissions | `GET /api/v1/member/{resourceKey}/{recordKey}` |
 | `member-get-record-actions` | Get focused next-step MCP actions for one member record | MCP-only next-step action guidance tool |
-| `member-generate-event-cover-image` | Generate and save a 16:9 website/app cover image for one accessible event using event data plus selected relation/media references | MCP-only creative image generation tool |
-| `member-generate-event-poster-image` | Generate and save a 4:5 portrait marketing poster for one accessible event using event data plus selected relation/media references | MCP-only creative image generation tool |
+| `member-upload-event-cover-image` | Upload and save a ChatGPT-generated or base64-encoded 16:9 cover image for one accessible event | MCP-only image upload tool |
+| `member-upload-event-poster-image` | Upload and save a ChatGPT-generated or base64-encoded 4:5 portrait poster for one accessible event | MCP-only image upload tool |
 | `member-get-write-schema` | Discover the update contract for a writable member record | `GET /api/v1/member/{resourceKey}/schema` |
 | `member-create-github-issue` | Create a GitHub issue in the configured repository | `POST /api/v1/github-issues` (member caller path) |
 | `member-update-record` | Update or preview a writable member record | `PUT /api/v1/member/{resourceKey}/{recordKey}` |
@@ -432,8 +440,8 @@ Member tool behavior notes:
 
 - `validate_only=true` is supported for member update previews.
 - `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries. Unlike admin, `member-list-records` does **not** accept a `filters` object; use `search`, `starts_after`, `starts_before`, and `starts_on_local_date` to narrow results.
-- `member-generate-event-cover-image` and `member-generate-event-poster-image` mutate accessible event media collections within Ahli scope. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. Both resolve one accessible event by `event_key`, build a prompt from event data, relation data, and selected available media, attach suitable reference images to the image request, normalize the output ratio, store the generated media, and return `prompt`, `upload_spec`, `reference_media`, `source_data`, `generated_media`, and generation metadata. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
-- If generation fails while attaching reference media, retry with `include_existing_media=false` and `max_reference_media=0` to generate without reference attachments.
+- `member-upload-event-cover-image` and `member-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the accessible event media collection within Ahli scope. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. To get the recommended prompt text and brand reference images before generating, call the `member-event-cover-image-prompt` or `member-event-poster-image-prompt` MCP prompts.
+- If the prompt call fails while attaching reference images, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
 - The member surface intentionally does not expose admin-only moderation, triage, or create workflows.
 - Member update schemas reuse the same resource-level write semantics where the resource is shared, so clients should still fetch the current record and re-send the full intended collection when a field is replacement-based.
