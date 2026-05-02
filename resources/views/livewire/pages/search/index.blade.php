@@ -253,14 +253,8 @@
                         <div class="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                             @foreach($eventMatches as $event)
                                 @php
-                                    $eventHasPoster = $event->hasMedia('poster');
                                     $eventChangeBadgeLabel = $event->public_change_badge_label;
-                                    $eventPosterAspectRatio = $eventHasPoster ? $event->poster_display_aspect_ratio : '16:9';
-                                    $eventPosterAspectClass = match ($eventPosterAspectRatio) {
-                                        '4:5' => 'aspect-[4/5]',
-                                        '16:9' => 'aspect-[16/9]',
-                                        default => 'aspect-[16/9]',
-                                    };
+                                    $eventCoverAspectClass = 'aspect-[16/9]';
                                     $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
                                     $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
                                     $locationText = is_string($primaryLocationName) && $primaryLocationName !== ''
@@ -270,10 +264,10 @@
 
                                 <article class="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-900/10">
                                     <a href="{{ route('events.show', $event) }}" wire:navigate class="block">
-                                        <div class="relative overflow-hidden bg-slate-100 {{ $eventPosterAspectClass }}"
-                                            data-poster-aspect="{{ $eventPosterAspectRatio }}">
+                                        <div class="relative overflow-hidden bg-slate-100 {{ $eventCoverAspectClass }}"
+                                            data-cover-aspect="16:9">
                                             <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}"
-                                                class="h-full w-full transition duration-700 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}"
+                                                class="h-full w-full transition duration-700 group-hover:scale-105 object-cover"
                                                 loading="lazy">
                                             <div class="absolute left-4 top-4 rounded-2xl bg-white/95 px-3 py-2 text-center shadow-sm">
                                                 <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}</p>

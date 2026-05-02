@@ -171,12 +171,16 @@ it('renders public event poster containers using the poster aspect ratio', funct
 
     $this->get(route('events.index'))
         ->assertSuccessful()
-        ->assertSee('data-poster-aspect="4:5"', false)
-        ->assertSee('data-poster-aspect="16:9"', false);
+        ->assertSee('data-cover-aspect="16:9"', false);
 
+    // Detail page still shows the real poster aspect ratio
     $this->get(route('events.show', $wideEvent))
         ->assertSuccessful()
         ->assertSee('data-poster-aspect="16:9"', false);
+
+    $this->get(route('events.show', $portraitEvent))
+        ->assertSuccessful()
+        ->assertSee('data-poster-aspect="4:5"', false);
 });
 
 it('uses a 16:9 placeholder aspect ratio for public events index cards without posters', function () {
@@ -199,7 +203,7 @@ it('uses a 16:9 placeholder aspect ratio for public events index cards without p
     $this->get(route('events.index', ['search' => 'Tanpa Poster']))
         ->assertSuccessful()
         ->assertSee('Majlis Tanpa Poster')
-        ->assertSee('data-poster-aspect="16:9"', false);
+        ->assertSee('data-cover-aspect="16:9"', false);
 });
 
 it('uses the real speaker avatar in public speaker share metadata and preview', function () {
@@ -310,7 +314,7 @@ it('uses a 16:9 placeholder aspect ratio in the shared series event card partial
     ])->render();
 
     expect($html)
-        ->toContain('data-poster-aspect="16:9"')
+        ->toContain('data-cover-aspect="16:9"')
         ->toContain('aspect-[16/9]');
 });
 
@@ -390,7 +394,7 @@ it('renders the date and event-type badges below the poster on public events ind
         ->assertSee('data-testid="event-card-date-badge"', false)
         ->assertSee('data-testid="event-card-type-badge"', false)
         ->assertSeeInOrder([
-            'data-poster-aspect=',
+            'data-cover-aspect=',
             'data-testid="event-card-badge-row"',
             'data-testid="event-card-title-link"',
         ], false);

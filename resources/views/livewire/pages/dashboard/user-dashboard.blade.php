@@ -252,7 +252,6 @@
                                         ? __('Saved + Going')
                                         : (in_array('going', $cardRoles, true) ? __('Going') : __('Saved'));
                                     $cardAction = in_array('going', $cardRoles, true) ? __('View event') : __('Open event');
-                                    $eventHasPoster = $event->hasMedia('poster');
                                     $cardRoles = array_filter($cardRoles, fn($r) => $r !== 'reminder');
                                     $roleString = implode(' ', $cardRoles);
                                 @endphp
@@ -263,7 +262,7 @@
                                 >
                                     <a href="{{ route('events.show', $event) }}" wire:navigate class="block">
                                         <div class="relative aspect-[16/8.5] overflow-hidden bg-slate-100">
-                                            <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" loading="lazy" class="h-full w-full transition duration-500 group-hover:scale-105 {{ $eventHasPoster ? 'object-contain bg-slate-100' : 'object-cover' }}">
+                                            <img src="{{ $event->card_image_url }}" alt="{{ $event->title }}" loading="lazy" class="h-full w-full transition duration-500 group-hover:scale-105 object-cover">
                                             <span class="absolute right-3 top-3 rounded-lg bg-emerald-700 px-3 py-1 text-xs font-semibold text-white">{{ $cardLabel }}</span>
                                         </div>
                                         <div class="p-4">
