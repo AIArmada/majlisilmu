@@ -26,10 +26,10 @@ If you are building an AI client, use this read order:
 
 If you are evaluating the MCP connector rather than the raw HTTP admin API, switch to `docs/MAJLISILMU_MCP_GUIDE.md`. The MCP server is intentionally sanitized and uses its own write-schema surface; when it advertises media/file fields, clients send JSON base64 file descriptors instead of multipart files.
 
-Event image generation over MCP is target-specific (not prompt-only and not ratio-selectable):
+Event image generation over MCP is target-specific (not prompt-only and not ratio-selectable). The workflow is 3 steps: call the image prompt, generate with ChatGPT, then upload with the upload tool:
 
-- `*-generate-event-cover-image` writes the Event `cover` collection at `16:9`.
-- `*-generate-event-poster-image` writes the Event `poster` collection at `4:5`.
+- `*-upload-event-cover-image` writes the Event `cover` collection at `16:9` (preceded by `*-event-cover-image-prompt`).
+- `*-upload-event-poster-image` writes the Event `poster` collection at `4:5` (preceded by `*-event-poster-image-prompt`).
 
 ---
 
