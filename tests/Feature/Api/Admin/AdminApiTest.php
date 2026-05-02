@@ -3518,6 +3518,84 @@ it('rejects admin event writes with conflicting location selections', function (
         ->assertJsonValidationErrors(['institution_id', 'venue_id', 'space_id']);
 });
 
+it('finds admin event records by related speaker name in search', function () {
+    $admin = adminApiUser('super_admin');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Nik Bakri Unique Speaker Name',
+    ]);
+
+    $matchingEvent = Event::factory()->create([
+        'title' => 'Event Without Speaker Name In Title',
+    ]);
+    $matchingEvent->speakers()->attach($speaker);
+
+    $unrelatedEvent = Event::factory()->create([
+        'title' => 'Completely Different Unrelated Event',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->getJson('/api/v1/admin/events?search='.urlencode('Nik Bakri'))->assertOk();
+
+    $routeKeys = collect($response->json('data'))->pluck('route_key');
+
+    expect($routeKeys)->toContain($matchingEvent->getRouteKey())
+        ->and($routeKeys)->not->toContain($unrelatedEvent->getRouteKey());
+});
+
+it('finds admin event records by related institution name in search', function () {
+    $admin = adminApiUser('super_admin');
+
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Unik Institution Search Test',
+    ]);
+
+    $matchingEvent = Event::factory()->create([
+        'title' => 'Event Without Institution Name In Title',
+        'institution_id' => $institution->getKey(),
+    ]);
+
+    $unrelatedEvent = Event::factory()->create([
+        'title' => 'Completely Different Unrelated Event Two',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->getJson('/api/v1/admin/events?search='.urlencode('Masjid Unik Institution'))->assertOk();
+
+    $routeKeys = collect($response->json('data'))->pluck('route_key');
+
+    expect($routeKeys)->toContain($matchingEvent->getRouteKey())
+        ->and($routeKeys)->not->toContain($unrelatedEvent->getRouteKey());
+});
+
+it('finds admin event records by related venue name in search', function () {
+    $admin = adminApiUser('super_admin');
+
+    $venue = Venue::factory()->create([
+        'name' => 'Dewan Unik Venue Search Test',
+    ]);
+
+    $matchingEvent = Event::factory()->create([
+        'title' => 'Event Without Venue Name In Title',
+        'venue_id' => $venue->getKey(),
+    ]);
+
+    $unrelatedEvent = Event::factory()->create([
+        'title' => 'Completely Different Unrelated Event Three',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->getJson('/api/v1/admin/events?search='.urlencode('Dewan Unik Venue'))->assertOk();
+
+    $routeKeys = collect($response->json('data'))->pluck('route_key');
+
+    expect($routeKeys)->toContain($matchingEvent->getRouteKey())
+        ->and($routeKeys)->not->toContain($unrelatedEvent->getRouteKey());
+});
+
 function ensureAdminApiMalaysiaCountryExists(): int
 {
     $malaysiaId = DB::table('countries')->where('id', 132)->value('id');
