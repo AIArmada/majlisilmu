@@ -20,7 +20,7 @@ class AdminGetEventModerationSchemaTool extends AbstractAdminTool
 {
     protected string $name = 'admin-get-event-moderation-schema';
 
-    protected string $description = 'Get the explicit admin moderation schema for one event record, including defaults, available actions, and conditional rules.';
+    protected string $description = 'Use this when you need the moderation schema for an event before applying a moderation action. Returns available actions, required fields, and conditional rules.';
 
     public function __construct(
         private readonly AdminEventModerationService $moderationService,

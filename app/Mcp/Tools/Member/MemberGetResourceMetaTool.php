@@ -19,7 +19,7 @@ class MemberGetResourceMetaTool extends AbstractMemberTool
 {
     protected string $name = 'member-get-resource-meta';
 
-    protected string $description = 'Get metadata for one Ahli-scoped member resource by resource key.';
+    protected string $description = 'Use this when you need to discover field definitions, available filter options, or sort options for one Ahli-scoped member resource. Do not use for listing records; use member-list-records for that.';
 
     public function __construct(
         private readonly MemberResourceService $resourceService,

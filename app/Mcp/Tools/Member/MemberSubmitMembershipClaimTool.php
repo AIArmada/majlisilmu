@@ -27,7 +27,7 @@ class MemberSubmitMembershipClaimTool extends AbstractMemberWriteTool
 {
     protected string $name = 'member-submit-membership-claim';
 
-    protected string $description = 'Submit a membership claim with justification and evidence uploads through the Ahli/member workflow surface.';
+    protected string $description = 'Use this when the authenticated Ahli/member needs to submit a new membership claim with justification and supporting evidence uploads.';
 
     public function __construct(
         private readonly MemberMembershipClaimWorkflowService $workflowService,

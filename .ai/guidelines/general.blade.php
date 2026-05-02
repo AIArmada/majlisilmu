@@ -428,3 +428,9 @@ vendor/bin/phpstan analyse --ansi
 
 ## Public Listing Visibility
 - If a public page is expected to show only approved records, explicitly constrain `status = approved` even when using broader reusable scopes.
+
+---
+
+# OpenAI Developer Docs MCP
+
+Always use the OpenAI developer documentation MCP server (`openaiDeveloperDocs`) if you need to work with the OpenAI API, ChatGPT Apps SDK, Codex, Responses API, or any other OpenAI product — without the user having to explicitly ask.

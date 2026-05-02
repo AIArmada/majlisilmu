@@ -19,7 +19,7 @@ class AdminGetRecordTool extends AbstractAdminTool
 {
     protected string $name = 'admin-get-record';
 
-    protected string $description = 'Get one admin resource record by resource key and record key.';
+    protected string $description = 'Use this when you need the full details of one admin record. Requires both resource_key and record_key. Do not use for listing multiple records; use admin-list-records for that.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,

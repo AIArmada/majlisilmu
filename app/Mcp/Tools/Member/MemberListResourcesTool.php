@@ -19,7 +19,7 @@ class MemberListResourcesTool extends AbstractMemberTool
 {
     protected string $name = 'member-list-resources';
 
-    protected string $description = 'List accessible Ahli-scoped member resources. Returns a compact summary by default; set verbose=true for full metadata.';
+    protected string $description = 'Use this when you need to discover which Ahli-scoped resources are available on this server. Returns a compact summary by default; set verbose=true for full field and filter metadata.';
 
     public function __construct(
         private readonly MemberResourceService $resourceService,

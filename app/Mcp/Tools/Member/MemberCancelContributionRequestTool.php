@@ -23,7 +23,7 @@ class MemberCancelContributionRequestTool extends AbstractMemberTool
 {
     protected string $name = 'member-cancel-contribution-request';
 
-    protected string $description = 'Cancel one pending contribution request owned by the authenticated Ahli/member.';
+    protected string $description = 'Use this when the authenticated Ahli/member needs to cancel a pending contribution request they own. Do not use for cancelling requests owned by other members.';
 
     public function __construct(
         private readonly MemberContributionWorkflowService $workflowService,

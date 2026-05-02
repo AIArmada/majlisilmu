@@ -19,7 +19,7 @@ class AdminGetRecordActionsTool extends AbstractAdminTool
 {
     protected string $name = 'admin-get-record-actions';
 
-    protected string $description = 'Get focused next-step MCP actions for one admin record, including writable and workflow follow-ups currently available on that record.';
+    protected string $description = 'Use this when you need to discover the next available workflow actions or follow-up MCP tool calls for one admin record. Returns only actions that are currently valid given the record\'s state.';
 
     public function __construct(
         private readonly AdminRecordActionService $recordActionService,

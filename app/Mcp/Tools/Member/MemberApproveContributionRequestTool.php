@@ -23,7 +23,7 @@ class MemberApproveContributionRequestTool extends AbstractMemberTool
 {
     protected string $name = 'member-approve-contribution-request';
 
-    protected string $description = 'Approve one reviewable contribution request through the Ahli/member workflow surface.';
+    protected string $description = 'Use this when you need to approve a reviewable contribution request through the Ahli workflow. Do not use for admin-level review; use admin-review-contribution-request for that.';
 
     public function __construct(
         private readonly MemberContributionWorkflowService $workflowService,

@@ -24,7 +24,7 @@ class MemberRejectContributionRequestTool extends AbstractMemberTool
 {
     protected string $name = 'member-reject-contribution-request';
 
-    protected string $description = 'Reject one reviewable contribution request through the Ahli/member workflow surface.';
+    protected string $description = 'Use this when you need to reject a reviewable contribution request through the Ahli workflow. Do not use for admin-level review; use admin-review-contribution-request for that.';
 
     public function __construct(
         private readonly MemberContributionWorkflowService $workflowService,

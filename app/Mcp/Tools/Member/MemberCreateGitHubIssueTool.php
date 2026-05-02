@@ -28,7 +28,7 @@ class MemberCreateGitHubIssueTool extends AbstractMemberTool
 {
     protected string $name = 'member-create-github-issue';
 
-    protected string $description = 'Create a GitHub issue in the configured MajlisIlmu repository for the authenticated Ahli/member actor.';
+    protected string $description = 'Use this when the authenticated Ahli/member wants to report a bug, request a feature, or submit feedback by creating a GitHub issue in the MajlisIlmu repository.';
 
     public function __construct(
         private readonly SubmitGitHubIssueReportAction $submitGitHubIssueReportAction,

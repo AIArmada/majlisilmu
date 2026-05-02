@@ -19,7 +19,7 @@ class AdminListRecordsTool extends AbstractAdminTool
 {
     protected string $name = 'admin-list-records';
 
-    protected string $description = 'List records for one admin resource with optional search, structured filters, date filters, and pagination.';
+    protected string $description = 'Use this when you need to list, search, or filter records for one admin resource. Supports free-text search, structured filters, date-range filters, and pagination. Do not use for fetching a single record by key; use admin-get-record for that.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,

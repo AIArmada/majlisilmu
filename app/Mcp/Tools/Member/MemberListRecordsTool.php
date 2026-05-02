@@ -19,7 +19,7 @@ class MemberListRecordsTool extends AbstractMemberTool
 {
     protected string $name = 'member-list-records';
 
-    protected string $description = 'List records for one Ahli-scoped member resource with optional search, date filters, and pagination.';
+    protected string $description = 'Use this when you need to list, search, or filter records for one Ahli-scoped resource. Supports free-text search, date-range filters, and pagination. Do not use for fetching a single record by key; use member-get-record for that.';
 
     public function __construct(
         private readonly MemberResourceService $resourceService,

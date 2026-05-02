@@ -19,7 +19,7 @@ class MemberListContributionRequestsTool extends AbstractMemberTool
 {
     protected string $name = 'member-list-contribution-requests';
 
-    protected string $description = 'List the authenticated member\'s own contribution requests plus any pending approvals available through the Ahli workflow surface.';
+    protected string $description = 'Use this when you need to list the authenticated member\'s own contribution requests or view pending approvals available through the Ahli workflow. Do not use for admin-level contribution request management.';
 
     public function __construct(
         private readonly MemberContributionWorkflowService $workflowService,

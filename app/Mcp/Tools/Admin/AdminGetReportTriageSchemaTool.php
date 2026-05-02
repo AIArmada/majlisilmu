@@ -20,7 +20,7 @@ class AdminGetReportTriageSchemaTool extends AbstractAdminTool
 {
     protected string $name = 'admin-get-report-triage-schema';
 
-    protected string $description = 'Get the explicit admin triage schema for one report record, including defaults, available actions, and conditional rules.';
+    protected string $description = 'Use this when you need the triage schema for a report before applying a triage action. Returns available actions, required fields, and conditional rules.';
 
     public function __construct(
         private readonly AdminReportTriageService $triageService,

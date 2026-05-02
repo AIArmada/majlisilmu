@@ -39,7 +39,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
 
     protected string $title = 'Create Event';
 
-    protected string $description = 'Create or preview an event using human-readable keys for organizer and location relations. Avoid passing raw UUIDs when route keys are available. Supports cover/poster/gallery image descriptors in the same request payload.';
+    protected string $description = 'Use this when you want to create a new event, optionally with cover, poster, or gallery images in the same request. Resolves organizer and location by human-readable route key — avoid raw UUIDs when a key is available. Do not use to update an existing event; use admin-update-record instead.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,

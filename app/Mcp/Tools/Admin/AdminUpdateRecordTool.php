@@ -24,7 +24,7 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
 {
     protected string $name = 'admin-update-record';
 
-    protected string $description = 'Update or preview a supported writable admin resource record. Requires record_key and payload. For event updates, payload can include cover/poster/gallery image descriptors together with regular fields.';
+    protected string $description = 'Use this when you need to update an existing writable admin resource record. Fetch the write schema first with admin-get-write-schema. For event records, the payload can include cover/poster/gallery image descriptors alongside regular fields. Do not use to create new records; use admin-create-record or admin-create-event instead.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,

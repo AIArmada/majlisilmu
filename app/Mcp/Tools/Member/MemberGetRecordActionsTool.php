@@ -19,7 +19,7 @@ class MemberGetRecordActionsTool extends AbstractMemberTool
 {
     protected string $name = 'member-get-record-actions';
 
-    protected string $description = 'Get focused next-step MCP actions for one Ahli-scoped member record, including writable follow-ups currently available on that record.';
+    protected string $description = 'Use this when you need to discover the next available workflow actions or follow-up MCP tool calls for one Ahli-scoped member record. Returns only actions valid for the record\'s current state.';
 
     public function __construct(
         private readonly MemberRecordActionService $recordActionService,

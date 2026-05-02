@@ -86,29 +86,25 @@ final readonly class MemberRecordActionService
         if ($resourceKey === 'events') {
             $actions[] = [
                 'key' => 'generate_event_cover_image',
-                'label' => 'Generate event cover image',
+                'label' => 'Upload event cover image',
                 'category' => 'creative_asset',
-                'description' => 'Generate and save a 16:9 website/app cover image using event, relation, and selected media references.',
-                'tool' => 'member-generate-event-cover-image',
+                'description' => 'Use the member-event-cover-image-prompt prompt to get the engineered prompt and reference images, generate with ChatGPT image generation, then upload the 16:9 result here.',
+                'tool' => 'member-upload-event-cover-image',
                 'arguments' => [
                     'event_key' => $recordKey,
-                    'creative_direction' => null,
-                    'include_existing_media' => true,
-                    'max_reference_media' => 6,
                 ],
+                'prerequisite_prompt' => 'member-event-cover-image-prompt',
             ];
             $actions[] = [
                 'key' => 'generate_event_poster_image',
-                'label' => 'Generate event poster image',
+                'label' => 'Upload event poster image',
                 'category' => 'creative_asset',
-                'description' => 'Generate and save a 4:5 portrait marketing poster using event, relation, and selected media references.',
-                'tool' => 'member-generate-event-poster-image',
+                'description' => 'Use the member-event-poster-image-prompt prompt to get the engineered prompt and reference images, generate with ChatGPT image generation, then upload the 4:5 result here.',
+                'tool' => 'member-upload-event-poster-image',
                 'arguments' => [
                     'event_key' => $recordKey,
-                    'creative_direction' => null,
-                    'include_existing_media' => true,
-                    'max_reference_media' => 6,
                 ],
+                'prerequisite_prompt' => 'member-event-poster-image-prompt',
             ];
         }
 

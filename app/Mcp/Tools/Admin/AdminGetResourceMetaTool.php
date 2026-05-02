@@ -19,7 +19,7 @@ class AdminGetResourceMetaTool extends AbstractAdminTool
 {
     protected string $name = 'admin-get-resource-meta';
 
-    protected string $description = 'Get metadata for one admin resource by resource key.';
+    protected string $description = 'Use this when you need to discover field definitions, available filter options, or sort options for one admin resource. Do not use for listing records; use admin-list-records for that.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
