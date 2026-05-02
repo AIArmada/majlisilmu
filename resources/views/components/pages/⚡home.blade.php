@@ -495,6 +495,138 @@ new
     <livewire:home.upcoming-events lazy.bundle />
 
     {{-- ═══════════════════════════════════════════════════════ --}}
+    {{-- GUIDE SECTION — Apa itu Majlis Ilmu? + PDF download     --}}
+    {{-- ═══════════════════════════════════════════════════════ --}}
+    <section class="py-20 bg-white" data-testid="homepage-guide-section">
+        <div class="container mx-auto px-6 lg:px-12">
+            <div class="max-w-5xl mx-auto">
+                <div class="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
+                    {{-- Text Content --}}
+                    <div class="scroll-reveal" x-intersect.once="$el.classList.add('revealed')">
+                        <span class="inline-block text-sm font-bold text-emerald-600 uppercase tracking-widest mb-3">{{ __('Panduan Pemula') }}</span>
+                        <h2 class="font-heading text-3xl lg:text-4xl font-bold text-slate-900 mb-5 leading-tight">
+                            {{ __('Apa itu Majlis Ilmu?') }}
+                        </h2>
+                        <p class="text-slate-600 leading-relaxed mb-4">
+                            {{ __('Majlis Ilmu ialah program pengajian, ceramah, kuliah, tazkirah, atau apa-apa bentuk perkongsian ilmu agama yang diadakan oleh masjid, surau, institusi, atau individu kepada orang ramai.') }}
+                        </p>
+                        <p class="text-slate-600 leading-relaxed mb-8">
+                            {{ __('MajlisIlmu.my memudahkan anda mencari, menyemak, dan menghadiri majlis ilmu yang berdekatan atau di mana-mana sahaja di seluruh Malaysia — percuma dan mudah.') }}
+                        </p>
+
+                        {{-- Key Points --}}
+                        <ul class="space-y-3 mb-10">
+                            <li class="flex items-start gap-3">
+                                <div class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                                    <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </div>
+                                <span class="text-slate-700 text-sm leading-relaxed">{{ __('Cara mencari kuliah dan ceramah berdekatan anda') }}</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <div class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                                    <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </div>
+                                <span class="text-slate-700 text-sm leading-relaxed">{{ __('Adab dan tata cara menghadiri majlis ilmu') }}</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <div class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                                    <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </div>
+                                <span class="text-slate-700 text-sm leading-relaxed">{{ __('Cara berkongsi majlis kepada rakan dan keluarga') }}</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <div class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                                    <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </div>
+                                <span class="text-slate-700 text-sm leading-relaxed">{{ __('Soalan lazim tentang platform MajlisIlmu.my') }}</span>
+                            </li>
+                        </ul>
+
+                        {{-- PDF Download CTA --}}
+                        <a
+                            href="{{ asset('downloads/panduan-majlis-ilmu.pdf') }}"
+                            download="panduan-majlis-ilmu.pdf"
+                            data-signal-event="guide.pdf_download_clicked"
+                            data-signal-category="guide"
+                            data-signal-component="homepage_guide_section"
+                            data-signal-control="pdf_download"
+                            class="inline-flex items-center gap-3 px-7 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:-translate-y-0.5 group"
+                        >
+                            <svg class="w-5 h-5 transition-transform group-hover:translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            {{ __('Muat Turun Panduan PDF') }}
+                        </a>
+                    </div>
+
+                    {{-- Visual Card --}}
+                    <div class="scroll-reveal reveal-right" x-intersect.once="$el.classList.add('revealed')" style="--reveal-d: 150ms">
+                        <div class="relative rounded-3xl overflow-hidden bg-gradient-to-br from-emerald-600 to-teal-700 p-8 shadow-2xl shadow-emerald-900/20">
+                            {{-- Background Pattern --}}
+                            <div class="absolute inset-0 opacity-10" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
+
+                            <div class="relative z-10">
+                                {{-- PDF Icon --}}
+                                <div class="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center mb-6 backdrop-blur-sm">
+                                    <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                </div>
+
+                                <p class="text-xs font-bold uppercase tracking-widest text-emerald-200 mb-2">{{ __('Panduan Percuma') }}</p>
+                                <h3 class="font-heading text-2xl font-bold text-white mb-4">{{ __('Apa itu Majlis Ilmu?') }}</h3>
+
+                                {{-- Guide Outline --}}
+                                <ul class="space-y-2 mb-8">
+                                    @foreach([
+                                        __('Apa itu Majlis Ilmu?'),
+                                        __('Kenapa menghadiri majlis ilmu penting?'),
+                                        __('Cara mencari kuliah di MajlisIlmu.my'),
+                                        __('Adab menghadiri majlis ilmu'),
+                                        __('Cara berkongsi majlis kepada orang lain'),
+                                        __('Soalan lazim ringkas'),
+                                    ] as $item)
+                                        <li class="flex items-center gap-2.5 text-sm text-emerald-100">
+                                            <svg class="w-3.5 h-3.5 flex-shrink-0 text-emerald-300" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                            </svg>
+                                            {{ $item }}
+                                        </li>
+                                    @endforeach
+                                </ul>
+
+                                {{-- Format badges --}}
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold backdrop-blur-sm">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        PDF
+                                    </span>
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold backdrop-blur-sm">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                                        {{ __('Percuma') }}
+                                    </span>
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold backdrop-blur-sm">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7 2a1 1 0 00-.707 1.707L7 4.414v3.758a1 1 0 01-.293.707l-4 4C.817 14.769 2.156 18 4.828 18h10.343c2.673 0 4.012-3.231 2.122-5.121l-4-4A1 1 0 0113 8.172V4.414l.707-.707A1 1 0 0013 2H7zm2 6.172V4h2v4.172a3 3 0 00.879 2.12l1.027 1.028a4 4 0 00-2.171.102l-.47.156a4 4 0 01-2.53 0l-.563-.187a1.993 1.993 0 00-.114-.035l1.063-1.063A3 3 0 009 8.172z" clip-rule="evenodd"/></svg>
+                                        {{ __('Bahasa Melayu') }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- CTA SECTION                                             --}}
     {{-- ═══════════════════════════════════════════════════════ --}}
     <section class="relative py-24 overflow-hidden bg-slate-950">
