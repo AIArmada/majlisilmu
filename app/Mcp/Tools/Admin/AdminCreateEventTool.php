@@ -39,7 +39,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
 
     protected string $title = 'Create Event';
 
-    protected string $description = 'Create or preview an event using human-readable keys for organizer and location relations. Avoid passing raw UUIDs when route keys are available.';
+    protected string $description = 'Create or preview an event using human-readable keys for organizer and location relations. Avoid passing raw UUIDs when route keys are available. Supports cover/poster/gallery image descriptors in the same request payload.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -75,6 +75,10 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                 'institution_key' => ['nullable', 'string'],
                 'venue_key' => ['nullable', 'string'],
                 'space_key' => ['nullable', 'string'],
+                'cover' => ['sometimes', 'array'],
+                'poster' => ['sometimes', 'array'],
+                'gallery' => ['sometimes', 'array', 'max:10'],
+                'gallery.*' => ['array'],
                 'status' => ['sometimes', 'string', 'in:draft,pending,approved'],
                 'registration_required' => ['sometimes', 'boolean'],
                 'registration_mode' => ['sometimes', 'string'],
@@ -311,6 +315,29 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             'institution_key' => $schema->string()->nullable()->description('Institution route key (slug preferred, UUID allowed).'),
             'venue_key' => $schema->string()->nullable()->description('Venue route key (slug preferred, UUID allowed).'),
             'space_key' => $schema->string()->nullable()->description('Space route key (slug preferred, UUID allowed).'),
+            'cover' => $schema->object([
+                'filename' => $schema->string()->required(),
+                'download_url' => $schema->string()->nullable(),
+                'content_base64' => $schema->string()->nullable(),
+                'file_id' => $schema->string()->nullable(),
+                'mime_type' => $schema->string()->nullable(),
+            ])->nullable()->description('Optional event cover image descriptor (16:9). Pass {download_url, file_id, filename} or {content_base64, filename}.'),
+            'poster' => $schema->object([
+                'filename' => $schema->string()->required(),
+                'download_url' => $schema->string()->nullable(),
+                'content_base64' => $schema->string()->nullable(),
+                'file_id' => $schema->string()->nullable(),
+                'mime_type' => $schema->string()->nullable(),
+            ])->nullable()->description('Optional event poster image descriptor (4:5). Pass {download_url, file_id, filename} or {content_base64, filename}.'),
+            'gallery' => $schema->array()->items(
+                $schema->object([
+                    'filename' => $schema->string()->required(),
+                    'download_url' => $schema->string()->nullable(),
+                    'content_base64' => $schema->string()->nullable(),
+                    'file_id' => $schema->string()->nullable(),
+                    'mime_type' => $schema->string()->nullable(),
+                ])
+            )->nullable()->description('Optional gallery image descriptors (max 10 items).'),
             'status' => $schema->string()->default('draft')->enum(['draft', 'pending', 'approved']),
             'registration_required' => $schema->boolean()->default(false),
             'registration_mode' => $schema->string()->default(RegistrationMode::Event->value)->enum($this->enumValues(RegistrationMode::class)),
@@ -320,6 +347,29 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             'validate_only' => $schema->boolean()->default(false),
             'apply_defaults' => $schema->boolean()->default(false),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    public function toArray(): array
+    {
+        $tool = parent::toArray();
+
+        $tool['_meta'] = array_merge(
+            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
+            [
+                'openai/note' => 'You may send event fields and image descriptors together in one call. For media fields cover/poster/gallery use {download_url, file_id, filename} or {content_base64, filename}.',
+                'openai/fileParams' => [
+                    'cover' => ['download_url', 'file_id'],
+                    'poster' => ['download_url', 'file_id'],
+                    'gallery[]' => ['download_url', 'file_id'],
+                ],
+            ],
+        );
+
+        return $tool;
     }
 
     /**
