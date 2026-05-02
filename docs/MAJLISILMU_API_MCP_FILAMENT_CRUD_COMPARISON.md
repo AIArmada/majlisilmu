@@ -1,6 +1,6 @@
 ---
 title: API / MCP / Filament Capability Matrix
-verified_at: 2026-04-28
+verified_at: 2026-05-03
 purpose: Canonical parity map for public workflow API, generic admin HTTP API, admin/member MCP, and the Filament admin/Ahli panels.
 machine_readable_companion: docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.json
 ---
@@ -128,7 +128,8 @@ The public/authenticated API is not a second generic CRUD registry. It is a set 
 
 ## Search parity note
 
-- Admin HTTP API and Admin/Member MCP now route list search for `speakers`, `institutions`, and `references` through shared specialized search services.
+- Admin HTTP API now exposes a dedicated event discovery endpoint (`GET /api/v1/admin/events/search`) aligned with `admin-search-events`; both surfaces share the same validation and filter normalization contract.
+- Admin HTTP API and Admin/Member MCP also route list search for `speakers`, `institutions`, and `references` through shared specialized search services.
 - Public speaker, institution, and reference directory endpoints use the same underlying search services for those resource families, but public reads still enforce active + verified visibility while admin/member surfaces preserve their broader or scoped record sets.
 - References now have a root-book plus child-part family model across all surfaces. Public directory pagination defaults to root/standalone references, while search can still return child parts. Shared search behavior now covers part labels/numbers, and root reference event filters expand to linked child parts automatically.
 - This is search-engine parity, not full surface symmetry; transport, authorization, filters, and returned field sets still differ by surface.
@@ -265,6 +266,11 @@ These resources are readable through the generic admin registry, but not writabl
 
 These capabilities remain outside generic admin CRUD, but now have explicit admin workflow parity where implemented.
 
+- **Event discovery:**
+	- HTTP endpoint: `GET /api/v1/admin/events/search`
+	- MCP tool: `admin-search-events`
+	- Shared contract: query validation, normalization, and execution flow are aligned via shared search services.
+
 - **Event moderation:**
 	- HTTP schema: `GET /api/v1/admin/events/{recordKey}/moderation-schema`
 	- HTTP action: `POST /api/v1/admin/events/{recordKey}/moderate`
@@ -338,12 +344,68 @@ This is the area where the previous version drifted the most.
 - Media fields follow the same descriptor transport as admin MCP when the schema advertises them.
 - Destructive `clear_*` media flags are also rejected here.
 
+## MCP Specialized Tools (AI and Workflow Extensions)
+
+Beyond generic CRUD parity, MCP exposes specialized tools that remain MCP-exclusive because they represent higher-level agent workflows or AI integrations rather than direct HTTP contracts.
+
+### AI Media Generation Tools
+
+These tools extend event marketing asset workflows by combining AI image generation with structured uploads to specific media collections:
+
+- **AdminUploadEventCoverImageTool**: AI-driven event cover image generation and upload (16:9 website/mobile ratio)
+  - Generates or fetches images from ChatGPT/AI provider
+  - Uploads to `event.cover` collection
+  - Admin API equivalent: `PUT /admin/events/{recordKey}` with cover file in `multipart/form-data`
+  - Filament equivalent: EventResource edit page → cover `SpatieMediaLibraryFileUpload` field
+  - Why MCP-only: Specialized AI workflow; generic CRUD already handles media in `UpdateRecord`
+
+- **AdminUploadEventPosterImageTool**: AI-driven event poster image generation and upload (4:5 portrait ratio)
+  - Generates or fetches images from ChatGPT/AI provider
+  - Uploads to `event.poster` collection
+  - Admin API equivalent: `PUT /admin/events/{recordKey}` with poster file in `multipart/form-data`
+  - Filament equivalent: EventResource edit page → poster `SpatieMediaLibraryFileUpload` field
+  - Why MCP-only: Specialized AI workflow; generic CRUD already handles media in `UpdateRecord`
+
+- **MemberUploadEventCoverImageTool**: Member-scoped version of admin cover tool
+  - Limited to member-owned or member-linked events
+  - Member API: Not exposed (member writes flow through Filament Ahli panel)
+  - Filament equivalent: Ahli EventResource edit page → cover field
+
+- **MemberUploadEventPosterImageTool**: Member-scoped version of admin poster tool
+  - Limited to member-owned or member-linked events
+  - Member API: Not exposed (member writes flow through Filament Ahli panel)
+  - Filament equivalent: Ahli EventResource edit page → poster field
+
+### Workflow Action Tools
+
+These tools expose explicit state-transition and review workflows as named MCP tools. Unlike AI tools, these ARE exposed across multiple surfaces:
+
+- **AdminModerateEventTool** (MCP + API): Moderate events with admin schema
+  - API: `POST /admin/events/{recordKey}/moderate` with schema from `GET /admin/events/{recordKey}/moderation-schema`
+  - MCP: `admin-moderate-event`
+  - Filament: EventResource view page → Moderate action
+
+- **AdminReviewContributionRequestTool** (MCP + API): Review contribution submissions
+- **AdminReviewMembershipClaimTool** (MCP + API): Review membership claims
+- **AdminTriageReportTool** (MCP + API): Triage user reports
+
+### Documentation and Utility Tools (MCP-Only)
+
+These tools provide agent-facing capabilities for documentation, debugging, and issue creation:
+
+- `AdminDocumentationSearchTool`, `AdminDocumentationFetchTool`
+- `AdminReadDebugLogTool`, `AdminCreateGitHubIssueTool`
+- `MemberDocumentationSearchTool`, `MemberDocumentationFetchTool`
+- `MemberReadDebugLogTool`, `MemberCreateGitHubIssueTool`
+
+These are intentionally MCP-only because they serve agent workflows, not user-facing API or UI surfaces.
+
 ## Important asymmetries
 
 - **Runtime admin inventory is broader than local app files.** Because the registry uses live Filament panel registration, vendor/plugin resources are part of the admin surface.
 - **Page keys do not equal permission.** `getPages()` and generic write support describe structural capability; per-actor authorization still comes from middleware and model policies.
 - **Admin API and Admin MCP share one mutation whitelist.** If `AdminResourceMutationService` changes, both transports change together.
-- **Admin API and Admin/Member MCP also share the richer directory search path for `speakers`, `institutions`, and `references`.** Public directories use the same search services, but visibility and scope still differ.
+- **Admin API and Admin/Member MCP share the dedicated event discovery contract (`/api/v1/admin/events/search` ↔ `admin-search-events`) and the richer directory search path for `speakers`, `institutions`, and `references`.** Public directories use the same search services, but visibility and scope still differ.
 - **Reference write semantics now include hierarchy metadata.** Admin API plus admin/member MCP reference schemas can carry `parent_reference_id`, `part_type`, `part_number`, and `part_label`, while list/detail payloads can expose `display_title` and `is_part` for human-safe rendering.
 - **Member MCP is narrower than admin.** Generic member CRUD still maps only to the four Ahli resources and exposes updates only, but the server now also carries workflow tools for contribution queues and membership claims.
 - **Public contributions and reports are authenticated workflows.** The API exposes form discovery publicly, but the actual create routes for contributions and reports live behind `auth:sanctum`.

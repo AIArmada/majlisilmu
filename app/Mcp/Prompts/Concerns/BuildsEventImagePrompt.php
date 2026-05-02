@@ -69,6 +69,11 @@ trait BuildsEventImagePrompt
         $payload = $result['payload'];
         $contentMedia = array_slice($result['content_media'], 0, $maxReferenceMedia);
 
+        $payload['reference_media'] = array_map(
+            fn (array $mediaItem): array => $mediaItem['payload'],
+            $contentMedia,
+        );
+
         $promptText = $this->buildPromptMessageText($payload, $targetCollection);
 
         $messages = [Response::text($promptText)];
@@ -90,26 +95,23 @@ trait BuildsEventImagePrompt
     private function buildPromptMessageText(array $payload, string $targetCollection): string
     {
         $prompt = is_string($payload['prompt'] ?? null) ? $payload['prompt'] : '';
-        $target = is_array($payload['target'] ?? null) ? $payload['target'] : [];
-        $aspectRatio = is_string($target['aspect_ratio'] ?? null) ? $target['aspect_ratio'] : ($targetCollection === 'poster' ? '4:5' : '16:9');
-        $outputWidth = is_int($target['output_width'] ?? null) ? $target['output_width'] : ($targetCollection === 'poster' ? 1600 : 1600);
-        $outputHeight = is_int($target['output_height'] ?? null) ? $target['output_height'] : ($targetCollection === 'poster' ? 2000 : 900);
+        $target = $this->canonicalTarget($targetCollection);
+        $aspectRatio = $target['aspect_ratio'];
+        $outputWidth = $target['output_width'];
+        $outputHeight = $target['output_height'];
         $event = is_array($payload['event'] ?? null) ? $payload['event'] : [];
         $eventTitle = is_string($event['title'] ?? null) ? $event['title'] : '';
         $eventKey = is_string($event['route_key'] ?? null) ? $event['route_key'] : '';
 
         $collectionLabel = $targetCollection === 'poster' ? 'marketing poster (4:5 portrait)' : 'website/mobile cover (16:9 landscape)';
+        $forbiddenShape = $targetCollection === 'poster' ? '16:9 landscape cover' : '4:5 portrait poster/flyer';
         $uploadTool = $targetCollection === 'poster' ? 'upload-event-poster-image' : 'upload-event-cover-image';
 
         $safetyNotes = is_array($payload['usage']['safety_notes'] ?? null)
             ? implode("\n", array_map(fn (mixed $n): string => '- '.(string) $n, $payload['usage']['safety_notes']))
             : '';
 
-        $referenceNote = '';
-
-        if (is_array($payload['reference_media'] ?? null) && count($payload['reference_media']) > 0) {
-            $referenceNote = "\n\nReference images are attached to this message. Use them for brand/style/identity consistency.";
-        }
+        $referenceNote = $this->referenceAssetsText($payload);
 
         return <<<TEXT
         Generate a {$collectionLabel} for the following event:
@@ -118,8 +120,10 @@ trait BuildsEventImagePrompt
 
         ---
         **Output requirements:**
+        - Target collection: `{$target['collection']}`
         - Aspect ratio: **{$aspectRatio}**
         - Recommended output size: {$outputWidth}×{$outputHeight} px
+        - Treat this as a strict {$target['collection']} request; do **not** generate a {$forbiddenShape}
         - Do NOT add letterboxing or padding — fill the entire canvas
 
         **Safety rules:**
@@ -130,6 +134,81 @@ trait BuildsEventImagePrompt
         - event_key: `{$eventKey}`
         - event_title: {$eventTitle}
         TEXT;
+    }
+
+    /**
+     * @return array{collection: 'cover'|'poster', aspect_ratio: string, output_width: int, output_height: int}
+     */
+    private function canonicalTarget(string $targetCollection): array
+    {
+        if ($targetCollection === 'poster') {
+            return [
+                'collection' => 'poster',
+                'aspect_ratio' => '4:5',
+                'output_width' => 1600,
+                'output_height' => 2000,
+            ];
+        }
+
+        return [
+            'collection' => 'cover',
+            'aspect_ratio' => '16:9',
+            'output_width' => 1600,
+            'output_height' => 900,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function referenceAssetsText(array $payload): string
+    {
+        $referenceMedia = is_array($payload['reference_media'] ?? null) ? $payload['reference_media'] : [];
+
+        if ($referenceMedia === []) {
+            return '';
+        }
+
+        $lines = [
+            '',
+            'Reference images are attached to this message when supported by the client. Use them for brand/style/identity consistency.',
+            'If your client does not expose inline image attachments, use these fallback reference assets:',
+        ];
+
+        foreach ($referenceMedia as $index => $media) {
+            if (! is_array($media)) {
+                continue;
+            }
+
+            $position = $index + 1;
+            $label = is_string($media['label'] ?? null) && trim((string) $media['label']) !== ''
+                ? trim((string) $media['label'])
+                : (is_string($media['file_name'] ?? null) && trim((string) $media['file_name']) !== ''
+                    ? trim((string) $media['file_name'])
+                    : "Reference asset {$position}");
+            $role = is_string($media['role'] ?? null) && trim((string) $media['role']) !== ''
+                ? trim((string) $media['role'])
+                : 'reference';
+            $collection = is_string($media['collection'] ?? null) && trim((string) $media['collection']) !== ''
+                ? trim((string) $media['collection'])
+                : 'unknown';
+            $reason = is_string($media['selection_reason'] ?? null) && trim((string) $media['selection_reason']) !== ''
+                ? trim((string) $media['selection_reason'])
+                : 'Use if helpful.';
+            $url = is_string($media['url'] ?? null) && trim((string) $media['url']) !== ''
+                ? trim((string) $media['url'])
+                : (is_string($media['original_url'] ?? null) && trim((string) $media['original_url']) !== ''
+                    ? trim((string) $media['original_url'])
+                    : null);
+
+            $urlLine = $url === null
+                ? 'no direct URL available; rely on the inline attachment if present'
+                : $url;
+
+            $lines[] = "{$position}. {$label} [role: {$role}; collection: {$collection}] — {$reason} — asset: {$urlLine}";
+        }
+
+        return "\n\n".implode("\n", $lines);
     }
 
     private function imageResponseForMedia(Media $media): ?Response

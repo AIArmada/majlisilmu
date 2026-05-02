@@ -6,9 +6,11 @@ use App\Enums\EventStructure;
 use App\Enums\EventVisibility;
 use App\Models\Event;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Speaker;
 use App\Services\EventSearchService;
 use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\ReferenceSearchService;
 use App\Support\Search\SpeakerSearchService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,7 +22,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
-#[Title('Search Majlis, Speakers & Institutions')]
+#[Title('Search Majlis, Speakers, References & Institutions')]
 class Index extends Component
 {
     #[Url]
@@ -158,6 +160,36 @@ class Index extends Component
         ];
     }
 
+    /**
+     * @return array{items: Collection<int, Reference>, total: int}
+     */
+    #[Computed]
+    public function referenceResults(): array
+    {
+        $search = $this->normalizedSearch();
+
+        if ($search === null) {
+            return [
+                'items' => collect(),
+                'total' => 0,
+            ];
+        }
+
+        $query = $this->referenceSearchQuery($search);
+        $total = (clone $query)->count();
+
+        /** @var Collection<int, Reference> $items */
+        $items = $query
+            ->orderBy('title')
+            ->limit(4)
+            ->get();
+
+        return [
+            'items' => $items,
+            'total' => $total,
+        ];
+    }
+
     public function render(): View
     {
         return view('livewire.pages.search.index');
@@ -203,6 +235,29 @@ class Index extends Component
                         ->where('events.starts_at', '>=', now());
                 }])
                 ->with(['address.state', 'address.district', 'address.subdistrict', 'media']),
+            $search,
+        );
+    }
+
+    /**
+     * @return Builder<Reference>
+     */
+    private function referenceSearchQuery(string $search): Builder
+    {
+        return app(ReferenceSearchService::class)->applySearch(
+            Reference::query()
+                ->active()
+                ->where('status', 'verified')
+                ->root()
+                ->withCount(['events' => function (Builder $query): void {
+                    $query
+                        ->where('events.is_active', true)
+                        ->whereIn('events.status', Event::PUBLIC_STATUSES)
+                        ->where('events.visibility', EventVisibility::Public)
+                        ->where('events.event_structure', '!=', EventStructure::ParentProgram->value)
+                        ->where('events.starts_at', '>=', now());
+                }])
+                ->with('media'),
             $search,
         );
     }

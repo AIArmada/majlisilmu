@@ -224,6 +224,7 @@ Use this section as the quick member-only capability summary.
 | Docs fetch | `fetch` |
 | Resource discovery | `member-list-resources` |
 | Resource metadata | `member-get-resource-meta` |
+| Dedicated event discovery | `member-search-events` |
 | Record list | `member-list-records` |
 | Record read | `member-get-record` |
 | Record action guidance | `member-get-record-actions` |
@@ -421,6 +422,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `fetch` | Fetch one verified member documentation page by id | MCP-only documentation fetch tool |
 | `member-list-resources` | List accessible member resources and their capability summary | `GET /api/v1/member/manifest` |
 | `member-get-resource-meta` | Read one member resource's metadata, pages, relations, abilities, and write-support flags | `GET /api/v1/member/{resourceKey}/meta` |
+| `member-search-events` | Search events with rich filters: keyword, geo/nearby, date range, clock-time or prayer-relative window, event type, format, language, audience (gender, age group, children, Muslim-only), institution/venue, key-person roles, topic/tag/reference UUIDs, and boolean flags (has_event_url, has_live_url) | MCP-only dedicated event discovery tool |
 | `member-list-records` | List records for one member resource with optional search, date filters, and pagination | `GET /api/v1/member/{resourceKey}` |
 | `member-list-related-records` | Traverse a named relation on one member record | `GET /api/v1/member/{resourceKey}/{recordKey}/relations/{relation}` |
 | `member-get-record` | Read one member record and its permissions | `GET /api/v1/member/{resourceKey}/{recordKey}` |
@@ -441,6 +443,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 Member tool behavior notes:
 
 - `validate_only=true` is supported for member update previews.
+- `member-search-events` is a dedicated event discovery tool. It supports keyword search, geo-proximity sorting (`sort=distance` with `lat`, `lng`, `radius_km`), date range (`starts_after`, `starts_before`, `time_scope`), clock-time or prayer-relative windows (`timing_mode`, `starts_time_from/until`, `prayer_time`), event type and format arrays, audience and boolean filters, institution/venue/speaker/role filters, and tag/reference UUID arrays. Respects member MCP scope boundaries. Each parameter's inline description lists valid values.
 - `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries. Unlike admin, `member-list-records` does **not** accept a `filters` object; use `search`, `starts_after`, `starts_before`, and `starts_on_local_date` to narrow results.
 - `member-upload-event-cover-image` and `member-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the accessible event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `member-event-cover-image-prompt` and `member-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - If attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.

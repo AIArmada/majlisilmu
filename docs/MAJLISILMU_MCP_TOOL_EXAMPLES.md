@@ -139,6 +139,44 @@ Use enum backing values in `filters`, and use date-only `YYYY-MM-DD` values for 
 }
 ```
 
+### Search events with dedicated filters
+
+Use the dedicated event search tool when you need richer discovery: geo-proximity, prayer-time windows, role-oriented constraints, and tag signals. All filter parameters are optional and combinable. Each parameter's inline description (visible in the tool schema) lists valid enum values and any interdependencies.
+
+```json
+{
+  "tool": "admin-search-events",
+  "arguments": {
+    "query": "kuliah aqidah",
+    "time_scope": "upcoming",
+    "event_format": ["physical"],
+    "is_muslim_only": true,
+    "age_group": ["youth"],
+    "lat": 3.139,
+    "lng": 101.687,
+    "radius_km": 10,
+    "sort": "distance",
+    "page": 1,
+    "per_page": 12
+  }
+}
+```
+
+```json
+{
+  "tool": "admin-search-events",
+  "arguments": {
+    "time_scope": "upcoming",
+    "event_type": ["khutbah_jumaat"],
+    "timing_mode": "prayer_relative",
+    "prayer_time": "friday_prayer",
+    "state_id": 14,
+    "sort": "time",
+    "per_page": 20
+  }
+}
+```
+
 ```json
 {
   "tool": "admin-list-records",
@@ -398,6 +436,40 @@ When reference media is enabled, speaker context selection follows this fallback
 
 ```json
 { "tool": "member-get-write-schema", "arguments": { "resource_key": "institutions", "record_key": "019d5cb5-7de1-7055-a4d3-b57ab007331e" } }
+```
+
+### Search events with dedicated filters
+
+Use the member-scoped event search tool for rich discovery while respecting Ahli visibility boundaries.
+
+```json
+{
+  "tool": "member-search-events",
+  "arguments": {
+    "query": "dhuha",
+    "time_scope": "all",
+    "event_format": ["physical"],
+    "children_allowed": true,
+    "state_id": 14,
+    "sort": "time",
+    "page": 1,
+    "per_page": 10
+  }
+}
+```
+
+```json
+{
+  "tool": "member-search-events",
+  "arguments": {
+    "time_scope": "upcoming",
+    "event_format": ["online", "hybrid"],
+    "has_live_url": true,
+    "age_group": ["adults"],
+    "sort": "time",
+    "per_page": 20
+  }
+}
 ```
 
 ```json

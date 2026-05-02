@@ -1,6 +1,6 @@
 {
-  "schema_version": "2.4.0",
-  "verified_at": "2026-04-28",
+  "schema_version": "2.6.0",
+  "verified_at": "2026-05-03",
   "title": "API / MCP / Filament Capability Matrix",
   "markdown_companion": "docs/MAJLISILMU_API_MCP_FILAMENT_CRUD_COMPARISON.md",
   "purpose": "Canonical parity map for public workflow API, generic admin HTTP API, admin/member MCP, and the Filament admin/Ahli panels.",
@@ -132,6 +132,7 @@
     "Replacement targets are resolved to the latest still-reachable public or unlisted event so stale replacement chains do not expose dead public links."
   ],
   "search_parity_notes": [
+    "Admin HTTP API now exposes dedicated event discovery at GET /api/v1/admin/events/search and aligns with admin-search-events via the same validation and normalization contract.",
     "Admin HTTP API and Admin/Member MCP now route list search for speakers, institutions, and references through shared specialized search services.",
     "Public speaker, institution, and reference directory endpoints use the same underlying search services for those resource families, but public reads still enforce active plus verified visibility while admin/member surfaces preserve their broader or scoped record sets.",
     "This is search-engine parity, not full surface symmetry; transport, authorization, filters, and returned field sets still differ by surface."
@@ -231,6 +232,98 @@
       "Does the public or authenticated workflow API surface change?",
       "If a surface does not change, is the gap intentional and documented?"
     ]
+  },
+  "mcp_specialized_tools": {
+    "purpose": "Documents MCP-exclusive tools that extend AI agent capabilities beyond generic CRUD parity. These tools remain MCP-only because they represent AI workflows, not generic HTTP contracts.",
+    "ai_media_generation_tools": {
+      "description": "AI-driven image generation and upload for event marketing assets. These are destructive MCP tools that generate, fetch, and upload images to specific event media collections.",
+      "parity_model": "generic_admin_crud surfaces (API + Filament) handle media via UpdateRecord schema with multipart/form-data; MCP adds specialized AI tools for generation workflows.",
+      "tools": [
+        {
+          "tool_name": "AdminUploadEventCoverImageTool",
+          "mcp_only": true,
+          "reason": "AI-specific workflow: generates cover image from prompt, downloads from ChatGPT/AI provider, uploads to event.cover collection with 16:9 ratio.",
+          "admin_api_equivalent": "PUT /admin/events/{recordKey} with cover file in multipart/form-data",
+          "filament_equivalent": "EventResource edit page -> cover SpatieMediaLibraryFileUpload field",
+          "accessible_via": ["admin_mcp"],
+          "ai_surface_only": true
+        },
+        {
+          "tool_name": "AdminUploadEventPosterImageTool",
+          "mcp_only": true,
+          "reason": "AI-specific workflow: generates poster image from prompt, downloads from ChatGPT/AI provider, uploads to event.poster collection with 4:5 portrait ratio.",
+          "admin_api_equivalent": "PUT /admin/events/{recordKey} with poster file in multipart/form-data",
+          "filament_equivalent": "EventResource edit page -> poster SpatieMediaLibraryFileUpload field",
+          "accessible_via": ["admin_mcp"],
+          "ai_surface_only": true
+        },
+        {
+          "tool_name": "MemberUploadEventCoverImageTool",
+          "mcp_only": true,
+          "reason": "Member-scoped AI workflow: same as admin cover tool but limited to member-owned/linked events.",
+          "member_api_equivalent": "None (member API is read-only for core CRUD; media updates flow through Ahli panel)",
+          "filament_equivalent": "Ahli EventResource edit page -> cover SpatieMediaLibraryFileUpload field",
+          "accessible_via": ["member_mcp"],
+          "ai_surface_only": true
+        },
+        {
+          "tool_name": "MemberUploadEventPosterImageTool",
+          "mcp_only": true,
+          "reason": "Member-scoped AI workflow: same as admin poster tool but limited to member-owned/linked events.",
+          "member_api_equivalent": "None (member API is read-only for core CRUD; media updates flow through Ahli panel)",
+          "filament_equivalent": "Ahli EventResource edit page -> poster SpatieMediaLibraryFileUpload field",
+          "accessible_via": ["member_mcp"],
+          "ai_surface_only": true
+        }
+      ]
+    },
+    "workflow_action_tools": {
+      "description": "MCP tools that expose state-transition and review workflows as named actions.",
+      "parity_model": "These tools are exposed via both admin_api (POST routes) and admin_mcp; they remain on both surfaces because they represent explicit workflows.",
+      "tools": [
+        {
+          "tool_name": "AdminModerateEventTool",
+          "mcp_only": false,
+          "api_route": "POST /admin/events/{recordKey}/moderate with schema from GET /admin/events/{recordKey}/moderation-schema",
+          "filament_equivalent": "EventResource view page -> Moderate action modal",
+          "accessible_via": ["admin_api", "admin_mcp", "admin_panel"]
+        },
+        {
+          "tool_name": "AdminReviewContributionRequestTool",
+          "mcp_only": false,
+          "api_route": "POST /admin/contribution-requests/{recordKey}/review with schema from GET /admin/contribution-requests/{recordKey}/review-schema",
+          "filament_equivalent": "ContributionRequestResource view page -> Review action modal",
+          "accessible_via": ["admin_api", "admin_mcp", "admin_panel"]
+        },
+        {
+          "tool_name": "AdminReviewMembershipClaimTool",
+          "mcp_only": false,
+          "api_route": "POST /admin/membership-claims/{recordKey}/review with schema from GET /admin/membership-claims/{recordKey}/review-schema",
+          "filament_equivalent": "MembershipClaimResource view page -> Review action modal",
+          "accessible_via": ["admin_api", "admin_mcp", "admin_panel"]
+        },
+        {
+          "tool_name": "AdminTriageReportTool",
+          "mcp_only": false,
+          "api_route": "POST /admin/reports/{recordKey}/triage with schema from GET /admin/reports/{recordKey}/triage-schema",
+          "filament_equivalent": "ReportResource edit page -> Triage action modal",
+          "accessible_via": ["admin_api", "admin_mcp", "admin_panel"]
+        }
+      ]
+    },
+    "documentation_and_utility_tools": {
+      "description": "MCP-exclusive tools for documentation access and debugging; not expected to have API or UI equivalents.",
+      "tools": [
+        "AdminDocumentationSearchTool",
+        "AdminDocumentationFetchTool",
+        "AdminReadDebugLogTool",
+        "AdminCreateGitHubIssueTool",
+        "MemberDocumentationSearchTool",
+        "MemberDocumentationFetchTool",
+        "MemberReadDebugLogTool",
+        "MemberCreateGitHubIssueTool"
+      ]
+    }
   },
   "runtime_inventory": {
     "admin_panel": {

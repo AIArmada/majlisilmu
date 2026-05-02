@@ -215,6 +215,7 @@ Use this section as the quick admin-only capability summary.
 | Docs fetch | `fetch` |
 | Resource discovery | `admin-list-resources` |
 | Resource metadata | `admin-get-resource-meta` |
+| Dedicated event discovery | `admin-search-events` |
 | Record list | `admin-list-records` |
 | Record read | `admin-get-record` |
 | Record action guidance | `admin-get-record-actions` |
@@ -433,6 +434,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `fetch` | Fetch one verified admin documentation page by id | MCP-only documentation fetch tool |
 | `admin-list-resources` | List accessible admin resources and their capability summary | `GET /api/v1/admin/manifest` |
 | `admin-get-resource-meta` | Read one admin resource's metadata, pages, relations, abilities, and write-support flags | `GET /api/v1/admin/{resourceKey}/meta` |
+| `admin-search-events` | Search events with rich filters: keyword, geo/nearby, date range, clock-time or prayer-relative window, event type, format, language, audience (gender, age group, children, Muslim-only), institution/venue, key-person roles, topic/tag/reference UUIDs, and boolean flags (has_event_url, has_live_url) | `GET /api/v1/admin/events/search` (same filter contract) |
 | `admin-list-records` | List records for one admin resource with optional search, structured filters, date filters, and pagination | `GET /api/v1/admin/{resourceKey}` |
 | `admin-list-related-records` | Traverse a named relation on one admin record | `GET /api/v1/admin/{resourceKey}/{recordKey}/relations/{relation}` |
 | `admin-get-record` | Read one admin record and its permissions | `GET /api/v1/admin/{resourceKey}/{recordKey}` |
@@ -458,6 +460,7 @@ Admin tool behavior notes:
 - `validate_only=true` is supported for create/update preview flows.
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
+- `admin-search-events` is a dedicated event discovery tool and is aligned with `GET /api/v1/admin/events/search`. It supports keyword search, geo-proximity sorting (`sort=distance` with `lat`, `lng`, `radius_km`), date range (`starts_after`, `starts_before`, `time_scope`), clock-time or prayer-relative windows (`timing_mode`, `starts_time_from/until`, `prayer_time`), event type and format arrays, audience and audience-boolean filters, institution/venue/speaker/role filters, and tag/reference UUID arrays. Each parameter's description in the tool schema lists valid enum values and interdependencies (e.g. `sort=distance` requires `lat`+`lng`).
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
 - `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `admin-event-cover-image-prompt` and `admin-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - If attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.

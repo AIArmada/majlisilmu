@@ -157,7 +157,8 @@
 
 <div class="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#f7f3ea] pb-0">
     <section class="relative max-w-[100vw] overflow-hidden border-b border-[#eadfca] bg-[#fbf8f1]">
-        <div class="absolute inset-y-0 right-0 hidden w-1/2 bg-[url('/images/pattern-bg.png')] bg-cover bg-center opacity-20 lg:block"></div>
+        <div class="absolute inset-y-0 right-0 hidden w-1/2 bg-cover bg-center opacity-20 lg:block"
+            style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
         <div class="container relative mx-auto max-w-[100vw] px-4 py-10 sm:px-6 lg:px-12 lg:py-14">
             <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
                 <div class="max-w-3xl">
@@ -475,7 +476,8 @@
                 </section>
 
                 <section class="relative overflow-hidden rounded-lg border border-emerald-900 bg-emerald-900 p-6 text-white shadow-sm">
-                    <div class="pointer-events-none absolute inset-0 bg-[url('/images/pattern-bg.png')] bg-[size:260px] bg-repeat opacity-15"></div>
+                    <div class="pointer-events-none absolute inset-0 bg-repeat opacity-15"
+                        style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-size: 260px;"></div>
                     <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/0 via-white/0 to-black/10"></div>
                     <div class="relative">
                     <h2 class="font-heading text-2xl font-bold">{{ __('Sebarkan ilmu, luaskan manfaat.') }}</h2>
@@ -523,7 +525,8 @@
     </main>
 
     <section class="relative mt-2 overflow-hidden bg-[#08243b] px-4 py-8 text-white sm:px-6">
-        <div class="absolute inset-0 bg-[url('/images/pattern-bg.png')] bg-cover bg-center opacity-15"></div>
+        <div class="absolute inset-0 bg-cover bg-center opacity-15"
+            style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
         <div class="absolute inset-0 bg-gradient-to-b from-white/0 via-white/0 to-black/10"></div>
         <div class="container relative mx-auto flex flex-col items-center gap-5 text-center lg:px-12">
             <h2 class="max-w-4xl font-heading text-2xl font-bold leading-snug md:text-3xl">

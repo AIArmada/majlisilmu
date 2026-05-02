@@ -83,9 +83,9 @@ it('documents the public reference directory in the mobile api reference', funct
     $markdown = file_get_contents(base_path('docs/MAJLISILMU_MOBILE_API_REFERENCE.md')) ?: '';
 
     expect($markdown)
-        ->toContain('| `GET` | `/references` | Public reference listing filters; reference directory items include `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` in the default payload |')
+        ->toContain('| `GET` | `/references` | Public reference listing filters; default directory pages show root/standalone references')
         ->toContain('`/speakers`, `/institutions`, and `/references` return **only** records where `is_active = true` AND `status = \'verified\'`')
-        ->toContain('Public reference directory list items expose `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` by default.')
+        ->toContain('Public reference directory list items expose `display_title`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, `is_part`, `author`, `type`, `publisher`, `publication_year`, `is_active`, `events_count`, `front_cover_url`, and `is_following` by default.')
         ->toContain('Unified search accepts `search` as the canonical query parameter and `q` as a compatibility alias')
         ->toContain('The `/institutions/near` alias requires either `near=lat,lng` or both `lat` and `lng`; calling it without coordinates intentionally returns a validation error.')
         ->toContain('There are no plural follow-list routes such as `/follows/speakers`')

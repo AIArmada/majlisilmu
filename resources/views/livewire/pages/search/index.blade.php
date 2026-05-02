@@ -1,21 +1,25 @@
-@section('title', __('Search Majlis, Speakers & Institutions') . ' - ' . config('app.name'))
-@section('meta_description', __('Search across upcoming majlis, trusted speakers, and institutions in one place.'))
+@section('title', __('Search Majlis, Speakers, References & Institutions') . ' - ' . config('app.name'))
+@section('meta_description', __('Search across upcoming majlis, trusted speakers, references, and institutions in one place.'))
 @section('og_url', route('search.index', request()->query()))
 
 @php
     $eventResults = $this->eventResults;
     $speakerResults = $this->speakerResults;
+    $referenceResults = $this->referenceResults;
     $institutionResults = $this->institutionResults;
 
     /** @var \Illuminate\Support\Collection<int, \App\Models\Event> $eventMatches */
     $eventMatches = $eventResults['items'];
     /** @var \Illuminate\Support\Collection<int, \App\Models\Speaker> $speakerMatches */
     $speakerMatches = $speakerResults['items'];
+    /** @var \Illuminate\Support\Collection<int, \App\Models\Reference> $referenceMatches */
+    $referenceMatches = $referenceResults['items'];
     /** @var \Illuminate\Support\Collection<int, \App\Models\Institution> $institutionMatches */
     $institutionMatches = $institutionResults['items'];
 
     $eventTotal = $eventResults['total'];
     $speakerTotal = $speakerResults['total'];
+    $referenceTotal = $referenceResults['total'];
     $institutionTotal = $institutionResults['total'];
 
     $hasSearchContext = $this->hasSearchContext;
@@ -24,7 +28,7 @@
     $lat = $this->lat;
     $lng = $this->lng;
     $radiusKm = $this->radius_km;
-    $hasAnyResults = $eventTotal > 0 || $speakerTotal > 0 || $institutionTotal > 0;
+    $hasAnyResults = $eventTotal > 0 || $speakerTotal > 0 || $referenceTotal > 0 || $institutionTotal > 0;
 
     $eventQueryParams = array_filter([
         'search' => $search,
@@ -38,6 +42,10 @@
     ], static fn (mixed $value): bool => filled($value));
 
     $institutionQueryParams = array_filter([
+        'search' => $search,
+    ], static fn (mixed $value): bool => filled($value));
+
+    $referenceQueryParams = array_filter([
         'search' => $search,
     ], static fn (mixed $value): bool => filled($value));
 
@@ -60,22 +68,22 @@
                     </span>
 
                     <h1 class="mt-5 font-heading text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl">
-                        {{ __('Search Majlis, Speakers & Institutions') }}
+                        {{ __('Search Majlis, Speakers, References & Institutions') }}
                     </h1>
 
                     <p class="mt-4 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
-                        {{ __('Search across upcoming majlis, trusted speakers, and institutions in one place.') }}
+                        {{ __('Search across upcoming majlis, trusted speakers, references, and institutions in one place.') }}
                     </p>
 
                     <form action="{{ route('search.index') }}" method="GET" class="mt-8">
                         <div class="relative group">
-                            <label for="unified-search" class="sr-only">{{ __('Search Majlis, Speakers & Institutions') }}</label>
+                            <label for="unified-search" class="sr-only">{{ __('Search Majlis, Speakers, References & Institutions') }}</label>
                             <input
                                 id="unified-search"
                                 type="text"
                                 name="search"
                                 wire:model.live.debounce.300ms="search"
-                                placeholder="{{ __('Search majlis, speakers, or institutions...') }}"
+                                placeholder="{{ __('Search majlis, speakers, references, or institutions...') }}"
                                 class="h-16 w-full rounded-[1.75rem] border-2 border-slate-200 bg-white pl-14 pr-14 text-base font-medium text-slate-900 shadow-lg shadow-slate-200/70 transition focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 placeholder:text-slate-400"
                             >
                             <svg class="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400 transition group-focus-within:text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -122,7 +130,7 @@
                 <div class="rounded-[1.75rem] border border-slate-200 bg-slate-50/90 p-6">
                     @if($hasSearchContext)
                         @if($hasTypedSearch)
-                            <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                                 <div class="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
                                     <p class="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">{{ __('Majlis') }}</p>
                                     <p class="mt-3 text-3xl font-heading font-bold text-slate-900">{{ $eventTotal }}</p>
@@ -133,6 +141,12 @@
                                     <p class="text-xs font-black uppercase tracking-[0.2em] text-sky-600">{{ __('Speakers') }}</p>
                                     <p class="mt-3 text-3xl font-heading font-bold text-slate-900">{{ $speakerTotal }}</p>
                                     <p class="mt-1 text-sm text-slate-500">{{ __('Matching speakers') }}</p>
+                                </div>
+
+                                <div class="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm">
+                                    <p class="text-xs font-black uppercase tracking-[0.2em] text-violet-600">{{ __('References') }}</p>
+                                    <p class="mt-3 text-3xl font-heading font-bold text-slate-900">{{ $referenceTotal }}</p>
+                                    <p class="mt-1 text-sm text-slate-500">{{ __('Matching references') }}</p>
                                 </div>
 
                                 <div class="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm">
@@ -159,6 +173,10 @@
                                     {{ __('View all speakers') }}
                                 </a>
 
+                                <a href="{{ route('references.index', $referenceQueryParams) }}" wire:navigate class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:text-violet-700">
+                                    {{ __('View all references') }}
+                                </a>
+
                                 <a href="{{ route('institutions.index', $institutionQueryParams) }}" wire:navigate class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-amber-300 hover:text-amber-700">
                                     {{ __('View all institutions') }}
                                 </a>
@@ -173,8 +191,8 @@
                     @else
                         <div class="rounded-[1.5rem] border border-dashed border-slate-200 bg-white p-6 text-left">
                             <p class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{{ __('Start with a search') }}</p>
-                            <h2 class="mt-3 font-heading text-2xl font-bold text-slate-900">{{ __('Enter a name, topic, speaker, or institution to start searching.') }}</h2>
-                            <p class="mt-3 text-sm leading-6 text-slate-600">{{ __('Use the search box to jump into relevant majlis, speaker profiles, and institution pages without guessing which directory to open first.') }}</p>
+                            <h2 class="mt-3 font-heading text-2xl font-bold text-slate-900">{{ __('Enter a name, topic, speaker, reference, or institution to start searching.') }}</h2>
+                            <p class="mt-3 text-sm leading-6 text-slate-600">{{ __('Use the search box to jump into relevant majlis, speaker profiles, references, and institution pages without guessing which directory to open first.') }}</p>
                         </div>
                     @endif
                 </div>
@@ -193,6 +211,12 @@
                     <span class="inline-flex rounded-full bg-sky-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-sky-700">{{ __('Speakers') }}</span>
                     <h2 class="mt-4 font-heading text-2xl font-bold text-slate-900">{{ __('Explore speaker profiles') }}</h2>
                     <p class="mt-3 text-sm leading-6 text-slate-600">{{ __('Search well-known asatizah and discover who is actively teaching in upcoming majlis.') }}</p>
+                </a>
+
+                <a href="{{ route('references.index') }}" wire:navigate class="group rounded-[1.75rem] border border-violet-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-900/10">
+                    <span class="inline-flex rounded-full bg-violet-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-violet-700">{{ __('References') }}</span>
+                    <h2 class="mt-4 font-heading text-2xl font-bold text-slate-900">{{ __('Browse books and source material') }}</h2>
+                    <p class="mt-3 text-sm leading-6 text-slate-600">{{ __('Open the references directory to find books, articles, and source materials behind upcoming majlis.') }}</p>
                 </a>
 
                 <a href="{{ route('institutions.index') }}" wire:navigate class="group rounded-[1.75rem] border border-amber-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-900/10">
@@ -220,6 +244,9 @@
                     </a>
                     <a href="{{ route('speakers.index') }}" wire:navigate class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:text-sky-700">
                         {{ __('View all speakers') }}
+                    </a>
+                    <a href="{{ route('references.index') }}" wire:navigate class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:text-violet-700">
+                        {{ __('View all references') }}
                     </a>
                     <a href="{{ route('institutions.index') }}" wire:navigate class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-amber-300 hover:text-amber-700">
                         {{ __('View all institutions') }}
@@ -324,7 +351,7 @@
                 </section>
 
                 @if($hasTypedSearch)
-                    <div class="grid gap-10 xl:grid-cols-2">
+                    <div class="grid gap-10 xl:grid-cols-3">
                         <section class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
                             <div class="flex items-center justify-between gap-4 border-b border-slate-100 pb-6">
                                 <div>
@@ -358,6 +385,60 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                 </svg>
                                                 {{ $speaker->events_count }} {{ __('Events') }}
+                                            </div>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </section>
+
+                        <section class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+                            <div class="flex items-center justify-between gap-4 border-b border-slate-100 pb-6">
+                                <div>
+                                    <span class="inline-flex rounded-full bg-violet-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-violet-700">{{ __('References') }}</span>
+                                    <h2 class="mt-3 font-heading text-3xl font-bold text-slate-900">{{ __('Matching references') }}</h2>
+                                </div>
+
+                                <a href="{{ route('references.index', $referenceQueryParams) }}" wire:navigate class="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 transition hover:text-violet-800">
+                                    {{ __('View all references') }}
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </a>
+                            </div>
+
+                            @if($referenceMatches->isEmpty())
+                                <div class="mt-8 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+                                    <p class="font-heading text-2xl font-bold text-slate-900">{{ __('No matching references yet') }}</p>
+                                    <p class="mt-3 text-sm leading-6 text-slate-600">{{ __('Try a different name, title, or keyword.') }}</p>
+                                </div>
+                            @else
+                                <div class="mt-8 grid gap-5 sm:grid-cols-2">
+                                    @foreach($referenceMatches as $reference)
+                                        @php
+                                            $referenceCoverUrl = $reference->getFirstMediaUrl('front_cover', 'thumb') ?: $reference->getFirstMediaUrl('back_cover', 'thumb');
+                                        @endphp
+
+                                        <a href="{{ route('references.show', $reference) }}" wire:navigate class="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50/60 transition hover:-translate-y-1 hover:border-violet-200 hover:bg-white hover:shadow-lg hover:shadow-violet-900/10">
+                                            <div class="relative flex aspect-4/5 items-center justify-center overflow-hidden bg-linear-to-br from-slate-50 to-violet-50">
+                                                @if($referenceCoverUrl !== '')
+                                                    <img src="{{ $referenceCoverUrl }}" alt="{{ $reference->title }}" class="h-full w-full object-cover transition duration-700 group-hover:scale-105" loading="lazy">
+                                                @else
+                                                    <svg class="h-14 w-14 text-violet-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                                    </svg>
+                                                @endif
+                                            </div>
+
+                                            <div class="space-y-4 p-5">
+                                                <h3 class="font-heading text-lg font-bold leading-tight text-slate-900 transition group-hover:text-violet-700 line-clamp-2">{{ $reference->title }}</h3>
+
+                                                <div class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    {{ $reference->events_count }} {{ __('Events') }}
+                                                </div>
                                             </div>
                                         </a>
                                     @endforeach

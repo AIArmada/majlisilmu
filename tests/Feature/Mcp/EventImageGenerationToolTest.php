@@ -8,6 +8,7 @@ use App\Enums\EventKeyPersonRole;
 use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\ReferenceType;
+use App\Mcp\Prompts\Concerns\BuildsEventImagePrompt;
 use App\Mcp\Servers\AdminServer;
 use App\Mcp\Servers\MemberServer;
 use App\Mcp\Tools\Admin\AdminGetRecordActionsTool;
@@ -22,6 +23,7 @@ use App\Models\Reference;
 use App\Models\Series;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Support\Mcp\EventCoverPromptBuilder;
 use App\Support\Mcp\EventImageGenerationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -30,6 +32,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Ai\Files\RemoteImage;
 use Laravel\Ai\Files\StoredImage;
+use Laravel\Mcp\Response;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -214,6 +217,102 @@ it('exposes mutating and open-world metadata for event image upload tools', func
     expect(data_get($adminTool, '_meta.openai/toolInvocation/invoking'))->toBe('Uploading event cover image...')
         ->and(data_get($memberTool, '_meta.openai/toolInvocation/invoked'))->toBe('Event cover image uploaded.')
         ->and(data_get($adminTool, 'inputSchema.properties.image'))->toBeArray();
+});
+
+it('formats cover prompt text as a strict 16:9 request and exposes fallback asset links', function (): void {
+    $formatter = new class
+    {
+        use BuildsEventImagePrompt;
+
+        /**
+         * @param  array<string, mixed>  $payload
+         */
+        public function format(array $payload, string $targetCollection): string
+        {
+            $method = new ReflectionMethod($this, 'buildPromptMessageText');
+            $method->setAccessible(true);
+
+            /** @var string $text */
+            $text = $method->invoke($this, $payload, $targetCollection);
+
+            return $text;
+        }
+    };
+
+    $text = $formatter->format([
+        'prompt' => 'Create an editorial event visual.',
+        'target' => [
+            'collection' => 'poster',
+            'aspect_ratio' => '4:5',
+            'output_width' => 1200,
+            'output_height' => 1500,
+        ],
+        'event' => [
+            'title' => 'Tadabbur Isu Semasa',
+            'route_key' => 'tadabbur-isu-semasa',
+        ],
+        'usage' => [
+            'safety_notes' => [
+                'Keep all event facts consistent with source_data.',
+            ],
+        ],
+        'reference_media' => [
+            [
+                'label' => 'Event Cover Image - Tadabbur Isu Semasa',
+                'role' => 'existing_event_cover',
+                'collection' => 'cover',
+                'selection_reason' => 'Use for continuity with the current event cover.',
+                'url' => 'https://example.test/storage/events/cover.webp',
+            ],
+        ],
+    ], 'cover');
+
+    expect($text)
+        ->toContain('Target collection: `cover`')
+        ->toContain('Aspect ratio: **16:9**')
+        ->toContain('strict cover request')
+        ->toContain('4:5 portrait poster/flyer')
+        ->toContain('fallback reference assets')
+        ->toContain('https://example.test/storage/events/cover.webp');
+});
+
+it('keeps listed prompt assets aligned with the attached reference media limit', function (): void {
+    [$event] = eventImageGenerationEventFixture();
+
+    $builderResult = app(EventCoverPromptBuilder::class)->build($event, [
+        'target_collection' => 'cover',
+        'include_existing_media' => true,
+    ]);
+
+    expect(count($builderResult['content_media']))->toBeGreaterThan(1);
+
+    $expectedFirstAssetUrl = (string) ($builderResult['content_media'][0]['payload']['url'] ?? '');
+    $unexpectedSecondAssetUrl = (string) ($builderResult['content_media'][1]['payload']['url'] ?? '');
+
+    $promptHarness = new class
+    {
+        use BuildsEventImagePrompt;
+
+        /**
+         * @param  array<string, mixed>  $arguments
+         * @return array<int, Response>
+         */
+        public function messages(Event $event, string $targetCollection, array $arguments): array
+        {
+            return $this->buildEventImagePromptMessages($event, $targetCollection, $arguments);
+        }
+    };
+
+    $responses = $promptHarness->messages($event, 'cover', [
+        'max_reference_media' => 1,
+    ]);
+
+    $firstMessage = $responses[0]->content()->toArray();
+
+    expect($responses)->toHaveCount(2)
+        ->and($firstMessage['type'] ?? null)->toBe('text')
+        ->and($firstMessage['text'] ?? '')->toContain($expectedFirstAssetUrl)
+        ->and($unexpectedSecondAssetUrl === '' || ! str_contains((string) ($firstMessage['text'] ?? ''), $unexpectedSecondAssetUrl))->toBeTrue();
 });
 
 it('uses storage-backed image attachments instead of remote url attachments', function (): void {

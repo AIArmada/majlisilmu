@@ -39,6 +39,7 @@ use App\Mcp\Tools\Admin\AdminListResourcesTool;
 use App\Mcp\Tools\Admin\AdminModerateEventTool;
 use App\Mcp\Tools\Admin\AdminReviewContributionRequestTool;
 use App\Mcp\Tools\Admin\AdminReviewMembershipClaimTool;
+use App\Mcp\Tools\Admin\AdminSearchEventsTool;
 use App\Mcp\Tools\Admin\AdminTriageReportTool;
 use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
 use App\Models\ContributionRequest;
@@ -2850,6 +2851,48 @@ it('returns structured MCP error payloads for validation failures', function () 
         ]);
 });
 
+it('searches /majlis-style events through the dedicated admin MCP tool', function () {
+    $admin = adminMcpUser('super_admin');
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $matchingEvent = Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'title' => 'Admin MCP Majlis Search Match',
+        'status' => 'approved',
+        'is_active' => true,
+        'is_muslim_only' => true,
+        'starts_at' => Carbon::parse('2026-05-25 12:00:00', 'UTC'),
+    ]);
+
+    Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'title' => 'Admin MCP Majlis Search Non Match',
+        'status' => 'approved',
+        'is_active' => true,
+        'is_muslim_only' => false,
+        'starts_at' => Carbon::parse('2026-05-25 12:00:00', 'UTC'),
+    ]);
+
+    // Verify event exists before searching to catch database issues early
+    expect(Event::where('is_muslim_only', true)->count())->toBeGreaterThanOrEqual(1);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminSearchEventsTool::class, [
+            'is_muslim_only' => true,
+            'time_scope' => 'all',
+            'per_page' => 10,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.search.query', null)
+            ->where('meta.search.sort', 'time')
+            ->where('meta.search.filters.is_muslim_only', true)
+            ->etc());
+});
+
 it('rejects unexpected MCP tool arguments instead of ignoring them', function () {
     $admin = adminMcpUser('super_admin');
 
@@ -3008,6 +3051,17 @@ it('denies non-admin users from MCP tools', function () {
         ->assertHasErrors(['Forbidden.']);
 });
 
+it('denies non-admin users from admin event search tool', function () {
+    $user = User::factory()->create();
+
+    AdminServer::actingAs($user)
+        ->tool(AdminSearchEventsTool::class, [
+            'time_scope' => 'all',
+            'per_page' => 5,
+        ])
+        ->assertHasErrors(['Forbidden.']);
+});
+
 it('serves an authenticated event stream compatibility endpoint for /mcp/admin', function () {
     $admin = adminMcpUser('super_admin');
     $token = $admin->createToken('mcp-http-test')->plainTextToken;
@@ -3154,6 +3208,7 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'fetch',
         'admin-list-resources',
         'admin-get-resource-meta',
+        'admin-search-events',
         'admin-list-records',
         'admin-get-record',
         'admin-get-record-actions',
@@ -3346,6 +3401,7 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'fetch',
         'admin-list-resources',
         'admin-get-resource-meta',
+        'admin-search-events',
         'admin-list-records',
         'admin-get-record',
         'admin-get-record-actions',
