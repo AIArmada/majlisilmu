@@ -197,6 +197,22 @@ it('rejects an invalid image descriptor (neither array nor valid JSON object)', 
         ->assertSee('The image must be a valid file descriptor object');
 });
 
+it('rejects event upload descriptors without content_base64', function (): void {
+    $admin = eventImageGenerationAdminUser();
+    [$event] = eventImageGenerationEventFixture();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUploadEventCoverImageTool::class, [
+            'event_key' => $event->slug,
+            'image' => [
+                'filename' => 'cover.webp',
+                'download_url' => 'https://example.com/cover.webp',
+                'mime_type' => 'image/webp',
+            ],
+        ])
+        ->assertSee('Event image uploads require content_base64 in this connector environment');
+});
+
 it('exposes mutating and open-world metadata for event image upload tools', function (): void {
     $adminTool = app(AdminUploadEventCoverImageTool::class)->toArray();
     $memberTool = app(MemberUploadEventCoverImageTool::class)->toArray();
