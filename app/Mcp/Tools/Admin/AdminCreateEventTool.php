@@ -19,9 +19,7 @@ use App\Models\Venue;
 use App\Support\Api\Admin\AdminResourceService;
 use Generator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\JsonSchema\Types\Type;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -272,90 +270,6 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
         return $payload;
     }
 
-    private function normalizeOptionalString(mixed $value): ?string
-    {
-        if (! is_scalar($value)) {
-            return null;
-        }
-
-        $normalized = trim((string) $value);
-
-        return $normalized !== '' ? $normalized : null;
-    }
-
-    private function normalizeOrganizerType(mixed $value): ?string
-    {
-        return match ($value) {
-            'institution', Institution::class => Institution::class,
-            'speaker', Speaker::class => Speaker::class,
-            default => null,
-        };
-    }
-
-    /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function resolveRecordIdentifier(string $field, string $modelClass, string $key): string
-    {
-        /** @var Model $model */
-        $model = new $modelClass;
-
-        foreach ($this->lookupColumns($model) as $column) {
-            if (! $this->canLookupWithValue($model, $column, $key)) {
-                continue;
-            }
-
-            $record = $modelClass::query()->where($column, $key)->first();
-
-            if ($record instanceof Model) {
-                return (string) $record->getKey();
-            }
-        }
-
-        throw ValidationException::withMessages([
-            $field => __('The selected record key is invalid.'),
-        ]);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function lookupColumns(Model $model): array
-    {
-        $columns = [];
-
-        if (in_array('slug', $model->getFillable(), true)) {
-            $columns[] = 'slug';
-        }
-
-        foreach ([$model->getRouteKeyName(), $model->getKeyName()] as $column) {
-            if (! in_array($column, $columns, true)) {
-                $columns[] = $column;
-            }
-        }
-
-        return $columns;
-    }
-
-    private function canLookupWithValue(Model $model, string $column, string $value): bool
-    {
-        $keyName = $model->getKeyName();
-
-        if ($column !== $keyName) {
-            return true;
-        }
-
-        if ($model->getKeyType() === 'int') {
-            return ctype_digit($value);
-        }
-
-        if ($keyName === 'id') {
-            return Str::isUuid($value) || Str::isUlid($value);
-        }
-
-        return true;
-    }
-
     /**
      * @return array<string, Type>
      */
@@ -449,15 +363,6 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
         );
 
         return $tool;
-    }
-
-    /**
-     * @param  class-string<\BackedEnum>  $enumClass
-     * @return list<string>
-     */
-    private function enumValues(string $enumClass): array
-    {
-        return array_values(array_column($enumClass::cases(), 'value'));
     }
 
     /**
