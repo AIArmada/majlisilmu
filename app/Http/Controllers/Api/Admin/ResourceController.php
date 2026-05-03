@@ -235,7 +235,7 @@ class ResourceController extends Controller
     )]
     public function showRecord(string $resourceKey, string $recordKey): JsonResponse
     {
-        return response()->json($this->resourceService->showRecord($resourceKey, $recordKey));
+        return response()->json($this->resourceService->showRecord($resourceKey, $recordKey, includeResourceMeta: true));
     }
 
     /**

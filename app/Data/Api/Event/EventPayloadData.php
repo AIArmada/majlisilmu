@@ -142,7 +142,7 @@ class EventPayloadData extends Data
         $addressLine = AddressHierarchyFormatter::format($address);
 
         return [
-            ...$payload,
+            ...Arr::except($payload, ['media']),
             'address_line' => $addressLine !== '' ? $addressLine : null,
             'map_url' => $address?->google_maps_url,
             'map_lat' => $address?->lat,

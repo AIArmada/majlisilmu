@@ -553,12 +553,14 @@ class AdminResourceRegistry
 
         $this->loadMissingApiRelations($record);
 
+        $attributes = $record instanceof Event
+            ? EventPayloadData::fromModel($record)->toArray()
+            : $this->serializeAttributes($record);
+
         return [
             'route_key' => (string) $record->getRouteKey(),
             'title' => $this->htmlableToString($resourceClass::getRecordTitle($record)),
-            'attributes' => $record instanceof Event
-                ? EventPayloadData::fromModel($record)->toArray()
-                : $this->serializeAttributes($record),
+            'attributes' => $this->stripResponsiveImages($attributes),
             'abilities' => $this->recordAbilities($resourceClass, $record),
             'panel_routes' => [
                 'view' => array_key_exists('view', $pages) ? $resourceClass::getUrl('view', ['record' => $record], panel: 'admin') : null,
@@ -696,6 +698,26 @@ class AdminResourceRegistry
         if ($relations !== []) {
             $record->loadMissing($relations);
         }
+    }
+
+    /**
+     * Recursively strip the `responsive_images` key from any nested array in the serialized payload.
+     * This prevents base64 SVG placeholders and large responsive-image URL lists from bloating MCP responses.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function stripResponsiveImages(array $data): array
+    {
+        unset($data['responsive_images']);
+
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $data[$key] = $this->stripResponsiveImages($value);
+            }
+        }
+
+        return $data;
     }
 
     /**
