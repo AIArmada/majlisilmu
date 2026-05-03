@@ -40,7 +40,7 @@ class EventSearchService
     {
         return [
             'media' => fn ($query) => $query
-                ->where('collection_name', 'poster')
+                ->whereIn('collection_name', ['cover', 'poster'])
                 ->ordered(),
             'references',
             'speakers.media' => fn ($query) => $query

@@ -2033,6 +2033,39 @@ describe('Event Search Filters', function () {
         }
     });
 
+    it('uses cover media for card images in search results when poster is missing', function () {
+        config(['scout.driver' => 'database']);
+        Storage::fake('public');
+        config()->set('media-library.disk_name', 'public');
+
+        $event = createVisibleEventForSearch([
+            'title' => 'Cover Only Search Card Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $event->addMedia(UploadedFile::fake()->image('cover-only.jpg', 1600, 900))
+            ->toMediaCollection('cover');
+
+        $results = app(EventSearchService::class)->search(
+            query: 'Cover Only Search Card Event',
+            filters: [],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        /** @var Event|null $resultEvent */
+        $resultEvent = collect($results->items())->first();
+
+        expect($resultEvent)->not->toBeNull()
+            ->and($resultEvent?->relationLoaded('media'))->toBeTrue()
+            ->and($resultEvent?->media->pluck('collection_name')->contains('cover'))->toBeTrue()
+            ->and($resultEvent?->card_image_url)->not->toContain('images/placeholders/event.png')
+            ->and($resultEvent?->card_image_url)->toContain('cover');
+    });
+
     it('displays event count', function () {
         Event::factory()->count(5)->create([
             'institution_id' => Institution::factory(),

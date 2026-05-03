@@ -75,9 +75,12 @@
     $eventPosterPreviewUrl = $eventHasPoster ? $event->getFirstMedia('poster')?->getAvailableUrl(['preview', 'card', 'thumb']) : null;
     $eventPosterOriginalUrl = $eventHasPoster ? $event->getFirstMediaUrl('poster') : null;
     // Hero atmospheric background:
-    // institution cover -> venue cover/main -> organizer institution cover -> gradient fallback.
+    // event cover -> institution cover -> venue cover/main -> organizer institution cover -> gradient fallback.
     // The event poster is NEVER used as background — it is a factual flyer and must be displayed clearly.
-    $heroImage = $event->institution?->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
+    $heroImage = $event->getFirstMedia('cover')?->getAvailableUrl(['banner', 'card', 'preview', 'thumb']) ?? '';
+    if (!$heroImage) {
+        $heroImage = $event->institution?->getFirstMedia('cover')?->getAvailableUrl(['banner']) ?? '';
+    }
     if (!$heroImage) {
         $heroImage = $event->venue?->getFirstMedia('main')?->getAvailableUrl(['banner'])
             ?? $event->venue?->getFirstMedia('cover')?->getAvailableUrl(['banner'])
