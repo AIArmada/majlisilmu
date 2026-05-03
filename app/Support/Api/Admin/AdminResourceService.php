@@ -12,6 +12,7 @@ use App\Enums\PrayerReference;
 use App\Enums\TimingMode;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Speakers\SpeakerResource;
+use App\Models\Event;
 use App\Models\User;
 use App\Support\Api\ApiPagination;
 use App\Support\Api\ResourceSearchDispatcher;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class AdminResourceService
@@ -255,9 +257,9 @@ class AdminResourceService
     }
 
     /**
-     * @return array{data: array{resource: array<string, mixed>, record: array<string, mixed>}}
+     * @return array{data: array{resource?: array<string, mixed>, record: array<string, mixed>}}
      */
-    public function showRecord(string $resourceKey, string $recordKey): array
+    public function showRecord(string $resourceKey, string $recordKey, bool $includeResourceMeta = false): array
     {
         $resourceClass = $this->resolveAccessibleResource($resourceKey);
         $record = $this->registry->resolveRecord($resourceClass, $recordKey);
@@ -265,12 +267,58 @@ class AdminResourceService
 
         abort_unless(collect($abilities)->contains(true), 403);
 
-        return [
-            'data' => [
-                'resource' => $this->registry->metadata($resourceClass),
-                'record' => $this->registry->serializeRecordDetail($resourceClass, $record),
-            ],
+        $data = [
+            'record' => $this->registry->serializeRecordDetail($resourceClass, $record),
         ];
+
+        if ($includeResourceMeta) {
+            $data = ['resource' => $this->registry->metadata($resourceClass), ...$data];
+        }
+
+        return ['data' => $data];
+    }
+
+    /**
+     * @return array{data: array{resource_key: string, record_key: string, media: list<array<string, mixed>>, media_count: int, card_image_url?: string|null, poster_url?: string|null}}
+     */
+    public function recordMedia(string $resourceKey, string $recordKey): array
+    {
+        $resourceClass = $this->resolveAccessibleResource($resourceKey);
+        $record = $this->registry->resolveRecord($resourceClass, $recordKey);
+        $abilities = $this->registry->recordAbilities($resourceClass, $record);
+
+        abort_unless(collect($abilities)->contains(true), 403);
+
+        $record->loadMissing('media');
+
+        /** @var list<array<string, mixed>> $media */
+        $media = $record->media
+            ->map(fn (Media $m): array => [
+                'id' => $m->id,
+                'collection_name' => $m->collection_name,
+                'file_name' => $m->file_name,
+                'mime_type' => $m->mime_type,
+                'size' => $m->size,
+                'url' => $m->getUrl(),
+            ])
+            ->values()
+            ->all();
+
+        /** @var array<string, mixed> $data */
+        $data = [
+            'resource_key' => $resourceKey,
+            'record_key' => $recordKey,
+            'media' => $media,
+            'media_count' => count($media),
+        ];
+
+        if ($record instanceof Event) {
+            $data['card_image_url'] = $record->card_image_url;
+            $data['poster_url'] = $record->getFirstMediaUrl('poster', 'card') ?: ($record->getFirstMediaUrl('poster', 'thumb') ?: $record->getFirstMediaUrl('poster'));
+            $data['cover_url'] = $record->getFirstMediaUrl('cover', 'card') ?: ($record->getFirstMediaUrl('cover', 'thumb') ?: $record->getFirstMediaUrl('cover'));
+        }
+
+        return ['data' => $data];
     }
 
     /**

@@ -19,6 +19,7 @@ use App\Mcp\Tools\Admin\AdminGetContributionRequestReviewSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetEventModerationSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetMembershipClaimReviewSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetRecordActionsTool;
+use App\Mcp\Tools\Admin\AdminGetRecordMediaTool;
 use App\Mcp\Tools\Admin\AdminGetRecordTool;
 use App\Mcp\Tools\Admin\AdminGetReportTriageSchemaTool;
 use App\Mcp\Tools\Admin\AdminGetResourceMetaTool;
@@ -76,6 +77,7 @@ class AdminServer extends MajlisIlmuServer
         AdminListRecordsTool::class,
         AdminListRelatedRecordsTool::class,
         AdminGetRecordTool::class,
+        AdminGetRecordMediaTool::class,
         AdminGetRecordActionsTool::class,
         AdminGetWriteSchemaTool::class,
         AdminGetEventModerationSchemaTool::class,

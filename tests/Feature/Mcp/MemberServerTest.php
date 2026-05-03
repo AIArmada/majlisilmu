@@ -1175,11 +1175,11 @@ it('initializes and lists member MCP tools over the HTTP endpoint for Passport-a
     expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.type'))->toBe('array');
     expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.type'))->toBe('object');
     expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.required'))
-        ->toBe(['filename']);
+        ->toBe(['filename', 'content_base64']);
     expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.properties.content_base64.type'))
         ->toBe('string');
-    expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.properties.content_url.type'))
-        ->toBe('string');
+    expect(data_get($tools->get('member-submit-membership-claim'), 'inputSchema.properties.evidence.items.properties'))
+        ->not->toHaveKey('content_url');
 
     $githubIssueCategorySchema = data_get($tools->get('member-create-github-issue'), 'inputSchema.properties.category');
 

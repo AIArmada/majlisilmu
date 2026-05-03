@@ -391,7 +391,6 @@ it('returns resource metadata, record listings, and record detail for speakers',
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
-            ->where('data.resource.key', 'speakers')
             ->where('data.record.route_key', $speaker->getRouteKey())
             ->where('data.record.attributes.name', 'Admin MCP Speaker')
             ->etc());
@@ -422,7 +421,6 @@ it('redacts tracked property write keys in admin MCP payloads', function () {
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
-            ->where('data.resource.key', 'tracked-properties')
             ->where('data.record.route_key', (string) $trackedProperty?->getRouteKey())
             ->where('data.record.attributes.write_key', 'present')
             ->etc());
@@ -719,7 +717,6 @@ it('surfaces public event change projections on admin event record detail throug
         ])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
-            ->where('data.resource.key', 'events')
             ->where('data.record.route_key', $original->getRouteKey())
             ->where('data.record.attributes.active_change_notice.type', EventChangeType::Other->value)
             ->where('data.record.attributes.replacement_event.id', $firstReplacement->id)
