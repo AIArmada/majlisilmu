@@ -23,7 +23,7 @@ class AdminReadDebugLogTool extends AbstractAdminTool
 
     protected string $title = 'Read Debug Log';
 
-    protected string $description = 'Read recent filtered lines from the application debug log. Defaults to showing only mcp.image_upload entries so you can diagnose image upload failures immediately after an upload attempt without leaving the MCP session.';
+    protected string $description = 'Read recent filtered lines from the application debug log. Defaults to `mcp.tool_execution` so you can inspect MCP tool execution traces. Set `all=true` to return every matching line.';
 
     public function handle(Request $request): ResponseFactory|Response
     {
@@ -31,14 +31,18 @@ class AdminReadDebugLogTool extends AbstractAdminTool
             $this->authorizeAdmin($request);
 
             $validated = $this->validateArguments($request, [
-                'filter' => ['nullable', 'string', 'min:3'],
-                'lines' => ['nullable', 'integer', 'min:1', 'max:200'],
+                'filter' => ['nullable', 'string'],
+                'lines' => ['nullable', 'integer', 'min:1', 'max:5000'],
+                'all' => ['nullable', 'boolean'],
             ]);
 
-            $filter = is_string($validated['filter'] ?? null) ? $validated['filter'] : 'mcp.image_upload';
-            $lines = is_int($validated['lines'] ?? null) ? $validated['lines'] : 50;
+            $filter = array_key_exists('filter', $validated) && is_string($validated['filter'])
+                ? $validated['filter']
+                : 'mcp.tool_execution';
+            $lines = is_int($validated['lines'] ?? null) ? $validated['lines'] : 500;
+            $all = (bool) ($validated['all'] ?? false);
 
-            return $this->readFilteredDebugLog($filter, $lines);
+            return $this->readFilteredDebugLog($filter, $lines, $all);
         });
     }
 
