@@ -292,7 +292,7 @@ For event media writes, ratio checks are server-enforced on every write surface:
 }
 ```
 
-**Example with ChatGPT file params (from file widget):**
+**Example with explicit `download_url` descriptor:**
 
 ```json
 {
@@ -544,7 +544,7 @@ Keyword `query` also expands to institution, speaker/key-person, and reference m
 }
 ```
 
-**Example with ChatGPT file params:**
+**Example with explicit `download_url` descriptor:**
 
 ```json
 {
@@ -614,5 +614,5 @@ Keyword `query` also expands to institution, speaker/key-person, and reference m
 - Read-only tools are for discovery and preview.
 - Write tools are schema-guided.
 - Generic MCP delete tools are intentionally not exposed on admin/member servers.
-- Media/file fields use JSON file descriptors (base64, URL, or ChatGPT file params) only when the write schema advertises them; destructive `clear_*` media flags are rejected.
+- Media/file fields use JSON file descriptors (base64 or URL descriptors) only when the write schema advertises them; destructive `clear_*` media flags are rejected.
 - If a capability is not listed in the server tool catalog, ChatGPT should not assume it exists.

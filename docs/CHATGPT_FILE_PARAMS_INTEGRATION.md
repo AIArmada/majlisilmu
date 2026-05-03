@@ -1,12 +1,12 @@
-# ChatGPT File Params Integration for MCP
+# ChatGPT File Descriptors & File Params for MCP
 
 ## Overview
 
-This document describes how MajlisIlmu MCP tools now support **ChatGPT file parameters** (`download_url`, `file_id`) alongside existing `content_base64` and `content_url` descriptors.
+This document describes how MajlisIlmu MCP tools support JSON file descriptors, including ChatGPT-style keys (`download_url`, `file_id`), alongside `content_base64` and `content_url`.
 
 ## What Changed
 
-### Core Changes
+### Current behavior
 
 #### 1. **McpFilePayloadNormalizer** (`app/Support/Mcp/McpFilePayloadNormalizer.php`)
 - **Now accepts `download_url`** as a synonym for `content_url`
@@ -25,27 +25,24 @@ This document describes how MajlisIlmu MCP tools now support **ChatGPT file para
   - `content_base64` or `content_url` or `download_url` (required, one of)
   - `file_id` (ChatGPT metadata; optional, ignored)
 
-#### 3. **MCP Tool Metadata**
-- **MemberSubmitMembershipClaimTool** now declares `_meta['openai/fileParams'] = ['evidence']`
-  - ChatGPT connectors use this to know which fields accept file params
-- **AdminCreateRecordTool** and **AdminUpdateRecordTool** add metadata notes about media fields in payload object
-  - Media-capable resources: Event, Institution, Reference, Report, Speaker, Venue, Series, DonationChannel, Inspiration, Space
+#### 3. **MCP Tool Metadata policy**
+- OpenAI Apps/Connectors `openai/fileParams` supports only **top-level object** fields, not arrays or nested subfields.
+- In proxy-mounted environments, connector rewrite can fail before MCP dispatch (`ValueError: File arg rewrite paths are required when proxied mounts are present`).
+- Therefore, MajlisIlmu event image tools currently use **descriptor-first mode** (no `openai/fileParams` on event upload/create tools) and rely on explicit descriptor objects in tool arguments.
 
 ## File Parameter Shape
 
 ### Accepted Formats
 
-#### ChatGPT Widget Upload (Recommended)
+#### Descriptor with ChatGPT-style URL keys
 ```json
 {
-  "evidence": [
-    {
-      "filename": "proof.png",
-      "download_url": "https://api.openai.com/files/file_id/content",
-      "file_id": "file_12345",
-      "mime_type": "image/png"
-    }
-  ]
+  "image": {
+    "filename": "cover.png",
+    "download_url": "https://api.openai.com/files/file_id/content",
+    "file_id": "file_12345",
+    "mime_type": "image/png"
+  }
 }
 ```
 
@@ -93,17 +90,16 @@ This document describes how MajlisIlmu MCP tools now support **ChatGPT file para
 ### For ChatGPT Connector Developers
 
 1. **Detect media fields** in the tool schema via `media_uploads_supported` and `file_descriptor_shape`
-2. **User uploads files** via widget (ChatGPT handles `uploadFile` / `selectFiles`)
-3. **Pass file params** with `download_url` and `file_id`:
+2. **Construct explicit descriptor objects** in tool arguments.
+3. **Pass descriptors** with `content_base64` (most reliable in proxied clients) or `download_url`/`file_id`:
    ```javascript
-   {
-     evidence: [{
-       filename: "user-evidence.pdf",
-       download_url: await window.openai.getFileDownloadUrl(fileId),
-       file_id: fileId,
-       mime_type: "application/pdf"
-     }]
-   }
+     {
+       image: {
+         filename: "generated-cover.png",
+         content_base64: "...",
+         mime_type: "image/png"
+       }
+     }
    ```
 4. **Server normalizes** to `UploadedFile` internally; validation continues as normal
 
@@ -112,10 +108,10 @@ This document describes how MajlisIlmu MCP tools now support **ChatGPT file para
 - Continue using `content_base64` or `content_url`
 - No changes required; full backward compatibility
 
-## Tools Supporting ChatGPT File Params
+## Tools Supporting Descriptor Uploads
 
 ### Member-Facing (Per-User Evidence)
-- **member-submit-membership-claim**: `evidence` field (array of files, max 8)
+- **member-submit-membership-claim** accepts descriptor arrays in `evidence` (max 8)
 
 ### Admin-Facing (Dynamic Resource Media)
 - **admin-create-record** (payload object fields):
@@ -156,7 +152,7 @@ When files cannot be processed, the normalizer provides context-aware errors:
 ```
 The MCP file descriptor must include either content_base64, content_url, or download_url. 
 MCP tools do not accept multipart/form-data payloads. 
-ChatGPT connectors may pass {download_url, file_id}.
+Clients may pass `{download_url, file_id}` inside descriptor objects.
 ```
 
 For failed downloads:
@@ -189,14 +185,11 @@ The MCP file descriptor (file_id: file_12345) could not be decoded.
 ### ChatGPT Connector Not Recognizing File Fields
 
 **Check**:
-1. Tool declares `_meta['openai/fileParams']` for array fields or payload subfields
+1. Do not declare `_meta['openai/fileParams']` for array fields or nested payload subfields
 2. Schema includes `file_descriptor_shape` documentation
 3. Field is declared with type `file` or `array<file>`
 
-**Example**:
-```php
-$tool['_meta'] = ['openai/fileParams' => ['evidence']];
-```
+If your connector environment is proxy-mounted, prefer explicit descriptors (`content_base64`) and avoid rewrite-dependent file-param metadata.
 
 ### Download URL Fails
 
@@ -207,6 +200,16 @@ $tool['_meta'] = ['openai/fileParams' => ['evidence']];
 4. File is non-empty (>0 bytes)
 5. Content-Type header is present and valid
 6. If the client/proxy layer throws rewrite/mount errors before MCP dispatch (e.g., "File arg rewrite paths are required when proxied mounts are present"), retry with `content_base64` instead of `download_url`.
+
+### Event upload tools and fileParams
+
+- `admin-upload-event-cover-image`
+- `admin-upload-event-poster-image`
+- `member-upload-event-cover-image`
+- `member-upload-event-poster-image`
+- `admin-create-event`
+
+These tools currently run in descriptor-first mode for compatibility with proxied connector mounts. They accept descriptor objects directly and do not rely on `openai/fileParams` rewrite behavior.
 
 ### MIME Type Mismatch
 

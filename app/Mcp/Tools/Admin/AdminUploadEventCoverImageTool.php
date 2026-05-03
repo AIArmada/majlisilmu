@@ -149,14 +149,6 @@ class AdminUploadEventCoverImageTool extends AbstractAdminTool
     #[\Override]
     public function toArray(): array
     {
-        $tool = parent::toArray();
-        $tool['_meta'] = array_merge(
-            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
-            [
-                'openai/fileParams' => ['image'],
-            ],
-        );
-
-        return $tool;
+        return parent::toArray();
     }
 }
