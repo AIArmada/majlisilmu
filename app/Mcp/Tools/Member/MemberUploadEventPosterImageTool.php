@@ -31,7 +31,7 @@ class MemberUploadEventPosterImageTool extends AbstractMemberTool
 
     protected string $title = 'Upload Event Poster Image';
 
-    protected string $description = 'Upload and save a 4:5 portrait marketing poster for an accessible Ahli event. Accepts image descriptors via {content_base64} (preferred in proxied clients) or {download_url, file_id}. Use the member-event-poster-image-prompt to get the recommended prompt and reference images before generating.';
+    protected string $description = 'Upload and save a 4:5 portrait marketing poster for an accessible Ahli event. Accepts image descriptors via {content_base64}. Use the member-event-poster-image-prompt to get the recommended prompt and reference images before generating.';
 
     public function __construct(
         private readonly MemberResourceRegistry $registry,
@@ -40,7 +40,7 @@ class MemberUploadEventPosterImageTool extends AbstractMemberTool
         $this->setMeta([
             'openai/toolInvocation/invoking' => 'Uploading event poster image...',
             'openai/toolInvocation/invoked' => 'Event poster image uploaded.',
-            'openai/note' => 'Pass {content_base64, filename} for maximum client/proxy compatibility, or {download_url, file_id, filename} when direct URL descriptors are supported. Required aspect ratio: 4:5 portrait.',
+            'openai/note' => 'Pass {content_base64, filename}. Required aspect ratio: 4:5 portrait.',
         ]);
     }
 
@@ -78,6 +78,7 @@ class MemberUploadEventPosterImageTool extends AbstractMemberTool
             abort_unless($event instanceof Event, 404);
 
             $imageDescriptor = $this->normalizeImageDescriptor($validated['image'], $traceId);
+            $this->enforceEventBase64Descriptor($imageDescriptor);
 
             $this->logEventImageUploadTrace($traceId, 'descriptor_normalized', [
                 'descriptor_keys' => array_keys($imageDescriptor),

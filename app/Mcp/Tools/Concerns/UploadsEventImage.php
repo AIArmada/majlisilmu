@@ -29,13 +29,11 @@ trait UploadsEventImage
                 ->description('Event UUID or slug/route key. Example: tadabbur-isu-semasa-ummah-qdkhqqn.'),
             'image' => $schema->object([
                 'filename' => $schema->string()->required()->description('Filename including extension, e.g. event-cover.jpg.'),
-                'download_url' => $schema->string()->nullable()->description('Temporary download URL for the image (preferred for ChatGPT-generated images).'),
-                'content_base64' => $schema->string()->nullable()->description('Base64-encoded image content (alternative to download_url).'),
-                'file_id' => $schema->string()->nullable()->description('ChatGPT file_id stored as metadata (optional).'),
+                'content_base64' => $schema->string()->required()->description('Base64-encoded image content.'),
                 'mime_type' => $schema->string()->nullable()->description('MIME type of the image, e.g. image/jpeg, image/png, image/webp. Auto-detected if omitted.'),
             ])
                 ->required()
-                ->description('Image file descriptor. For ChatGPT-generated images pass {download_url, file_id, filename}. For base64 images pass {content_base64, filename}.'),
+                ->description('Image file descriptor. Pass {content_base64, filename}. In proxied connector environments this is the reliable upload path.'),
             'creative_direction' => $schema->string()
                 ->nullable()
                 ->description('Optional note about the creative direction saved as metadata on the media item.'),
@@ -95,7 +93,7 @@ trait UploadsEventImage
             $decoded = json_decode($value, true);
 
             if (is_array($decoded) && ! array_is_list($decoded)) {
-                Log::debug('mcp.image_upload: descriptor received as JSON-encoded string (openai/fileParams), decoded successfully', [
+                Log::debug('mcp.image_upload: descriptor received as JSON-encoded string, decoded successfully', [
                     'trace_id' => $traceId,
                     'keys' => array_keys($decoded),
                     'json_length' => strlen($value),
@@ -119,6 +117,26 @@ trait UploadsEventImage
 
         throw ValidationException::withMessages([
             'image' => ['The image must be a valid file descriptor object.'],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $descriptor
+     */
+    protected function enforceEventBase64Descriptor(array $descriptor): void
+    {
+        $base64Value = $descriptor['content_base64']
+            ?? $descriptor['contentBase64']
+            ?? $descriptor['base64']
+            ?? $descriptor['data']
+            ?? null;
+
+        if (is_string($base64Value) && trim($base64Value) !== '') {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'image.content_base64' => ['Event image uploads require content_base64 in this connector environment.'],
         ]);
     }
 
