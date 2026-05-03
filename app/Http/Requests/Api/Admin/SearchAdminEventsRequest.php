@@ -29,6 +29,7 @@ class SearchAdminEventsRequest extends FormRequest
         'source_tag_ids',
         'issue_tag_ids',
         'reference_ids',
+        'reference_author_search',
     ];
 
     /**

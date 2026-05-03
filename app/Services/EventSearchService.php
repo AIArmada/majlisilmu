@@ -11,6 +11,9 @@ use App\Models\Institution;
 use App\Models\Reference;
 use App\Models\Venue;
 use App\Support\Cache\SafeModelCache;
+use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\ReferenceSearchService;
+use App\Support\Search\SpeakerSearchService;
 use App\Support\Search\TypesenseHealthCheckService;
 use App\Support\Timezone\UserDateTimeFormatter;
 use Carbon\CarbonInterface;
@@ -23,7 +26,12 @@ use Illuminate\Support\Str;
 
 class EventSearchService
 {
-    public function __construct(private TypesenseHealthCheckService $healthCheck) {}
+    public function __construct(
+        private TypesenseHealthCheckService $healthCheck,
+        private SpeakerSearchService $speakerSearch,
+        private InstitutionSearchService $institutionSearch,
+        private ReferenceSearchService $referenceSearch,
+    ) {}
 
     /**
      * @return array<int|string, mixed>
@@ -190,7 +198,7 @@ class EventSearchService
         $search->options([
             'filter_by' => implode(' && ', $this->buildTypesenseFilterParts($filters)),
             'sort_by' => $sortBy,
-            'query_by' => 'title',
+            'query_by' => 'title,speaker_names,institution_name',
         ]);
 
         return $search->paginate($perPage);
@@ -221,7 +229,13 @@ class EventSearchService
 
         $directQuery = $this->buildDatabaseQuery(null, $filters)
             ->with($this->cardRelationships());
-        $this->applyDirectSearch($directQuery, $normalizedQuery);
+        $this->applyDirectSearch(
+            $directQuery,
+            $normalizedQuery,
+            (bool) ($filters['search_include_institutions'] ?? true),
+            (bool) ($filters['search_include_speakers'] ?? true),
+            (bool) ($filters['search_include_references'] ?? true),
+        );
         $this->applyDatabaseOrdering($directQuery, $sort, $normalizedQuery);
 
         $directMatches = $directQuery->paginate($perPage);
@@ -519,7 +533,13 @@ class EventSearchService
         }
 
         if (filled($query)) {
-            $this->applyDirectSearch($queryBuilder, $query);
+            $this->applyDirectSearch(
+                $queryBuilder,
+                $query,
+                (bool) ($filters['search_include_institutions'] ?? true),
+                (bool) ($filters['search_include_speakers'] ?? true),
+                (bool) ($filters['search_include_references'] ?? true),
+            );
         }
 
         if (! empty($filters['country_id'])) {
@@ -698,6 +718,21 @@ class EventSearchService
 
         $referenceIds = $this->expandedReferenceIdsForFiltering($filters['reference_ids'] ?? null);
 
+        $referenceAuthorSearches = $this->normalizeArrayFilter($filters['reference_author_search'] ?? null);
+
+        if ($referenceAuthorSearches === [] && filled($filters['reference_author_search'] ?? null)) {
+            $referenceAuthorSearches = [trim((string) $filters['reference_author_search'])];
+        }
+
+        foreach ($referenceAuthorSearches as $authorSearch) {
+            if ($authorSearch === '') {
+                continue;
+            }
+
+            $authorReferenceIds = $this->referenceSearch->publicSearchIds($authorSearch);
+            $referenceIds = array_values(array_unique(array_merge($referenceIds, $authorReferenceIds)));
+        }
+
         if ($referenceIds !== []) {
             $queryBuilder->whereHas('references', function (Builder $referenceQuery) use ($referenceIds): void {
                 $referenceQuery->whereIn('references.id', $referenceIds);
@@ -767,8 +802,13 @@ class EventSearchService
     /**
      * @param  Builder<Event>  $queryBuilder
      */
-    protected function applyDirectSearch(Builder $queryBuilder, string $search): void
-    {
+    protected function applyDirectSearch(
+        Builder $queryBuilder,
+        string $search,
+        bool $includeInstitutions = true,
+        bool $includeSpeakers = true,
+        bool $includeReferences = true,
+    ): void {
         $normalizedSearch = trim($search);
 
         if ($normalizedSearch === '') {
@@ -785,17 +825,50 @@ class EventSearchService
             static fn (string $token): bool => $token !== ''
         ));
 
-        $queryBuilder->where(function (Builder $nestedQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch, $searchTokens): void {
-            $nestedQuery
-                ->where('title', $operator, "%{$normalizedSearch}%")
-                ->orWhere('title', $operator, $collapsedWildcardSearch);
+        // Resolve related entity IDs from the search term.
+        $speakerIds = $includeSpeakers ? $this->speakerSearch->publicSearchIds($normalizedSearch) : [];
+        $institutionIds = $includeInstitutions ? $this->institutionSearch->publicSearchIds($normalizedSearch) : [];
+        $referenceIds = $includeReferences ? $this->referenceSearch->publicSearchIds($normalizedSearch) : [];
 
-            foreach ($searchTokens as $token) {
-                if (mb_strlen($token) < 3) {
-                    continue;
+        $queryBuilder->where(function (Builder $nestedQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch, $searchTokens, $speakerIds, $institutionIds, $referenceIds, $includeSpeakers): void {
+            // Title match (ranked first via applyDatabaseOrdering).
+            $nestedQuery->where(function (Builder $titleQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch, $searchTokens): void {
+                $titleQuery
+                    ->where('title', $operator, "%{$normalizedSearch}%")
+                    ->orWhere('title', $operator, $collapsedWildcardSearch);
+
+                foreach ($searchTokens as $token) {
+                    if (mb_strlen($token) < 3) {
+                        continue;
+                    }
+
+                    $titleQuery->orWhere('title', $operator, "%{$token}%");
                 }
+            });
 
-                $nestedQuery->orWhere('title', $operator, "%{$token}%");
+            // Institution name match.
+            if ($institutionIds !== []) {
+                $nestedQuery->orWhereIn('events.institution_id', $institutionIds);
+            }
+
+            // Key people: linked speaker IDs (all roles) + free-text name match.
+            if ($includeSpeakers) {
+                $nestedQuery->orWhereHas('keyPeople', function (Builder $keyPeopleQuery) use ($speakerIds, $normalizedSearch, $operator): void {
+                    $keyPeopleQuery->where(function (Builder $inner) use ($speakerIds, $normalizedSearch, $operator): void {
+                        $inner->where('event_key_people.name', $operator, "%{$normalizedSearch}%");
+
+                        if ($speakerIds !== []) {
+                            $inner->orWhereIn('event_key_people.speaker_id', $speakerIds);
+                        }
+                    });
+                });
+            }
+
+            // Reference title/author match.
+            if ($referenceIds !== []) {
+                $nestedQuery->orWhereHas('references', function (Builder $referenceQuery) use ($referenceIds): void {
+                    $referenceQuery->whereIn('references.id', $referenceIds);
+                });
             }
         });
     }
@@ -948,7 +1021,7 @@ class EventSearchService
         $search->options([
             'filter_by' => $filterBy,
             'sort_by' => "location({$lat}, {$lng}):asc,starts_at:asc",
-            'query_by' => 'title',
+            'query_by' => 'title,speaker_names,institution_name',
         ]);
 
         return $search->paginate($perPage);

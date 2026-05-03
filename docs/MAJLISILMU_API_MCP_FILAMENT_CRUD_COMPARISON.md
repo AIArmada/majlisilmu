@@ -128,7 +128,7 @@ The public/authenticated API is not a second generic CRUD registry. It is a set 
 
 ## Search parity note
 
-- Admin HTTP API now exposes a dedicated event discovery endpoint (`GET /api/v1/admin/events/search`) aligned with `admin-search-events`; both surfaces share the same validation and filter normalization contract.
+- Admin HTTP API now exposes a dedicated event discovery endpoint (`GET /api/v1/admin/events/search`) aligned with `admin-search-events`; both surfaces share the same validation and filter normalization contract, including cross-entity keyword expansion (institution/speaker/reference), scope toggles (`search_include_*`), and `reference_author_search`.
 - Admin HTTP API and Admin/Member MCP also route list search for `speakers`, `institutions`, and `references` through shared specialized search services.
 - Public speaker, institution, and reference directory endpoints use the same underlying search services for those resource families, but public reads still enforce active + verified visibility while admin/member surfaces preserve their broader or scoped record sets.
 - References now have a root-book plus child-part family model across all surfaces. Public directory pagination defaults to root/standalone references, while search can still return child parts. Shared search behavior now covers part labels/numbers, and root reference event filters expand to linked child parts automatically.

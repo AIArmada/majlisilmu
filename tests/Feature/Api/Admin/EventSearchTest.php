@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\Event;
+use App\Models\Institution;
+use App\Models\Reference;
+use App\Models\Speaker;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -87,6 +90,82 @@ describe('Event Search API', function () {
 
         expect(data_get($response->json(), 'meta.search.sort'))->toBe('time')
             ->and(data_get($response->json(), 'meta.search.nearby.enabled'))->toBeFalse();
+    });
+
+    it('searches by institution, speaker, and reference associations', function () {
+        $admin = eventSearchAdminUser();
+
+        Sanctum::actingAs($admin);
+
+        $institution = Institution::factory()->create([
+            'name' => 'Markaz Ikhlas API Admin',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Event::factory()->create([
+            'title' => 'API Admin Institution Match Event',
+            'institution_id' => $institution->id,
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $speaker = Speaker::factory()->create([
+            'name' => 'Ustaz Akram API Admin',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $speakerEvent = Event::factory()->create([
+            'title' => 'API Admin Speaker Match Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $speakerEvent->keyPeople()->create([
+            'speaker_id' => $speaker->id,
+            'name' => $speaker->name,
+            'role' => 'speaker',
+            'order_column' => 1,
+        ]);
+
+        $reference = Reference::factory()->create([
+            'title' => 'Kitab API Admin Search Reference',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $referenceEvent = Event::factory()->create([
+            'title' => 'API Admin Reference Match Event',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $referenceEvent->references()->attach($reference->id);
+
+        $institutionResponse = $this->getJson('/api/v1/admin/events/search?query=Markaz%20Ikhlas%20API%20Admin&time_scope=all')
+            ->assertOk();
+
+        expect(collect(data_get($institutionResponse->json(), 'data', []))->pluck('title')->all())
+            ->toContain('API Admin Institution Match Event');
+
+        $speakerResponse = $this->getJson('/api/v1/admin/events/search?query=Akram%20API%20Admin&time_scope=all')
+            ->assertOk();
+
+        expect(collect(data_get($speakerResponse->json(), 'data', []))->pluck('title')->all())
+            ->toContain('API Admin Speaker Match Event');
+
+        $referenceResponse = $this->getJson('/api/v1/admin/events/search?query=API%20Admin%20Search%20Reference&time_scope=all')
+            ->assertOk();
+
+        expect(collect(data_get($referenceResponse->json(), 'data', []))->pluck('title')->all())
+            ->toContain('API Admin Reference Match Event');
     });
 });
 
