@@ -48,19 +48,19 @@ Use `admin-list-records` with `resource_key: "events"`. Date filters are **date-
 ```json
 {
   "resource_key": "events",
-  "starts_after": "2026-04-24",
-  "starts_before": "2026-05-03",
+  "starts_after": "2026-04-25",
+  "starts_before": "2026-05-02",
   "page": 1,
   "per_page": 50
 }
 ```
 
-**Date boundary rule:** `starts_after` and `starts_before` are exclusive boundaries. To list events for local dates 25 Apr through 2 May inclusive, set `starts_after` to the day before the range start and `starts_before` to the day after the range end:
+**Date boundary rule:** `starts_after` and `starts_before` are inclusive boundaries. Use the exact first and last local dates you want to include:
 
 | Goal | `starts_after` | `starts_before` |
 |---|---|---|
-| Events on 3–9 May | `2026-05-02` | `2026-05-10` |
-| Inclusive week example: 25 Apr – 1 May | `2026-04-24` | `2026-05-02` |
+| Events on 3–9 May | `2026-05-03` | `2026-05-09` |
+| Inclusive week example: 25 Apr – 1 May | `2026-04-25` | `2026-05-01` |
 | Events on exactly 30 Apr | use `starts_on_local_date` | — |
 
 #### List events on one exact local date
@@ -88,8 +88,8 @@ For user-facing event reports, scope results to the records that are publicly vi
     "is_active": true,
     "visibility": "public"
   },
-  "starts_after": "2026-05-02",
-  "starts_before": "2026-05-10",
+  "starts_after": "2026-05-03",
+  "starts_before": "2026-05-09",
   "page": 1,
   "per_page": 50
 }
@@ -465,7 +465,7 @@ Admin tool behavior notes:
 - `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `admin-event-cover-image-prompt` and `admin-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - If attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
-- For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` and `starts_before` are exclusive boundaries — to include a local date in the result set, set `starts_after` to the day before and `starts_before` to the day after. For a single local date, use `starts_on_local_date` instead.
+- For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` is inclusive (on or after the given local date) and `starts_before` is inclusive (on or before the given local date) across both `admin-search-events` and `admin-list-records`. For a single local date, use `starts_on_local_date` instead.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
 - `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
 - The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
@@ -480,7 +480,7 @@ Admin tool behavior notes:
 
 1. Before operational calls, ensure `docs-admin-mcp-guide` is loaded via `fetch`.
 2. If an operational call returns `documentation_preflight_injected`, **repeat the exact same call** — the guide is now loaded and the call will succeed.
-3. For event lists by date range, use `resource_key: "events"` with `starts_after` and `starts_before` (exclusive date-only boundaries).
+3. For event lists by date range, use `resource_key: "events"` with `starts_after` and `starts_before` (inclusive date-only boundaries).
 4. For a single local date, prefer `starts_on_local_date` over a same-day range.
 5. For user-facing event summaries, prefer `timing_display`, `starts_on_local_date`, `end_time_display`, and `event_type_label` over raw UTC fields.
 6. For any write, call `admin-get-write-schema` first and trust the live schema.
