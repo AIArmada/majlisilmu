@@ -46,8 +46,15 @@ class MemberUploadEventPosterImageTool extends AbstractMemberTool
 
     public function handle(Request $request): ResponseFactory|Response
     {
-        return $this->safeResponse(function () use ($request): ResponseFactory {
-            $this->authorizeMember($request);
+        $traceId = $this->startEventImageUploadTrace($request, $this->name);
+
+        return $this->safeResponse(function () use ($request, $traceId): ResponseFactory {
+            $actor = $this->authorizeMember($request);
+
+            $this->logEventImageUploadTrace($traceId, 'authorized', [
+                'actor_id' => $actor->getKey(),
+                'actor_type' => 'member',
+            ]);
 
             $validated = $this->validateArguments($request, [
                 'event_key' => ['required', 'string', 'min:1'],
@@ -55,18 +62,44 @@ class MemberUploadEventPosterImageTool extends AbstractMemberTool
                 'creative_direction' => ['nullable', 'string', 'max:2000'],
             ]);
 
+            $this->logEventImageUploadTrace($traceId, 'arguments_validated', [
+                'event_key' => (string) $validated['event_key'],
+                'has_creative_direction' => is_string($validated['creative_direction'] ?? null) && $validated['creative_direction'] !== '',
+            ]);
+
             $event = $this->resolveEvent((string) $validated['event_key']);
+
+            $this->logEventImageUploadTrace($traceId, 'event_resolved', [
+                'event_found' => $event instanceof Event,
+                'event_id' => $event instanceof Event ? $event->getKey() : null,
+                'event_slug' => $event instanceof Event ? $event->slug : null,
+            ]);
 
             abort_unless($event instanceof Event, 404);
 
-            $imageDescriptor = $this->normalizeImageDescriptor($validated['image']);
+            $imageDescriptor = $this->normalizeImageDescriptor($validated['image'], $traceId);
+
+            $this->logEventImageUploadTrace($traceId, 'descriptor_normalized', [
+                'descriptor_keys' => array_keys($imageDescriptor),
+                'has_download_url' => isset($imageDescriptor['download_url']) || isset($imageDescriptor['downloadUrl']),
+                'has_content_base64' => isset($imageDescriptor['content_base64']) || isset($imageDescriptor['contentBase64']) || isset($imageDescriptor['base64']) || isset($imageDescriptor['data']),
+                'has_file_id' => isset($imageDescriptor['file_id']) || isset($imageDescriptor['fileId']),
+            ]);
 
             $media = $this->uploadService->upload(
                 event: $event,
                 collection: 'poster',
                 descriptor: $imageDescriptor,
                 creativeDirection: is_string($validated['creative_direction'] ?? null) ? $validated['creative_direction'] : null,
+                traceId: $traceId,
             );
+
+            $this->logEventImageUploadTrace($traceId, 'upload_completed', [
+                'media_id' => $media->getKey(),
+                'collection' => $media->collection_name,
+                'mime_type' => $media->mime_type,
+                'file_name' => $media->file_name,
+            ]);
 
             return $this->eventImageUploadResponse($event, $media, 'poster');
         });

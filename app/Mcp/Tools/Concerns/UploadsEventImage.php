@@ -8,7 +8,9 @@ use App\Models\Event;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -78,10 +80,11 @@ trait UploadsEventImage
      * @throws ValidationException if the value is neither a valid descriptor array
      *                             nor a JSON-encoded descriptor object
      */
-    protected function normalizeImageDescriptor(mixed $value): array
+    protected function normalizeImageDescriptor(mixed $value, ?string $traceId = null): array
     {
         if (is_array($value) && ! array_is_list($value)) {
             Log::debug('mcp.image_upload: descriptor received as associative array', [
+                'trace_id' => $traceId,
                 'keys' => array_keys($value),
             ]);
 
@@ -93,6 +96,7 @@ trait UploadsEventImage
 
             if (is_array($decoded) && ! array_is_list($decoded)) {
                 Log::debug('mcp.image_upload: descriptor received as JSON-encoded string (openai/fileParams), decoded successfully', [
+                    'trace_id' => $traceId,
                     'keys' => array_keys($decoded),
                     'json_length' => strlen($value),
                 ]);
@@ -101,12 +105,14 @@ trait UploadsEventImage
             }
 
             Log::debug('mcp.image_upload: descriptor received as string but could not be decoded as JSON object', [
+                'trace_id' => $traceId,
                 'type' => gettype($value),
                 'json_error' => json_last_error_msg(),
                 'preview' => substr($value, 0, 100),
             ]);
         } else {
             Log::debug('mcp.image_upload: descriptor received with unexpected type', [
+                'trace_id' => $traceId,
                 'type' => gettype($value),
             ]);
         }
@@ -144,5 +150,61 @@ trait UploadsEventImage
                 'size' => (int) $media->size,
             ],
         ]);
+    }
+
+    protected function startEventImageUploadTrace(Request $request, string $toolName): string
+    {
+        $traceId = (string) Str::ulid();
+        $arguments = $request->all();
+        $image = $arguments['image'] ?? null;
+
+        Log::debug('mcp.image_upload.trace: request_received', [
+            'trace_id' => $traceId,
+            'tool' => $toolName,
+            'argument_keys' => array_keys($arguments),
+            'has_image' => array_key_exists('image', $arguments),
+            'image_summary' => $this->imageInputSummary($image),
+            'has_creative_direction' => isset($arguments['creative_direction']) && is_string($arguments['creative_direction']) && $arguments['creative_direction'] !== '',
+        ]);
+
+        return $traceId;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    protected function logEventImageUploadTrace(string $traceId, string $stage, array $context = []): void
+    {
+        Log::debug("mcp.image_upload.trace: {$stage}", array_merge([
+            'trace_id' => $traceId,
+        ], $context));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function imageInputSummary(mixed $image): array
+    {
+        if (is_array($image)) {
+            return [
+                'type' => 'array',
+                'keys' => array_keys($image),
+                'has_download_url' => isset($image['download_url']) || isset($image['downloadUrl']),
+                'has_content_base64' => isset($image['content_base64']) || isset($image['contentBase64']) || isset($image['data']) || isset($image['base64']),
+                'has_file_id' => isset($image['file_id']) || isset($image['fileId']),
+            ];
+        }
+
+        if (is_string($image)) {
+            return [
+                'type' => 'string',
+                'length' => strlen($image),
+                'starts_with_json_object' => str_starts_with(trim($image), '{'),
+            ];
+        }
+
+        return [
+            'type' => gettype($image),
+        ];
     }
 }

@@ -222,7 +222,7 @@ it('exposes mutating and open-world metadata for event image upload tools', func
         ->and(data_get($adminTool, 'inputSchema.properties.image'))->toBeArray();
 
     expect(data_get(app(AdminCreateEventTool::class)->toArray(), '_meta.openai/fileParams'))
-        ->toBe(['cover', 'poster', 'gallery']);
+        ->toBe(['cover', 'poster']);
 });
 
 it('formats cover prompt text as a strict 16:9 request and exposes fallback asset links', function (): void {
