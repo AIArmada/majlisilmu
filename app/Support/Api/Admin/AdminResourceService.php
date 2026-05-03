@@ -409,6 +409,264 @@ class AdminResourceService
         ];
     }
 
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return array<string, mixed>
+     */
+    public function batchStoreRecords(string $resourceKey, array $items, ?User $actor = null, bool $validateOnly = false): array
+    {
+        $resourceClass = $this->resolveWritableResource($resourceKey);
+
+        abort_unless($actor instanceof User && $actor->can('create', $resourceClass::getModel()), 403);
+
+        $results = [];
+        $created = 0;
+        $validationFailed = 0;
+        $errors = 0;
+
+        foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                $item = [];
+            }
+
+            $externalRowId = isset($item['external_row_id']) && is_string($item['external_row_id'])
+                ? $item['external_row_id']
+                : null;
+
+            /** @var array<string, mixed> $payload */
+            $payload = isset($item['payload']) && is_array($item['payload']) ? $item['payload'] : $item;
+
+            if (array_key_exists('external_row_id', $payload)) {
+                unset($payload['external_row_id']);
+            }
+
+            try {
+                $validated = $this->validatedPayload($resourceClass, $payload);
+
+                if ($validateOnly) {
+                    $preview = $this->previewWriteRecord($resourceClass, $validated, 'create');
+                    $results[] = array_filter([
+                        'row' => $index,
+                        'external_row_id' => $externalRowId,
+                        'status' => 'preview',
+                        'preview' => $preview['data']['preview'] ?? null,
+                    ], static fn (mixed $v): bool => $v !== null);
+                    $created++;
+                } else {
+                    $record = $this->mutationService->store($resourceClass, $validated, $actor);
+                    $result = [
+                        'row' => $index,
+                        'status' => 'created',
+                        'record' => $this->registry->serializeRecordDetail($resourceClass, $record),
+                    ];
+
+                    if ($externalRowId !== null) {
+                        $result['external_row_id'] = $externalRowId;
+                    }
+
+                    $results[] = $result;
+                    $created++;
+                }
+            } catch (ValidationException $exception) {
+                $result = [
+                    'row' => $index,
+                    'status' => 'validation_failed',
+                    'errors' => $exception->errors(),
+                ];
+
+                if ($externalRowId !== null) {
+                    $result['external_row_id'] = $externalRowId;
+                }
+
+                $results[] = $result;
+                $validationFailed++;
+            } catch (\Throwable $exception) {
+                $result = [
+                    'row' => $index,
+                    'status' => 'error',
+                    'message' => $exception->getMessage(),
+                ];
+
+                if ($externalRowId !== null) {
+                    $result['external_row_id'] = $externalRowId;
+                }
+
+                $results[] = $result;
+                $errors++;
+            }
+        }
+
+        return [
+            'data' => [
+                'resource' => $this->registry->metadata($resourceClass),
+                'validate_only' => $validateOnly,
+                'results' => $results,
+                'summary' => [
+                    'total' => count($items),
+                    $validateOnly ? 'previewed' : 'created' => $created,
+                    'validation_failed' => $validationFailed,
+                    'errors' => $errors,
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items  Each item must contain 'record_key' and 'payload'.
+     * @return array<string, mixed>
+     */
+    public function batchUpdateRecords(string $resourceKey, array $items, ?User $actor = null, bool $validateOnly = false): array
+    {
+        $resourceClass = $this->resolveWritableResource($resourceKey);
+
+        abort_unless($actor instanceof User, 403);
+
+        $results = [];
+        $updated = 0;
+        $validationFailed = 0;
+        $errors = 0;
+        $notFound = 0;
+
+        foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                $item = [];
+            }
+
+            $recordKey = isset($item['record_key']) && is_string($item['record_key']) ? $item['record_key'] : null;
+            $externalRowId = isset($item['external_row_id']) && is_string($item['external_row_id'])
+                ? $item['external_row_id']
+                : null;
+
+            /** @var array<string, mixed> $payload */
+            $payload = isset($item['payload']) && is_array($item['payload']) ? $item['payload'] : [];
+
+            if ($recordKey === null || trim($recordKey) === '') {
+                $result = [
+                    'row' => $index,
+                    'status' => 'error',
+                    'message' => 'Missing required field: record_key.',
+                ];
+
+                if ($externalRowId !== null) {
+                    $result['external_row_id'] = $externalRowId;
+                }
+
+                $results[] = $result;
+                $errors++;
+
+                continue;
+            }
+
+            try {
+                $record = $this->registry->resolveRecord($resourceClass, $recordKey);
+
+                if (! $actor->can('update', $record)) {
+                    $result = [
+                        'row' => $index,
+                        'record_key' => $recordKey,
+                        'status' => 'error',
+                        'message' => 'Insufficient permissions to update this record.',
+                    ];
+
+                    if ($externalRowId !== null) {
+                        $result['external_row_id'] = $externalRowId;
+                    }
+
+                    $results[] = $result;
+                    $errors++;
+
+                    continue;
+                }
+
+                $validated = $this->validatedPayload($resourceClass, $payload, updating: true, record: $record);
+
+                if ($validateOnly) {
+                    $preview = $this->previewWriteRecord($resourceClass, $validated, 'update', $record);
+                    $results[] = array_filter([
+                        'row' => $index,
+                        'record_key' => $recordKey,
+                        'external_row_id' => $externalRowId,
+                        'status' => 'preview',
+                        'preview' => $preview['data']['preview'] ?? null,
+                    ], static fn (mixed $v): bool => $v !== null);
+                    $updated++;
+                } else {
+                    $record = $this->mutationService->update($resourceClass, $record, $validated, $actor);
+                    $result = [
+                        'row' => $index,
+                        'record_key' => $recordKey,
+                        'status' => 'updated',
+                        'record' => $this->registry->serializeRecordDetail($resourceClass, $record),
+                    ];
+
+                    if ($externalRowId !== null) {
+                        $result['external_row_id'] = $externalRowId;
+                    }
+
+                    $results[] = $result;
+                    $updated++;
+                }
+            } catch (NotFoundHttpException) {
+                $result = [
+                    'row' => $index,
+                    'record_key' => $recordKey,
+                    'status' => 'not_found',
+                    'message' => "Record not found: {$recordKey}.",
+                ];
+
+                if ($externalRowId !== null) {
+                    $result['external_row_id'] = $externalRowId;
+                }
+
+                $results[] = $result;
+                $notFound++;
+            } catch (ValidationException $exception) {
+                $result = [
+                    'row' => $index,
+                    'record_key' => $recordKey,
+                    'status' => 'validation_failed',
+                    'errors' => $exception->errors(),
+                ];
+
+                if ($externalRowId !== null) {
+                    $result['external_row_id'] = $externalRowId;
+                }
+
+                $results[] = $result;
+                $validationFailed++;
+            } catch (\Throwable $exception) {
+                $result = [
+                    'row' => $index,
+                    'record_key' => $recordKey,
+                    'status' => 'error',
+                    'message' => $exception->getMessage(),
+                ];
+
+                if ($externalRowId !== null) {
+                    $result['external_row_id'] = $externalRowId;
+                }
+
+                $results[] = $result;
+                $errors++;
+            }
+        }
+
+        return [
+            'data' => [
+                'resource' => $this->registry->metadata($resourceClass),
+                'validate_only' => $validateOnly,
+                'results' => $results,
+                'summary' => [
+                    'total' => count($items),
+                    $validateOnly ? 'previewed' : 'updated' => $updated,
+                    'validation_failed' => $validationFailed,
+                    'not_found' => $notFound,
+                    'errors' => $errors,
+                ],
+            ],
+        ];
+    }
+
     public function hasAnyWritableResourceAccess(?User $user = null): bool
     {
         if (! $user instanceof User || ! $user->hasApplicationAdminAccess()) {

@@ -219,10 +219,14 @@ These are registered at runtime and therefore part of the admin registry surface
 
 - `GET /api/v1/admin/{resourceKey}/schema`
 - `POST /api/v1/admin/{resourceKey}`
+- `POST /api/v1/admin/{resourceKey}/batch`
 - `PUT /api/v1/admin/{resourceKey}/{recordKey}`
+- `PUT /api/v1/admin/{resourceKey}/batch`
 - `admin-get-write-schema`
 - `admin-create-record`
+- `admin-batch-create-records`
 - `admin-update-record`
+- `admin-batch-update-records`
 
 It does **not** mean every admin-facing actor can write it. Actual create/update access is still policy-driven per request.
 
@@ -241,20 +245,22 @@ All four Ahli resources are update-capable through Member MCP. None expose gener
 
 These twelve resources are the entire current generic admin write whitelist.
 
+> **Legend:** `R` = read/list, `S` = schema, `C` = create, `BC` = batch create, `U` = update, `BU` = batch update, `P` = preview/validate-only, `meta` = resource metadata, `related` = related record traversal.
+
 | Resource | Admin API | Admin MCP | Member MCP | Admin panel pages | Ahli panel pages | Workflow overlap |
 | --- | --- | --- | --- | --- | --- | --- |
-| `events` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/search/detail with event-change projections; public submit-event create; authenticated saved/going/check-ins/registrations |
-| `inspirations` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public random inspiration discovery |
-| `institutions` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `edit` | public read/detail; authenticated contribution create/suggest; institution workspace; follows |
-| `speakers` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/detail; authenticated contribution create/suggest; follows |
-| `references` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | `R + related + S + U + P` | `index`, `create`, `edit` | `index`, `edit` | public read/list/detail; authenticated suggest update; follows |
-| `reports` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | authenticated report submission; explicit admin report triage |
-| `donation-channels` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public institution donation details; event default donation detail |
-| `series` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public read/detail; authenticated follows; event-series assignment |
-| `spaces` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `view`, `edit` | not exposed | public space catalogs; event space assignment |
-| `venues` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `view`, `edit` | not exposed | public read/detail plus public venue catalogs |
-| `subdistricts` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | public and admin catalog lookups only |
-| `tags` | `R + meta + related + S + C + U + P` | `R + meta + related + S + C + U + P` | not exposed | `index`, `create`, `edit` | not exposed | taxonomy and event-tagging management |
+| `events` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/search/detail with event-change projections; public submit-event create; authenticated saved/going/check-ins/registrations |
+| `inspirations` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | not exposed | `index`, `create`, `edit` | not exposed | public random inspiration discovery |
+| `institutions` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `edit` | public read/detail; authenticated contribution create/suggest; institution workspace; follows |
+| `speakers` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | `R + related + S + U + P` | `index`, `create`, `view`, `edit` | `index`, `view`, `edit` | public read/detail; authenticated contribution create/suggest; follows |
+| `references` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | `R + related + S + U + P` | `index`, `create`, `edit` | `index`, `edit` | public read/list/detail; authenticated suggest update; follows |
+| `reports` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | not exposed | `index`, `create`, `edit` | not exposed | authenticated report submission; explicit admin report triage |
+| `donation-channels` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | not exposed | `index`, `create`, `edit` | not exposed | public institution donation details; event default donation detail |
+| `series` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | not exposed | `index`, `create`, `edit` | not exposed | public read/detail; authenticated follows; event-series assignment |
+| `spaces` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | not exposed | `index`, `create`, `view`, `edit` | not exposed | public space catalogs; event space assignment |
+| `venues` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | not exposed | `index`, `create`, `view`, `edit` | not exposed | public read/detail plus public venue catalogs |
+| `subdistricts` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | not exposed | `index`, `create`, `edit` | not exposed | public and admin catalog lookups only |
+| `tags` | `R + meta + related + S + C + BC + U + BU + P` | `R + meta + related + S + C + BC + U + BU + P` | not exposed | `index`, `create`, `edit` | not exposed | taxonomy and event-tagging management |
 
 ## Read-only generic admin groups
 
@@ -265,6 +271,17 @@ These resources are readable through the generic admin registry, but not writabl
 ## Explicit admin workflow actions
 
 These capabilities remain outside generic admin CRUD, but now have explicit admin workflow parity where implemented.
+
+- **Batch create/update (generic resources):**
+	- HTTP create: `POST /api/v1/admin/{resourceKey}/batch` with `items` array; supports `validate_only` query param
+	- HTTP update: `PUT /api/v1/admin/{resourceKey}/batch` with `items` array of `{record_key, payload}`; supports `validate_only` query param
+	- MCP tool (create): `admin-batch-create-records` — generic batch create for any writable resource
+	- MCP tool (update): `admin-batch-update-records` — generic batch update for any writable resource
+	- MCP tool (events): `admin-batch-create-events` — event-specific batch create with `organizer_key`, `speaker_keys`, `reference_keys`, `institution_key`, `venue_key`, `space_key` key resolution (same semantics as `admin-create-event`)
+	- All batch tools return a per-row result list (`created`/`updated`/`validation_failed`/`not_found`/`unresolved_key`/`error`/`preview`) plus a `summary` object
+	- `external_row_id` per item enables idempotency tracking and safe retries after interruption
+	- Maximum 100 items per batch for generic tools; 50 items per batch for `admin-batch-create-events`
+	- `validate_only=true` returns per-row `preview` status without persisting any records
 
 - **Event discovery:**
 	- HTTP endpoint: `GET /api/v1/admin/events/search`

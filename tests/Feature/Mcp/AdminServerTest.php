@@ -20,6 +20,9 @@ use App\Enums\RegistrationMode;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\AdminServer;
+use App\Mcp\Tools\Admin\AdminBatchCreateEventsTool;
+use App\Mcp\Tools\Admin\AdminBatchCreateRecordsTool;
+use App\Mcp\Tools\Admin\AdminBatchUpdateRecordsTool;
 use App\Mcp\Tools\Admin\AdminCreateEventTool;
 use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
@@ -3374,7 +3377,10 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-get-contribution-request-review-schema',
         'admin-get-membership-claim-review-schema',
         'admin-create-event',
+        'admin-batch-create-events',
         'admin-create-record',
+        'admin-batch-create-records',
+        'admin-batch-update-records',
         'admin-create-github-issue',
         'admin-moderate-event',
         'admin-triage-report',
@@ -4089,3 +4095,201 @@ function adminMcpEventPayload(array $fixtures, array $overrides = []): array
         'is_active' => true,
     ], $overrides);
 }
+
+it('batch-creates admin resource records via the admin-batch-create-records MCP tool', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchCreateRecordsTool::class, [
+            'resource_key' => 'speakers',
+            'items' => [
+                [
+                    'external_row_id' => 'mcp-row-1',
+                    'payload' => [
+                        'name' => 'MCP Batch Speaker Alpha',
+                        'gender' => 'male',
+                        'status' => 'verified',
+                        'is_active' => true,
+                    ],
+                ],
+                [
+                    'external_row_id' => 'mcp-row-2',
+                    'payload' => [
+                        'name' => 'MCP Batch Speaker Beta',
+                        'gender' => 'female',
+                        'status' => 'verified',
+                        'is_active' => true,
+                    ],
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.summary.total', 2)
+            ->where('data.summary.created', 2)
+            ->where('data.summary.validation_failed', 0)
+            ->where('data.validate_only', false)
+            ->has('data.results', 2)
+            ->where('data.results.0.status', 'created')
+            ->where('data.results.0.external_row_id', 'mcp-row-1')
+            ->where('data.results.1.status', 'created')
+            ->where('data.results.1.external_row_id', 'mcp-row-2')
+            ->etc()
+        );
+
+    assertDatabaseHas('speakers', ['name' => 'MCP Batch Speaker Alpha']);
+    assertDatabaseHas('speakers', ['name' => 'MCP Batch Speaker Beta']);
+});
+
+it('batch-creates records with validate_only via the admin-batch-create-records MCP tool without persisting', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchCreateRecordsTool::class, [
+            'resource_key' => 'speakers',
+            'items' => [
+                [
+                    'payload' => [
+                        'name' => 'MCP Dry Run Speaker',
+                        'gender' => 'male',
+                        'status' => 'verified',
+                        'is_active' => true,
+                    ],
+                ],
+            ],
+            'validate_only' => true,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.validate_only', true)
+            ->where('data.results.0.status', 'preview')
+            ->etc()
+        );
+
+    assertDatabaseMissing('speakers', ['name' => 'MCP Dry Run Speaker']);
+});
+
+it('batch-updates admin resource records via the admin-batch-update-records MCP tool', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'MCP Batch Update Before',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchUpdateRecordsTool::class, [
+            'resource_key' => 'speakers',
+            'items' => [
+                [
+                    'record_key' => (string) $speaker->getKey(),
+                    'external_row_id' => 'mcp-update-1',
+                    'payload' => [
+                        'name' => 'MCP Batch Update After',
+                        'gender' => 'male',
+                        'status' => 'verified',
+                        'is_active' => true,
+                    ],
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.summary.total', 1)
+            ->where('data.summary.updated', 1)
+            ->where('data.results.0.status', 'updated')
+            ->where('data.results.0.external_row_id', 'mcp-update-1')
+            ->etc()
+        );
+
+    assertDatabaseHas('speakers', ['name' => 'MCP Batch Update After']);
+});
+
+it('batch-creates events via the admin-batch-create-events MCP tool with speaker_keys and reference_keys resolved', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'MCP Batch Event Speaker',
+        'slug' => 'mcp-batch-event-speaker',
+        'status' => 'verified',
+        'gender' => 'male',
+        'is_active' => true,
+    ]);
+
+    $institution = Institution::factory()->create([
+        'name' => 'MCP Batch Institution',
+        'slug' => 'mcp-batch-institution',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchCreateEventsTool::class, [
+            'items' => [
+                [
+                    'external_row_id' => 'event-row-1',
+                    'title' => 'MCP Batch Event Alpha',
+                    'event_date' => '2026-07-15',
+                    'prayer_time' => EventPrayerTime::LainWaktu->value,
+                    'custom_time' => '20:00',
+                    'event_type' => [EventType::Other->value],
+                    'institution_key' => $institution->slug,
+                    'speaker_keys' => [$speaker->slug],
+                    'status' => 'draft',
+                    'is_active' => true,
+                ],
+                [
+                    'external_row_id' => 'event-row-2',
+                    'title' => 'MCP Batch Event Beta',
+                    'event_date' => '2026-07-16',
+                    'prayer_time' => EventPrayerTime::LainWaktu->value,
+                    'custom_time' => '21:00',
+                    'event_type' => [EventType::Other->value],
+                    'status' => 'draft',
+                    'is_active' => true,
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.summary.total', 2)
+            ->where('data.summary.created', 2)
+            ->where('data.results.0.status', 'created')
+            ->where('data.results.0.external_row_id', 'event-row-1')
+            ->where('data.results.1.status', 'created')
+            ->where('data.results.1.external_row_id', 'event-row-2')
+            ->etc()
+        );
+
+    assertDatabaseHas('events', ['title' => 'MCP Batch Event Alpha']);
+    assertDatabaseHas('events', ['title' => 'MCP Batch Event Beta']);
+});
+
+it('batch-creates events with validate_only via admin-batch-create-events without persisting', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchCreateEventsTool::class, [
+            'items' => [
+                [
+                    'title' => 'MCP Batch Dry Run Event',
+                    'event_date' => '2026-08-01',
+                    'prayer_time' => EventPrayerTime::LainWaktu->value,
+                    'custom_time' => '20:00',
+                    'event_type' => [EventType::Other->value],
+                    'status' => 'draft',
+                    'is_active' => true,
+                ],
+            ],
+            'validate_only' => true,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.validate_only', true)
+            ->where('data.results.0.status', 'preview')
+            ->etc()
+        );
+
+    assertDatabaseMissing('events', ['title' => 'MCP Batch Dry Run Event']);
+});

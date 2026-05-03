@@ -3657,3 +3657,265 @@ function adminApiEventPayload(array $fixtures, array $overrides = []): array
         'is_active' => true,
     ], $overrides);
 }
+
+it('batch-creates admin resource records and returns per-row results', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $speaker1 = Speaker::factory()->create([
+        'name' => 'Batch API Speaker One',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker2 = Speaker::factory()->create([
+        'name' => 'Batch API Speaker Two',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $response = $this->postJson('/api/v1/admin/speakers/batch', [
+        'items' => [
+            [
+                'external_row_id' => 'row-A',
+                'payload' => [
+                    'name' => 'Batch Created Speaker Alpha',
+                    'gender' => 'male',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+            [
+                'external_row_id' => 'row-B',
+                'payload' => [
+                    'name' => 'Batch Created Speaker Beta',
+                    'gender' => 'female',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $response->assertCreated();
+
+    expect($response->json('data.summary.total'))->toBe(2)
+        ->and($response->json('data.summary.created'))->toBe(2)
+        ->and($response->json('data.summary.validation_failed'))->toBe(0)
+        ->and($response->json('data.summary.errors'))->toBe(0);
+
+    $results = $response->json('data.results');
+
+    expect($results)->toHaveCount(2)
+        ->and($results[0]['status'])->toBe('created')
+        ->and($results[0]['external_row_id'])->toBe('row-A')
+        ->and($results[1]['status'])->toBe('created')
+        ->and($results[1]['external_row_id'])->toBe('row-B');
+
+    $this->assertDatabaseHas('speakers', ['name' => 'Batch Created Speaker Alpha']);
+    $this->assertDatabaseHas('speakers', ['name' => 'Batch Created Speaker Beta']);
+});
+
+it('batch-creates records and returns per-row validation errors without rolling back successes', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->postJson('/api/v1/admin/speakers/batch', [
+        'items' => [
+            [
+                'external_row_id' => 'row-ok',
+                'payload' => [
+                    'name' => 'Batch Valid Speaker',
+                    'gender' => 'male',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+            [
+                'external_row_id' => 'row-fail',
+                'payload' => [
+                    // Missing required name
+                    'gender' => 'male',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $response->assertCreated();
+
+    expect($response->json('data.summary.total'))->toBe(2)
+        ->and($response->json('data.summary.created'))->toBe(1)
+        ->and($response->json('data.summary.validation_failed'))->toBe(1);
+
+    $results = collect($response->json('data.results'));
+
+    $okResult = $results->firstWhere('external_row_id', 'row-ok');
+    $failResult = $results->firstWhere('external_row_id', 'row-fail');
+
+    expect($okResult['status'])->toBe('created')
+        ->and($failResult['status'])->toBe('validation_failed')
+        ->and($failResult['errors'])->toBeArray();
+
+    $this->assertDatabaseHas('speakers', ['name' => 'Batch Valid Speaker']);
+});
+
+it('batch-creates records with validate_only and returns previews without persisting', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->postJson('/api/v1/admin/speakers/batch?validate_only=1', [
+        'items' => [
+            [
+                'payload' => [
+                    'name' => 'Dry Run Speaker',
+                    'gender' => 'male',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+
+    expect($response->json('data.validate_only'))->toBeTrue()
+        ->and($response->json('data.results.0.status'))->toBe('preview');
+
+    $this->assertDatabaseMissing('speakers', ['name' => 'Dry Run Speaker']);
+});
+
+it('batch-updates admin resource records and returns per-row results', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $speaker1 = Speaker::factory()->create([
+        'name' => 'Batch Update Speaker One',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    $speaker2 = Speaker::factory()->create([
+        'name' => 'Batch Update Speaker Two',
+        'status' => 'pending',
+        'is_active' => true,
+    ]);
+
+    $response = $this->putJson('/api/v1/admin/speakers/batch', [
+        'items' => [
+            [
+                'record_key' => (string) $speaker1->getKey(),
+                'external_row_id' => 'update-A',
+                'payload' => [
+                    'name' => 'Batch Updated Speaker One',
+                    'gender' => 'male',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+            [
+                'record_key' => (string) $speaker2->getKey(),
+                'external_row_id' => 'update-B',
+                'payload' => [
+                    'name' => 'Batch Updated Speaker Two',
+                    'gender' => 'female',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+
+    expect($response->json('data.summary.total'))->toBe(2)
+        ->and($response->json('data.summary.updated'))->toBe(2)
+        ->and($response->json('data.summary.validation_failed'))->toBe(0)
+        ->and($response->json('data.summary.not_found'))->toBe(0);
+
+    $results = $response->json('data.results');
+
+    expect($results)->toHaveCount(2)
+        ->and($results[0]['status'])->toBe('updated')
+        ->and($results[0]['external_row_id'])->toBe('update-A')
+        ->and($results[1]['status'])->toBe('updated')
+        ->and($results[1]['external_row_id'])->toBe('update-B');
+
+    $this->assertDatabaseHas('speakers', ['name' => 'Batch Updated Speaker One']);
+    $this->assertDatabaseHas('speakers', ['name' => 'Batch Updated Speaker Two']);
+});
+
+it('batch-updates returns not_found for missing record keys', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->putJson('/api/v1/admin/speakers/batch', [
+        'items' => [
+            [
+                'record_key' => '00000000-0000-0000-0000-000000000000',
+                'payload' => [
+                    'name' => 'Ghost Speaker',
+                    'gender' => 'male',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+
+    expect($response->json('data.summary.not_found'))->toBe(1)
+        ->and($response->json('data.results.0.status'))->toBe('not_found');
+});
+
+it('batch-updates returns error for items missing record_key', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->putJson('/api/v1/admin/speakers/batch', [
+        'items' => [
+            [
+                'payload' => [
+                    'name' => 'No Key Speaker',
+                    'gender' => 'male',
+                    'status' => 'verified',
+                    'is_active' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+
+    expect($response->json('data.results.0.status'))->toBe('error');
+});
+
+it('rejects batch operations on non-writable resources', function () {
+    $admin = adminApiUser('super_admin');
+
+    Sanctum::actingAs($admin);
+
+    $this->postJson('/api/v1/admin/users/batch', [
+        'items' => [['payload' => ['name' => 'Test']]],
+    ])->assertNotFound();
+});
+
+it('rejects unauthenticated batch create requests', function () {
+    $this->postJson('/api/v1/admin/speakers/batch', [
+        'items' => [['payload' => ['name' => 'Test']]],
+    ])->assertUnauthorized();
+});
+
+it('rejects unauthenticated batch update requests', function () {
+    $this->putJson('/api/v1/admin/speakers/batch', [
+        'items' => [['record_key' => 'some-key', 'payload' => ['name' => 'Test']]],
+    ])->assertUnauthorized();
+});
