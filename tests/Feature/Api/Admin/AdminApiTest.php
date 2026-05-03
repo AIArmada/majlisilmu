@@ -3684,6 +3684,7 @@ it('batch-creates admin resource records and returns per-row results', function 
                     'gender' => 'male',
                     'status' => 'verified',
                     'is_active' => true,
+                    'address' => ['country_id' => 132],
                 ],
             ],
             [
@@ -3693,6 +3694,7 @@ it('batch-creates admin resource records and returns per-row results', function 
                     'gender' => 'female',
                     'status' => 'verified',
                     'is_active' => true,
+                    'address' => ['country_id' => 132],
                 ],
             ],
         ],
@@ -3731,6 +3733,7 @@ it('batch-creates records and returns per-row validation errors without rolling 
                     'gender' => 'male',
                     'status' => 'verified',
                     'is_active' => true,
+                    'address' => ['country_id' => 132],
                 ],
             ],
             [
@@ -3776,6 +3779,7 @@ it('batch-creates records with validate_only and returns previews without persis
                     'gender' => 'male',
                     'status' => 'verified',
                     'is_active' => true,
+                    'address' => ['country_id' => 132],
                 ],
             ],
         ],

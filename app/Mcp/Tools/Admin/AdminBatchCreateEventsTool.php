@@ -343,5 +343,4 @@ class AdminBatchCreateEventsTool extends AbstractAdminWriteTool
             'apply_defaults' => $schema->boolean()->default(false)->description('When true, fills schema defaults into the normalized payload visible in validate_only previews.'),
         ];
     }
-
 }

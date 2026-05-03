@@ -354,5 +354,4 @@ class AdminBatchUpdateEventsTool extends AbstractAdminWriteTool
             'validate_only' => $schema->boolean()->default(false)->description('When true, validates all items without persisting. Returns per-row preview or validation error details.'),
         ];
     }
-
 }
