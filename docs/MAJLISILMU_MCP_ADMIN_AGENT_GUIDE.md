@@ -239,7 +239,7 @@ Event image generation uses a 3-step workflow on the admin server:
 
 1. Call the MCP prompt `admin-event-cover-image-prompt` (for `cover`) or `admin-event-poster-image-prompt` (for `poster`) with `event_key`, optional `creative_direction`, `include_existing_media`, and `max_reference_media` arguments. The prompt returns engineered prompt text and brand reference images.
 2. Generate the image using ChatGPT native image generation with the returned prompt and reference images.
-3. Upload the result with `admin-upload-event-cover-image` (writes `cover` at `16:9`) or `admin-upload-event-poster-image` (writes `poster` at `4:5`) by passing the `event_key` and an image descriptor (`{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images).
+3. Upload the result with `admin-upload-event-cover-image` (writes `cover` at `16:9`) or `admin-upload-event-poster-image` (writes `poster` at `4:5`) by passing the `event_key` and an explicit image descriptor (`{content_base64, filename}` recommended in proxied clients, or `{download_url, file_id, filename}` when URL fetch is available).
 
 - Use `admin-upload-event-cover-image` for the website/app event visual.
 - Use `admin-upload-event-poster-image` for the external-distribution flyer visual.
@@ -399,7 +399,7 @@ You can provide a URL-based descriptor when base64 content is unavailable:
 }
 ```
 
-**ChatGPT file params** are also supported as an alternative to `content_url`:
+**ChatGPT-style descriptor keys** are supported as an alternative to `content_url`:
 
 ```json
 {
@@ -412,7 +412,7 @@ You can provide a URL-based descriptor when base64 content is unavailable:
 
 Accepted aliases: `file_name`, `fileName`, or `name` for `filename`; `mime` or `mimeType` for `mime_type`; `base64`, `contentBase64`, or `data` for `content_base64`; and `contentUrl` or `url` for `content_url`. ChatGPT file params: `downloadUrl` or `download_url` for content URL, and `fileId` or `file_id` for metadata (ignored by server). Data URLs are accepted for `content_base64`. Filename extensions are recommended; when omitted, the server derives the staged extension from `mime_type` or response Content-Type header. For safety, URL-based descriptors (`content_url` or `download_url`) must be absolute `http(s)` URLs without embedded credentials, must resolve to public hosts only, and must not redirect.
 
-If a client bridge/proxy file-URL rewrite fails before request dispatch (for example mount-rewrite errors), use `content_base64` descriptors as the fallback path.
+If a client bridge/proxy file-URL rewrite fails before request dispatch (for example mount-rewrite errors), use `content_base64` descriptors as the fallback path. Event upload/create tools intentionally run descriptor-first and do not rely on rewrite metadata.
 
 Schema fields describe the exact upload rules:
 
@@ -462,14 +462,14 @@ Admin tool behavior notes:
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-search-events` is a dedicated event discovery tool and is aligned with `GET /api/v1/admin/events/search`. It supports keyword search with default cross-entity expansion (institution/speaker/reference), geo-proximity sorting (`sort=distance` with `lat`, `lng`, `radius_km`), date range (`starts_after`, `starts_before`, `time_scope`), clock-time or prayer-relative windows (`timing_mode`, `starts_time_from/until`, `prayer_time`), event type and format arrays, audience and audience-boolean filters, institution/venue/speaker/role filters, tag/reference UUID arrays, reference author filters (`reference_author_search`), and query expansion toggles (`search_include_institutions`, `search_include_speakers`, `search_include_references`). Each parameter's description in the tool schema lists valid enum values and interdependencies (e.g. `sort=distance` requires `lat`+`lng`).
 - `admin-list-records` accepts a `filters` object keyed by the resource metadata filter keys, for example `{ "status": "approved", "is_active": true }` for `events`.
-- `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `admin-event-cover-image-prompt` and `admin-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+- `admin-upload-event-cover-image` and `admin-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{content_base64, filename}` for maximum compatibility, or `{download_url, file_id, filename}` when URL fetch is available. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `admin-event-cover-image-prompt` and `admin-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - If attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.
 - For `speakers`, `institutions`, and `references`, `admin-list-records` search reuses the same specialized search services as the public directory endpoints; the main difference is record scope, not text-matching behavior.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` is inclusive (on or after the given local date) and `starts_before` is inclusive (on or before the given local date) across both `admin-search-events` and `admin-list-records`. For a single local date, use `starts_on_local_date` instead.
 - Event enum filters and payload values must be backing values, for example `filter[event_type]=kuliah_ceramah` and `filter[timing_mode]=prayer_relative`.
 - `admin-get-record-actions` is read-only and returns record-specific next-step MCP tools, including explicit workflow-schema tool hints when a moderation, triage, or review flow is currently available on that record.
 - The dedicated admin workflow-schema tools are read-only and expose defaults, available actions, fields, and conditional rules for their matching moderation/review workflow.
-- Media/file upload fields accept JSON base64 descriptors only when the matching write schema advertises them.
+- Media/file upload fields accept JSON descriptors when the matching write schema advertises them (`content_base64`, `content_url`, and `download_url` are supported by descriptor parsing).
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain.
 - All read-only tools (discovery, list, get, schema, and workflow-schema tools) carry read-only and idempotent metadata hints; MCP clients that honor these hints can call them without requiring confirmation.

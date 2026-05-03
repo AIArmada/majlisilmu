@@ -244,7 +244,7 @@ Event image generation uses a 3-step workflow on the member server:
 
 1. Call the MCP prompt `member-event-cover-image-prompt` (for `cover`) or `member-event-poster-image-prompt` (for `poster`) with `event_key`, optional `creative_direction`, `include_existing_media`, and `max_reference_media` arguments. The prompt returns engineered prompt text and brand reference images.
 2. Generate the image using ChatGPT native image generation with the returned prompt and reference images.
-3. Upload the result with `member-upload-event-cover-image` (writes `cover` at `16:9`) or `member-upload-event-poster-image` (writes `poster` at `4:5`) by passing the `event_key` and an image descriptor (`{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images).
+3. Upload the result with `member-upload-event-cover-image` (writes `cover` at `16:9`) or `member-upload-event-poster-image` (writes `poster` at `4:5`) by passing the `event_key` and an explicit image descriptor (`{content_base64, filename}` recommended in proxied clients, or `{download_url, file_id, filename}` when URL fetch is available).
 
 - Use `member-upload-event-cover-image` for the website/app event visual.
 - Use `member-upload-event-poster-image` for the external-distribution flyer visual.
@@ -360,7 +360,7 @@ Member tools like `member-submit-membership-claim` accept media/file descriptors
 // Content URL
 { "filename": "proof.pdf", "content_url": "https://example.com/file.pdf" }
 
-// ChatGPT file params (from file widget)
+// Descriptor using download_url/file_id (from file widget)
 { "filename": "proof.pdf", "download_url": "https://api.openai.com/files/...", "file_id": "file_xyz" }
 ```
 
@@ -387,7 +387,7 @@ You can also provide a URL-based descriptor when base64 content is unavailable:
 }
 ```
 
-**ChatGPT file params** are also supported as an alternative to `content_url`:
+**ChatGPT-style descriptor keys** are supported as an alternative to `content_url`:
 
 ```json
 {
@@ -400,7 +400,7 @@ You can also provide a URL-based descriptor when base64 content is unavailable:
 
 Accepted aliases are `file_name`, `fileName`, or `name` for `filename`; `mime` or `mimeType` for `mime_type`; and `base64`, `contentBase64`, or `data` for `content_base64`. URL aliases `contentUrl` and `url` are accepted for `content_url`. ChatGPT file params: `downloadUrl` or `download_url` for content URL, and `fileId` or `file_id` for metadata (ignored by server). Data URLs are accepted for `content_base64`. Filename extensions are recommended; when they are omitted, the server derives the staged extension from `mime_type` or the fetched response content type. For safety, URL-based descriptors (`content_url` or `download_url`) must be absolute `http(s)` URLs without embedded credentials, must resolve to public hosts only, and must not redirect.
 
-If a client bridge/proxy file-URL rewrite fails before request dispatch (for example mount-rewrite errors), use `content_base64` descriptors as the fallback path.
+If a client bridge/proxy file-URL rewrite fails before request dispatch (for example mount-rewrite errors), use `content_base64` descriptors as the fallback path. Event upload tools intentionally run descriptor-first and do not rely on rewrite metadata.
 
 Schema fields describe the exact upload rules:
 
@@ -445,7 +445,7 @@ Member tool behavior notes:
 - `validate_only=true` is supported for member update previews.
 - `member-search-events` is a dedicated event discovery tool. It supports keyword search with default cross-entity expansion (institution/speaker/reference), geo-proximity sorting (`sort=distance` with `lat`, `lng`, `radius_km`), date range (`starts_after`, `starts_before`, `time_scope`), clock-time or prayer-relative windows (`timing_mode`, `starts_time_from/until`, `prayer_time`), event type and format arrays, audience and boolean filters, institution/venue/speaker/role filters, tag/reference UUID arrays, reference author filters (`reference_author_search`), and query expansion toggles (`search_include_institutions`, `search_include_speakers`, `search_include_references`). Respects member MCP scope boundaries. Each parameter's inline description lists valid values.
 - `member-list-records` shares the same discovery behavior as admin for the overlapping readable resources, but still respects member visibility and ownership boundaries. Unlike admin, `member-list-records` does **not** accept a `filters` object; use `search`, `starts_after`, `starts_before`, and `starts_on_local_date` to narrow results.
-- `member-upload-event-cover-image` and `member-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the accessible event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{download_url, file_id, filename}` for ChatGPT-generated images or `{content_base64, filename}` for base64 images. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `member-event-cover-image-prompt` and `member-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
+- `member-upload-event-cover-image` and `member-upload-event-poster-image` accept a pre-generated image via `{event_key, image, creative_direction?}` and save it to the accessible event media collection. The cover tool writes `cover` at required ratio `16:9`; the poster tool writes `poster` at required ratio `4:5`. The `image` field is a file descriptor: pass `{content_base64, filename}` for maximum compatibility, or `{download_url, file_id, filename}` when URL fetch is available. Optionally include `mime_type` in the descriptor; it is auto-detected if omitted. Use the MCP prompts `member-event-cover-image-prompt` and `member-event-poster-image-prompt` before calling these tools — the prompts build engineered prompt text with brand reference images for ChatGPT native image generation. Speaker-context references follow this order: speaker `cover`, then speaker `avatar`, then organizer institution media from `event->organizer`.
 - If attaching reference media fails, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`, then re-generate and re-upload.
 - For date-aware resources, `starts_after`, `starts_before`, and `starts_on_local_date` are date-only `YYYY-MM-DD` strings interpreted in the resolved request timezone. Do not send ISO 8601 timestamps to those MCP arguments. `starts_after` is inclusive (on or after the given local date) and `starts_before` is inclusive (on or before the given local date) across both `member-search-events` and `member-list-records`. For a single local date, use `starts_on_local_date` instead.
 - The member surface intentionally does not expose admin-only moderation, triage, or create workflows.

@@ -79,13 +79,13 @@
 
 ---
 
-### "I'm integrating ChatGPT file uploads (with download_url)"
+### "I'm integrating MCP file descriptors (content_base64 / download_url)"
 → Read: **[CHATGPT_FILE_PARAMS_INTEGRATION.md](CHATGPT_FILE_PARAMS_INTEGRATION.md)**
 
 ✅ You'll learn:
-- ChatGPT file param format (`download_url`, `file_id`)
+- Descriptor formats (`content_base64`, `content_url`, `download_url`, `file_id`)
+- Proxy-safe upload guidance for connector environments
 - How to detect media-capable fields
-- How to construct file descriptors
 - Security validation rules
 
 ---
@@ -113,7 +113,7 @@
 | Admin Agent Guide | ✅ [MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md](MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md) | — | For AI agents (English sufficient) |
 | Member Agent Guide | ✅ [MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md](MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md) | — | For AI agents (English sufficient) |
 | Tool Examples | ✅ [MAJLISILMU_MCP_TOOL_EXAMPLES.md](MAJLISILMU_MCP_TOOL_EXAMPLES.md) | — | JSON is language-agnostic |
-| File Params | ✅ [CHATGPT_FILE_PARAMS_INTEGRATION.md](CHATGPT_FILE_PARAMS_INTEGRATION.md) | — | For technical integrators |
+| File Descriptors | ✅ [CHATGPT_FILE_PARAMS_INTEGRATION.md](CHATGPT_FILE_PARAMS_INTEGRATION.md) | — | For technical integrators |
 
 ---
 
