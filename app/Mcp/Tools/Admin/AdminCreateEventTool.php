@@ -101,7 +101,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             );
 
             $payload = $this->buildEventPayload($validated);
-            $this->enforceEventBase64MediaDescriptors($payload);
+            $this->enforceEventMediaDescriptorsHaveContentSource($payload);
 
             $this->ensureDestructiveMediaClearFlagsAreUnsupported($payload);
 
@@ -319,17 +319,20 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             'cover' => $schema->object([
                 'filename' => $schema->string()->required(),
                 'content_base64' => $schema->string()->nullable(),
+                'content_url' => $schema->string()->nullable(),
                 'mime_type' => $schema->string()->nullable(),
-            ])->nullable()->description('Optional event cover image descriptor (16:9). Pass {content_base64, filename}.'),
+            ])->nullable()->description('Optional event cover image descriptor (16:9). Pass {content_base64, filename} or {content_url, filename}.'),
             'poster' => $schema->object([
                 'filename' => $schema->string()->required(),
                 'content_base64' => $schema->string()->nullable(),
+                'content_url' => $schema->string()->nullable(),
                 'mime_type' => $schema->string()->nullable(),
-            ])->nullable()->description('Optional event poster image descriptor (4:5). Pass {content_base64, filename}.'),
+            ])->nullable()->description('Optional event poster image descriptor (4:5). Pass {content_base64, filename} or {content_url, filename}.'),
             'gallery' => $schema->array()->items(
                 $schema->object([
                     'filename' => $schema->string()->required(),
                     'content_base64' => $schema->string()->nullable(),
+                    'content_url' => $schema->string()->nullable(),
                     'mime_type' => $schema->string()->nullable(),
                 ])
             )->nullable()->description('Optional gallery image descriptors (max 10 items).'),
@@ -355,7 +358,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
         $tool['_meta'] = array_merge(
             is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
             [
-                'openai/note' => 'You may send event fields and image descriptors together in one call. For media fields cover/poster/gallery pass {content_base64, filename}.',
+                'openai/note' => 'You may send event fields and image descriptors together in one call. For media fields cover/poster/gallery pass {content_base64, filename} or {content_url, filename}.',
             ],
         );
 
@@ -374,10 +377,10 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function enforceEventBase64MediaDescriptors(array $payload): void
+    private function enforceEventMediaDescriptorsHaveContentSource(array $payload): void
     {
-        $this->enforceBase64DescriptorField($payload, 'cover');
-        $this->enforceBase64DescriptorField($payload, 'poster');
+        $this->enforceDescriptorFieldHasContentSource($payload, 'cover');
+        $this->enforceDescriptorFieldHasContentSource($payload, 'poster');
 
         $gallery = $payload['gallery'] ?? null;
 
@@ -390,9 +393,9 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                 continue;
             }
 
-            $this->assertDescriptorHasBase64(
+            $this->assertDescriptorHasContentSource(
                 descriptor: $descriptor,
-                field: "gallery.{$index}.content_base64",
+                field: "gallery.{$index}",
             );
         }
     }
@@ -400,7 +403,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function enforceBase64DescriptorField(array $payload, string $field): void
+    private function enforceDescriptorFieldHasContentSource(array $payload, string $field): void
     {
         $descriptor = $payload[$field] ?? null;
 
@@ -408,16 +411,16 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             return;
         }
 
-        $this->assertDescriptorHasBase64(
+        $this->assertDescriptorHasContentSource(
             descriptor: $descriptor,
-            field: "{$field}.content_base64",
+            field: $field,
         );
     }
 
     /**
      * @param  array<string, mixed>  $descriptor
      */
-    private function assertDescriptorHasBase64(array $descriptor, string $field): void
+    private function assertDescriptorHasContentSource(array $descriptor, string $field): void
     {
         $base64Value = $descriptor['content_base64']
             ?? $descriptor['contentBase64']
@@ -425,12 +428,21 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             ?? $descriptor['data']
             ?? null;
 
+        $contentUrl = $descriptor['content_url']
+            ?? $descriptor['contentUrl']
+            ?? $descriptor['url']
+            ?? null;
+
         if (is_string($base64Value) && trim($base64Value) !== '') {
             return;
         }
 
+        if (is_string($contentUrl) && trim($contentUrl) !== '') {
+            return;
+        }
+
         throw ValidationException::withMessages([
-            $field => ['Event media uploads require content_base64 in this connector environment.'],
+            $field => ['Event media uploads require either content_base64 or content_url.'],
         ]);
     }
 }

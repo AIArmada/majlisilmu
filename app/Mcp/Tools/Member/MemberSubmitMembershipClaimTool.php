@@ -82,10 +82,11 @@ class MemberSubmitMembershipClaimTool extends AbstractMemberWriteTool
                     $schema->object([
                         'filename' => $schema->string()->required()->min(1),
                         'mime_type' => $schema->string()->min(1),
-                        'content_base64' => $schema->string()->required()->min(1),
+                        'content_base64' => $schema->string()->min(1),
+                        'content_url' => $schema->string()->min(1),
                     ])->withoutAdditionalProperties()
                 )
-                ->description('Array of MCP file descriptors. Each item must include filename and content_base64. This is the only reliable upload path in proxied connector environments. Multipart/form-data is not supported for MCP tools.'),
+                ->description('Array of MCP file descriptors. Each item must include filename plus either content_base64 or content_url. Multipart/form-data is not supported for MCP tools.'),
         ];
     }
 
