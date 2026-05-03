@@ -22,6 +22,7 @@ use App\Mcp\Resources\Docs\McpGuideResource;
 use App\Mcp\Servers\AdminServer;
 use App\Mcp\Tools\Admin\AdminBatchCreateEventsTool;
 use App\Mcp\Tools\Admin\AdminBatchCreateRecordsTool;
+use App\Mcp\Tools\Admin\AdminBatchUpdateEventsTool;
 use App\Mcp\Tools\Admin\AdminBatchUpdateRecordsTool;
 use App\Mcp\Tools\Admin\AdminCreateEventTool;
 use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
@@ -44,6 +45,7 @@ use App\Mcp\Tools\Admin\AdminReviewContributionRequestTool;
 use App\Mcp\Tools\Admin\AdminReviewMembershipClaimTool;
 use App\Mcp\Tools\Admin\AdminSearchEventsTool;
 use App\Mcp\Tools\Admin\AdminTriageReportTool;
+use App\Mcp\Tools\Admin\AdminUpdateEventTool;
 use App\Mcp\Tools\Admin\AdminUpdateRecordTool;
 use App\Models\ContributionRequest;
 use App\Models\DonationChannel;
@@ -3378,6 +3380,8 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
         'admin-get-membership-claim-review-schema',
         'admin-create-event',
         'admin-batch-create-events',
+        'admin-update-event',
+        'admin-batch-update-events',
         'admin-create-record',
         'admin-batch-create-records',
         'admin-batch-update-records',
@@ -3576,6 +3580,9 @@ it('initializes and lists admin MCP tools over the HTTP endpoint', function () {
         'admin-get-contribution-request-review-schema',
         'admin-get-membership-claim-review-schema',
         'admin-create-event',
+        'admin-batch-create-events',
+        'admin-update-event',
+        'admin-batch-update-events',
         'admin-create-record',
         'admin-create-github-issue',
         'admin-moderate-event',
@@ -4292,4 +4299,137 @@ it('batch-creates events with validate_only via admin-batch-create-events withou
         );
 
     assertDatabaseMissing('events', ['title' => 'MCP Batch Dry Run Event']);
+});
+
+it('updates an event via the admin-update-event MCP tool with speaker_keys resolved', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $event = Event::factory()->create([
+        'title' => 'Original Event Title',
+        'status' => 'draft',
+    ]);
+
+    $speaker = Speaker::factory()->create(['slug' => 'test-update-speaker']);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateEventTool::class, [
+            'event_key' => $event->getRouteKey(),
+            'title' => 'Updated Event Title',
+            'speaker_keys' => [$speaker->slug],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.title', 'Updated Event Title')
+            ->etc()
+        );
+
+    assertDatabaseHas('events', [
+        'id' => $event->id,
+        'title' => 'Updated Event Title',
+    ]);
+});
+
+it('updates an event with validate_only via admin-update-event without persisting', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $event = Event::factory()->create(['title' => 'Event Before Dry Run']);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateEventTool::class, [
+            'event_key' => $event->getRouteKey(),
+            'title' => 'Should Not Persist',
+            'validate_only' => true,
+        ])
+        ->assertOk();
+
+    assertDatabaseHas('events', [
+        'id' => $event->id,
+        'title' => 'Event Before Dry Run',
+    ]);
+});
+
+it('batch-updates events via the admin-batch-update-events MCP tool with speaker_keys resolved', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $eventA = Event::factory()->create(['title' => 'Batch Update Event Alpha', 'status' => 'draft']);
+    $eventB = Event::factory()->create(['title' => 'Batch Update Event Beta', 'status' => 'draft']);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchUpdateEventsTool::class, [
+            'items' => [
+                [
+                    'event_key' => $eventA->getRouteKey(),
+                    'title' => 'Updated Alpha',
+                    'external_row_id' => 'row-alpha',
+                ],
+                [
+                    'event_key' => $eventB->getRouteKey(),
+                    'title' => 'Updated Beta',
+                    'external_row_id' => 'row-beta',
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.results.0.status', 'updated')
+            ->where('data.results.1.status', 'updated')
+            ->etc()
+        );
+
+    assertDatabaseHas('events', ['id' => $eventA->id, 'title' => 'Updated Alpha']);
+    assertDatabaseHas('events', ['id' => $eventB->id, 'title' => 'Updated Beta']);
+});
+
+it('batch-updates events with validate_only via admin-batch-update-events without persisting', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $event = Event::factory()->create(['title' => 'Batch Dry Run Event']);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchUpdateEventsTool::class, [
+            'items' => [
+                [
+                    'event_key' => $event->getRouteKey(),
+                    'title' => 'Should Not Persist Batch',
+                ],
+            ],
+            'validate_only' => true,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.validate_only', true)
+            ->where('data.results.0.status', 'preview')
+            ->etc()
+        );
+
+    assertDatabaseHas('events', [
+        'id' => $event->id,
+        'title' => 'Batch Dry Run Event',
+    ]);
+});
+
+it('batch-updates events returns unresolved_key for invalid event key via admin-batch-update-events', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $event = Event::factory()->create(['title' => 'Valid Event For Batch Update']);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchUpdateEventsTool::class, [
+            'items' => [
+                [
+                    'event_key' => $event->getRouteKey(),
+                    'title' => 'Valid Update',
+                ],
+                [
+                    'event_key' => 'does-not-exist-key',
+                    'title' => 'Should Not Update',
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.results.0.status', 'updated')
+            ->where('data.results.1.status', 'not_found')
+            ->etc()
+        );
 });
