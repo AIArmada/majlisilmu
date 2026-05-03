@@ -11,6 +11,7 @@ use App\Enums\ReferenceType;
 use App\Mcp\Prompts\Concerns\BuildsEventImagePrompt;
 use App\Mcp\Servers\AdminServer;
 use App\Mcp\Servers\MemberServer;
+use App\Mcp\Tools\Admin\AdminCreateEventTool;
 use App\Mcp\Tools\Admin\AdminGetRecordActionsTool;
 use App\Mcp\Tools\Admin\AdminUploadEventCoverImageTool;
 use App\Mcp\Tools\Member\MemberGetRecordActionsTool;
@@ -216,7 +217,12 @@ it('exposes mutating and open-world metadata for event image upload tools', func
 
     expect(data_get($adminTool, '_meta.openai/toolInvocation/invoking'))->toBe('Uploading event cover image...')
         ->and(data_get($memberTool, '_meta.openai/toolInvocation/invoked'))->toBe('Event cover image uploaded.')
+        ->and(data_get($adminTool, '_meta.openai/fileParams'))->toBe(['image'])
+        ->and(data_get($memberTool, '_meta.openai/fileParams'))->toBe(['image'])
         ->and(data_get($adminTool, 'inputSchema.properties.image'))->toBeArray();
+
+    expect(data_get(app(AdminCreateEventTool::class)->toArray(), '_meta.openai/fileParams'))
+        ->toBe(['cover', 'poster', 'gallery']);
 });
 
 it('formats cover prompt text as a strict 16:9 request and exposes fallback asset links', function (): void {

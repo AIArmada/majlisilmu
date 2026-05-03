@@ -120,9 +120,7 @@ class AdminUploadEventPosterImageTool extends AbstractAdminTool
         $tool['_meta'] = array_merge(
             is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
             [
-                'openai/fileParams' => [
-                    'image' => ['download_url', 'file_id'],
-                ],
+                'openai/fileParams' => ['image'],
             ],
         );
 
