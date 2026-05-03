@@ -37,6 +37,7 @@ class EventImageGenerationService
             'target_collection' => $targetCollection,
             'creative_direction' => $options['creative_direction'] ?? null,
             'include_existing_media' => $options['include_existing_media'] ?? true,
+            'max_reference_media' => $options['max_reference_media'] ?? null,
         ]);
 
         $payload = $result['payload'];

@@ -88,7 +88,8 @@ class EventCoverPromptBuilder
      * @param  array{
      *   target_collection?: string|null,
      *   creative_direction?: string|null,
-     *   include_existing_media?: bool|null
+     *   include_existing_media?: bool|null,
+     *   max_reference_media?: int|null
      * }  $options
      * @return array{
      *   payload: array<string, mixed>,
@@ -103,8 +104,13 @@ class EventCoverPromptBuilder
         $creativeDirection = $this->optionalString($options['creative_direction'] ?? null);
         $includeExistingMedia = $options['include_existing_media'] ?? true;
         $includeExistingMedia = is_bool($includeExistingMedia) ? $includeExistingMedia : true;
+        $maxReferenceMedia = max(0, min(10, (int) ($options['max_reference_media'] ?? 10)));
 
-        $selectedMedia = $this->selectedMedia($event, $target['collection'], $includeExistingMedia);
+        $selectedMedia = array_slice(
+            $this->selectedMedia($event, $target['collection'], $includeExistingMedia),
+            0,
+            $maxReferenceMedia,
+        );
         $referenceMedia = array_map(
             fn (array $candidate): array => $candidate['payload'],
             $selectedMedia,
@@ -449,6 +455,7 @@ class EventCoverPromptBuilder
             '',
             $isCover ? 'Core event facts for design context:' : 'Required visible event facts:',
             "- Title: {$event->title}",
+            "- Use the title as an ambience anchor: derive mood and scholarly atmosphere from \"{$event->title}\" while keeping all facts accurate.",
         ];
 
         if (! $isCover) {
@@ -494,6 +501,7 @@ class EventCoverPromptBuilder
             '',
             'Design direction:',
             '- Use refined Islamic editorial design: confident hierarchy, elegant Malay typography, generous negative space, and contemporary masjid/knowledge visual language.',
+            '- Treat the event title as the primary narrative cue for ambience: tune lighting, tone, palette, and setting details to match the meaning and spirit of the title.',
             '- Prefer authentic visual cues from the selected reference media over generic stock imagery.',
             '- If speaker reference images are provided, preserve likeness respectfully. If no actual speaker media is provided, use text-only speaker treatment and do not invent faces.',
             '- If book/reference cover images are provided, use them as subtle study-material cues rather than copying the full cover as the poster.',
@@ -512,7 +520,11 @@ class EventCoverPromptBuilder
                 $label = (string) ($media['label'] ?? $media['file_name'] ?? "Reference media {$position}");
                 $role = (string) ($media['role'] ?? 'reference');
                 $reason = (string) ($media['selection_reason'] ?? 'Use if helpful.');
-                $lines[] = "{$position}. {$label} ({$role}) - {$reason}";
+                $url = (string) ($media['url'] ?? $media['original_url'] ?? '');
+                $urlLine = $url !== ''
+                    ? "URL: {$url}"
+                    : 'URL: no direct URL available; use attached reference media.';
+                $lines[] = "{$position}. {$label} ({$role}) - {$reason} - {$urlLine}";
             }
         }
 
