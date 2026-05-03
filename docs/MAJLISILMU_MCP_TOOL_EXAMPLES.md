@@ -342,6 +342,136 @@ Fetch the live schema first so the client sees the current enum values and allow
 }
 ```
 
+### Update a single event
+
+Use `admin-update-event` to update an existing event identified by slug or UUID. Specify only the fields you want to change; omitted optional fields preserve the current value. `speaker_keys` and `reference_keys` perform a full sync — omit to leave unchanged, pass `[]` to detach all.
+
+```json
+{
+  "tool": "admin-update-event",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "title": "Kuliah Selasa — Siri Baharu",
+    "event_date": "2026-05-13",
+    "prayer_time": "after_maghrib",
+    "venue_key": "masjid-wilayah-persekutuan",
+    "speaker_keys": ["ahmad-fauzi-my", "ustaz-zaharuddin"],
+    "validate_only": true
+  }
+}
+```
+
+### Batch create events
+
+Use `admin-batch-create-events` to create up to 50 events in one call. Each item uses the same field contract as `admin-create-event`. Set `validate_only=true` to preview all rows without persisting.
+
+```json
+{
+  "tool": "admin-batch-create-events",
+  "arguments": {
+    "validate_only": false,
+    "items": [
+      {
+        "external_row_id": "row-1",
+        "title": "Kuliah Tafsir Selasa",
+        "event_date": "2026-05-06",
+        "prayer_time": "after_maghrib",
+        "event_format": "physical",
+        "institution_key": "masjid-wilayah-persekutuan",
+        "speaker_keys": ["ahmad-fauzi-my"]
+      },
+      {
+        "external_row_id": "row-2",
+        "title": "Kuliah Tafsir Rabu",
+        "event_date": "2026-05-07",
+        "prayer_time": "after_isyak",
+        "event_format": "physical",
+        "institution_key": "masjid-wilayah-persekutuan",
+        "speaker_keys": ["ustaz-zaharuddin"]
+      }
+    ]
+  }
+}
+```
+
+Each result in `data.results` has a `status` of `created`, `validation_failed`, `unresolved_key`, or `error`. The `summary` block counts totals per status.
+
+### Batch update events
+
+Use `admin-batch-update-events` to update up to 50 existing events in one call. Each item must include `event_key` (slug or UUID). Omitted optional fields preserve the current value.
+
+```json
+{
+  "tool": "admin-batch-update-events",
+  "arguments": {
+    "validate_only": false,
+    "items": [
+      {
+        "event_key": "weekly-kuliah-selasa",
+        "external_row_id": "row-1",
+        "event_date": "2026-05-13",
+        "prayer_time": "after_maghrib"
+      },
+      {
+        "event_key": "kuliah-tafsir-rabu",
+        "external_row_id": "row-2",
+        "status": "approved"
+      }
+    ]
+  }
+}
+```
+
+### Batch create generic resource records
+
+Use `admin-batch-create-records` to create up to 100 records for any writable admin resource in one call. Fetch the write schema first to confirm the required fields.
+
+```json
+{
+  "tool": "admin-batch-create-records",
+  "arguments": {
+    "resource_key": "tags",
+    "validate_only": false,
+    "items": [
+      {
+        "external_row_id": "tag-1",
+        "payload": { "name": { "ms": "Fiqh Muamalat", "en": "Fiqh Muamalat" } }
+      },
+      {
+        "external_row_id": "tag-2",
+        "payload": { "name": { "ms": "Sirah Nabawiyyah", "en": "Sirah Nabawiyyah" } }
+      }
+    ]
+  }
+}
+```
+
+### Batch update generic resource records
+
+Use `admin-batch-update-records` to update up to 100 records for any writable admin resource in one call. Each item must include `record_key` (UUID or slug) and `payload`.
+
+```json
+{
+  "tool": "admin-batch-update-records",
+  "arguments": {
+    "resource_key": "speakers",
+    "validate_only": true,
+    "items": [
+      {
+        "record_key": "ahmad-fauzi-my",
+        "external_row_id": "spk-1",
+        "payload": { "status": "verified" }
+      },
+      {
+        "record_key": "ustaz-zaharuddin",
+        "external_row_id": "spk-2",
+        "payload": { "status": "verified" }
+      }
+    ]
+  }
+}
+```
+
 ### Create a GitHub issue and auto-assign Copilot
 
 ```json
