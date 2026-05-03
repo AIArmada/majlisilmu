@@ -1424,7 +1424,10 @@
       "batch_max_items": 100,
       "batch_events_max_items": 50,
       "batch_validate_only": true,
-      "batch_external_row_id": true
+      "batch_external_row_id": true,
+      "create_event_tool": "admin-create-event",
+      "update_event_tool": "admin-update-event",
+      "batch_update_events_tool": "admin-batch-update-events"
     },
     "member_mcp": {
       "schema_tool": "member-get-write-schema",

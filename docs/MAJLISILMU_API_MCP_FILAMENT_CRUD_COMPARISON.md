@@ -223,9 +223,13 @@ These are registered at runtime and therefore part of the admin registry surface
 - `PUT /api/v1/admin/{resourceKey}/{recordKey}`
 - `PUT /api/v1/admin/{resourceKey}/batch`
 - `admin-get-write-schema`
+- `admin-create-event`
 - `admin-create-record`
+- `admin-batch-create-events`
 - `admin-batch-create-records`
+- `admin-update-event`
 - `admin-update-record`
+- `admin-batch-update-events`
 - `admin-batch-update-records`
 
 It does **not** mean every admin-facing actor can write it. Actual create/update access is still policy-driven per request.
@@ -277,10 +281,11 @@ These capabilities remain outside generic admin CRUD, but now have explicit admi
 	- HTTP update: `PUT /api/v1/admin/{resourceKey}/batch` with `items` array of `{record_key, payload}`; supports `validate_only` query param
 	- MCP tool (create): `admin-batch-create-records` — generic batch create for any writable resource
 	- MCP tool (update): `admin-batch-update-records` — generic batch update for any writable resource
-	- MCP tool (events): `admin-batch-create-events` — event-specific batch create with `organizer_key`, `speaker_keys`, `reference_keys`, `institution_key`, `venue_key`, `space_key` key resolution (same semantics as `admin-create-event`)
+	- MCP tool (events create): `admin-batch-create-events` — event-specific batch create with `organizer_key`, `speaker_keys`, `reference_keys`, `institution_key`, `venue_key`, `space_key` key resolution (same semantics as `admin-create-event`)
+	- MCP tool (events update): `admin-batch-update-events` — event-specific batch update with the same key resolution as `admin-update-event`
 	- All batch tools return a per-row result list (`created`/`updated`/`validation_failed`/`not_found`/`unresolved_key`/`error`/`preview`) plus a `summary` object
 	- `external_row_id` per item enables idempotency tracking and safe retries after interruption
-	- Maximum 100 items per batch for generic tools; 50 items per batch for `admin-batch-create-events`
+	- Maximum 100 items per batch for generic tools; 50 items per batch for event-specific batch tools
 	- `validate_only=true` returns per-row `preview` status without persisting any records
 
 - **Event discovery:**
