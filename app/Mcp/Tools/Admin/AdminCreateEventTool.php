@@ -360,8 +360,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
         $tool['_meta'] = array_merge(
             is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
             [
-                'openai/note' => 'You may send event fields and image descriptors together in one call. For media fields cover/poster/gallery use {download_url, file_id, filename} or {content_base64, filename}.',
-                'openai/fileParams' => ['cover', 'poster', 'gallery'],
+                'openai/note' => 'You may send event fields and image descriptors together in one call. For media fields cover/poster/gallery prefer {content_base64, filename} for maximum client/proxy compatibility; {download_url, file_id, filename} is also accepted when direct URL descriptors are supported.',
             ],
         );
 

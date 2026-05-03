@@ -31,7 +31,7 @@ class AdminUploadEventCoverImageTool extends AbstractAdminTool
 
     protected string $title = 'Upload Event Cover Image';
 
-    protected string $description = 'Upload and save a 16:9 website/mobile-app cover image for an admin-accessible event. Accepts a ChatGPT-generated image via {download_url, file_id} or a base64-encoded image via {content_base64}. Use the admin-event-cover-image-prompt to get the recommended prompt and reference images before generating.';
+    protected string $description = 'Upload and save a 16:9 website/mobile-app cover image for an admin-accessible event. Accepts image descriptors via {content_base64} (preferred in proxied clients) or {download_url, file_id}. Use the admin-event-cover-image-prompt to get the recommended prompt and reference images before generating.';
 
     public function __construct(
         private readonly AdminResourceRegistry $registry,
@@ -40,7 +40,7 @@ class AdminUploadEventCoverImageTool extends AbstractAdminTool
         $this->setMeta([
             'openai/toolInvocation/invoking' => 'Uploading event cover image...',
             'openai/toolInvocation/invoked' => 'Event cover image uploaded.',
-            'openai/note' => 'Pass {download_url, file_id, filename} for ChatGPT-generated images or {content_base64, filename} for base64 images. Required aspect ratio: 16:9.',
+            'openai/note' => 'Pass {content_base64, filename} for maximum client/proxy compatibility, or {download_url, file_id, filename} when direct URL descriptors are supported. Required aspect ratio: 16:9.',
         ]);
     }
 
@@ -116,14 +116,6 @@ class AdminUploadEventCoverImageTool extends AbstractAdminTool
     #[\Override]
     public function toArray(): array
     {
-        $tool = parent::toArray();
-        $tool['_meta'] = array_merge(
-            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
-            [
-                'openai/fileParams' => ['image'],
-            ],
-        );
-
-        return $tool;
+        return parent::toArray();
     }
 }
