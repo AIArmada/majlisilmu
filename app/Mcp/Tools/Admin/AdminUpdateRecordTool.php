@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Admin;
 
 use App\Support\Api\Admin\AdminResourceService;
+use Generator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Validation\ValidationException;
@@ -30,9 +31,14 @@ class AdminUpdateRecordTool extends AbstractAdminWriteTool
         private readonly AdminResourceService $resourceService,
     ) {}
 
-    public function handle(Request $request): ResponseFactory|Response
+    public function handle(Request $request): Generator
     {
-        return $this->safeResponse(function () use ($request): ResponseFactory {
+        yield Response::notification('notifications/message', [
+            'level' => 'info',
+            'data' => 'Validating and updating record...',
+        ]);
+
+        yield $this->safeResponse(function () use ($request): ResponseFactory {
             $actor = $this->authorizeAdmin($request);
 
             $validated = $this->validateArguments($request, [

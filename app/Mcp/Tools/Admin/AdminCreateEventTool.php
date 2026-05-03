@@ -12,10 +12,12 @@ use App\Enums\EventType;
 use App\Enums\EventVisibility;
 use App\Enums\RegistrationMode;
 use App\Models\Institution;
+use App\Models\Reference;
 use App\Models\Space;
 use App\Models\Speaker;
 use App\Models\Venue;
 use App\Support\Api\Admin\AdminResourceService;
+use Generator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\JsonSchema\Types\Type;
@@ -39,15 +41,20 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
 
     protected string $title = 'Create Event';
 
-    protected string $description = 'Use this when you want to create a new event, optionally with cover, poster, or gallery images in the same request. Resolves organizer and location by human-readable route key — avoid raw UUIDs when a key is available. Do not use to update an existing event; use admin-update-record instead.';
+    protected string $description = 'Use this when you want to create a new event, optionally with cover, poster, or gallery images in the same request. Resolves organizer and location by human-readable route key — avoid raw UUIDs when a key is available. Supports speaker_keys and reference_keys to attach required speakers and references by slug or UUID. Do not use to update an existing event; use admin-update-record instead.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
     ) {}
 
-    public function handle(Request $request): ResponseFactory|Response
+    public function handle(Request $request): Generator
     {
-        return $this->safeResponse(function () use ($request): ResponseFactory {
+        yield Response::notification('notifications/message', [
+            'level' => 'info',
+            'data' => 'Validating and creating event...',
+        ]);
+
+        yield $this->safeResponse(function () use ($request): ResponseFactory {
             $actor = $this->authorizeAdmin($request);
 
             $validated = $this->validateArguments($request, [
@@ -75,6 +82,28 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                 'institution_key' => ['nullable', 'string'],
                 'venue_key' => ['nullable', 'string'],
                 'space_key' => ['nullable', 'string'],
+                'speaker_keys' => ['sometimes', 'nullable', 'array'],
+                'speaker_keys.*' => ['string'],
+                'reference_keys' => ['sometimes', 'nullable', 'array'],
+                'reference_keys.*' => ['string'],
+                'languages' => ['sometimes', 'nullable', 'array'],
+                'languages.*' => ['integer'],
+                'domain_tags' => ['sometimes', 'nullable', 'array'],
+                'domain_tags.*' => ['string'],
+                'discipline_tags' => ['sometimes', 'nullable', 'array'],
+                'discipline_tags.*' => ['string'],
+                'source_tags' => ['sometimes', 'nullable', 'array'],
+                'source_tags.*' => ['string'],
+                'issue_tags' => ['sometimes', 'nullable', 'array'],
+                'issue_tags.*' => ['string'],
+                'other_key_people' => ['sometimes', 'nullable', 'array'],
+                'other_key_people.*.role' => ['required_with:other_key_people.*.name,other_key_people.*.speaker_id', 'string'],
+                'other_key_people.*.speaker_id' => ['nullable', 'string'],
+                'other_key_people.*.name' => ['nullable', 'string', 'max:255'],
+                'other_key_people.*.is_public' => ['sometimes', 'boolean'],
+                'other_key_people.*.notes' => ['nullable', 'string', 'max:500'],
+                'series' => ['sometimes', 'nullable', 'array'],
+                'series.*' => ['string'],
                 'cover' => ['sometimes', 'array'],
                 'poster' => ['sometimes', 'array'],
                 'gallery' => ['sometimes', 'array', 'max:10'],
@@ -152,6 +181,8 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             $payload['institution_key'],
             $payload['venue_key'],
             $payload['space_key'],
+            $payload['speaker_keys'],
+            $payload['reference_keys'],
         );
 
         $organizerType = $this->normalizeOrganizerType($validated['organizer_type'] ?? null);
@@ -198,6 +229,44 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                 modelClass: Space::class,
                 key: $spaceKey,
             );
+        }
+
+        $speakerKeys = array_values(array_filter(
+            array_map(
+                fn (mixed $k): ?string => $this->normalizeOptionalString($k),
+                (array) ($validated['speaker_keys'] ?? [])
+            ),
+            static fn (?string $v): bool => $v !== null,
+        ));
+
+        if ($speakerKeys !== []) {
+            $payload['speakers'] = array_values(array_map(
+                fn (string $key): string => $this->resolveRecordIdentifier(
+                    field: 'speaker_keys',
+                    modelClass: Speaker::class,
+                    key: $key,
+                ),
+                $speakerKeys,
+            ));
+        }
+
+        $referenceKeys = array_values(array_filter(
+            array_map(
+                fn (mixed $k): ?string => $this->normalizeOptionalString($k),
+                (array) ($validated['reference_keys'] ?? [])
+            ),
+            static fn (?string $v): bool => $v !== null,
+        ));
+
+        if ($referenceKeys !== []) {
+            $payload['references'] = array_values(array_map(
+                fn (string $key): string => $this->resolveRecordIdentifier(
+                    field: 'reference_keys',
+                    modelClass: Reference::class,
+                    key: $key,
+                ),
+                $referenceKeys,
+            ));
         }
 
         return $payload;
@@ -316,6 +385,23 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             'institution_key' => $schema->string()->nullable()->description('Institution route key (slug preferred, UUID allowed).'),
             'venue_key' => $schema->string()->nullable()->description('Venue route key (slug preferred, UUID allowed).'),
             'space_key' => $schema->string()->nullable()->description('Space route key (slug preferred, UUID allowed).'),
+            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of speaker route keys (slug preferred, UUID allowed). Each entry is resolved to a speaker UUID and attached as a speaker-role key person. Required for event types that mandate a speaker: kuliah_ceramah, kelas_daurah, talim, forum, seminar_konvensyen, tazkirah.'),
+            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of reference route keys (slug preferred, UUID allowed). Each entry is resolved to a reference UUID and linked to the event.'),
+            'languages' => $schema->array()->items($schema->integer())->nullable()->description('Array of language record IDs (integers) for the event language(s). Use admin-list-records on the languages resource to discover available IDs.'),
+            'domain_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of domain/category tag UUIDs (max 3). Use admin-list-records on the tags resource filtered by type=domain.'),
+            'discipline_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of discipline/field-of-study tag UUIDs. Use admin-list-records on the tags resource filtered by type=discipline.'),
+            'source_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of source tag UUIDs (e.g. Quran, Hadith). Use admin-list-records on the tags resource filtered by type=source.'),
+            'issue_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of issue/theme tag UUIDs. Use admin-list-records on the tags resource filtered by type=issue.'),
+            'other_key_people' => $schema->array()->items(
+                $schema->object([
+                    'role' => $schema->string()->required()->description('One of the non-speaker EventKeyPersonRole values: moderator, khatib, imam, bilal, pic, other.'),
+                    'speaker_id' => $schema->string()->nullable()->description('UUID of an existing speaker profile. Required when name is omitted.'),
+                    'name' => $schema->string()->nullable()->description('Display name. Required when speaker_id is omitted.'),
+                    'is_public' => $schema->boolean()->default(true),
+                    'notes' => $schema->string()->nullable(),
+                ])
+            )->nullable()->description('Optional non-speaker key people (moderators, khatib, imam, bilal, PIC, etc.).'),
+            'series' => $schema->array()->items($schema->string())->nullable()->description('Array of series UUIDs to link the event to.'),
             'cover' => $schema->object([
                 'filename' => $schema->string()->required(),
                 'content_base64' => $schema->string()->nullable(),

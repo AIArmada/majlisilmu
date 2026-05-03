@@ -2583,6 +2583,68 @@ it('emulates production yasin create flow with validate-only then actual create'
     )->toBe('pending');
 });
 
+it('creates a tazkirah event with speaker_keys via admin-create-event', function () {
+    ensureMcpMalaysiaCountryExists();
+
+    $admin = adminMcpUser('super_admin');
+
+    $institution = Institution::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $reference = Reference::factory()->create([
+        'status' => 'verified',
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminCreateEventTool::class, [
+            'title' => 'Tazkirah Test With Speaker',
+            'description' => '<p>Test tazkirah</p>',
+            'event_date' => '2026-06-15',
+            'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'event_format' => EventFormat::Physical->value,
+            'visibility' => EventVisibility::Public->value,
+            'gender' => EventGenderRestriction::All->value,
+            'age_group' => [EventAgeGroup::AllAges->value],
+            'children_allowed' => false,
+            'is_muslim_only' => true,
+            'event_type' => [EventType::Tazkirah->value],
+            'organizer_type' => 'institution',
+            'organizer_key' => (string) $institution->slug,
+            'institution_key' => (string) $institution->slug,
+            'speaker_keys' => [(string) $speaker->slug],
+            'reference_keys' => [(string) $reference->slug],
+            'languages' => [101],
+            'registration_required' => false,
+            'registration_mode' => RegistrationMode::Event->value,
+            'status' => 'pending',
+            'is_featured' => false,
+            'is_active' => true,
+            'validate_only' => false,
+            'apply_defaults' => false,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.attributes.title', 'Tazkirah Test With Speaker')
+            ->where('data.record.attributes.status', 'pending')
+            ->etc());
+
+    $created = Event::query()->where('title', 'Tazkirah Test With Speaker')->firstOrFail();
+    $created->load(['keyPeople', 'references']);
+
+    expect($created->keyPeople)->toHaveCount(1)
+        ->and((string) $created->keyPeople->first()?->speaker_id)->toBe((string) $speaker->getKey())
+        ->and($created->references)->toHaveCount(1)
+        ->and((string) $created->references->first()?->getKey())->toBe((string) $reference->getKey());
+});
+
 it('allows admin event create payload to control workflow-ready status', function () {
     ensureMcpMalaysiaCountryExists();
 
@@ -3404,6 +3466,9 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
     expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.institution_key.type'))->contains('string'))->toBeTrue();
     expect(data_get($tools->get('admin-create-event'), 'inputSchema.properties.organizer_id'))->toBeNull();
     expect(data_get($tools->get('admin-create-event'), 'inputSchema.properties.institution_id'))->toBeNull();
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.speaker_keys.type'))->contains('array'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.reference_keys.type'))->contains('array'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.languages.type'))->contains('array'))->toBeTrue();
 
     expect(data_get($tools->get('admin-create-record'), 'inputSchema.properties.payload.type'))->toBe('object');
     expect(collect((array) data_get($tools->get('admin-create-record'), 'inputSchema.required'))->contains('payload'))->toBeTrue();
