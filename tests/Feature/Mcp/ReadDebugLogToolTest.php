@@ -50,10 +50,11 @@ it('returns mcp.image_upload log lines for admins', function (): void {
     ]).PHP_EOL);
 
     AdminServer::actingAs($admin)
-        ->tool(AdminReadDebugLogTool::class)
+        ->tool(AdminReadDebugLogTool::class, ['filter' => 'mcp.image_upload'])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
             ->where('filter', 'mcp.image_upload')
+            ->where('all', false)
             ->where('total_matched', 2)
             ->where('lines.0', '[2026-05-02 12:00:00] local.DEBUG: mcp.image_upload: start {"event":"test-event"}')
             ->where('lines.1', '[2026-05-02 12:00:02] local.DEBUG: mcp.image_upload: complete {"media_id":"abc-123"}')
@@ -71,11 +72,34 @@ it('respects the lines limit', function (): void {
     file_put_contents($logPath, implode(PHP_EOL, $allLines).PHP_EOL);
 
     AdminServer::actingAs($admin)
-        ->tool(AdminReadDebugLogTool::class, ['lines' => 3])
+        ->tool(AdminReadDebugLogTool::class, ['filter' => 'mcp.image_upload', 'lines' => 3])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
+            ->where('filter', 'mcp.image_upload')
+            ->where('all', false)
             ->where('total_matched', 10)
             ->count('lines', 3)
+            ->etc());
+});
+
+it('returns all matching lines when all is true', function (): void {
+    $admin = debugLogAdminUser();
+
+    $logPath = debugLogTestPath();
+    $allLines = array_map(
+        fn (int $i): string => "[2026-05-02 12:00:{$i}] local.DEBUG: mcp.image_upload: entry {$i}",
+        range(0, 9),
+    );
+    file_put_contents($logPath, implode(PHP_EOL, $allLines).PHP_EOL);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminReadDebugLogTool::class, ['filter' => 'mcp.image_upload', 'all' => true])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('filter', 'mcp.image_upload')
+            ->where('all', true)
+            ->where('total_matched', 10)
+            ->count('lines', 10)
             ->etc());
 });
 
@@ -85,12 +109,13 @@ it('returns an empty result when no log file exists', function (): void {
     @unlink(debugLogTestPath());
 
     AdminServer::actingAs($admin)
-        ->tool(AdminReadDebugLogTool::class)
+        ->tool(AdminReadDebugLogTool::class, ['filter' => 'mcp.image_upload'])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
             ->where('lines', [])
             ->where('total_matched', 0)
             ->where('filter', 'mcp.image_upload')
+            ->where('all', false)
             ->etc());
 });
 
@@ -108,6 +133,7 @@ it('accepts a custom filter string', function (): void {
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
             ->where('filter', 'custom.channel')
+            ->where('all', false)
             ->where('total_matched', 1)
             ->etc());
 });
@@ -122,11 +148,30 @@ it('returns mcp.image_upload log lines for members', function (): void {
     ]).PHP_EOL);
 
     MemberServer::actingAs($member)
-        ->tool(MemberReadDebugLogTool::class)
+        ->tool(MemberReadDebugLogTool::class, ['filter' => 'mcp.image_upload'])
         ->assertOk()
         ->assertStructuredContent(fn ($json) => $json
             ->where('filter', 'mcp.image_upload')
+            ->where('all', false)
             ->where('total_matched', 1)
+            ->etc());
+});
+
+it('reads mcp tool execution logs by default for admins', function (): void {
+    $admin = debugLogAdminUser();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminReadDebugLogTool::class, ['filter' => 'custom.channel'])
+        ->assertOk();
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminReadDebugLogTool::class, ['all' => true])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('filter', 'mcp.tool_execution')
+            ->where('all', true)
+            ->where('total_matched', fn (int $value): bool => $value >= 2)
+            ->where('lines.0', fn (string $line): bool => str_contains($line, 'mcp.tool_execution'))
             ->etc());
 });
 
