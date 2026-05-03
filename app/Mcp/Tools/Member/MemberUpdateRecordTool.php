@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Member;
 
 use App\Support\Api\Member\MemberResourceService;
+use Generator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
-use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
@@ -29,9 +29,14 @@ class MemberUpdateRecordTool extends AbstractMemberWriteTool
         private readonly MemberResourceService $resourceService,
     ) {}
 
-    public function handle(Request $request): ResponseFactory|Response
+    public function handle(Request $request): Generator
     {
-        return $this->structuredResponse(function () use ($request): array {
+        yield Response::notification('notifications/message', [
+            'level' => 'info',
+            'data' => 'Validating and updating record...',
+        ]);
+
+        yield $this->structuredResponse(function () use ($request): array {
             $actor = $this->authorizeMember($request);
 
             $validated = $this->validateArguments($request, [

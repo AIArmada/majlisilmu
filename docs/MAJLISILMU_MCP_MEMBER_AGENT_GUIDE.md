@@ -439,6 +439,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-list-membership-claims` | List the authenticated member's membership claims | `GET /api/v1/member/membership-claims` |
 | `member-submit-membership-claim` | Submit a membership claim with evidence uploads | `POST /api/v1/member/membership-claims` |
 | `member-cancel-membership-claim` | Cancel one of the member's membership claims | `DELETE /api/v1/member/membership-claims/{claimKey}` |
+| `member-read-debug-log` | Read recent filtered lines from the application debug log | MCP-only debug log reader |
 
 Member tool behavior notes:
 
@@ -452,6 +453,7 @@ Member tool behavior notes:
 - Member update schemas reuse the same resource-level write semantics where the resource is shared, so clients should still fetch the current record and re-send the full intended collection when a field is replacement-based.
 - `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
 - All read-only member tools (discovery, list, get, schema, and workflow listing tools) carry read-only and idempotent metadata hints; MCP clients that honor these hints can call them without requiring confirmation.
+- `member-update-record` does **not** support `apply_defaults` (unlike `admin-update-record`). To apply server-side schema defaults during a preview, call `member-get-write-schema` and use the returned defaults directly in the payload.
 
 ## Agent Quick Rules
 

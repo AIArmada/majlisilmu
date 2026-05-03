@@ -428,6 +428,8 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-review-membership-claim` | Approve or reject a pending membership claim | `POST /api/v1/admin/membership-claims/{recordKey}/review` |
 | `admin-create-record` | Create or preview a writable admin record | `POST /api/v1/admin/{resourceKey}` |
 | `admin-create-event` | Create or preview a new event with event-first fields and relation route keys, optionally including cover, poster, or gallery image descriptors | MCP-only event creation tool |
+| `admin-get-record-media` | List media attachments for one admin record to verify uploads or prefill forms | MCP-only media inspection tool |
+| `admin-read-debug-log` | Read recent filtered lines from the application debug log | MCP-only debug log reader |
 | `admin-update-record` | Update or preview a writable admin record | `PUT /api/v1/admin/{resourceKey}/{recordKey}` |
 
 Admin tool behavior notes:
@@ -448,6 +450,9 @@ Admin tool behavior notes:
 - If the prompt call fails while attaching reference images, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`.
 - Event media writes enforce fixed ratios across MCP writes: `cover` must be `16:9` and `poster` must be `4:5`.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
+- `admin-create-event` now maps to the `/hantar-majlis` wizard payload model for event creation. It accepts scalar event fields, relation route keys (`organizer_key`, `institution_key`, `venue_key`, `space_key`), speaker/reference route-key arrays (`speaker_keys`, `reference_keys`), language IDs (`languages`), tag arrays (`domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`), `other_key_people`, optional `series`, and media descriptors (`cover`, `poster`, `gallery`).
+- `admin-get-record-media` returns media collection metadata for one admin record. Use it to verify that cover/poster/gallery uploads persisted and to build reference-media descriptors for image generation prompts.
+- `admin-read-debug-log` returns recent application debug-log lines, optionally filtered by a keyword. Restrict access to trusted admin actors only.
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain. This tool is **conditionally registered** and only present when the GitHub issue reporter is configured; it will be absent from `tools/list` if GitHub issue reporting has not been set up.
 - The admin workflow tools (`admin-get-event-moderation-schema`, `admin-moderate-event`, `admin-get-report-triage-schema`, `admin-triage-report`, `admin-get-contribution-request-review-schema`, `admin-review-contribution-request`, `admin-get-membership-claim-review-schema`, `admin-review-membership-claim`) are **conditionally registered** based on the current user's permissions: moderation tools require `canModerate`, triage tools require `canTriage`, and review tools require `canReview`. If these tools are absent from `tools/list`, the authenticated admin user lacks the corresponding workflow permission.
 - All read-only discovery, list, get, and schema tools carry `#[IsReadOnly]` + `#[IsIdempotent]` annotations; AI clients that honor MCP tool annotations can call them freely without confirmation prompts.
@@ -480,6 +485,7 @@ The member server is the model-visible API-like surface for Ahli-scoped workflow
 | `member-cancel-membership-claim` | Cancel one pending membership claim owned by the authenticated member |
 | `member-create-github-issue` | Create a GitHub issue in the configured repository |
 | `member-update-record` | Update a writable member record using the schema-guided payload contract |
+| `member-read-debug-log` | Read recent filtered lines from the application debug log | MCP-only debug log reader |
 
 Member tool behavior notes:
 
@@ -496,6 +502,7 @@ Member tool behavior notes:
 - Contribution-request workflow tools cover listing, approving, rejecting, and cancelling queue items that the authenticated member can legitimately act on through the Ahli surface.
 - Membership-claim workflow tools cover listing, submitting with evidence uploads, and cancelling the member's own pending claims.
 - `member-create-github-issue` creates a plain GitHub issue only; it does not assign Copilot.
+- `member-update-record` does **not** support `apply_defaults` (unlike `admin-update-record`). Preview calls via `validate_only=true` normalize the payload but do not apply schema defaults.
 - Media/file upload fields accept JSON file descriptors when the matching member write schema advertises them; descriptor content may be provided via `content_base64`, `content_url`, or `download_url`.
 - If the prompt call fails while attaching reference images, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`.
 - As with admin tools, ChatGPT only understands what the tool descriptor exposes; if a capability is not registered as a tool, the model will not assume it exists.
@@ -617,15 +624,17 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `fetch` | Fetch the full text of one verified docs page | `id` |
 | `admin-list-resources` | Discover accessible admin resources | `verbose?`, `writable_only?` |
 | `admin-get-resource-meta` | Inspect one resource’s metadata, routes, relations, and abilities | `resource_key` |
-| `admin-search-events` | Run dedicated event discovery with rich filters | `query?`, `sort?` (time/relevance/distance), `time_scope?` (upcoming/past/all), `starts_after?`, `starts_before?`, `starts_time_from?`, `starts_time_until?`, `timing_mode?`, `prayer_time?`, `event_type?` (array), `event_format?` (array: physical/online/hybrid), `language_codes?` (array), `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `country_id?`, `state_id?`, `district_id?`, `subdistrict_id?`, `lat?`, `lng?`, `radius_km?`, `institution_id?`, `venue_id?`, `speaker_ids?` (array), `key_person_roles?` (array), `person_in_charge_ids?`, `moderator_ids?`, `imam_ids?`, `khatib_ids?`, `bilal_ids?`, `topic_ids?` (array), `domain_tag_ids?` (array), `source_tag_ids?` (array), `issue_tag_ids?` (array), `reference_ids?` (array), `reference_author_search?` (array), `search_include_institutions?`, `search_include_speakers?`, `search_include_references?`, `has_event_url?`, `has_live_url?`, `has_end_time?`, `page?`, `per_page?` |
+| `admin-search-events` | Run dedicated event discovery with rich filters | `query?`, `sort?` (time/relevance/distance), `time_scope?` (upcoming/past/all), `starts_after?`, `starts_before?`, `starts_time_from?`, `starts_time_until?`, `timing_mode?`, `prayer_time?`, `event_type?` (array), `event_format?` (array: physical/online/hybrid), `language_codes?` (array), `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `country_id?`, `state_id?`, `district_id?`, `subdistrict_id?`, `lat?`, `lng?`, `radius_km?`, `institution_id?`, `venue_id?`, `speaker_ids?` (array), `key_person_roles?` (array), `person_in_charge_ids?`, `person_in_charge_search?`, `moderator_ids?`, `imam_ids?`, `khatib_ids?`, `bilal_ids?`, `topic_ids?` (array), `domain_tag_ids?` (array), `source_tag_ids?` (array), `issue_tag_ids?` (array), `reference_ids?` (array), `reference_author_search?` (array), `search_include_institutions?`, `search_include_speakers?`, `search_include_references?`, `has_event_url?`, `has_live_url?`, `has_end_time?`, `page?`, `per_page?` |
 | `admin-list-records` | Search and paginate records for one admin resource | `resource_key`, `search?`, `filters?`, `starts_after?`, `starts_before?`, `starts_on_local_date?`, `page?`, `per_page?` |
-| `admin-list-related-records` | Traverse a named relation on a record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
+| `admin-list-related-records` | Traverse a named relation on a record | `resource_key`, `record_key`, `relation`, `search?`, `page?`, `per_page?` |
 | `admin-get-record` | Read one admin record and its permissions | `resource_key`, `record_key` |
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | `resource_key`, `record_key` |
 | `admin-upload-event-cover-image` | Upload a pre-generated image to the event `cover` collection at `16:9` (use `admin-event-cover-image-prompt` first) | `event_key`, `image`, `creative_direction?` |
 | `admin-upload-event-poster-image` | Upload a pre-generated image to the event `poster` collection at `4:5` (use `admin-event-poster-image-prompt` first) | `event_key`, `image`, `creative_direction?` |
-| `admin-create-event` | Create or preview an event with event-first arguments | `title`, `event_date`, `event_type?`, `prayer_time?`, `organizer_key?`, `institution_key?`, `validate_only?` |
-| `admin-create-github-issue` | Create a GitHub issue in the configured repository and auto-assign Copilot (conditionally registered) | `category`, `title`, `summary`, `platform?`, `proposal?` |
+| `admin-create-event` | Create or preview a new event with event-first fields and relation route keys, aligned to `/hantar-majlis` non-media payload structure. | `title`, `event_date`, `event_type` (array), `prayer_time`, `description?`, `custom_time?`, `end_time?`, `timezone?`, `event_format?`, `visibility?`, `event_url?`, `live_url?`, `recording_url?`, `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `organizer_type?`, `organizer_key?`, `institution_key?`, `venue_key?`, `space_key?`, `speaker_keys?` (array), `reference_keys?` (array), `languages?` (array of IDs), `domain_tags?` (array), `discipline_tags?` (array), `source_tags?` (array), `issue_tags?` (array), `other_key_people?` (array), `series?` (array), `status?`, `registration_required?`, `registration_mode?`, `is_priority?`, `is_featured?`, `is_active?`, `cover?`, `poster?`, `gallery?`, `validate_only?`, `apply_defaults?` |
+| `admin-get-record-media` | List media attachments for one admin record | `resource_key`, `record_key` |
+| `admin-read-debug-log` | Read recent filtered lines from the debug log | `filter?`, `lines?`, `all?` |
+| `admin-create-github-issue` | Create a GitHub issue in the configured repository and auto-assign Copilot (conditionally registered) | `category`, `title`, `summary`, `platform?`, `proposal?`, `description?` (plus additional diagnostic fields) |
 | `admin-get-write-schema` | Fetch the create/update contract for a writable admin record | `resource_key`, `operation`, `record_key?` |
 | `admin-get-event-moderation-schema` | Fetch the explicit moderation schema for one event | `record_key` |
 | `admin-get-report-triage-schema` | Fetch the explicit triage schema for one report | `record_key` |
@@ -636,7 +645,6 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `admin-review-contribution-request` | Approve or reject one pending contribution request | `record_key`, `action`, `reason_code?`, `reviewer_note?` |
 | `admin-review-membership-claim` | Approve or reject one pending membership claim | `record_key`, `action`, `granted_role_slug?`, `reviewer_note?` |
 | `admin-create-record` | Create or preview a writable admin record | `resource_key`, `payload`, `validate_only?`, `apply_defaults?` |
-| `admin-create-event` | Create or preview a new event with event-first fields and relation route keys | `title`, `event_date`, `prayer_time`, `event_type`, `validate_only?`, `cover?`, `poster?`, `gallery?` |
 | `admin-update-record` | Update or preview a writable admin record | `resource_key`, `record_key`, `payload`, `validate_only?`, `apply_defaults?` |
 
 ### Member MCP tools
@@ -647,15 +655,17 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `fetch` | Fetch the full text of one verified docs page | `id` |
 | `member-list-resources` | Discover accessible Ahli-scoped resources | `verbose?` |
 | `member-get-resource-meta` | Inspect one member resource’s metadata and write support | `resource_key` |
-| `member-search-events` | Run dedicated event discovery with rich filters | `query?`, `sort?` (time/relevance/distance), `time_scope?` (upcoming/past/all), `starts_after?`, `starts_before?`, `starts_time_from?`, `starts_time_until?`, `timing_mode?`, `prayer_time?`, `event_type?` (array), `event_format?` (array: physical/online/hybrid), `language_codes?` (array), `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `country_id?`, `state_id?`, `district_id?`, `subdistrict_id?`, `lat?`, `lng?`, `radius_km?`, `institution_id?`, `venue_id?`, `speaker_ids?` (array), `key_person_roles?` (array), `person_in_charge_ids?`, `moderator_ids?`, `imam_ids?`, `khatib_ids?`, `bilal_ids?`, `topic_ids?` (array), `domain_tag_ids?` (array), `source_tag_ids?` (array), `issue_tag_ids?` (array), `reference_ids?` (array), `has_event_url?`, `has_live_url?`, `has_end_time?`, `page?`, `per_page?` |
-| `member-list-records` | Search and paginate records for one member resource | `resource_key`, `search?`, `page?`, `per_page?` |
-| `member-list-related-records` | Traverse a named relation on a member record | `resource_key`, `record_key`, `relation`, `page?`, `per_page?` |
+| `member-search-events` | Run dedicated event discovery with rich filters | `query?`, `sort?` (time/relevance/distance), `time_scope?` (upcoming/past/all), `starts_after?`, `starts_before?`, `starts_time_from?`, `starts_time_until?`, `timing_mode?`, `prayer_time?`, `event_type?` (array), `event_format?` (array: physical/online/hybrid), `language_codes?` (array), `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `country_id?`, `state_id?`, `district_id?`, `subdistrict_id?`, `lat?`, `lng?`, `radius_km?`, `institution_id?`, `venue_id?`, `speaker_ids?` (array), `key_person_roles?` (array), `person_in_charge_ids?`, `person_in_charge_search?`, `moderator_ids?`, `imam_ids?`, `khatib_ids?`, `bilal_ids?`, `topic_ids?` (array), `domain_tag_ids?` (array), `source_tag_ids?` (array), `issue_tag_ids?` (array), `reference_ids?` (array), `reference_author_search?` (array), `search_include_institutions?`, `search_include_speakers?`, `search_include_references?`, `has_event_url?`, `has_live_url?`, `has_end_time?`, `page?`, `per_page?` |
+| `member-list-records` | Search and paginate records for one member resource | `resource_key`, `search?`, `starts_after?`, `starts_before?`, `starts_on_local_date?`, `page?`, `per_page?` |
+| `member-list-related-records` | Traverse a named relation on a member record | `resource_key`, `record_key`, `relation`, `search?`, `page?`, `per_page?` |
 | `member-get-record` | Read one member record | `resource_key`, `record_key` |
 | `member-get-record-actions` | Get focused next-step MCP actions for one member record | `resource_key`, `record_key` |
 | `member-upload-event-cover-image` | Upload a pre-generated image to the accessible event `cover` collection at `16:9` (use `member-event-cover-image-prompt` first) | `event_key`, `image`, `creative_direction?` |
 | `member-upload-event-poster-image` | Upload a pre-generated image to the accessible event `poster` collection at `4:5` (use `member-event-poster-image-prompt` first) | `event_key`, `image`, `creative_direction?` |
-| `member-create-github-issue` | Create a GitHub issue in the configured repository (conditionally registered) | `category`, `title`, `summary`, `platform?`, `proposal?` |
+| `member-create-github-issue` | Create a GitHub issue in the configured repository (conditionally registered) | `category`, `title`, `summary`, `platform?`, `proposal?`, `description?` (plus additional diagnostic fields) |
+| `member-read-debug-log` | Read recent filtered lines from the debug log | `filter?`, `lines?`, `all?` |
 | `member-get-write-schema` | Fetch the writable update contract for one member record | `resource_key`, `record_key` |
+| `member-update-record` | Update or preview a writable member record. Supports `validate_only?` but **not** `apply_defaults` (unlike `admin-update-record`). | `resource_key`, `record_key`, `payload`, `validate_only?` |
 | `member-list-contribution-requests` | List the authenticated member's contribution queue and pending approvals | none |
 | `member-approve-contribution-request` | Approve one reviewable contribution request | `request_id`, `reviewer_note?` |
 | `member-reject-contribution-request` | Reject one reviewable contribution request | `request_id`, `reason_code`, `reviewer_note?` |
@@ -663,7 +673,6 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `member-list-membership-claims` | List the authenticated member's membership claims | none |
 | `member-submit-membership-claim` | Submit a membership claim with evidence uploads | `subject_type`, `subject`, `justification`, `evidence` |
 | `member-cancel-membership-claim` | Cancel one pending membership claim owned by the member | `claim_id` |
-| `member-update-record` | Update or preview a writable member record | `resource_key`, `record_key`, `payload`, `validate_only?` |
 
 ### Reading rules for the appendix
 
