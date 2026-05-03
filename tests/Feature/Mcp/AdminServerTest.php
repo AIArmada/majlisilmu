@@ -4327,6 +4327,8 @@ it('updates an event via the admin-update-event MCP tool with speaker_keys resol
         'id' => $event->id,
         'title' => 'Updated Event Title',
     ]);
+
+    expect($event->refresh()->speakers->contains($speaker))->toBeTrue();
 });
 
 it('updates an event with validate_only via admin-update-event without persisting', function () {
@@ -4348,11 +4350,12 @@ it('updates an event with validate_only via admin-update-event without persistin
     ]);
 });
 
-it('batch-updates events via the admin-batch-update-events MCP tool with speaker_keys resolved', function () {
+it('batch-updates events and resolves speaker_keys via admin-batch-update-events', function () {
     $admin = adminMcpUser('super_admin');
 
     $eventA = Event::factory()->create(['title' => 'Batch Update Event Alpha', 'status' => 'draft']);
     $eventB = Event::factory()->create(['title' => 'Batch Update Event Beta', 'status' => 'draft']);
+    $speaker = Speaker::factory()->create(['slug' => 'batch-update-speaker']);
 
     AdminServer::actingAs($admin)
         ->tool(AdminBatchUpdateEventsTool::class, [
@@ -4361,6 +4364,7 @@ it('batch-updates events via the admin-batch-update-events MCP tool with speaker
                     'event_key' => $eventA->getRouteKey(),
                     'title' => 'Updated Alpha',
                     'external_row_id' => 'row-alpha',
+                    'speaker_keys' => [$speaker->slug],
                 ],
                 [
                     'event_key' => $eventB->getRouteKey(),
@@ -4378,6 +4382,7 @@ it('batch-updates events via the admin-batch-update-events MCP tool with speaker
 
     assertDatabaseHas('events', ['id' => $eventA->id, 'title' => 'Updated Alpha']);
     assertDatabaseHas('events', ['id' => $eventB->id, 'title' => 'Updated Beta']);
+    expect($eventA->refresh()->speakers->contains($speaker))->toBeTrue();
 });
 
 it('batch-updates events with validate_only via admin-batch-update-events without persisting', function () {
