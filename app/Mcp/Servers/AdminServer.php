@@ -10,6 +10,9 @@ use App\Mcp\Prompts\AdminEventCoverImagePrompt;
 use App\Mcp\Prompts\AdminEventPosterImagePrompt;
 use App\Mcp\Prompts\DocumentationToolRoutingPrompt;
 use App\Mcp\Resources\Docs\McpGuideResource;
+use App\Mcp\Tools\Admin\AdminBatchCreateEventsTool;
+use App\Mcp\Tools\Admin\AdminBatchCreateRecordsTool;
+use App\Mcp\Tools\Admin\AdminBatchUpdateRecordsTool;
 use App\Mcp\Tools\Admin\AdminCreateEventTool;
 use App\Mcp\Tools\Admin\AdminCreateGitHubIssueTool;
 use App\Mcp\Tools\Admin\AdminCreateRecordTool;
@@ -85,12 +88,15 @@ class AdminServer extends MajlisIlmuServer
         AdminGetContributionRequestReviewSchemaTool::class,
         AdminGetMembershipClaimReviewSchemaTool::class,
         AdminCreateEventTool::class,
+        AdminBatchCreateEventsTool::class,
         AdminCreateRecordTool::class,
+        AdminBatchCreateRecordsTool::class,
         AdminCreateGitHubIssueTool::class,
         AdminModerateEventTool::class,
         AdminTriageReportTool::class,
         AdminReviewContributionRequestTool::class,
         AdminReviewMembershipClaimTool::class,
         AdminUpdateRecordTool::class,
+        AdminBatchUpdateRecordsTool::class,
     ];
 }

@@ -144,31 +144,50 @@
       {
         "key": "panel_only",
         "description": "Operational or destructive capabilities that stay in Filament unless a later product and security decision promotes them.",
-        "default_surfaces": ["admin_panel", "ahli_panel"],
+        "default_surfaces": [
+          "admin_panel",
+          "ahli_panel"
+        ],
         "implementation_rule": "Do not mirror these capabilities to API or MCP by default."
       },
       {
         "key": "generic_admin_crud",
         "description": "Schema-guided admin CRUD for stable application resources.",
-        "default_surfaces": ["admin_panel", "admin_api", "admin_mcp"],
+        "default_surfaces": [
+          "admin_panel",
+          "admin_api",
+          "admin_mcp"
+        ],
         "implementation_rule": "Expand through shared admin mutation services so HTTP and MCP move together."
       },
       {
         "key": "member_scoped_crud",
         "description": "Scoped edit capabilities for member-owned or member-linked records.",
-        "default_surfaces": ["ahli_panel", "member_mcp"],
+        "default_surfaces": [
+          "ahli_panel",
+          "member_mcp"
+        ],
         "implementation_rule": "Keep member scope and permission checks aligned with Ahli resources."
       },
       {
         "key": "workflow_api",
         "description": "Public or authenticated workflow contracts such as contributions, membership claims, account settings, and workspace actions.",
-        "default_surfaces": ["public_api", "authenticated_api"],
+        "default_surfaces": [
+          "public_api",
+          "authenticated_api"
+        ],
         "implementation_rule": "Mirror into Ahli panel or Member MCP only when the flow is genuine member self-service, not merely because generic CRUD exists."
       },
       {
         "key": "workflow_action",
         "description": "Explicit review, moderation, approval, or state-transition actions.",
-        "default_surfaces": ["admin_panel", "admin_api", "admin_mcp", "ahli_panel", "member_mcp"],
+        "default_surfaces": [
+          "admin_panel",
+          "admin_api",
+          "admin_mcp",
+          "ahli_panel",
+          "member_mcp"
+        ],
         "implementation_rule": "Expose these as named actions on eligible surfaces instead of overloading generic create or update."
       }
     ],
@@ -187,7 +206,11 @@
     "default_excluded_resource_groups": [
       {
         "key": "geography_base_tables",
-        "resource_keys": ["countries", "states", "districts"],
+        "resource_keys": [
+          "countries",
+          "states",
+          "districts"
+        ],
         "rule": "Keep these out of parity expansion by default unless there is an explicit integration need."
       },
       {
@@ -245,7 +268,9 @@
           "reason": "AI-specific workflow: generates cover image from prompt, downloads from ChatGPT/AI provider, uploads to event.cover collection with 16:9 ratio.",
           "admin_api_equivalent": "PUT /admin/events/{recordKey} with cover file in multipart/form-data",
           "filament_equivalent": "EventResource edit page -> cover SpatieMediaLibraryFileUpload field",
-          "accessible_via": ["admin_mcp"],
+          "accessible_via": [
+            "admin_mcp"
+          ],
           "ai_surface_only": true
         },
         {
@@ -254,7 +279,9 @@
           "reason": "AI-specific workflow: generates poster image from prompt, downloads from ChatGPT/AI provider, uploads to event.poster collection with 4:5 portrait ratio.",
           "admin_api_equivalent": "PUT /admin/events/{recordKey} with poster file in multipart/form-data",
           "filament_equivalent": "EventResource edit page -> poster SpatieMediaLibraryFileUpload field",
-          "accessible_via": ["admin_mcp"],
+          "accessible_via": [
+            "admin_mcp"
+          ],
           "ai_surface_only": true
         },
         {
@@ -263,7 +290,9 @@
           "reason": "Member-scoped AI workflow: same as admin cover tool but limited to member-owned/linked events.",
           "member_api_equivalent": "None (member API is read-only for core CRUD; media updates flow through Ahli panel)",
           "filament_equivalent": "Ahli EventResource edit page -> cover SpatieMediaLibraryFileUpload field",
-          "accessible_via": ["member_mcp"],
+          "accessible_via": [
+            "member_mcp"
+          ],
           "ai_surface_only": true
         },
         {
@@ -272,7 +301,9 @@
           "reason": "Member-scoped AI workflow: same as admin poster tool but limited to member-owned/linked events.",
           "member_api_equivalent": "None (member API is read-only for core CRUD; media updates flow through Ahli panel)",
           "filament_equivalent": "Ahli EventResource edit page -> poster SpatieMediaLibraryFileUpload field",
-          "accessible_via": ["member_mcp"],
+          "accessible_via": [
+            "member_mcp"
+          ],
           "ai_surface_only": true
         }
       ]
@@ -286,28 +317,44 @@
           "mcp_only": false,
           "api_route": "POST /admin/events/{recordKey}/moderate with schema from GET /admin/events/{recordKey}/moderation-schema",
           "filament_equivalent": "EventResource view page -> Moderate action modal",
-          "accessible_via": ["admin_api", "admin_mcp", "admin_panel"]
+          "accessible_via": [
+            "admin_api",
+            "admin_mcp",
+            "admin_panel"
+          ]
         },
         {
           "tool_name": "AdminReviewContributionRequestTool",
           "mcp_only": false,
           "api_route": "POST /admin/contribution-requests/{recordKey}/review with schema from GET /admin/contribution-requests/{recordKey}/review-schema",
           "filament_equivalent": "ContributionRequestResource view page -> Review action modal",
-          "accessible_via": ["admin_api", "admin_mcp", "admin_panel"]
+          "accessible_via": [
+            "admin_api",
+            "admin_mcp",
+            "admin_panel"
+          ]
         },
         {
           "tool_name": "AdminReviewMembershipClaimTool",
           "mcp_only": false,
           "api_route": "POST /admin/membership-claims/{recordKey}/review with schema from GET /admin/membership-claims/{recordKey}/review-schema",
           "filament_equivalent": "MembershipClaimResource view page -> Review action modal",
-          "accessible_via": ["admin_api", "admin_mcp", "admin_panel"]
+          "accessible_via": [
+            "admin_api",
+            "admin_mcp",
+            "admin_panel"
+          ]
         },
         {
           "tool_name": "AdminTriageReportTool",
           "mcp_only": false,
           "api_route": "POST /admin/reports/{recordKey}/triage with schema from GET /admin/reports/{recordKey}/triage-schema",
           "filament_equivalent": "ReportResource edit page -> Triage action modal",
-          "accessible_via": ["admin_api", "admin_mcp", "admin_panel"]
+          "accessible_via": [
+            "admin_api",
+            "admin_mcp",
+            "admin_panel"
+          ]
         }
       ]
     },
@@ -330,151 +377,950 @@
       "source_of_truth": "Filament::getPanel('admin')->getResources()",
       "resource_count": 30,
       "resources": [
-        {"resource_key": "ai-model-pricings", "resource_class": "App\\Filament\\Resources\\AiModelPricings\\AiModelPricingResource", "model_class": "App\\Models\\AiModelPricing", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "ai-usage-logs", "resource_class": "App\\Filament\\Resources\\AiUsageLogs\\AiUsageLogResource", "model_class": "App\\Models\\AiUsageLog", "source": "app", "page_keys": ["index"], "generic_admin_write": false},
-        {"resource_key": "audits", "resource_class": "App\\Filament\\Resources\\Audits\\AuditResource", "model_class": "App\\Models\\Audit", "source": "app", "page_keys": ["index", "view"], "generic_admin_write": false},
-        {"resource_key": "contribution-requests", "resource_class": "App\\Filament\\Resources\\ContributionRequests\\ContributionRequestResource", "model_class": "App\\Models\\ContributionRequest", "source": "app", "page_keys": ["index", "view"], "generic_admin_write": false},
-        {"resource_key": "countries", "resource_class": "App\\Filament\\Resources\\Countries\\CountryResource", "model_class": "App\\Models\\Country", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "districts", "resource_class": "App\\Filament\\Resources\\Districts\\DistrictResource", "model_class": "App\\Models\\District", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "donation-channels", "resource_class": "App\\Filament\\Resources\\DonationChannels\\DonationChannelResource", "model_class": "App\\Models\\DonationChannel", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": true},
-        {"resource_key": "events", "resource_class": "App\\Filament\\Resources\\Events\\EventResource", "model_class": "App\\Models\\Event", "source": "app", "page_keys": ["index", "create", "view", "edit"], "generic_admin_write": true},
-        {"resource_key": "inspirations", "resource_class": "App\\Filament\\Resources\\Inspirations\\InspirationResource", "model_class": "App\\Models\\Inspiration", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": true},
-        {"resource_key": "institutions", "resource_class": "App\\Filament\\Resources\\Institutions\\InstitutionResource", "model_class": "App\\Models\\Institution", "source": "app", "page_keys": ["index", "create", "view", "edit"], "generic_admin_write": true},
-        {"resource_key": "membership-claims", "resource_class": "App\\Filament\\Resources\\MembershipClaims\\MembershipClaimResource", "model_class": "App\\Models\\MembershipClaim", "source": "app", "page_keys": ["index", "view"], "generic_admin_write": false},
-        {"resource_key": "permissions", "resource_class": "AIArmada\\FilamentAuthz\\Resources\\PermissionResource", "model_class": "AIArmada\\FilamentAuthz\\Models\\Permission", "source": "vendor", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "references", "resource_class": "App\\Filament\\Resources\\References\\ReferenceResource", "model_class": "App\\Models\\Reference", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": true},
-        {"resource_key": "reports", "resource_class": "App\\Filament\\Resources\\Reports\\ReportResource", "model_class": "App\\Models\\Report", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": true},
-        {"resource_key": "roles", "resource_class": "AIArmada\\FilamentAuthz\\Resources\\RoleResource", "model_class": "AIArmada\\FilamentAuthz\\Models\\Role", "source": "vendor", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "saved-signal-reports", "resource_class": "AIArmada\\FilamentSignals\\Resources\\SavedSignalReportResource", "model_class": "AIArmada\\Signals\\Models\\SavedSignalReport", "source": "vendor", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "series", "resource_class": "App\\Filament\\Resources\\Series\\SeriesResource", "model_class": "App\\Models\\Series", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": true},
-        {"resource_key": "signal-alert-logs", "resource_class": "AIArmada\\FilamentSignals\\Resources\\SignalAlertLogResource", "model_class": "AIArmada\\Signals\\Models\\SignalAlertLog", "source": "vendor", "page_keys": ["index"], "generic_admin_write": false},
-        {"resource_key": "signal-alert-rules", "resource_class": "AIArmada\\FilamentSignals\\Resources\\SignalAlertRuleResource", "model_class": "AIArmada\\Signals\\Models\\SignalAlertRule", "source": "vendor", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "signal-goals", "resource_class": "AIArmada\\FilamentSignals\\Resources\\SignalGoalResource", "model_class": "AIArmada\\Signals\\Models\\SignalGoal", "source": "vendor", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "signal-segments", "resource_class": "AIArmada\\FilamentSignals\\Resources\\SignalSegmentResource", "model_class": "AIArmada\\Signals\\Models\\SignalSegment", "source": "vendor", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "slug-redirects", "resource_class": "App\\Filament\\Resources\\SlugRedirects\\SlugRedirectResource", "model_class": "App\\Models\\SlugRedirect", "source": "app", "page_keys": ["index", "create", "view", "edit"], "generic_admin_write": false},
-        {"resource_key": "spaces", "resource_class": "App\\Filament\\Resources\\Spaces\\SpaceResource", "model_class": "App\\Models\\Space", "source": "app", "page_keys": ["index", "create", "view", "edit"], "generic_admin_write": true},
-        {"resource_key": "speakers", "resource_class": "App\\Filament\\Resources\\Speakers\\SpeakerResource", "model_class": "App\\Models\\Speaker", "source": "app", "page_keys": ["index", "create", "view", "edit"], "generic_admin_write": true},
-        {"resource_key": "states", "resource_class": "App\\Filament\\Resources\\States\\StateResource", "model_class": "App\\Models\\State", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "subdistricts", "resource_class": "App\\Filament\\Resources\\Subdistricts\\SubdistrictResource", "model_class": "App\\Models\\Subdistrict", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": true},
-        {"resource_key": "tags", "resource_class": "App\\Filament\\Resources\\Tags\\TagResource", "model_class": "App\\Models\\Tag", "source": "app", "page_keys": ["index", "create", "edit"], "generic_admin_write": true},
-        {"resource_key": "tracked-properties", "resource_class": "AIArmada\\FilamentSignals\\Resources\\TrackedPropertyResource", "model_class": "AIArmada\\Signals\\Models\\TrackedProperty", "source": "vendor", "page_keys": ["index", "create", "edit"], "generic_admin_write": false},
-        {"resource_key": "users", "resource_class": "App\\Filament\\Resources\\Authz\\UserResource", "model_class": "App\\Models\\User", "source": "app", "page_keys": ["index", "create", "view", "edit"], "generic_admin_write": false},
-        {"resource_key": "venues", "resource_class": "App\\Filament\\Resources\\Venues\\VenueResource", "model_class": "App\\Models\\Venue", "source": "app", "page_keys": ["index", "create", "view", "edit"], "generic_admin_write": true}
+        {
+          "resource_key": "ai-model-pricings",
+          "resource_class": "App\\Filament\\Resources\\AiModelPricings\\AiModelPricingResource",
+          "model_class": "App\\Models\\AiModelPricing",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "ai-usage-logs",
+          "resource_class": "App\\Filament\\Resources\\AiUsageLogs\\AiUsageLogResource",
+          "model_class": "App\\Models\\AiUsageLog",
+          "source": "app",
+          "page_keys": [
+            "index"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "audits",
+          "resource_class": "App\\Filament\\Resources\\Audits\\AuditResource",
+          "model_class": "App\\Models\\Audit",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "view"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "contribution-requests",
+          "resource_class": "App\\Filament\\Resources\\ContributionRequests\\ContributionRequestResource",
+          "model_class": "App\\Models\\ContributionRequest",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "view"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "countries",
+          "resource_class": "App\\Filament\\Resources\\Countries\\CountryResource",
+          "model_class": "App\\Models\\Country",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "districts",
+          "resource_class": "App\\Filament\\Resources\\Districts\\DistrictResource",
+          "model_class": "App\\Models\\District",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "donation-channels",
+          "resource_class": "App\\Filament\\Resources\\DonationChannels\\DonationChannelResource",
+          "model_class": "App\\Models\\DonationChannel",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "events",
+          "resource_class": "App\\Filament\\Resources\\Events\\EventResource",
+          "model_class": "App\\Models\\Event",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "inspirations",
+          "resource_class": "App\\Filament\\Resources\\Inspirations\\InspirationResource",
+          "model_class": "App\\Models\\Inspiration",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "institutions",
+          "resource_class": "App\\Filament\\Resources\\Institutions\\InstitutionResource",
+          "model_class": "App\\Models\\Institution",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "membership-claims",
+          "resource_class": "App\\Filament\\Resources\\MembershipClaims\\MembershipClaimResource",
+          "model_class": "App\\Models\\MembershipClaim",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "view"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "permissions",
+          "resource_class": "AIArmada\\FilamentAuthz\\Resources\\PermissionResource",
+          "model_class": "AIArmada\\FilamentAuthz\\Models\\Permission",
+          "source": "vendor",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "references",
+          "resource_class": "App\\Filament\\Resources\\References\\ReferenceResource",
+          "model_class": "App\\Models\\Reference",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "reports",
+          "resource_class": "App\\Filament\\Resources\\Reports\\ReportResource",
+          "model_class": "App\\Models\\Report",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "roles",
+          "resource_class": "AIArmada\\FilamentAuthz\\Resources\\RoleResource",
+          "model_class": "AIArmada\\FilamentAuthz\\Models\\Role",
+          "source": "vendor",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "saved-signal-reports",
+          "resource_class": "AIArmada\\FilamentSignals\\Resources\\SavedSignalReportResource",
+          "model_class": "AIArmada\\Signals\\Models\\SavedSignalReport",
+          "source": "vendor",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "series",
+          "resource_class": "App\\Filament\\Resources\\Series\\SeriesResource",
+          "model_class": "App\\Models\\Series",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "signal-alert-logs",
+          "resource_class": "AIArmada\\FilamentSignals\\Resources\\SignalAlertLogResource",
+          "model_class": "AIArmada\\Signals\\Models\\SignalAlertLog",
+          "source": "vendor",
+          "page_keys": [
+            "index"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "signal-alert-rules",
+          "resource_class": "AIArmada\\FilamentSignals\\Resources\\SignalAlertRuleResource",
+          "model_class": "AIArmada\\Signals\\Models\\SignalAlertRule",
+          "source": "vendor",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "signal-goals",
+          "resource_class": "AIArmada\\FilamentSignals\\Resources\\SignalGoalResource",
+          "model_class": "AIArmada\\Signals\\Models\\SignalGoal",
+          "source": "vendor",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "signal-segments",
+          "resource_class": "AIArmada\\FilamentSignals\\Resources\\SignalSegmentResource",
+          "model_class": "AIArmada\\Signals\\Models\\SignalSegment",
+          "source": "vendor",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "slug-redirects",
+          "resource_class": "App\\Filament\\Resources\\SlugRedirects\\SlugRedirectResource",
+          "model_class": "App\\Models\\SlugRedirect",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "spaces",
+          "resource_class": "App\\Filament\\Resources\\Spaces\\SpaceResource",
+          "model_class": "App\\Models\\Space",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "speakers",
+          "resource_class": "App\\Filament\\Resources\\Speakers\\SpeakerResource",
+          "model_class": "App\\Models\\Speaker",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "states",
+          "resource_class": "App\\Filament\\Resources\\States\\StateResource",
+          "model_class": "App\\Models\\State",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "subdistricts",
+          "resource_class": "App\\Filament\\Resources\\Subdistricts\\SubdistrictResource",
+          "model_class": "App\\Models\\Subdistrict",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "tags",
+          "resource_class": "App\\Filament\\Resources\\Tags\\TagResource",
+          "model_class": "App\\Models\\Tag",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": true
+        },
+        {
+          "resource_key": "tracked-properties",
+          "resource_class": "AIArmada\\FilamentSignals\\Resources\\TrackedPropertyResource",
+          "model_class": "AIArmada\\Signals\\Models\\TrackedProperty",
+          "source": "vendor",
+          "page_keys": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "users",
+          "resource_class": "App\\Filament\\Resources\\Authz\\UserResource",
+          "model_class": "App\\Models\\User",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "generic_admin_write": false
+        },
+        {
+          "resource_key": "venues",
+          "resource_class": "App\\Filament\\Resources\\Venues\\VenueResource",
+          "model_class": "App\\Models\\Venue",
+          "source": "app",
+          "page_keys": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "generic_admin_write": true
+        }
       ]
     },
     "ahli_panel": {
       "source_of_truth": "Filament::getPanel('ahli')->getResources()",
       "resource_count": 4,
       "resources": [
-        {"resource_key": "events", "resource_class": "App\\Filament\\Ahli\\Resources\\Events\\EventResource", "model_class": "App\\Models\\Event", "page_keys": ["index", "view", "edit"], "generic_member_write": true},
-        {"resource_key": "institutions", "resource_class": "App\\Filament\\Ahli\\Resources\\Institutions\\InstitutionResource", "model_class": "App\\Models\\Institution", "page_keys": ["edit"], "generic_member_write": true},
-        {"resource_key": "references", "resource_class": "App\\Filament\\Ahli\\Resources\\References\\ReferenceResource", "model_class": "App\\Models\\Reference", "page_keys": ["index", "edit"], "generic_member_write": true},
-        {"resource_key": "speakers", "resource_class": "App\\Filament\\Ahli\\Resources\\Speakers\\SpeakerResource", "model_class": "App\\Models\\Speaker", "page_keys": ["index", "view", "edit"], "generic_member_write": true}
+        {
+          "resource_key": "events",
+          "resource_class": "App\\Filament\\Ahli\\Resources\\Events\\EventResource",
+          "model_class": "App\\Models\\Event",
+          "page_keys": [
+            "index",
+            "view",
+            "edit"
+          ],
+          "generic_member_write": true
+        },
+        {
+          "resource_key": "institutions",
+          "resource_class": "App\\Filament\\Ahli\\Resources\\Institutions\\InstitutionResource",
+          "model_class": "App\\Models\\Institution",
+          "page_keys": [
+            "edit"
+          ],
+          "generic_member_write": true
+        },
+        {
+          "resource_key": "references",
+          "resource_class": "App\\Filament\\Ahli\\Resources\\References\\ReferenceResource",
+          "model_class": "App\\Models\\Reference",
+          "page_keys": [
+            "index",
+            "edit"
+          ],
+          "generic_member_write": true
+        },
+        {
+          "resource_key": "speakers",
+          "resource_class": "App\\Filament\\Ahli\\Resources\\Speakers\\SpeakerResource",
+          "model_class": "App\\Models\\Speaker",
+          "page_keys": [
+            "index",
+            "view",
+            "edit"
+          ],
+          "generic_member_write": true
+        }
       ]
     }
   },
   "generic_admin_write_support": {
     "source_of_truth": "App\\Support\\Api\\Admin\\AdminResourceMutationService::supports()",
-    "resource_keys": ["donation-channels", "events", "inspirations", "institutions", "references", "reports", "series", "spaces", "speakers", "subdistricts", "tags", "venues"],
+    "resource_keys": [
+      "donation-channels",
+      "events",
+      "inspirations",
+      "institutions",
+      "references",
+      "reports",
+      "series",
+      "spaces",
+      "speakers",
+      "subdistricts",
+      "tags",
+      "venues"
+    ],
     "resource_details": {
       "donation-channels": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": false, "schema": false, "update": false, "validate_only": false},
-        "panel_pages": {"admin": ["index", "create", "edit"], "ahli": []},
-        "workflow_overlap": ["public institution donation details", "event default donation detail"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": false,
+          "schema": false,
+          "update": false,
+          "validate_only": false
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "ahli": []
+        },
+        "workflow_overlap": [
+          "public institution donation details",
+          "event default donation detail"
+        ]
       },
       "events": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": true, "schema": true, "update": true, "validate_only": true},
-        "panel_pages": {"admin": ["index", "create", "view", "edit"], "ahli": ["index", "view", "edit"]},
-        "workflow_overlap": ["public read/search/detail", "public submit-event create", "authenticated saved/going/check-ins/registrations"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": true,
+          "schema": true,
+          "update": true,
+          "validate_only": true
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "ahli": [
+            "index",
+            "view",
+            "edit"
+          ]
+        },
+        "workflow_overlap": [
+          "public read/search/detail",
+          "public submit-event create",
+          "authenticated saved/going/check-ins/registrations"
+        ]
       },
       "inspirations": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": false, "schema": false, "update": false, "validate_only": false},
-        "panel_pages": {"admin": ["index", "create", "edit"], "ahli": []},
-        "workflow_overlap": ["public random inspiration discovery"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": false,
+          "schema": false,
+          "update": false,
+          "validate_only": false
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "ahli": []
+        },
+        "workflow_overlap": [
+          "public random inspiration discovery"
+        ]
       },
       "institutions": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": true, "schema": true, "update": true, "validate_only": true},
-        "panel_pages": {"admin": ["index", "create", "view", "edit"], "ahli": ["edit"]},
-        "workflow_overlap": ["public read/detail", "authenticated contribution create/suggest", "institution workspace", "follows"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": true,
+          "schema": true,
+          "update": true,
+          "validate_only": true
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "ahli": [
+            "edit"
+          ]
+        },
+        "workflow_overlap": [
+          "public read/detail",
+          "authenticated contribution create/suggest",
+          "institution workspace",
+          "follows"
+        ]
       },
       "references": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": true, "schema": true, "update": true, "validate_only": true},
-        "panel_pages": {"admin": ["index", "create", "edit"], "ahli": ["index", "edit"]},
-        "workflow_overlap": ["public read/list/detail", "authenticated suggest update", "follows"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": true,
+          "schema": true,
+          "update": true,
+          "validate_only": true
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "ahli": [
+            "index",
+            "edit"
+          ]
+        },
+        "workflow_overlap": [
+          "public read/list/detail",
+          "authenticated suggest update",
+          "follows"
+        ]
       },
       "reports": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": false, "schema": false, "update": false, "validate_only": false},
-        "panel_pages": {"admin": ["index", "create", "edit"], "ahli": []},
-        "workflow_overlap": ["authenticated report submission", "explicit admin report triage"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": false,
+          "schema": false,
+          "update": false,
+          "validate_only": false
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "ahli": []
+        },
+        "workflow_overlap": [
+          "authenticated report submission",
+          "explicit admin report triage"
+        ]
       },
       "series": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": false, "schema": false, "update": false, "validate_only": false},
-        "panel_pages": {"admin": ["index", "create", "edit"], "ahli": []},
-        "workflow_overlap": ["public read/detail", "authenticated follows", "event-series assignment"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": false,
+          "schema": false,
+          "update": false,
+          "validate_only": false
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "ahli": []
+        },
+        "workflow_overlap": [
+          "public read/detail",
+          "authenticated follows",
+          "event-series assignment"
+        ]
       },
       "speakers": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": true, "schema": true, "update": true, "validate_only": true},
-        "panel_pages": {"admin": ["index", "create", "view", "edit"], "ahli": ["index", "view", "edit"]},
-        "workflow_overlap": ["public read/detail", "authenticated contribution create/suggest", "follows"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": true,
+          "schema": true,
+          "update": true,
+          "validate_only": true
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "ahli": [
+            "index",
+            "view",
+            "edit"
+          ]
+        },
+        "workflow_overlap": [
+          "public read/detail",
+          "authenticated contribution create/suggest",
+          "follows"
+        ]
       },
       "spaces": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "schema_content_type": "application/json", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "media_upload_transport": null, "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": false, "schema": false, "update": false, "validate_only": false},
-        "panel_pages": {"admin": ["index", "create", "view", "edit"], "ahli": []},
-        "workflow_overlap": ["public space catalogs", "event space assignment"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "schema_content_type": "application/json",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "media_upload_transport": null,
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": false,
+          "schema": false,
+          "update": false,
+          "validate_only": false
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "ahli": []
+        },
+        "workflow_overlap": [
+          "public space catalogs",
+          "event space assignment"
+        ]
       },
       "subdistricts": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "schema_content_type": "application/json", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "media_upload_transport": null, "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": false, "schema": false, "update": false, "validate_only": false},
-        "panel_pages": {"admin": ["index", "create", "edit"], "ahli": []},
-        "workflow_overlap": ["public and admin catalog lookups only"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "schema_content_type": "application/json",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "media_upload_transport": null,
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": false,
+          "schema": false,
+          "update": false,
+          "validate_only": false
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "ahli": []
+        },
+        "workflow_overlap": [
+          "public and admin catalog lookups only"
+        ]
       },
       "tags": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "schema_content_type": "application/json", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "media_upload_transport": null, "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": false, "schema": false, "update": false, "validate_only": false},
-        "panel_pages": {"admin": ["index", "create", "edit"], "ahli": []},
-        "workflow_overlap": ["taxonomy and event-tagging management"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "schema_content_type": "application/json",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "media_upload_transport": null,
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": false,
+          "schema": false,
+          "update": false,
+          "validate_only": false
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "edit"
+          ],
+          "ahli": []
+        },
+        "workflow_overlap": [
+          "taxonomy and event-tagging management"
+        ]
       },
       "venues": {
-        "admin_api": {"schema": true, "store": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "schema_content_type": "multipart/form-data", "related_records": true},
-        "admin_mcp": {"schema": true, "create": true, "update": true, "validate_only": true, "apply_defaults": true, "validation_feedback": true, "media_upload_transport": "json_base64_descriptor", "destructive_clear_flags_supported": false},
-        "member_mcp": {"visible": false, "schema": false, "update": false, "validate_only": false},
-        "panel_pages": {"admin": ["index", "create", "view", "edit"], "ahli": []},
-        "workflow_overlap": ["public read/detail", "public venue catalogs"]
+        "admin_api": {
+          "schema": true,
+          "store": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "schema_content_type": "multipart/form-data",
+          "related_records": true
+        },
+        "admin_mcp": {
+          "schema": true,
+          "create": true,
+          "update": true,
+          "validate_only": true,
+          "apply_defaults": true,
+          "validation_feedback": true,
+          "media_upload_transport": "json_base64_descriptor",
+          "destructive_clear_flags_supported": false
+        },
+        "member_mcp": {
+          "visible": false,
+          "schema": false,
+          "update": false,
+          "validate_only": false
+        },
+        "panel_pages": {
+          "admin": [
+            "index",
+            "create",
+            "view",
+            "edit"
+          ],
+          "ahli": []
+        },
+        "workflow_overlap": [
+          "public read/detail",
+          "public venue catalogs"
+        ]
       }
     }
   },
   "generic_member_write_support": {
     "source_of_truth": "App\\Support\\Api\\Member\\MemberResourceMutationService::supports()",
-    "resource_keys": ["events", "institutions", "references", "speakers"],
+    "resource_keys": [
+      "events",
+      "institutions",
+      "references",
+      "speakers"
+    ],
     "update_only": true,
     "validate_only": true,
     "related_records_tool": true
   },
   "read_only_generic_admin_groups": {
-    "geography": ["countries", "states", "districts"],
+    "geography": [
+      "countries",
+      "states",
+      "districts"
+    ],
     "directory_and_content": [],
-    "moderation_and_workflow": ["membership-claims", "contribution-requests"],
-    "system_auth_and_ops": ["ai-model-pricings", "ai-usage-logs", "audits", "users", "slug-redirects", "roles", "permissions", "tracked-properties", "signal-goals", "signal-segments", "saved-signal-reports", "signal-alert-rules", "signal-alert-logs"]
+    "moderation_and_workflow": [
+      "membership-claims",
+      "contribution-requests"
+    ],
+    "system_auth_and_ops": [
+      "ai-model-pricings",
+      "ai-usage-logs",
+      "audits",
+      "users",
+      "slug-redirects",
+      "roles",
+      "permissions",
+      "tracked-properties",
+      "signal-goals",
+      "signal-segments",
+      "saved-signal-reports",
+      "signal-alert-rules",
+      "signal-alert-logs"
+    ]
   },
   "explicit_admin_workflow_actions": {
     "moderate_event": {
@@ -485,7 +1331,15 @@
       "admin_mcp": {
         "tool": "admin-moderate-event"
       },
-      "action_keys": ["approve", "request_changes", "reject", "cancel", "reconsider", "remoderate", "revert_to_draft"]
+      "action_keys": [
+        "approve",
+        "request_changes",
+        "reject",
+        "cancel",
+        "reconsider",
+        "remoderate",
+        "revert_to_draft"
+      ]
     },
     "review_contribution_request": {
       "admin_api": {
@@ -495,7 +1349,10 @@
       "admin_mcp": {
         "tool": "admin-review-contribution-request"
       },
-      "action_keys": ["approve", "reject"]
+      "action_keys": [
+        "approve",
+        "reject"
+      ]
     },
     "review_membership_claim": {
       "admin_api": {
@@ -505,7 +1362,10 @@
       "admin_mcp": {
         "tool": "admin-review-membership-claim"
       },
-      "action_keys": ["approve", "reject"]
+      "action_keys": [
+        "approve",
+        "reject"
+      ]
     },
     "triage_report": {
       "admin_api": {
@@ -515,7 +1375,12 @@
       "admin_mcp": {
         "tool": "admin-triage-report"
       },
-      "action_keys": ["triage", "resolve", "dismiss", "reopen"]
+      "action_keys": [
+        "triage",
+        "resolve",
+        "dismiss",
+        "reopen"
+      ]
     }
   },
   "transport_rules": {
@@ -525,7 +1390,17 @@
       "apply_defaults_preview": true,
       "validation_feedback": true,
       "record_key_rule": "Use the admin record route_key returned by admin collection or detail payloads whenever available.",
-      "validation_remediation_details": ["fix_plan", "remaining_blockers", "normalized_payload_preview", "can_retry"]
+      "validation_remediation_details": [
+        "fix_plan",
+        "remaining_blockers",
+        "normalized_payload_preview",
+        "can_retry"
+      ],
+      "batch_create_route": "POST /api/v1/admin/{resourceKey}/batch",
+      "batch_update_route": "PUT /api/v1/admin/{resourceKey}/batch",
+      "batch_max_items": 100,
+      "batch_validate_only": true,
+      "batch_external_row_id": true
     },
     "admin_mcp": {
       "schema_tool": "admin-get-write-schema",
@@ -537,7 +1412,19 @@
       "validation_feedback": true,
       "media_upload_transport": "json_base64_descriptor",
       "destructive_clear_flags_supported": false,
-      "validation_remediation_details": ["fix_plan", "remaining_blockers", "normalized_payload_preview", "can_retry"]
+      "validation_remediation_details": [
+        "fix_plan",
+        "remaining_blockers",
+        "normalized_payload_preview",
+        "can_retry"
+      ],
+      "batch_create_tool": "admin-batch-create-records",
+      "batch_create_events_tool": "admin-batch-create-events",
+      "batch_update_tool": "admin-batch-update-records",
+      "batch_max_items": 100,
+      "batch_events_max_items": 50,
+      "batch_validate_only": true,
+      "batch_external_row_id": true
     },
     "member_mcp": {
       "schema_tool": "member-get-write-schema",

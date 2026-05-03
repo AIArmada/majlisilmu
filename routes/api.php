@@ -137,6 +137,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::get('/events/search', [EventSearchController::class, 'search'])->name('events.search');
             Route::get('/{resourceKey}', [AdminResourceController::class, 'indexRecords'])->name('resources.index');
             Route::post('/{resourceKey}', [AdminResourceController::class, 'storeRecord'])->name('resources.store');
+            Route::post('/{resourceKey}/batch', [AdminResourceController::class, 'batchStoreRecords'])->name('resources.batch-store');
+            Route::put('/{resourceKey}/batch', [AdminResourceController::class, 'batchUpdateRecords'])->name('resources.batch-update');
             Route::get('/{resourceKey}/meta', [AdminResourceController::class, 'show'])->name('resources.meta');
             Route::get('/{resourceKey}/schema', [AdminResourceController::class, 'schema'])->name('resources.schema');
             Route::get('/events/{recordKey}/moderation-schema', [AdminEventModerationController::class, 'schema'])->name('events.moderation-schema');
