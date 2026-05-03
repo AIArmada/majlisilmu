@@ -31,7 +31,7 @@ class MemberUploadEventCoverImageTool extends AbstractMemberTool
 
     protected string $title = 'Upload Event Cover Image';
 
-    protected string $description = 'Upload and save a 16:9 website/mobile-app cover image for an accessible Ahli event. Accepts image descriptors via {content_base64}. Use the member-event-cover-image-prompt to get the recommended prompt and reference images before generating.';
+    protected string $description = 'Upload and save a 16:9 website/mobile-app cover image for an accessible Ahli event. Accepts image descriptors via {content_base64} or {content_url}. Use the member-event-cover-image-prompt to get the recommended prompt and reference images before generating.';
 
     public function __construct(
         private readonly MemberResourceRegistry $registry,
@@ -40,7 +40,7 @@ class MemberUploadEventCoverImageTool extends AbstractMemberTool
         $this->setMeta([
             'openai/toolInvocation/invoking' => 'Uploading event cover image...',
             'openai/toolInvocation/invoked' => 'Event cover image uploaded.',
-            'openai/note' => 'Pass {content_base64, filename}. Required aspect ratio: 16:9.',
+            'openai/note' => 'Pass {content_base64, filename} or {content_url, filename}. Required aspect ratio: 16:9.',
         ]);
     }
 
@@ -78,7 +78,7 @@ class MemberUploadEventCoverImageTool extends AbstractMemberTool
             abort_unless($event instanceof Event, 404);
 
             $imageDescriptor = $this->normalizeImageDescriptor($validated['image'], $traceId);
-            $this->enforceEventBase64Descriptor($imageDescriptor);
+            $this->enforceEventDescriptorHasContentSource($imageDescriptor);
 
             $this->logEventImageUploadTrace($traceId, 'descriptor_normalized', [
                 'descriptor_keys' => array_keys($imageDescriptor),

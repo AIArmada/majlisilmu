@@ -29,11 +29,12 @@ trait UploadsEventImage
                 ->description('Event UUID or slug/route key. Example: tadabbur-isu-semasa-ummah-qdkhqqn.'),
             'image' => $schema->object([
                 'filename' => $schema->string()->required()->description('Filename including extension, e.g. event-cover.jpg.'),
-                'content_base64' => $schema->string()->required()->description('Base64-encoded image content.'),
+                'content_base64' => $schema->string()->nullable()->description('Base64-encoded image content.'),
+                'content_url' => $schema->string()->nullable()->description('HTTPS URL to fetch the image content.'),
                 'mime_type' => $schema->string()->nullable()->description('MIME type of the image, e.g. image/jpeg, image/png, image/webp. Auto-detected if omitted.'),
             ])
                 ->required()
-                ->description('Image file descriptor. Pass {content_base64, filename}. In proxied connector environments this is the reliable upload path.'),
+                ->description('Image file descriptor. Pass either {content_base64, filename} or {content_url, filename}. Avoid connector file rewrite paths in proxied environments.'),
             'creative_direction' => $schema->string()
                 ->nullable()
                 ->description('Optional note about the creative direction saved as metadata on the media item.'),
@@ -123,7 +124,7 @@ trait UploadsEventImage
     /**
      * @param  array<string, mixed>  $descriptor
      */
-    protected function enforceEventBase64Descriptor(array $descriptor): void
+    protected function enforceEventDescriptorHasContentSource(array $descriptor): void
     {
         $base64Value = $descriptor['content_base64']
             ?? $descriptor['contentBase64']
@@ -131,12 +132,21 @@ trait UploadsEventImage
             ?? $descriptor['data']
             ?? null;
 
+        $contentUrl = $descriptor['content_url']
+            ?? $descriptor['contentUrl']
+            ?? $descriptor['url']
+            ?? null;
+
         if (is_string($base64Value) && trim($base64Value) !== '') {
             return;
         }
 
+        if (is_string($contentUrl) && trim($contentUrl) !== '') {
+            return;
+        }
+
         throw ValidationException::withMessages([
-            'image.content_base64' => ['Event image uploads require content_base64 in this connector environment.'],
+            'image' => ['Event image uploads require either content_base64 or content_url.'],
         ]);
     }
 

@@ -29,6 +29,7 @@ use App\Support\Mcp\EventImageGenerationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Ai\Files\RemoteImage;
@@ -185,6 +186,39 @@ it('accepts a JSON-encoded string image descriptor (ChatGPT openai/fileParams se
     expect($event->fresh()->getFirstMedia('cover'))->toBeInstanceOf(Media::class);
 });
 
+it('uploads and stores an admin event cover via content_url descriptor', function (): void {
+    $admin = eventImageGenerationAdminUser();
+    [$event] = eventImageGenerationEventFixture();
+
+    $imageFixture = fakeGeneratedImageUpload('url-cover.jpg', 1200, 800);
+    $contents = file_get_contents($imageFixture->getRealPath());
+    expect($contents)->toBeString();
+
+    Http::fake([
+        'https://cdn.example.com/*' => Http::response((string) $contents, 200, [
+            'Content-Type' => 'image/jpeg',
+        ]),
+    ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUploadEventCoverImageTool::class, [
+            'event_key' => $event->slug,
+            'image' => [
+                'filename' => 'url-cover.jpg',
+                'content_url' => 'https://cdn.example.com/url-cover.jpg',
+                'mime_type' => 'image/jpeg',
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('event.route_key', $event->getRouteKey())
+            ->where('collection', 'cover')
+            ->has('media.id')
+            ->etc());
+
+    expect($event->fresh()->getFirstMedia('cover'))->toBeInstanceOf(Media::class);
+});
+
 it('rejects an invalid image descriptor (neither array nor valid JSON object)', function (): void {
     $admin = eventImageGenerationAdminUser();
     [$event] = eventImageGenerationEventFixture();
@@ -197,7 +231,7 @@ it('rejects an invalid image descriptor (neither array nor valid JSON object)', 
         ->assertSee('The image must be a valid file descriptor object');
 });
 
-it('rejects event upload descriptors without content_base64', function (): void {
+it('rejects event upload descriptors without content source', function (): void {
     $admin = eventImageGenerationAdminUser();
     [$event] = eventImageGenerationEventFixture();
 
@@ -206,11 +240,10 @@ it('rejects event upload descriptors without content_base64', function (): void 
             'event_key' => $event->slug,
             'image' => [
                 'filename' => 'cover.webp',
-                'download_url' => 'https://example.com/cover.webp',
                 'mime_type' => 'image/webp',
             ],
         ])
-        ->assertSee('Event image uploads require content_base64 in this connector environment');
+        ->assertSee('Event image uploads require either content_base64 or content_url.');
 });
 
 it('exposes mutating and open-world metadata for event image upload tools', function (): void {
