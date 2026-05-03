@@ -27,13 +27,14 @@ use App\Models\Speaker;
 use App\Models\Tag;
 use App\Models\Venue;
 use App\Support\Location\AddressHierarchyFormatter;
-use App\Support\Timezone\UserDateTimeFormatter;
 use BackedEnum;
+use Carbon\Carbon;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\MissingAttributeException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Nnjeim\World\Models\Language;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -328,10 +329,31 @@ class EventCoverPromptBuilder
             );
         }
 
+        $institutionReference = null;
+
         if ($event->organizer instanceof Institution) {
-            $this->pushMediaCandidates($selected, $seen, $event->organizer, 'cover', ['banner'], 'institution_cover', 'Fallback environment reference from the event organizer institution when speaker media is unavailable.', 1);
-            $this->pushMediaCandidates($selected, $seen, $event->organizer, 'logo', ['thumb'], 'institution_logo', 'Fallback organizer identity mark from the event organizer institution.', 1);
-            $this->pushMediaCandidates($selected, $seen, $event->organizer, 'gallery', ['gallery_thumb'], 'institution_gallery', 'Fallback atmosphere references from the event organizer institution.', 2);
+            $institutionReference = $event->organizer;
+        } elseif ($event->institution instanceof Institution) {
+            $institutionReference = $event->institution;
+        }
+
+        if ($institutionReference instanceof Institution) {
+            $isOrganizerInstitution = $event->organizer instanceof Institution
+                && (string) $event->organizer->getKey() === (string) $institutionReference->getKey();
+
+            $coverReason = $isOrganizerInstitution
+                ? 'Fallback environment reference from the event organizer institution when speaker media is unavailable.'
+                : 'Fallback environment reference from the linked institution when event-level media is unavailable.';
+            $logoReason = $isOrganizerInstitution
+                ? 'Fallback organizer identity mark from the event organizer institution.'
+                : 'Fallback institution identity mark from the linked institution.';
+            $galleryReason = $isOrganizerInstitution
+                ? 'Fallback atmosphere references from the event organizer institution.'
+                : 'Fallback atmosphere references from the linked institution.';
+
+            $this->pushMediaCandidates($selected, $seen, $institutionReference, 'cover', ['banner'], 'institution_cover', $coverReason, 1);
+            $this->pushMediaCandidates($selected, $seen, $institutionReference, 'logo', ['thumb'], 'institution_logo', $logoReason, 1);
+            $this->pushMediaCandidates($selected, $seen, $institutionReference, 'gallery', ['gallery_thumb'], 'institution_gallery', $galleryReason, 2);
         }
 
         foreach ($event->references as $reference) {
@@ -723,7 +745,19 @@ class EventCoverPromptBuilder
         ?string $selectionReason,
     ): array {
         $selectedConversion = $this->selectedConversion($media, $preferredConversions);
-        $url = $preferredConversions === [] ? $media->getUrl() : $media->getAvailableUrl($preferredConversions);
+        $useTemporaryUrl = $this->diskSupportsTemporaryUrls($media->disk);
+        $expiry = now()->addMinutes(60);
+
+        if ($useTemporaryUrl) {
+            $url = $preferredConversions === []
+                ? $media->getTemporaryUrl($expiry)
+                : $media->getAvailableTemporaryUrl($preferredConversions, $expiry);
+            $originalUrl = $media->getTemporaryUrl($expiry);
+        } else {
+            $url = $preferredConversions === [] ? $media->getUrl() : $media->getAvailableUrl($preferredConversions);
+            $originalUrl = $media->getUrl();
+        }
+
         $sourceDimensions = $media->getCustomProperty('source_dimensions', []);
 
         return [
@@ -738,12 +772,25 @@ class EventCoverPromptBuilder
             'mime_type' => $media->mime_type,
             'size_bytes' => (int) $media->size,
             'url' => $url !== '' ? $url : null,
-            'original_url' => $media->getUrl() !== '' ? $media->getUrl() : null,
+            'original_url' => $originalUrl !== '' ? $originalUrl : null,
             'custom_properties' => $this->normalizeArray($media->custom_properties ?? []),
             'source_dimensions' => is_array($sourceDimensions) ? $this->normalizeArray($sourceDimensions) : [],
             'selected_for_prompt' => $selected,
             'selection_reason' => $selectionReason,
         ];
+    }
+
+    private function diskSupportsTemporaryUrls(?string $disk): bool
+    {
+        if (! is_string($disk) || $disk === '') {
+            return false;
+        }
+
+        try {
+            return Storage::disk($disk)->providesTemporaryUrls();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -788,19 +835,45 @@ class EventCoverPromptBuilder
 
     private function dateTimeLine(Event $event): string
     {
-        $date = $event->starts_at instanceof DateTimeInterface
-            ? UserDateTimeFormatter::translatedFormat($event->starts_at, 'l, j F Y')
-            : null;
-        $start = $event->timing_display;
-        $end = $event->ends_at instanceof DateTimeInterface
-            ? UserDateTimeFormatter::format($event->ends_at, 'g:i A')
-            : null;
+        $timezone = $this->eventTimezone($event);
+        $startsAt = $this->inEventTimezone($event->starts_at, $timezone);
+        $endsAt = $this->inEventTimezone($event->ends_at, $timezone);
+
+        $date = $startsAt?->translatedFormat('l, j F Y');
+        $start = $startsAt?->format('g:i A');
+        $end = $endsAt?->format('g:i A');
 
         return trim(implode(' ', array_filter([
             $date,
-            $end !== null ? "{$start} - {$end}" : $start,
-            "({$event->timezone})",
+            ($start !== null && $end !== null) ? "{$start} - {$end}" : $start,
+            "({$timezone})",
         ])));
+    }
+
+    private function eventTimezone(Event $event): string
+    {
+        $timezone = is_string($event->timezone) ? trim($event->timezone) : '';
+
+        if ($timezone === '') {
+            return 'UTC';
+        }
+
+        try {
+            new \DateTimeZone($timezone);
+
+            return $timezone;
+        } catch (\Throwable) {
+            return 'UTC';
+        }
+    }
+
+    private function inEventTimezone(?DateTimeInterface $dateTime, string $timezone): ?Carbon
+    {
+        if (! $dateTime instanceof DateTimeInterface) {
+            return null;
+        }
+
+        return Carbon::instance($dateTime)->setTimezone($timezone);
     }
 
     private function locationLine(Event $event): ?string
