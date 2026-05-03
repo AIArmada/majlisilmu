@@ -217,12 +217,12 @@ it('exposes mutating and open-world metadata for event image upload tools', func
 
     expect(data_get($adminTool, '_meta.openai/toolInvocation/invoking'))->toBe('Uploading event cover image...')
         ->and(data_get($memberTool, '_meta.openai/toolInvocation/invoked'))->toBe('Event cover image uploaded.')
-        ->and(data_get($adminTool, '_meta.openai/fileParams'))->toBe(['image'])
-        ->and(data_get($memberTool, '_meta.openai/fileParams'))->toBe(['image'])
+        ->and(data_get($adminTool, '_meta.openai/fileParams'))->toBeNull()
+        ->and(data_get($memberTool, '_meta.openai/fileParams'))->toBeNull()
         ->and(data_get($adminTool, 'inputSchema.properties.image'))->toBeArray();
 
     expect(data_get(app(AdminCreateEventTool::class)->toArray(), '_meta.openai/fileParams'))
-        ->toBe(['cover', 'poster', 'gallery']);
+        ->toBeNull();
 });
 
 it('formats cover prompt text as a strict 16:9 request and exposes fallback asset links', function (): void {
