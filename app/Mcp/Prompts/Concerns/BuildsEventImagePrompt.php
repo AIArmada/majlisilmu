@@ -64,6 +64,7 @@ trait BuildsEventImagePrompt
                 ? trim((string) $arguments['creative_direction'])
                 : null,
             'include_existing_media' => $this->parseBoolArgument($arguments['include_existing_media'] ?? null, true),
+            'max_reference_media' => $maxReferenceMedia,
         ]);
 
         $payload = $result['payload'];

@@ -370,6 +370,25 @@ it('keeps listed prompt assets aligned with the attached reference media limit',
         ->and($unexpectedSecondAssetUrl === '' || ! str_contains((string) ($firstMessage['text'] ?? ''), $unexpectedSecondAssetUrl))->toBeTrue();
 });
 
+it('embeds reference urls and title-driven ambience guidance in generated prompt text', function (): void {
+    [$event] = eventImageGenerationEventFixture();
+
+    $result = app(EventCoverPromptBuilder::class)->build($event, [
+        'target_collection' => 'cover',
+        'include_existing_media' => true,
+    ]);
+
+    $prompt = (string) data_get($result, 'payload.prompt', '');
+    $firstReferenceUrl = (string) data_get($result, 'payload.reference_media.0.url', '');
+
+    expect($firstReferenceUrl)->not->toBe('')
+        ->and($prompt)->toContain('Selected reference media to attach/use:')
+        ->and($prompt)->toContain('URL:')
+        ->and($prompt)->toContain($firstReferenceUrl)
+        ->and($prompt)->toContain('Use the title as an ambience anchor')
+        ->and($prompt)->toContain((string) $event->title);
+});
+
 it('includes linked institution media fallback links when organizer is missing', function (): void {
     $institution = Institution::factory()->create([
         'name' => 'Masjid Al-Ihsan',
@@ -531,7 +550,6 @@ it('uses temporary signed urls for reference media payloads when disk supports i
     expect($coverMedia)->not->toBeNull()
         ->and($coverMedia['url'])->toContain('expiration=');
 });
-
 
 /**
  * @return array{0: Event, 1: Speaker, 2: Reference, 3: Institution}
