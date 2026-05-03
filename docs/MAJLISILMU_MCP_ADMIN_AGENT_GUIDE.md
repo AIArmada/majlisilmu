@@ -1,6 +1,6 @@
 # MajlisIlmu Admin MCP Agent Guide
 
-Updated: May 2, 2026
+Updated: May 4, 2026
 Audience: model-facing admin MCP agents and tool clients.
 
 This guide is for the admin MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The member guide is separate and is not exposed through this server.
@@ -181,8 +181,14 @@ Apply this before operational tools such as:
 - `admin-list-related-records`
 - `admin-get-resource-meta`
 - `admin-get-write-schema`
+- `admin-create-event`
+- `admin-batch-create-events`
+- `admin-update-event`
+- `admin-batch-update-events`
 - `admin-create-record`
+- `admin-batch-create-records`
 - `admin-update-record`
+- `admin-batch-update-records`
 - `admin-get-event-moderation-schema`
 - `admin-get-report-triage-schema`
 - `admin-get-contribution-request-review-schema`
@@ -229,9 +235,15 @@ Use this section as the quick admin-only capability summary.
 | Membership-claim workflows | `admin-review-membership-claim` |
 | Event image prompts | `admin-event-cover-image-prompt` (prompt), `admin-event-poster-image-prompt` (prompt) |
 | Event image upload | `admin-upload-event-cover-image`, `admin-upload-event-poster-image` |
+| Dedicated event create | `admin-create-event` |
+| Batch event create | `admin-batch-create-events` |
+| Dedicated event update | `admin-update-event` |
+| Batch event update | `admin-batch-update-events` |
 | Create | `admin-create-record` |
+| Batch create | `admin-batch-create-records` |
 | Update | `admin-update-record` |
-| Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` |
+| Batch update | `admin-batch-update-records` |
+| Validate-only preview | Yes, on create/update/batch tools |
 
 ## Event cover/poster image generation
 
@@ -260,18 +272,18 @@ Event image generation uses a 3-step workflow on the admin server:
 
 | Resource | Admin MCP | Notes |
 | --- | --- | --- |
-| `events` | list/get/meta + schema + create + update + preview | Event moderation has a dedicated workflow schema tool |
-| `inspirations` | list/get/meta + schema + create + update + preview | Admin-only through the current MCP surface |
-| `institutions` | list/get/meta + schema + create + update + preview | Member scope is separate |
-| `speakers` | list/get/meta + schema + create + update + preview | Member scope is separate |
-| `references` | list/get/meta + schema + create + update + preview | Member scope is separate |
-| `reports` | list/get/meta + schema + create + update + preview | Admin-only CRUD plus explicit triage workflow |
-| `donation-channels` | list/get/meta + schema + create + update + preview | Admin-only payment channel management |
-| `series` | list/get/meta + schema + create + update + preview | Admin-only through the current MCP surface |
-| `spaces` | list/get/meta + schema + create + update + preview | Admin-only through the current MCP surface |
-| `tags` | list/get/meta + schema + create + update + preview | Admin-only taxonomy management |
-| `venues` | list/get/meta + schema + create + update + preview | Admin-only through the current MCP surface |
-| `subdistricts` | list/get/meta + schema + create + update + preview | No media upload fields |
+| `events` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Event moderation has a dedicated workflow schema tool |
+| `inspirations` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only through the current MCP surface |
+| `institutions` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Member scope is separate |
+| `speakers` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Member scope is separate |
+| `references` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Member scope is separate |
+| `reports` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only CRUD plus explicit triage workflow |
+| `donation-channels` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only payment channel management |
+| `series` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only through the current MCP surface |
+| `spaces` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only through the current MCP surface |
+| `tags` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only taxonomy management |
+| `venues` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only through the current MCP surface |
+| `subdistricts` | list/get/meta + schema + create + batch-create + update + batch-update + preview | No media upload fields |
 
 ## Current structurally write-capable admin resources include:
 
@@ -370,7 +382,7 @@ When the user asks you to “look for” a named place, start with the most like
 
 ## Validate-only preview behavior
 
-- `validate_only=true` is supported on `admin-create-record` and `admin-update-record`.
+- `validate_only=true` is supported on `admin-create-event`, `admin-update-event`, `admin-batch-create-events`, `admin-batch-update-events`, `admin-create-record`, `admin-update-record`, `admin-batch-create-records`, and `admin-batch-update-records`.
 - Previews normalize descriptors into file summaries without persisting media.
 - `apply_defaults=true` enables server-side default application during preview flows where the schema advertises it.
 - schema-driven `feedback` issues may include suggested values, defaults, and conditional `required_because` context.
