@@ -29,10 +29,12 @@ final class EventImageUploadService
         string $collection,
         array $descriptor,
         ?string $creativeDirection = null,
+        ?string $traceId = null,
     ): Media {
         abort_unless(in_array($collection, self::ACCEPTED_COLLECTIONS, true), 422, 'Collection must be one of: '.implode(', ', self::ACCEPTED_COLLECTIONS));
 
         Log::debug('mcp.image_upload: upload started', [
+            'trace_id' => $traceId,
             'event_id' => $event->getKey(),
             'event_slug' => $event->slug,
             'collection' => $collection,
@@ -53,10 +55,18 @@ final class EventImageUploadService
             [$collection => $contract],
         );
 
+        Log::debug('mcp.image_upload: descriptor normalized by mcp file normalizer', [
+            'trace_id' => $traceId,
+            'event_id' => $event->getKey(),
+            'collection' => $collection,
+            'temporary_paths_count' => count($result['temporary_paths']),
+        ]);
+
         /** @var UploadedFile $uploadedFile */
         $uploadedFile = $result['payload'][$collection];
 
         Log::debug('mcp.image_upload: file normalized, staging for media library', [
+            'trace_id' => $traceId,
             'event_id' => $event->getKey(),
             'collection' => $collection,
             'original_name' => $uploadedFile->getClientOriginalName(),
@@ -65,9 +75,10 @@ final class EventImageUploadService
         ]);
 
         try {
-            $media = $this->storeMedia($event, $collection, $uploadedFile, $descriptor, $creativeDirection);
+            $media = $this->storeMedia($event, $collection, $uploadedFile, $descriptor, $creativeDirection, $traceId);
 
             Log::debug('mcp.image_upload: media stored successfully', [
+                'trace_id' => $traceId,
                 'event_id' => $event->getKey(),
                 'collection' => $collection,
                 'media_id' => $media->getKey(),
@@ -79,6 +90,13 @@ final class EventImageUploadService
             return $media;
         } finally {
             $normalizer->cleanup($result['temporary_paths']);
+
+            Log::debug('mcp.image_upload: temporary files cleanup completed', [
+                'trace_id' => $traceId,
+                'event_id' => $event->getKey(),
+                'collection' => $collection,
+                'temporary_paths_count' => count($result['temporary_paths']),
+            ]);
         }
     }
 
@@ -91,6 +109,7 @@ final class EventImageUploadService
         UploadedFile $uploadedFile,
         array $descriptor,
         ?string $creativeDirection,
+        ?string $traceId,
     ): Media {
         $label = $collection === 'poster' ? 'Event Poster Image' : 'Event Cover Image';
         $fileId = $this->stringFromDescriptor($descriptor, ['file_id', 'fileId']);
@@ -108,6 +127,15 @@ final class EventImageUploadService
         if ($creativeDirection !== null && $creativeDirection !== '') {
             $customProperties['creative_direction'] = $creativeDirection;
         }
+
+        Log::debug('mcp.image_upload: preparing media library write', [
+            'trace_id' => $traceId,
+            'event_id' => $event->getKey(),
+            'collection' => $collection,
+            'uploaded_file_original_name' => $uploadedFile->getClientOriginalName(),
+            'has_chatgpt_file_id' => isset($customProperties['chatgpt_file_id']),
+            'has_creative_direction' => isset($customProperties['creative_direction']),
+        ]);
 
         $title = is_string($event->title) && $event->title !== '' ? $event->title : (string) $event->getKey();
 

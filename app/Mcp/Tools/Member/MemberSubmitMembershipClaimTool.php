@@ -124,26 +124,6 @@ class MemberSubmitMembershipClaimTool extends AbstractMemberWriteTool
         )));
     }
 
-    /**
-     * Add ChatGPT file params metadata for connector compatibility.
-     *
-     * @return array<string, mixed>
-     */
-    #[\Override]
-    public function toArray(): array
-    {
-        $tool = parent::toArray();
-
-        $tool['_meta'] = array_merge(
-            is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [],
-            [
-                'openai/fileParams' => ['evidence'],
-            ],
-        );
-
-        return $tool;
-    }
-
     #[\Override]
     public function shouldRegister(Request $request, MemberResourceService $resourceService): bool
     {
