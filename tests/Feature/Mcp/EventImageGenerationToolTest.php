@@ -370,6 +370,106 @@ it('keeps listed prompt assets aligned with the attached reference media limit',
         ->and($unexpectedSecondAssetUrl === '' || ! str_contains((string) ($firstMessage['text'] ?? ''), $unexpectedSecondAssetUrl))->toBeTrue();
 });
 
+it('includes linked institution media fallback links when organizer is missing', function (): void {
+    $institution = Institution::factory()->create([
+        'name' => 'Masjid Al-Ihsan',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $institution
+        ->addMedia(fakeGeneratedImageUpload('institution-linked-cover.jpg', 1600, 900))
+        ->toMediaCollection('cover');
+
+    $event = Event::factory()->create([
+        'institution_id' => $institution->getKey(),
+        'organizer_type' => null,
+        'organizer_id' => null,
+        'title' => 'Kuliah Subuh Al-Ihsan',
+        'slug' => 'kuliah-subuh-al-ihsan',
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $builderResult = app(EventCoverPromptBuilder::class)->build($event->fresh(), [
+        'target_collection' => 'cover',
+        'include_existing_media' => true,
+    ]);
+
+    $institutionMediaPayload = collect($builderResult['content_media'])
+        ->pluck('payload')
+        ->first(fn (mixed $payload): bool => is_array($payload) && data_get($payload, 'source.id') === (string) $institution->getKey());
+
+    expect($institutionMediaPayload)->toBeArray();
+
+    $expectedInstitutionAssetUrl = (string) (
+        data_get($institutionMediaPayload, 'url')
+        ?? data_get($institutionMediaPayload, 'original_url')
+        ?? ''
+    );
+
+    expect($expectedInstitutionAssetUrl)->not->toBe('');
+
+    $promptHarness = new class
+    {
+        use BuildsEventImagePrompt;
+
+        /**
+         * @param  array<string, mixed>  $arguments
+         * @return array<int, Response>
+         */
+        public function messages(Event $event, string $targetCollection, array $arguments): array
+        {
+            return $this->buildEventImagePromptMessages($event, $targetCollection, $arguments);
+        }
+    };
+
+    $responses = $promptHarness->messages($event->fresh(), 'cover', [
+        'include_existing_media' => true,
+        'max_reference_media' => 4,
+    ]);
+
+    $firstMessage = $responses[0]->content()->toArray();
+
+    expect($firstMessage['type'] ?? null)->toBe('text')
+        ->and($firstMessage['text'] ?? '')->toContain('fallback reference assets')
+        ->and($firstMessage['text'] ?? '')->toContain($expectedInstitutionAssetUrl);
+});
+
+it('uses event timezone for poster prompt date and time context', function (): void {
+    config()->set('app.timezone', 'UTC');
+
+    [$event] = eventImageGenerationEventFixture();
+
+    $event->forceFill([
+        'starts_at' => Carbon::parse('2026-05-07 01:30:00', 'Asia/Kuala_Lumpur')->utc(),
+        'ends_at' => Carbon::parse('2026-05-07 02:30:00', 'Asia/Kuala_Lumpur')->utc(),
+        'timezone' => 'Asia/Kuala_Lumpur',
+    ])->save();
+
+    $promptHarness = new class
+    {
+        use BuildsEventImagePrompt;
+
+        /**
+         * @param  array<string, mixed>  $arguments
+         * @return array<int, Response>
+         */
+        public function messages(Event $event, string $targetCollection, array $arguments): array
+        {
+            return $this->buildEventImagePromptMessages($event, $targetCollection, $arguments);
+        }
+    };
+
+    $responses = $promptHarness->messages($event->fresh(), 'poster', []);
+    $firstMessage = $responses[0]->content()->toArray();
+
+    expect($firstMessage['type'] ?? null)->toBe('text')
+        ->and($firstMessage['text'] ?? '')->toContain('Date and time:')
+        ->and($firstMessage['text'] ?? '')->toContain('1:30 AM - 2:30 AM (Asia/Kuala_Lumpur)')
+        ->and($firstMessage['text'] ?? '')->not->toContain('5:30 PM - 6:30 PM (Asia/Kuala_Lumpur)');
+});
+
 it('uses storage-backed image attachments instead of remote url attachments', function (): void {
     Storage::fake('s3');
 
@@ -399,6 +499,39 @@ it('uses storage-backed image attachments instead of remote url attachments', fu
         ->toBeInstanceOf(StoredImage::class)
         ->not->toBeInstanceOf(RemoteImage::class);
 });
+
+it('uses temporary signed urls for reference media payloads when disk supports it', function (): void {
+    Storage::fake('s3');
+
+    $event = Event::factory()->create([
+        'institution_id' => Institution::factory()->create()->getKey(),
+        'title' => 'S3 URL Event',
+        'slug' => 's3-url-event',
+        'status' => 'approved',
+        'is_active' => true,
+    ]);
+
+    $event
+        ->addMedia(fakeGeneratedImageUpload('s3-cover.jpg', 1600, 900))
+        ->toMediaCollection('cover', 's3');
+
+    $media = $event->getFirstMedia('cover');
+    expect($media)->toBeInstanceOf(Media::class);
+
+    $builder = app(EventCoverPromptBuilder::class);
+    $payload = $builder->build($event, [
+        'target_collection' => 'cover',
+        'include_existing_media' => true,
+        'max_reference_media' => 5,
+    ]);
+
+    $mediaItems = $payload['payload']['source_data']['available_media'] ?? [];
+    $coverMedia = collect($mediaItems)->firstWhere('collection', 'cover');
+
+    expect($coverMedia)->not->toBeNull()
+        ->and($coverMedia['url'])->toContain('expiration=');
+});
+
 
 /**
  * @return array{0: Event, 1: Speaker, 2: Reference, 3: Institution}
