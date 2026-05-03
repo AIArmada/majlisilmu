@@ -39,7 +39,7 @@ class AdminUpdateEventTool extends AbstractAdminWriteTool
 
     protected string $title = 'Update Event';
 
-    protected string $description = 'Use this to update an existing event record. Resolves organizer and location by human-readable route key — avoid raw UUIDs when a key is available. Supports speaker_keys and reference_keys to replace attached speakers and references by slug or UUID. Supports cover, poster, and gallery image descriptors in the same request. Do not use to create a new event; use admin-create-event instead.';
+    protected string $description = 'Use this to update an existing event record. Resolves organizer and location by human-readable route key — avoid raw UUIDs when a key is available. Supports speaker_keys and reference_keys to replace (full sync) attached speakers and references by slug or UUID — omit the field to leave existing relationships unchanged; pass an empty array to detach all. Supports cover, poster, and gallery image descriptors in the same request; media clear flags are not supported — omit fields to leave existing media unchanged. Do not use to create a new event; use admin-create-event instead.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
