@@ -12,6 +12,7 @@ use App\Models\Venue;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 describe('Event Show Page Going Feature', function () {
@@ -435,6 +436,28 @@ describe('Event Show Page Location & Contact Info', function () {
         $this->get(route('events.show', $event))
             ->assertOk()
             ->assertDontSee('class="size-full object-cover opacity-65"', false);
+    });
+
+    it('uses event cover as the hero background when available', function () {
+        Storage::fake('public');
+        config()->set('media-library.disk_name', 'public');
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now()->subDay(),
+            'starts_at' => now()->addDay(),
+            'institution_id' => null,
+            'venue_id' => null,
+        ]);
+
+        $event->addMedia(UploadedFile::fake()->image('event-cover-hero.jpg', 1600, 900))
+            ->toMediaCollection('cover');
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee('class="size-full object-cover opacity-65"', false)
+            ->assertSee('/cover/', false);
     });
 
     it('displays full venue address on the event page', function () {
