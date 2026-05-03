@@ -22,6 +22,20 @@ it('serves scramble docs only on the api host', function () {
     ])->assertNotFound();
 });
 
+it('keeps the docs landing page lightweight by loading docs json lazily', function () {
+    mock(Generator::class, function (MockInterface $mock): void {
+        $mock->shouldNotReceive('__invoke');
+    });
+
+    $this->get('https://api.majlisilmu.test/docs', [
+        'Host' => 'api.majlisilmu.test',
+    ])
+        ->assertOk()
+        ->assertSee('docs.apiDescriptionUrl =', false)
+        ->assertSee('/docs.json', false)
+        ->assertDontSee('apiDescriptionDocument =', false);
+});
+
 it('serves scramble docs publicly on the api host outside local environments', function () {
     $originalEnvironment = app()->environment();
     app()['env'] = 'production';

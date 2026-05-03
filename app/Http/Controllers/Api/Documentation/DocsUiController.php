@@ -6,23 +6,20 @@ namespace App\Http\Controllers\Api\Documentation;
 
 use App\Http\Controllers\Controller;
 use App\Support\ApiDocumentation\ApiDocumentationConfigFactory;
-use App\Support\ApiDocumentation\ReconnectCachedDatabaseConnections;
-use Dedoc\Scramble\Generator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Route;
 
 class DocsUiController extends Controller
 {
     public function __invoke(
-        Generator $generator,
-        ReconnectCachedDatabaseConnections $reconnectCachedDatabaseConnections,
         ApiDocumentationConfigFactory $configFactory,
     ): View {
-        $reconnectCachedDatabaseConnections();
-
         $config = $configFactory->make();
 
-        return view()->file(base_path('vendor/dedoc/scramble/resources/views/docs.blade.php'), [
-            'spec' => $generator($config),
+        return view('api.documentation.docs', [
+            'specUrl' => Route::has('scramble.docs.document')
+                ? route('scramble.docs.document')
+                : '/docs.json',
             'config' => $config,
         ]);
     }
