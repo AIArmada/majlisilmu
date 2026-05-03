@@ -4233,6 +4233,7 @@ it('batch-creates events via the admin-batch-create-events MCP tool with speaker
 
     AdminServer::actingAs($admin)
         ->tool(AdminBatchCreateEventsTool::class, [
+            'apply_defaults' => true,
             'items' => [
                 [
                     'external_row_id' => 'event-row-1',
@@ -4278,6 +4279,7 @@ it('batch-creates events with validate_only via admin-batch-create-events withou
 
     AdminServer::actingAs($admin)
         ->tool(AdminBatchCreateEventsTool::class, [
+            'apply_defaults' => true,
             'items' => [
                 [
                     'title' => 'MCP Batch Dry Run Event',
@@ -4426,7 +4428,7 @@ it('batch-updates events returns unresolved_key for invalid event key via admin-
                     'title' => 'Valid Update',
                 ],
                 [
-                    'event_key' => 'does-not-exist-key',
+                    'event_key' => '00000000-0000-0000-0000-000000000000',
                     'title' => 'Should Not Update',
                 ],
             ],
