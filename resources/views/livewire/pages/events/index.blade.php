@@ -541,7 +541,7 @@
                         wire:keydown.escape="clearSearch"
                         data-signal-control="search"
                         data-signal-include-value="true"
-                        placeholder="{{ __('Cari mengikut tajuk...') }}"
+                        placeholder="{{ __('Cari majlis...') }}"
                         class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 bg-white shadow-lg shadow-slate-200/60 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
                     >
                     <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors"
@@ -559,6 +559,21 @@
                             {{ __('Clear') }}
                         </button>
                     @endif
+                </div>
+
+                <div class="mt-3 flex flex-wrap items-center justify-center gap-5">
+                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-600 select-none">
+                        <input type="checkbox" wire:model.live="search_include_institutions" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                        {{ __('Institusi') }}
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-600 select-none">
+                        <input type="checkbox" wire:model.live="search_include_speakers" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                        {{ __('Penceramah') }}
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-600 select-none">
+                        <input type="checkbox" wire:model.live="search_include_references" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                        {{ __('Rujukan') }}
+                    </label>
                 </div>
             </div>
 

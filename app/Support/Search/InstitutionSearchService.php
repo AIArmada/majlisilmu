@@ -75,29 +75,23 @@ class InstitutionSearchService
      */
     private function applyDatabaseSearch(Builder $query, string $normalizedSearch): Builder
     {
-
-        $operator = DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
-        $collapsedWildcardSearch = '%'.str_replace(' ', '%', $normalizedSearch).'%';
         $searchTokens = array_values(array_filter(explode(' ', $normalizedSearch), static fn (string $token): bool => $token !== ''));
 
-        return $query->where(function (Builder $innerQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch, $searchTokens): void {
-            $innerQuery->searchNameOrNickname($normalizedSearch)
-                ->orWhere('institutions.description', $operator, "%{$normalizedSearch}%")
-                ->orWhere('institutions.description', $operator, $collapsedWildcardSearch);
+        return $query->where(function (Builder $innerQuery) use ($normalizedSearch, $searchTokens): void {
+            $innerQuery->searchNameOrNickname($normalizedSearch);
 
             if (count($searchTokens) < 2) {
                 return;
             }
 
-            $innerQuery->orWhere(function (Builder $tokenQuery) use ($searchTokens, $operator): void {
+            $innerQuery->orWhere(function (Builder $tokenQuery) use ($searchTokens): void {
                 foreach ($searchTokens as $token) {
                     if (mb_strlen($token) < 2) {
                         continue;
                     }
 
-                    $tokenQuery->where(function (Builder $tokenMatchQuery) use ($token, $operator): void {
-                        $tokenMatchQuery->searchNameOrNickname($token)
-                            ->orWhere('institutions.description', $operator, "%{$token}%");
+                    $tokenQuery->where(function (Builder $tokenMatchQuery) use ($token): void {
+                        $tokenMatchQuery->searchNameOrNickname($token);
                     });
                 }
             });
@@ -223,7 +217,7 @@ class InstitutionSearchService
         return Institution::query()
             ->active()
             ->where('status', 'verified')
-            ->select(['id', 'name', 'nickname', 'description'])
+            ->select(['id', 'name', 'nickname'])
             ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateFilter($query, $normalizedSearch))
             ->tap(fn (Builder $query): Builder => $this->applyFuzzyCandidateOrdering($query, $normalizedSearch))
             ->limit($this->typesenseResultLimit())
@@ -232,7 +226,6 @@ class InstitutionSearchService
                 $candidates = array_values(array_filter([
                     $this->normalizeText((string) $institution->name),
                     $this->normalizeText((string) $institution->nickname),
-                    $this->normalizeText((string) $institution->description),
                 ], static fn (string $candidate): bool => $candidate !== ''));
 
                 $scoreCandidates = [];
@@ -276,7 +269,6 @@ class InstitutionSearchService
                 $model->qualifyColumn($model->getKeyName()),
                 $model->qualifyColumn('name'),
                 $model->qualifyColumn('nickname'),
-                $model->qualifyColumn('description'),
             ])
             ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateFilter($builder, $normalizedSearch))
             ->tap(fn (Builder $builder): Builder => $this->applyFuzzyCandidateOrdering($builder, $normalizedSearch))
@@ -286,7 +278,6 @@ class InstitutionSearchService
                 $candidates = array_values(array_filter([
                     $this->normalizeText((string) $institution->name),
                     $this->normalizeText((string) $institution->nickname),
-                    $this->normalizeText((string) $institution->description),
                 ], static fn (string $candidate): bool => $candidate !== ''));
 
                 $scoreCandidates = [];
@@ -334,8 +325,7 @@ class InstitutionSearchService
             foreach ($patterns as $pattern) {
                 $candidateQuery
                     ->orWhere('institutions.name', $operator, $pattern)
-                    ->orWhere('institutions.nickname', $operator, $pattern)
-                    ->orWhere('institutions.description', $operator, $pattern);
+                    ->orWhere('institutions.nickname', $operator, $pattern);
             }
         });
     }
@@ -481,7 +471,7 @@ class InstitutionSearchService
 
         $rawResults = Institution::search($search)
             ->options([
-                'query_by' => 'display_name,name,nickname,description,search_text',
+                'query_by' => 'display_name,name,nickname,search_text',
                 'per_page' => $this->typesenseResultLimit(),
                 ...$options,
             ])

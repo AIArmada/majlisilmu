@@ -2893,6 +2893,101 @@ it('searches /majlis-style events through the dedicated admin MCP tool', functio
             ->etc());
 });
 
+it('searches events by institution, speaker, and reference through admin-search-events MCP tool', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $institution = Institution::factory()->create([
+        'name' => 'Markaz Ikhlas MCP Admin',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    Event::factory()->create([
+        'institution_id' => $institution->id,
+        'title' => 'MCP Admin Institution Match Event',
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $speaker = Speaker::factory()->create([
+        'name' => 'Ustaz Akram MCP Admin',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $speakerEvent = Event::factory()->create([
+        'title' => 'MCP Admin Speaker Match Event',
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $speakerEvent->keyPeople()->create([
+        'speaker_id' => $speaker->id,
+        'name' => $speaker->name,
+        'role' => 'speaker',
+        'order_column' => 1,
+    ]);
+
+    $reference = Reference::factory()->create([
+        'title' => 'Kitab MCP Admin Search Reference',
+        'status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $referenceEvent = Event::factory()->create([
+        'title' => 'MCP Admin Reference Match Event',
+        'status' => 'approved',
+        'is_active' => true,
+        'visibility' => 'public',
+        'published_at' => now(),
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $referenceEvent->references()->attach($reference->id);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminSearchEventsTool::class, [
+            'query' => 'Markaz Ikhlas MCP Admin',
+            'time_scope' => 'all',
+            'per_page' => 10,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.search.query', 'Markaz Ikhlas MCP Admin')
+            ->where('data', fn ($items): bool => collect($items)->pluck('title')->contains('MCP Admin Institution Match Event'))
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminSearchEventsTool::class, [
+            'query' => 'Akram MCP Admin',
+            'time_scope' => 'all',
+            'per_page' => 10,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.search.query', 'Akram MCP Admin')
+            ->where('data', fn ($items): bool => collect($items)->pluck('title')->contains('MCP Admin Speaker Match Event'))
+            ->etc());
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminSearchEventsTool::class, [
+            'query' => 'MCP Admin Search Reference',
+            'time_scope' => 'all',
+            'per_page' => 10,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('meta.search.query', 'MCP Admin Search Reference')
+            ->where('data', fn ($items): bool => collect($items)->pluck('title')->contains('MCP Admin Reference Match Event'))
+            ->etc());
+});
+
 it('rejects unexpected MCP tool arguments instead of ignoring them', function () {
     $admin = adminMcpUser('super_admin');
 

@@ -229,6 +229,21 @@ class Index extends Component implements HasForms
     #[Url]
     public string $sort = 'time';
 
+    #[Url]
+    public bool $search_include_institutions = true;
+
+    #[Url]
+    public bool $search_include_speakers = true;
+
+    #[Url]
+    public bool $search_include_references = true;
+
+    /**
+     * @var list<string>
+     */
+    #[Url]
+    public array $reference_author_search = [];
+
     /**
      * @var array<string, mixed>
      */
@@ -580,6 +595,15 @@ class Index extends Component implements HasForms
                                     ->multiple()
                                     ->getSearchResultsUsing(fn (string $search): array => $this->searchReferenceOptions($search))
                                     ->getOptionLabelsUsing(fn (array $values): array => $this->referenceOptionLabels($values))
+                                    ->live(),
+
+                                Select::make('reference_author_search')
+                                    ->label(__('Pengarang Rujukan'))
+                                    ->placeholder(__('Cari atau pilih pengarang...'))
+                                    ->searchable()
+                                    ->multiple()
+                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchReferenceAuthorOptions($search))
+                                    ->getOptionLabelsUsing(fn (array $values): array => $this->referenceAuthorOptionLabels($values))
                                     ->live(),
                             ]),
 
@@ -1107,6 +1131,52 @@ class Index extends Component implements HasForms
     }
 
     /**
+     * @return array<string, string>
+     */
+    private function searchReferenceAuthorOptions(string $search): array
+    {
+        $query = Reference::query()
+            ->where('is_active', true)
+            ->whereNotNull('author')
+            ->where('author', '!=', '')
+            ->orderBy('author');
+
+        $normalizedSearch = trim($search);
+
+        if ($normalizedSearch !== '') {
+            $query->where('author', $this->databaseLikeOperator(), "%{$normalizedSearch}%");
+        }
+
+        return $query
+            ->limit(50)
+            ->pluck('author', 'author')
+            ->mapWithKeys(fn (string $author): array => [$author => $author])
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $values
+     * @return array<string, string>
+     */
+    public function referenceAuthorOptionLabels(array $values): array
+    {
+        if ($values === []) {
+            return [];
+        }
+
+        return Reference::query()
+            ->where('is_active', true)
+            ->whereIn('author', $values)
+            ->whereNotNull('author')
+            ->where('author', '!=', '')
+            ->orderBy('author')
+            ->limit(count($values))
+            ->pluck('author', 'author')
+            ->mapWithKeys(fn (string $author): array => [$author => $author])
+            ->all();
+    }
+
+    /**
      * @param  Builder<Reference>  $query
      * @return array<string, string>
      */
@@ -1328,6 +1398,15 @@ class Index extends Component implements HasForms
             return true;
         });
 
+        // Boolean scope toggles must be included even when false.
+        $searchFilters['search_include_institutions'] = $filters['search_include_institutions'];
+        $searchFilters['search_include_speakers'] = $filters['search_include_speakers'];
+        $searchFilters['search_include_references'] = $filters['search_include_references'];
+
+        if ($filters['reference_author_search'] !== []) {
+            $searchFilters['reference_author_search'] = $filters['reference_author_search'];
+        }
+
         /** @var EventSearchService $searchService */
         $searchService = app(EventSearchService::class);
 
@@ -1438,6 +1517,10 @@ class Index extends Component implements HasForms
             'lng' => null,
             'radius_km' => 15,
             'sort' => 'time',
+            'search_include_institutions' => true,
+            'search_include_speakers' => true,
+            'search_include_references' => true,
+            'reference_author_search' => [],
         ];
     }
 
@@ -1500,6 +1583,10 @@ class Index extends Component implements HasForms
             'lng' => filled($this->lng) ? $this->lng : null,
             'radius_km' => max(1, min(1000, $this->radius_km)),
             'sort' => in_array($this->sort, ['time', 'relevance', 'distance'], true) ? $this->sort : $defaults['sort'],
+            'search_include_institutions' => $this->search_include_institutions,
+            'search_include_speakers' => $this->search_include_speakers,
+            'search_include_references' => $this->search_include_references,
+            'reference_author_search' => $this->normalizeStringArray($this->reference_author_search),
         ];
     }
 
@@ -1549,6 +1636,10 @@ class Index extends Component implements HasForms
         $this->lng = $filters['lng'];
         $this->radius_km = $filters['radius_km'];
         $this->sort = $filters['sort'];
+        $this->search_include_institutions = (bool) ($filters['search_include_institutions'] ?? true);
+        $this->search_include_speakers = (bool) ($filters['search_include_speakers'] ?? true);
+        $this->search_include_references = (bool) ($filters['search_include_references'] ?? true);
+        $this->reference_author_search = $filters['reference_author_search'];
     }
 
     /**
@@ -1636,6 +1727,10 @@ class Index extends Component implements HasForms
             'lng' => filled($normalized['lng']) ? (string) $normalized['lng'] : null,
             'radius_km' => max(1, min(1000, (int) ($normalized['radius_km'] ?? $defaults['radius_km']))),
             'sort' => $sort,
+            'search_include_institutions' => (bool) ($normalized['search_include_institutions'] ?? true),
+            'search_include_speakers' => (bool) ($normalized['search_include_speakers'] ?? true),
+            'search_include_references' => (bool) ($normalized['search_include_references'] ?? true),
+            'reference_author_search' => $this->normalizeStringArray($normalized['reference_author_search'] ?? []),
         ];
     }
 

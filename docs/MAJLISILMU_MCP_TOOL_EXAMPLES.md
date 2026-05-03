@@ -143,6 +143,8 @@ Use enum backing values in `filters`, and use date-only `YYYY-MM-DD` values for 
 
 Use the dedicated event search tool when you need richer discovery: geo-proximity, prayer-time windows, role-oriented constraints, and tag signals. All filter parameters are optional and combinable. Each parameter's inline description (visible in the tool schema) lists valid enum values and any interdependencies.
 
+Keyword `query` expands to related institution, speaker/key-person, and reference matches by default. Use `search_include_institutions`, `search_include_speakers`, and `search_include_references` to narrow expansion when needed.
+
 ```json
 {
   "tool": "admin-search-events",
@@ -158,6 +160,22 @@ Use the dedicated event search tool when you need richer discovery: geo-proximit
     "sort": "distance",
     "page": 1,
     "per_page": 12
+  }
+}
+```
+
+```json
+{
+  "tool": "admin-search-events",
+  "arguments": {
+    "query": "ibn qudamah",
+    "reference_author_search": ["Ibn Qudamah"],
+    "search_include_institutions": false,
+    "search_include_speakers": false,
+    "search_include_references": true,
+    "time_scope": "all",
+    "sort": "relevance",
+    "per_page": 10
   }
 }
 ```
@@ -442,6 +460,8 @@ When reference media is enabled, speaker context selection follows this fallback
 
 Use the member-scoped event search tool for rich discovery while respecting Ahli visibility boundaries.
 
+Keyword `query` also expands to institution, speaker/key-person, and reference matches by default. Toggle `search_include_*` flags to include/exclude each relation family.
+
 ```json
 {
   "tool": "member-search-events",
@@ -453,6 +473,21 @@ Use the member-scoped event search tool for rich discovery while respecting Ahli
     "state_id": 14,
     "sort": "time",
     "page": 1,
+    "per_page": 10
+  }
+}
+```
+
+```json
+{
+  "tool": "member-search-events",
+  "arguments": {
+    "query": "markaz ikhlas",
+    "search_include_institutions": true,
+    "search_include_speakers": false,
+    "search_include_references": false,
+    "sort": "relevance",
+    "time_scope": "all",
     "per_page": 10
   }
 }

@@ -36,6 +36,7 @@ class McpEventSearchService
         'source_tag_ids',
         'issue_tag_ids',
         'reference_ids',
+        'reference_author_search',
     ];
 
     /**
@@ -78,6 +79,10 @@ class McpEventSearchService
         'has_event_url',
         'has_live_url',
         'has_end_time',
+        'search_include_institutions',
+        'search_include_speakers',
+        'search_include_references',
+        'reference_author_search',
     ];
 
     public function __construct(
@@ -233,6 +238,11 @@ class McpEventSearchService
             'has_event_url' => ['sometimes', 'nullable', 'boolean'],
             'has_live_url' => ['sometimes', 'nullable', 'boolean'],
             'has_end_time' => ['sometimes', 'nullable', 'boolean'],
+            'search_include_institutions' => ['sometimes', 'nullable', 'boolean'],
+            'search_include_speakers' => ['sometimes', 'nullable', 'boolean'],
+            'search_include_references' => ['sometimes', 'nullable', 'boolean'],
+            'reference_author_search' => ['sometimes', 'nullable', 'array'],
+            'reference_author_search.*' => ['string', 'max:255'],
         ];
     }
 
@@ -364,6 +374,18 @@ class McpEventSearchService
             'has_end_time' => $schema->boolean()->nullable()->description(
                 'Pass true to return only events with a specified end time. Pass false to return events without one.'
             ),
+            'search_include_institutions' => $schema->boolean()->nullable()->description(
+                'When false, the keyword search (query) will not expand to match institution names. Default: true.'
+            ),
+            'search_include_speakers' => $schema->boolean()->nullable()->description(
+                'When false, the keyword search (query) will not expand to match speaker names or key-person names. Default: true.'
+            ),
+            'search_include_references' => $schema->boolean()->nullable()->description(
+                'When false, the keyword search (query) will not expand to match reference (book/kitab) titles or authors. Default: true.'
+            ),
+            'reference_author_search' => $stringArray->description(
+                'Array of reference author keywords/names. Returns events linked to references whose author matches any provided value.'
+            ),
         ];
     }
 
@@ -383,6 +405,19 @@ class McpEventSearchService
         $filters['starts_time_from'] = $this->normalizeOptionalString($filters['starts_time_from'] ?? null);
         $filters['starts_time_until'] = $this->normalizeOptionalString($filters['starts_time_until'] ?? null);
 
+        // Scope toggles: default to true when absent; must survive array_filter as they can be false.
+        $includeInstitutions = isset($filters['search_include_institutions'])
+            ? (bool) $filters['search_include_institutions']
+            : true;
+        $includeSpeakers = isset($filters['search_include_speakers'])
+            ? (bool) $filters['search_include_speakers']
+            : true;
+        $includeReferences = isset($filters['search_include_references'])
+            ? (bool) $filters['search_include_references']
+            : true;
+
+        unset($filters['search_include_institutions'], $filters['search_include_speakers'], $filters['search_include_references']);
+
         if (($filters['time_scope'] ?? 'upcoming') === 'upcoming') {
             $filters['time_scope'] = null;
         }
@@ -396,7 +431,7 @@ class McpEventSearchService
             $filters['prayer_time'] = null;
         }
 
-        return array_filter($filters, function (mixed $value): bool {
+        $filtered = array_filter($filters, function (mixed $value): bool {
             if ($value === null || $value === '') {
                 return false;
             }
@@ -407,6 +442,13 @@ class McpEventSearchService
 
             return true;
         });
+
+        // Boolean scope toggles must be preserved even when false.
+        $filtered['search_include_institutions'] = $includeInstitutions;
+        $filtered['search_include_speakers'] = $includeSpeakers;
+        $filtered['search_include_references'] = $includeReferences;
+
+        return $filtered;
     }
 
     /**

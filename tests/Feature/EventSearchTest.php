@@ -164,10 +164,13 @@ describe('Event Search Filters', function () {
             ->toBeNull();
     });
 
-    it('shows title-only search placeholder on events index', function () {
+    it('shows search placeholder on events index', function () {
         $this->get(eventsIndexUrl())
             ->assertOk()
-            ->assertSee('Cari mengikut tajuk...');
+            ->assertSee('Cari majlis...')
+            ->assertSee('search_include_institutions')
+            ->assertSee('search_include_speakers')
+            ->assertSee('search_include_references');
     });
 
     it('loads the advanced filter panel only after it is opened', function () {
@@ -393,7 +396,7 @@ describe('Event Search Filters', function () {
             ->assertDontSee('Umbrella Program Hidden From Index');
     });
 
-    it('does not search events by institution name when title does not match', function () {
+    it('searches events by institution name when the institution name matches', function () {
         $matchInstitution = Institution::factory()->create([
             'name' => 'Pusat Tarbiah Al Hikmah',
             'status' => 'verified',
@@ -425,47 +428,11 @@ describe('Event Search Filters', function () {
         $response = $this->get(eventsIndexUrl('search=Al%20Hikmah'));
 
         $response->assertOk()
-            ->assertDontSee('Kuliah Subuh Institusi A')
+            ->assertSee('Kuliah Subuh Institusi A')
             ->assertDontSee('Kuliah Subuh Institusi B');
     });
 
-    it('does not search events by venue name when title does not match', function () {
-        $matchVenue = Venue::factory()->create([
-            'name' => 'Surau Taman Melawati',
-            'status' => 'verified',
-            'is_active' => true,
-        ]);
-
-        $otherVenue = Venue::factory()->create([
-            'name' => 'Masjid Al Falah',
-            'status' => 'verified',
-            'is_active' => true,
-        ]);
-
-        Event::factory()->for($matchVenue)->create([
-            'title' => 'Kuliah Malam Lokasi A',
-            'status' => 'approved',
-            'visibility' => 'public',
-            'published_at' => now(),
-            'starts_at' => now()->addDays(1),
-        ]);
-
-        Event::factory()->for($otherVenue)->create([
-            'title' => 'Kuliah Malam Lokasi B',
-            'status' => 'approved',
-            'visibility' => 'public',
-            'published_at' => now(),
-            'starts_at' => now()->addDays(1),
-        ]);
-
-        $response = $this->get(eventsIndexUrl('search=Melawati'));
-
-        $response->assertOk()
-            ->assertDontSee('Kuliah Malam Lokasi A')
-            ->assertDontSee('Kuliah Malam Lokasi B');
-    });
-
-    it('does not search events by speaker name when title does not match', function () {
+    it('searches events by speaker name when the speaker is attached', function () {
         $matchSpeaker = Speaker::factory()->create([
             'name' => 'Ustaz Samad Al-Bakri',
             'status' => 'verified',
@@ -499,8 +466,320 @@ describe('Event Search Filters', function () {
         $response = $this->get(eventsIndexUrl('search=Samad'));
 
         $response->assertOk()
-            ->assertDontSee('Kuliah Speaker A')
+            ->assertSee('Kuliah Speaker A')
             ->assertDontSee('Kuliah Speaker B');
+    });
+
+    it('searches events by free-text key person name when no linked speaker entity exists', function () {
+        $matchEvent = createVisibleEventForSearch([
+            'title' => 'Kuliah Usul Fiqh',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $matchEvent->keyPeople()->create([
+            'name' => 'Ustaz Tarmizi Jamaluddin',
+            'role' => EventKeyPersonRole::Speaker,
+            'speaker_id' => null,
+            'order_column' => 1,
+        ]);
+
+        $otherEvent = createVisibleEventForSearch([
+            'title' => 'Kuliah Tauhid',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $otherEvent->keyPeople()->create([
+            'name' => 'Ustaz Hafiz Rahim',
+            'role' => EventKeyPersonRole::Speaker,
+            'speaker_id' => null,
+            'order_column' => 1,
+        ]);
+
+        $response = $this->get(eventsIndexUrl('search=Tarmizi'));
+
+        $response->assertOk()
+            ->assertSee('Kuliah Usul Fiqh')
+            ->assertDontSee('Kuliah Tauhid');
+    });
+
+    it('searches events by reference title when the reference is attached', function () {
+        $matchReference = Reference::factory()->create([
+            'title' => 'Kitab Al Fiqh Al Islami',
+            'status' => 'verified',
+        ]);
+
+        $otherReference = Reference::factory()->create([
+            'title' => 'Syarah Matan Ghayah',
+            'status' => 'verified',
+        ]);
+
+        $matchEvent = createVisibleEventForSearch([
+            'title' => 'Halaqah Rujukan A',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $matchEvent->references()->attach($matchReference->id);
+
+        $otherEvent = createVisibleEventForSearch([
+            'title' => 'Halaqah Rujukan B',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $otherEvent->references()->attach($otherReference->id);
+
+        $response = $this->get(eventsIndexUrl('search=Al%20Fiqh'));
+
+        $response->assertOk()
+            ->assertSee('Halaqah Rujukan A')
+            ->assertDontSee('Halaqah Rujukan B');
+    });
+
+    it('searches events by reference author when the reference is attached', function () {
+        $matchReference = Reference::factory()->create([
+            'title' => 'Kitab Al Fiqh',
+            'author' => 'Qudama AlMaqdisi Unique',
+            'status' => 'verified',
+        ]);
+
+        $otherReference = Reference::factory()->create([
+            'title' => 'Kitab Al Aqidah',
+            'author' => 'Taymiyya AlHanbali Unique',
+            'status' => 'verified',
+        ]);
+
+        $matchEvent = createVisibleEventForSearch([
+            'title' => 'Halaqah Author A',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $matchEvent->references()->attach($matchReference->id);
+
+        $otherEvent = createVisibleEventForSearch([
+            'title' => 'Halaqah Author B',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $otherEvent->references()->attach($otherReference->id);
+
+        $results = app(EventSearchService::class)->search(
+            query: 'Qudama AlMaqdisi',
+            filters: [],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($results->items())->pluck('title')->all())
+            ->toContain('Halaqah Author A')
+            ->not->toContain('Halaqah Author B');
+    });
+
+    it('filters events by reference_author_search filter', function () {
+        $matchReference = Reference::factory()->create([
+            'title' => 'Risalah Tawhid',
+            'author' => 'Muhammad Abduh',
+            'status' => 'verified',
+        ]);
+
+        $otherReference = Reference::factory()->create([
+            'title' => 'Al Bidaya Wal Nihaya',
+            'author' => 'Ibn Kathir',
+            'status' => 'verified',
+        ]);
+
+        $matchEvent = createVisibleEventForSearch([
+            'title' => 'Kuliah Abduh Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $matchEvent->references()->attach($matchReference->id);
+
+        $noMatchEvent = createVisibleEventForSearch([
+            'title' => 'Kuliah Ibn Kathir No Match',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $noMatchEvent->references()->attach($otherReference->id);
+
+        $results = app(EventSearchService::class)->search(
+            query: null,
+            filters: ['reference_author_search' => ['Muhammad Abduh']],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($results->items())->pluck('title')->all())
+            ->toContain('Kuliah Abduh Match')
+            ->not->toContain('Kuliah Ibn Kathir No Match');
+    });
+
+    it('excludes institution name from search expansion when search_include_institutions is false', function () {
+        $institution = Institution::factory()->create([
+            'name' => 'Markaz Ilmu Sejahtera',
+            'status' => 'verified',
+        ]);
+
+        $institutionEvent = createVisibleEventForSearch([
+            'title' => 'Kuliah Unique Xqrz',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+            'institution_id' => $institution->id,
+        ]);
+
+        // With institution scope enabled (default), event surfaces via institution name.
+        $withScope = app(EventSearchService::class)->search(
+            query: 'Markaz Ilmu Sejahtera',
+            filters: ['search_include_institutions' => true],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($withScope->items())->pluck('title')->all())
+            ->toContain('Kuliah Unique Xqrz');
+
+        // With institution scope disabled, event must not appear.
+        $withoutScope = app(EventSearchService::class)->search(
+            query: 'Markaz Ilmu Sejahtera',
+            filters: ['search_include_institutions' => false],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($withoutScope->items())->pluck('title')->all())
+            ->not->toContain('Kuliah Unique Xqrz');
+    });
+
+    it('excludes speaker name from search expansion when search_include_speakers is false', function () {
+        $speaker = Speaker::factory()->create([
+            'name' => 'Ustaz Zakaria Najib',
+            'status' => 'verified',
+        ]);
+
+        $speakerEvent = createVisibleEventForSearch([
+            'title' => 'Kuliah Speaker Scope Xqrz',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $speakerEvent->keyPeople()->create([
+            'speaker_id' => $speaker->id,
+            'name' => $speaker->name,
+            'role' => EventKeyPersonRole::Speaker,
+        ]);
+
+        // With speaker scope enabled (default), event surfaces via speaker name.
+        $withScope = app(EventSearchService::class)->search(
+            query: 'Zakaria Najib',
+            filters: ['search_include_speakers' => true],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($withScope->items())->pluck('title')->all())
+            ->toContain('Kuliah Speaker Scope Xqrz');
+
+        // With speaker scope disabled, event must not appear.
+        $withoutScope = app(EventSearchService::class)->search(
+            query: 'Zakaria Najib',
+            filters: ['search_include_speakers' => false],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($withoutScope->items())->pluck('title')->all())
+            ->not->toContain('Kuliah Speaker Scope Xqrz');
+    });
+
+    it('excludes reference from search expansion when search_include_references is false', function () {
+        $reference = Reference::factory()->create([
+            'title' => 'Tafsir Ibn Juzayy',
+            'status' => 'verified',
+        ]);
+
+        $referenceEvent = createVisibleEventForSearch([
+            'title' => 'Kuliah Reference Scope Xqrz',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+        $referenceEvent->references()->attach($reference->id);
+
+        // With reference scope enabled (default), event surfaces via reference title.
+        $withScope = app(EventSearchService::class)->search(
+            query: 'Ibn Juzayy',
+            filters: ['search_include_references' => true],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($withScope->items())->pluck('title')->all())
+            ->toContain('Kuliah Reference Scope Xqrz');
+
+        // With reference scope disabled, event must not appear.
+        $withoutScope = app(EventSearchService::class)->search(
+            query: 'Ibn Juzayy',
+            filters: ['search_include_references' => false],
+            perPage: 20,
+            sort: 'time',
+        );
+
+        expect(collect($withoutScope->items())->pluck('title')->all())
+            ->not->toContain('Kuliah Reference Scope Xqrz');
+    });
+
+    it('does not search events by venue name when title does not match', function () {
+        $matchVenue = Venue::factory()->create([
+            'name' => 'Surau Taman Melawati',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $otherVenue = Venue::factory()->create([
+            'name' => 'Masjid Al Irsyad',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        Event::factory()->for($matchVenue)->create([
+            'title' => 'Kuliah Lokasi A Xyznotmatch',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        Event::factory()->for($otherVenue)->create([
+            'title' => 'Kuliah Lokasi B Xyznotmatch',
+            'status' => 'approved',
+            'visibility' => 'public',
+            'published_at' => now(),
+            'starts_at' => now()->addDays(1),
+        ]);
+
+        $response = $this->get(eventsIndexUrl('search=Melawati'));
+
+        $response->assertOk()
+            ->assertDontSee('Kuliah Lokasi A Xyznotmatch')
+            ->assertDontSee('Kuliah Lokasi B Xyznotmatch');
     });
 
     it('supports fuzzy search with minor title typos', function () {
