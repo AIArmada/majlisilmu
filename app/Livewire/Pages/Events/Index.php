@@ -2,15 +2,14 @@
 
 namespace App\Livewire\Pages\Events;
 
+use App\Actions\Events\SaveEventAction;
+use App\Actions\Events\UnsaveEventAction;
 use App\Enums\EventAgeGroup;
-use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
 use App\Enums\EventKeyPersonRole;
 use App\Enums\EventPrayerTime;
-use App\Enums\EventType;
 use App\Enums\TagType;
 use App\Enums\TimingMode;
-use App\Forms\SharedFormSchema;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\Event;
@@ -20,14 +19,14 @@ use App\Models\Speaker;
 use App\Models\State;
 use App\Models\Subdistrict;
 use App\Models\Tag;
+use App\Models\User;
 use App\Models\Venue;
 use App\Services\EventSearchService;
+use App\Support\Auth\IntendedRedirect;
 use App\Support\Cache\SafeModelCache;
 use App\Support\Location\FederalTerritoryLocation;
 use App\Support\Location\PreferredCountryResolver;
 use App\Support\Location\PublicGeolocationPermission;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
@@ -249,19 +248,12 @@ class Index extends Component implements HasForms
      */
     public array $filterData = [];
 
-    public bool $showAdvancedFiltersPanel = false;
-
     public function mount(): void
     {
         $normalized = $this->normalizedUrlState();
 
         $this->fillPublicPropertiesFromFilters($normalized);
         $this->filterData = $normalized;
-    }
-
-    public function toggleAdvancedFiltersPanel(): void
-    {
-        $this->showAdvancedFiltersPanel = ! $this->showAdvancedFiltersPanel;
     }
 
     public function showsGeolocationControls(): bool
@@ -287,440 +279,299 @@ class Index extends Component implements HasForms
         return $schema
             ->statePath('filterData')
             ->schema([
-                Section::make(__('Advanced Filters'))
-                    ->extraAttributes(['class' => 'mi-advanced-filter-section'])
-                    ->description(__('Refine events using format, timing, audience, speakers, and links.'))
-                    ->collapsible()
-                    ->collapsed()
+                Section::make(__('Masa'))
+                    ->extraAttributes(['class' => 'mi-advanced-filter-group'])
                     ->schema([
-                        Section::make(__('Time & Date'))
-                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Set the date range when events are held, then choose timing mode.'))
-                            ->columns(['default' => 1, 'md' => 2, 'xl' => 5])
-                            ->schema([
-                                DatePicker::make('starts_after')
-                                    ->label(__('Held From Date'))
-                                    ->helperText(__('Filters events held on or after this date.'))
-                                    ->native()
-                                    ->maxDate(fn (Get $get): ?string => $get('starts_before'))
-                                    ->live(),
+                        Select::make('time_scope')
+                            ->label(__('Time Scope'))
+                            ->options([
+                                'upcoming' => __('Upcoming'),
+                                'past' => __('Past'),
+                                'all' => __('All Time'),
+                            ])
+                            ->default('upcoming')
+                            ->live(),
 
-                                DatePicker::make('starts_before')
-                                    ->label(__('Held Until Date'))
-                                    ->helperText(__('Filters events held on or before this date.'))
-                                    ->native()
-                                    ->minDate(fn (Get $get): ?string => $get('starts_after'))
-                                    ->live(),
+                        Select::make('timing_mode')
+                            ->label(__('Timing Mode'))
+                            ->placeholder(__('Any'))
+                            ->options([
+                                TimingMode::Absolute->value => TimingMode::Absolute->label(),
+                                TimingMode::PrayerRelative->value => TimingMode::PrayerRelative->label(),
+                            ])
+                            ->afterStateUpdated(function (mixed $state, Set $set): void {
+                                if ($state !== TimingMode::PrayerRelative->value) {
+                                    $set('prayer_time', null);
+                                }
 
-                                Select::make('time_scope')
-                                    ->label(__('Time Scope'))
-                                    ->options([
-                                        'upcoming' => __('Upcoming'),
-                                        'past' => __('Past'),
-                                        'all' => __('All Time'),
-                                    ])
-                                    ->default('upcoming')
-                                    ->live(),
+                                if ($state !== TimingMode::Absolute->value) {
+                                    $set('starts_time_from', null);
+                                    $set('starts_time_until', null);
+                                }
+                            })
+                            ->live(),
 
-                                Select::make('timing_mode')
-                                    ->label(__('Timing Mode'))
-                                    ->placeholder(__('Any'))
-                                    ->options([
-                                        TimingMode::Absolute->value => TimingMode::Absolute->label(),
-                                        TimingMode::PrayerRelative->value => TimingMode::PrayerRelative->label(),
-                                    ])
-                                    ->afterStateUpdated(function (mixed $state, Set $set): void {
-                                        if ($state !== TimingMode::PrayerRelative->value) {
-                                            $set('prayer_time', null);
-                                        }
+                        Select::make('prayer_time')
+                            ->label(__('Prayer Time'))
+                            ->placeholder(__('Any'))
+                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
+                            ->searchable()
+                            ->options(collect(EventPrayerTime::cases())
+                                ->mapWithKeys(fn (EventPrayerTime $prayerTime): array => [$prayerTime->value => $prayerTime->getLabel()])
+                                ->all()
+                            )
+                            ->live(),
 
-                                        if ($state !== TimingMode::Absolute->value) {
-                                            $set('starts_time_from', null);
-                                            $set('starts_time_until', null);
-                                        }
-                                    })
-                                    ->live(),
+                        TimePicker::make('starts_time_from')
+                            ->label(__('Masa Dari'))
+                            ->helperText(__('Tapis berdasarkan masa mula majlis dari waktu ini.'))
+                            ->placeholder(__('Any'))
+                            ->seconds(false)
+                            ->native(false)
+                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value)
+                            ->live(),
 
-                                Select::make('prayer_time')
-                                    ->label(__('Prayer Time'))
-                                    ->placeholder(__('Any'))
-                                    ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::PrayerRelative->value)
-                                    ->searchable()
-                                    ->options(collect(EventPrayerTime::cases())
-                                        ->mapWithKeys(fn (EventPrayerTime $prayerTime): array => [$prayerTime->value => $prayerTime->getLabel()])
-                                        ->all()
-                                    )
-                                    ->live(),
+                        TimePicker::make('starts_time_until')
+                            ->label(__('Masa Hingga'))
+                            ->helperText(__('Tapis berdasarkan masa mula majlis hingga waktu ini.'))
+                            ->placeholder(__('Any'))
+                            ->seconds(false)
+                            ->native(false)
+                            ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value)
+                            ->live(),
+                    ]),
 
-                                TimePicker::make('starts_time_from')
-                                    ->label(__('Masa Dari'))
-                                    ->helperText(__('Tapis berdasarkan masa mula majlis dari waktu ini.'))
-                                    ->placeholder(__('Any'))
-                                    ->seconds(false)
-                                    ->native(false)
-                                    ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value)
-                                    ->live(),
+                Section::make(__('Lokasi majlis'))
+                    ->extraAttributes(['class' => 'mi-advanced-filter-group'])
+                    ->schema([
+                        Select::make('institution_id')
+                            ->label(__('Institution'))
+                            ->placeholder(__('Any Institution'))
+                            ->searchable()
+                            ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchInstitutionOptions(
+                                countryId: $this->normalizeNullableString($get('country_id')),
+                                stateId: $this->normalizeNullableString($get('state_id')),
+                                districtId: $this->normalizeNullableString($get('district_id')),
+                                subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                search: $search,
+                            ))
+                            ->getOptionLabelUsing(fn (string $value): ?string => $this->institutionOptionLabel($value))
+                            ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
+                            ->live(),
 
-                                TimePicker::make('starts_time_until')
-                                    ->label(__('Masa Hingga'))
-                                    ->helperText(__('Tapis berdasarkan masa mula majlis hingga waktu ini.'))
-                                    ->placeholder(__('Any'))
-                                    ->seconds(false)
-                                    ->native(false)
-                                    ->visible(fn (Get $get): bool => $get('timing_mode') === TimingMode::Absolute->value)
-                                    ->live(),
-                            ]),
+                        Select::make('venue_id')
+                            ->label(__('Tempat'))
+                            ->placeholder(__('Any Venue'))
+                            ->searchable()
+                            ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchVenueOptions(
+                                countryId: $this->normalizeNullableString($get('country_id')),
+                                stateId: $this->normalizeNullableString($get('state_id')),
+                                districtId: $this->normalizeNullableString($get('district_id')),
+                                subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
+                                search: $search,
+                            ))
+                            ->getOptionLabelUsing(fn (string $value): ?string => $this->venueOptionLabel($value))
+                            ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
+                            ->live(),
+                    ]),
 
-                        Section::make(__('Location'))
-                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Narrow events by geography, institution, and venue.'))
-                            ->columns(['default' => 1, 'md' => 2, 'lg' => 3])
-                            ->schema([
-                                Hidden::make('country_id'),
+                Section::make(__('Penceramah & kandungan'))
+                    ->extraAttributes(['class' => 'mi-advanced-filter-group'])
+                    ->schema([
+                        Select::make('speaker_ids')
+                            ->label(__('Speaker'))
+                            ->placeholder(__('Any Speaker'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
+                            ->live(),
 
-                                Select::make('state_id')
-                                    ->label(__('State'))
-                                    ->placeholder(__('All States'))
-                                    ->options(fn (): array => $this->states()
-                                        ->pluck('name', 'id')
-                                        ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
-                                        ->all()
-                                    )
-                                    ->searchable()
-                                    ->disabled(fn (Get $get): bool => ! filled($get('country_id')))
-                                    ->live()
-                                    ->afterStateUpdated(function (Set $set): void {
-                                        $set('district_id', null);
-                                        $set('subdistrict_id', null);
-                                        $set('institution_id', null);
-                                        $set('venue_id', null);
-                                    }),
+                        Select::make('key_person_roles')
+                            ->label(__('Peranan Lain'))
+                            ->placeholder(__('Any Role'))
+                            ->searchable()
+                            ->multiple()
+                            ->options(EventKeyPersonRole::nonSpeakerOptions())
+                            ->live(),
 
-                                Select::make('district_id')
-                                    ->label(__('District'))
-                                    ->placeholder(__('All Districts'))
-                                    ->options(fn (Get $get): array => collect(SharedFormSchema::districtOptionsForState($get('state_id')))
-                                        ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
-                                        ->all())
-                                    ->disabled(fn (Get $get): bool => ! filled($get('state_id')))
-                                    ->visible(fn (Get $get): bool => filled($get('state_id')) && ! FederalTerritoryLocation::isFederalTerritoryStateId($get('state_id')))
-                                    ->searchable()
-                                    ->live()
-                                    ->afterStateUpdated(function (Set $set): void {
-                                        $set('subdistrict_id', null);
-                                        $set('institution_id', null);
-                                        $set('venue_id', null);
-                                    }),
+                        Select::make('person_in_charge_ids')
+                            ->label(__('PIC / Penyelaras'))
+                            ->placeholder(__('Any PIC / Penyelaras'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
+                            ->live(),
 
-                                Select::make('subdistrict_id')
-                                    ->label(__('Bandar / Mukim / Zon'))
-                                    ->placeholder(__('All Subdistricts'))
-                                    ->options(fn (Get $get): array => collect(SharedFormSchema::subdistrictOptionsForSelection($get('state_id'), $get('district_id')))
-                                        ->mapWithKeys(fn (string $name, mixed $id): array => [(string) $id => $name])
-                                        ->all())
-                                    ->disabled(fn (Get $get): bool => ! SharedFormSchema::shouldShowSubdistrictField($get('state_id'), $get('district_id')))
-                                    ->searchable()
-                                    ->live()
-                                    ->afterStateUpdated(function (Set $set): void {
-                                        $set('institution_id', null);
-                                        $set('venue_id', null);
-                                    }),
+                        TextInput::make('person_in_charge_search')
+                            ->label(__('Nama PIC / Penyelaras'))
+                            ->placeholder(__('Cari nama PIC / Penyelaras'))
+                            ->maxLength(255)
+                            ->live(onBlur: true),
 
-                                Select::make('institution_id')
-                                    ->label(__('Institution'))
-                                    ->placeholder(__('Any Institution'))
-                                    ->searchable()
-                                    ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchInstitutionOptions(
-                                        countryId: $this->normalizeNullableString($get('country_id')),
-                                        stateId: $this->normalizeNullableString($get('state_id')),
-                                        districtId: $this->normalizeNullableString($get('district_id')),
-                                        subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
-                                        search: $search,
-                                    ))
-                                    ->getOptionLabelUsing(fn (string $value): ?string => $this->institutionOptionLabel($value))
-                                    ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
-                                    ->live(),
+                        Select::make('moderator_ids')
+                            ->label(__('Moderator'))
+                            ->placeholder(__('Any Moderator'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
+                            ->live(),
 
-                                Select::make('venue_id')
-                                    ->label(__('Tempat'))
-                                    ->placeholder(__('Any Venue'))
-                                    ->searchable()
-                                    ->getSearchResultsUsing(fn (Get $get, string $search): array => $this->searchVenueOptions(
-                                        countryId: $this->normalizeNullableString($get('country_id')),
-                                        stateId: $this->normalizeNullableString($get('state_id')),
-                                        districtId: $this->normalizeNullableString($get('district_id')),
-                                        subdistrictId: $this->normalizeNullableString($get('subdistrict_id')),
-                                        search: $search,
-                                    ))
-                                    ->getOptionLabelUsing(fn (string $value): ?string => $this->venueOptionLabel($value))
-                                    ->helperText(__('Pilihan mengikut lokasi yang dipilih.'))
-                                    ->live(),
+                        Select::make('imam_ids')
+                            ->label(__('Imam'))
+                            ->placeholder(__('Any Imam'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
+                            ->live(),
 
-                                TextInput::make('radius_km')
-                                    ->label(__('Radius (km)'))
-                                    ->helperText(__('Applied when searching nearby events from your detected location.'))
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->maxValue(1000)
-                                    ->step(1)
-                                    ->extraInputAttributes([
-                                        'min' => 1,
-                                        'max' => 1000,
-                                        'step' => 1,
-                                    ])
-                                    ->extraFieldWrapperAttributes([
-                                        'data-testid' => 'advanced-nearby-radius',
-                                        'x-cloak' => true,
-                                        'x-bind:hidden' => '! geolocationPermitted',
-                                        ...(app(PublicGeolocationPermission::class)->isGranted() ? [] : ['hidden' => 'hidden']),
-                                    ])
-                                    ->suffix(__('km'))
-                                    ->visible(fn (Get $get): bool => filled($get('lat')) && filled($get('lng')))
-                                    ->live(),
-                            ]),
+                        Select::make('khatib_ids')
+                            ->label(__('Khatib'))
+                            ->placeholder(__('Any Khatib'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
+                            ->live(),
 
-                        Section::make(__('People & Content'))
-                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Filter by speakers, categories, knowledge fields, themes, and references.'))
-                            ->columns(['default' => 1, 'md' => 2, 'xl' => 3])
-                            ->schema([
-                                Select::make('speaker_ids')
-                                    ->label(__('Speaker'))
-                                    ->placeholder(__('Any Speaker'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
-                                    ->live(),
+                        Select::make('bilal_ids')
+                            ->label(__('Bilal'))
+                            ->placeholder(__('Any Bilal'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
+                            ->live(),
 
-                                Select::make('key_person_roles')
-                                    ->label(__('Peranan Lain'))
-                                    ->placeholder(__('Any Role'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->options(EventKeyPersonRole::nonSpeakerOptions())
-                                    ->live(),
+                        Select::make('domain_tag_ids')
+                            ->label(__('Kategori'))
+                            ->placeholder(__('Any Category'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchTagOptions(TagType::Domain, $search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->tagOptionLabels(TagType::Domain, $values))
+                            ->live(),
 
-                                Select::make('person_in_charge_ids')
-                                    ->label(__('PIC / Penyelaras'))
-                                    ->placeholder(__('Any PIC / Penyelaras'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
-                                    ->live(),
+                        Select::make('topic_ids')
+                            ->label(__('Bidang Ilmu'))
+                            ->placeholder(__('Any Knowledge Field'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchTagOptions(TagType::Discipline, $search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->tagOptionLabels(TagType::Discipline, $values))
+                            ->live(),
 
-                                TextInput::make('person_in_charge_search')
-                                    ->label(__('Nama PIC / Penyelaras'))
-                                    ->placeholder(__('Cari nama PIC / Penyelaras'))
-                                    ->maxLength(255)
-                                    ->live(onBlur: true),
+                        Select::make('source_tag_ids')
+                            ->label(__('Sumber Rujukan Utama'))
+                            ->placeholder(__('Pilih sumber...'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchTagOptions(TagType::Source, $search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->tagOptionLabels(TagType::Source, $values))
+                            ->live(),
 
-                                Select::make('moderator_ids')
-                                    ->label(__('Moderator'))
-                                    ->placeholder(__('Any Moderator'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
-                                    ->live(),
+                        Select::make('issue_tag_ids')
+                            ->label(__('Tema / Isu'))
+                            ->placeholder(__('Pilih atau taip untuk tambah tema...'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchTagOptions(TagType::Issue, $search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->tagOptionLabels(TagType::Issue, $values))
+                            ->live(),
 
-                                Select::make('imam_ids')
-                                    ->label(__('Imam'))
-                                    ->placeholder(__('Any Imam'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
-                                    ->live(),
+                        Select::make('reference_ids')
+                            ->label(__('Rujukan Kitab/Buku'))
+                            ->placeholder(__('Cari atau pilih rujukan...'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchReferenceOptions($search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->referenceOptionLabels($values))
+                            ->live(),
 
-                                Select::make('khatib_ids')
-                                    ->label(__('Khatib'))
-                                    ->placeholder(__('Any Khatib'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
-                                    ->live(),
+                        Select::make('reference_author_search')
+                            ->label(__('Pengarang Rujukan'))
+                            ->placeholder(__('Cari atau pilih pengarang...'))
+                            ->searchable()
+                            ->multiple()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->searchReferenceAuthorOptions($search))
+                            ->getOptionLabelsUsing(fn (array $values): array => $this->referenceAuthorOptionLabels($values))
+                            ->live(),
+                    ]),
 
-                                Select::make('bilal_ids')
-                                    ->label(__('Bilal'))
-                                    ->placeholder(__('Any Bilal'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchSpeakerOptions($search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->speakerOptionLabels($values))
-                                    ->live(),
+                Section::make(__('Untuk siapa'))
+                    ->extraAttributes(['class' => 'mi-advanced-filter-group'])
+                    ->schema([
+                        Select::make('gender')
+                            ->label(__('Gender'))
+                            ->placeholder(__('Any'))
+                            ->options(collect(EventGenderRestriction::cases())
+                                ->mapWithKeys(fn (EventGenderRestriction $gender): array => [$gender->value => $gender->getLabel()])
+                                ->all()
+                            )
+                            ->live(),
 
-                                Select::make('domain_tag_ids')
-                                    ->label(__('Kategori'))
-                                    ->placeholder(__('Any Category'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchTagOptions(TagType::Domain, $search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->tagOptionLabels(TagType::Domain, $values))
-                                    ->live(),
+                        Select::make('age_group')
+                            ->label(__('Age Group'))
+                            ->placeholder(__('Any Age Group'))
+                            ->options(collect(EventAgeGroup::cases())
+                                ->mapWithKeys(fn (EventAgeGroup $age): array => [$age->value => $age->getLabel()])
+                                ->all()
+                            )
+                            ->multiple()
+                            ->live()
+                            ->afterStateUpdated(function (mixed $state, Set $set): void {
+                                $ageGroups = $this->normalizeStringArray($state);
 
-                                Select::make('topic_ids')
-                                    ->label(__('Bidang Ilmu'))
-                                    ->placeholder(__('Any Knowledge Field'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchTagOptions(TagType::Discipline, $search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->tagOptionLabels(TagType::Discipline, $values))
-                                    ->live(),
+                                if (
+                                    in_array(EventAgeGroup::Children->value, $ageGroups, true)
+                                    || in_array(EventAgeGroup::AllAges->value, $ageGroups, true)
+                                ) {
+                                    $set('children_allowed', true);
+                                }
+                            }),
 
-                                Select::make('source_tag_ids')
-                                    ->label(__('Sumber Rujukan Utama'))
-                                    ->placeholder(__('Pilih sumber...'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchTagOptions(TagType::Source, $search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->tagOptionLabels(TagType::Source, $values))
-                                    ->live(),
+                        Select::make('children_allowed')
+                            ->label(__('Children Allowed'))
+                            ->placeholder(__('Any'))
+                            ->options([
+                                '1' => __('Yes'),
+                                '0' => __('No'),
+                            ])
+                            ->live(),
 
-                                Select::make('issue_tag_ids')
-                                    ->label(__('Tema / Isu'))
-                                    ->placeholder(__('Pilih atau taip untuk tambah tema...'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchTagOptions(TagType::Issue, $search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->tagOptionLabels(TagType::Issue, $values))
-                                    ->live(),
+                        Select::make('is_muslim_only')
+                            ->label(__('Muslim Only'))
+                            ->placeholder(__('Any'))
+                            ->options([
+                                '1' => __('Yes'),
+                                '0' => __('No'),
+                            ])
+                            ->live(),
+                    ]),
 
-                                Select::make('reference_ids')
-                                    ->label(__('Rujukan Kitab/Buku'))
-                                    ->placeholder(__('Cari atau pilih rujukan...'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchReferenceOptions($search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->referenceOptionLabels($values))
-                                    ->live(),
+                Section::make(__('Pautan & siaran'))
+                    ->extraAttributes(['class' => 'mi-advanced-filter-group'])
+                    ->schema([
+                        Select::make('has_event_url')
+                            ->label(__('Event URL'))
+                            ->placeholder(__('Any'))
+                            ->options([
+                                '1' => __('Has URL'),
+                                '0' => __('No URL'),
+                            ])
+                            ->live(),
 
-                                Select::make('reference_author_search')
-                                    ->label(__('Pengarang Rujukan'))
-                                    ->placeholder(__('Cari atau pilih pengarang...'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->getSearchResultsUsing(fn (string $search): array => $this->searchReferenceAuthorOptions($search))
-                                    ->getOptionLabelsUsing(fn (array $values): array => $this->referenceAuthorOptionLabels($values))
-                                    ->live(),
-                            ]),
-
-                        Section::make(__('Event Settings'))
-                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Filter by event type, format, age group, gender, and language.'))
-                            ->columns(['default' => 1, 'md' => 2, 'xl' => 3])
-                            ->schema([
-                                Select::make('event_type')
-                                    ->label(__('Event Type'))
-                                    ->placeholder(__('Any Type'))
-                                    ->searchable()
-                                    ->multiple()
-                                    ->options(fn (): array => collect(EventType::cases())
-                                        ->mapToGroups(fn (EventType $type): array => [
-                                            $type->getGroup() => [$type->value => $type->getLabel()],
-                                        ])
-                                        ->map(fn (Collection $group): array => $group->collapse()->all())
-                                        ->toArray())
-                                    ->live(),
-
-                                Select::make('event_format')
-                                    ->label(__('Format Majlis'))
-                                    ->placeholder(__('Any Format'))
-                                    ->options(collect(EventFormat::cases())
-                                        ->mapWithKeys(fn (EventFormat $format): array => [$format->value => $format->getLabel()])
-                                        ->all()
-                                    )
-                                    ->multiple()
-                                    ->live(),
-
-                                Select::make('gender')
-                                    ->label(__('Gender'))
-                                    ->placeholder(__('Any'))
-                                    ->options(collect(EventGenderRestriction::cases())
-                                        ->mapWithKeys(fn (EventGenderRestriction $gender): array => [$gender->value => $gender->getLabel()])
-                                        ->all()
-                                    )
-                                    ->live(),
-
-                                Select::make('age_group')
-                                    ->label(__('Age Group'))
-                                    ->placeholder(__('Any Age Group'))
-                                    ->options(collect(EventAgeGroup::cases())
-                                        ->mapWithKeys(fn (EventAgeGroup $age): array => [$age->value => $age->getLabel()])
-                                        ->all()
-                                    )
-                                    ->multiple()
-                                    ->live()
-                                    ->afterStateUpdated(function (mixed $state, Set $set): void {
-                                        $ageGroups = $this->normalizeStringArray($state);
-
-                                        if (
-                                            in_array(EventAgeGroup::Children->value, $ageGroups, true)
-                                            || in_array(EventAgeGroup::AllAges->value, $ageGroups, true)
-                                        ) {
-                                            $set('children_allowed', true);
-                                        }
-                                    }),
-
-                                Select::make('language_codes')
-                                    ->label(__('Bahasa'))
-                                    ->helperText(__('Bahasa yang digunakan dalam majlis.'))
-                                    ->placeholder(__('Any Language'))
-                                    ->multiple()
-                                    ->searchable()
-                                    ->options(fn (): array => $this->languageOptions())
-                                    ->live(),
-                            ]),
-
-                        Section::make(__('Audience'))
-                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Set attendance restrictions and age targeting.'))
-                            ->columns(['default' => 1, 'md' => 2, 'xl' => 4])
-                            ->schema([
-                                Select::make('children_allowed')
-                                    ->label(__('Children Allowed'))
-                                    ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Yes'),
-                                        '0' => __('No'),
-                                    ])
-                                    ->live(),
-
-                                Select::make('is_muslim_only')
-                                    ->label(__('Muslim Only'))
-                                    ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Yes'),
-                                        '0' => __('No'),
-                                    ])
-                                    ->live(),
-                            ]),
-
-                        Section::make(__('Links & Visibility'))
-                            ->extraAttributes(['class' => 'mi-advanced-filter-group'])
-                            ->description(__('Filter events by event and live URL availability.'))
-                            ->columns(['default' => 1, 'md' => 2])
-                            ->schema([
-                                Select::make('has_event_url')
-                                    ->label(__('Event URL'))
-                                    ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Has URL'),
-                                        '0' => __('No URL'),
-                                    ])
-                                    ->live(),
-
-                                Select::make('has_live_url')
-                                    ->label(__('Live URL'))
-                                    ->placeholder(__('Any'))
-                                    ->options([
-                                        '1' => __('Has Live URL'),
-                                        '0' => __('No Live URL'),
-                                    ])
-                                    ->live(),
-                            ]),
+                        Select::make('has_live_url')
+                            ->label(__('Live URL'))
+                            ->placeholder(__('Any'))
+                            ->options([
+                                '1' => __('Has Live URL'),
+                                '0' => __('No Live URL'),
+                            ])
+                            ->live(),
                     ]),
             ]);
     }
@@ -797,6 +648,70 @@ class Index extends Component implements HasForms
         $this->filterData['sort'] = $sort;
 
         $this->resetPage();
+    }
+
+    public function toggleSave(string $eventId): void
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            $this->redirect(IntendedRedirect::loginUrl(request()->fullUrl()), navigate: true);
+
+            return;
+        }
+
+        $event = Event::query()
+            ->active()
+            ->whereKey($eventId)
+            ->first();
+
+        if (! $event instanceof Event || ! in_array((string) $event->status, Event::ENGAGEABLE_STATUSES, true)) {
+            return;
+        }
+
+        $isSaved = $user->savedEvents()
+            ->where('event_id', $event->id)
+            ->exists();
+
+        if ($isSaved) {
+            app(UnsaveEventAction::class)->handle($event->id, $user);
+
+            return;
+        }
+
+        app(SaveEventAction::class)->handle($event, $user, request());
+    }
+
+    /**
+     * @return list<string>
+     */
+    #[Computed]
+    public function savedEventIds(): array
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return [];
+        }
+
+        $eventIds = [];
+
+        foreach ($this->events()->items() as $event) {
+            if ($event instanceof Event) {
+                $eventIds[] = (string) $event->getKey();
+            }
+        }
+
+        if ($eventIds === []) {
+            return [];
+        }
+
+        return $user->savedEvents()
+            ->whereIn('events.id', $eventIds)
+            ->pluck('events.id')
+            ->map(fn (mixed $eventId): string => (string) $eventId)
+            ->values()
+            ->all();
     }
 
     /**

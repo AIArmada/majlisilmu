@@ -136,7 +136,8 @@ describe('Event Search Filters', function () {
 
         $response->assertOk()
             ->assertSee('Circle of')
-            ->assertSee('Advanced Filters')
+            ->assertSee('Penceramah & kandungan')
+            ->assertDontSee('Advanced Filters')
             ->assertDontSee('/flux/flux.js', false)
             ->assertSee('/js/filament/schemas/schemas.js', false)
             ->assertSee('/js/filament/support/support.js', false)
@@ -167,17 +168,18 @@ describe('Event Search Filters', function () {
     it('shows search placeholder on events index', function () {
         $this->get(eventsIndexUrl())
             ->assertOk()
-            ->assertSee('Cari majlis...')
+            ->assertSee('Cari tajuk, ustaz, masjid, topik...')
             ->assertSee('search_include_institutions')
             ->assertSee('search_include_speakers')
             ->assertSee('search_include_references');
     });
 
-    it('loads the advanced filter panel only after it is opened', function () {
+    it('renders secondary filters directly in the events index sidebar', function () {
         Livewire::test(Index::class)
-            ->assertDontSee('People & Content')
-            ->call('toggleAdvancedFiltersPanel')
-            ->assertSee('People & Content');
+            ->assertSee('Penceramah & kandungan')
+            ->assertSee('Lokasi majlis')
+            ->assertSee('Event URL')
+            ->assertDontSee('Advanced Filters');
     });
 
     it('does not preload unrelated filter option labels into the initial events index response', function () {

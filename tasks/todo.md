@@ -11381,3 +11381,33 @@
 
 ## Review
 - Pending.
+
+# Majlis Index Redesign Todo
+
+- [x] Audit current `/majlis` layout, Livewire state, active filters, and event-card data dependencies
+- [x] Redesign the page structure to match the supplied reference: hero/search, filter rail, result toolbar, compact list cards, map promo, and bottom CTA
+- [x] Preserve URL-bound filters, geolocation, saved-search, share, pagination, and Signals tracking hooks
+- [x] Extract the former advanced-filter fields into the main filter rail and remove the advanced-filter disclosure
+- [x] Evaluate whether new or updated product event tracking is needed for changed interactions
+- [x] Run focused rendering/tests, PHPStan where practical, build, and diff checks
+
+## Review
+- Changes:
+  - Rebuilt `/majlis` around the supplied reference with a large search hero, persistent filter rail, result toolbar, compact list cards, map prompt, and bottom CTA.
+  - Moved the remaining secondary filters directly into the sidebar under `Masa`, `Lokasi majlis`, `Penceramah & kandungan`, `Untuk siapa`, and `Pautan & siaran`; removed the `Penapis Lanjutan` / `Advanced Filters` disclosure path.
+  - Reworked the event cards toward the latest reference: a wider results column, larger 16:9 media preview, compact middle details, and a desktop right-side status/action rail.
+  - Aligned the desktop filter/results grid to the same site container span as the header, so the content runs from the logo edge to the `Daftar` button edge rather than using a narrower standalone cap.
+  - Preserved URL-bound filter state, nearby search, saved search entry points, share/map/save actions, pagination, and Signals hooks; the removed disclosure tracking is no longer needed because the controls are always visible.
+- Verification:
+  - Chrome DevTools on `https://majlisilmu.test/majlis` => `200`, no console errors, no `Penapis Lanjutan` / `Penapisan Lanjutan` / `Advanced Filters` text in the page, extracted filter sections rendered directly.
+  - Chrome DevTools at 1800px desktop width => header content spans 180px to 1620px; filter/results grid now uses the same span.
+  - Chrome DevTools event-card image ratio check on `https://majlisilmu.test/majlis` => 384 x 216, ratio 1.778, with the detail column still rendering at 502px.
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventSearchTest.php` => 82 passed, 281 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php` => 30 passed, 222 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/EventEngagementLivewireTest.php` => 2 passed, 9 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Laravel13CacheSerializationTest.php` => 4 passed, 20 assertions
+  - `vendor/bin/phpstan analyse app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php tests/Feature/EventSearchTest.php tests/Feature/EventEngagementLivewireTest.php tests/Feature/Laravel13CacheSerializationTest.php --ansi` => no errors
+  - `vendor/bin/pint --test app/Livewire/Pages/Events/Index.php app/Services/EventSearchService.php tests/Feature/EventSearchTest.php tests/Feature/EventEngagementLivewireTest.php tests/Feature/Laravel13CacheSerializationTest.php resources/views/livewire/pages/events/index.blade.php` => pass
+  - `npm run build` => pass
+  - `git diff --check` => pass
+  - Full `vendor/bin/phpstan analyse --ansi` still fails on two pre-existing `PreNominal::PU` exhaustiveness errors in `app/Models/Speaker.php` and `database/migrations/2026_04_09_000100_add_search_index_to_speakers.php`.
