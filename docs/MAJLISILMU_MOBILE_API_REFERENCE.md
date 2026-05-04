@@ -1,6 +1,6 @@
 # Majlisilmu Mobile API Reference
 
-**Last Updated:** 2026-05-02
+**Last Updated:** 2026-05-04
 **Audience:** Android, iOS application developers, and AI agents
 **Public Base Path:** `/api/v1`
 **Admin Base Path:** `/api/v1/admin`
@@ -1055,7 +1055,7 @@ Nested collection item contracts for institutions:
 - The `allow_public_event_submission` field is only accepted on `PUT` (update), not on `POST` (create). Sending it on create returns `422`.
 - For events, sparse `PUT` updates are supported. Omitted scalar fields and relation arrays preserve the current stored value; you only need to send the arrays that should actually change.
 - For events, submitted `speakers` or `other_key_people` arrays rebuild the combined `key_people` rows. Do not rely on row ids surviving an update.
-- For institutions, speakers, venues, and references, fetch the current record before editing `contacts` or `social_media`, modify the collection locally, then resend the **full** array. Generic patch-style array updates are not supported.
+- For institutions, speakers, venues, and references, admin and member get-record responses now embed `contacts` and `social_media` directly in `attributes` alongside `address`. To update these collections, fetch the current record, modify locally, then resend the **full** array. Generic patch-style array updates are not supported.
 - For speakers, apply the same fetch-modify-resend rule to `honorific`, `pre_nominal`, `post_nominal`, `qualifications`, and `language_ids` whenever you want to preserve existing entries.
 - For venues, never send `address = {}` as a no-op placeholder. On the shared save path it removes the stored address.
 - For series, `languages` follows omit-preserve / null-clear / array-replace semantics, but `title`, `slug`, and `visibility` remain required on update.
