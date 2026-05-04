@@ -72,6 +72,7 @@ enum PreNominal: string implements HasLabel
 
             // Program-Based/Religious Roles
             self::ImamMuda => __('Imam Muda'),
+            self::PU => __('PU'),
             self::Dai => __('Dai'),
             self::Mufti => __('Mufti'),
             self::Kadi => __('Kadi'),
