@@ -2530,6 +2530,7 @@ it('exposes institution contacts and social_media in admin-get-record response',
         ->assertJsonPath('data.record.attributes.contacts.0.category', 'email')
         ->assertJsonPath('data.record.attributes.contacts.0.value', 'get-record@example.test')
         ->assertJsonPath('data.record.attributes.social_media.0.platform', 'facebook')
+        // Facebook is a handle-style platform: the URL is canonicalized to a username and url is stored as null.
         ->assertJsonPath('data.record.attributes.social_media.0.username', 'get-record-institution')
         ->assertJsonPath('data.record.attributes.social_media.0.url', null);
 });
