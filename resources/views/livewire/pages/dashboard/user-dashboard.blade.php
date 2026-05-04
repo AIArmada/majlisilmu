@@ -159,7 +159,7 @@
     <section class="relative max-w-[100vw] overflow-hidden border-b border-[#eadfca] bg-[#fbf8f1]">
         <div class="absolute inset-y-0 right-0 hidden w-1/2 bg-cover bg-center opacity-20 lg:block"
             style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
-        <div class="container relative mx-auto max-w-[100vw] px-4 py-10 sm:px-6 lg:px-12 lg:py-14">
+        <div class="container relative mx-auto px-6 py-10 lg:px-12 lg:py-14">
             <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
                 <div class="max-w-3xl">
                     <p class="text-sm font-semibold text-emerald-800">{{ $dashboardPageLabel }}</p>
@@ -198,7 +198,7 @@
         </div>
     </section>
 
-    <main class="container mx-auto w-full max-w-[100vw] px-4 py-8 sm:px-6 lg:px-12">
+    <main class="container mx-auto w-full px-6 py-8 lg:px-12">
         <div class="grid gap-7 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div class="min-w-0 space-y-7">
                 <section id="majlis-saya" x-data="{ activeMajlisTab: 'all' }" class="max-w-full rounded-lg border border-[#eadfca] bg-white p-5 shadow-sm">
