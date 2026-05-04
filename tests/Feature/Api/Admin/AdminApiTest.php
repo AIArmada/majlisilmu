@@ -2503,6 +2503,37 @@ it('replaces institution contacts and social media collections and canonicalizes
         ->and($institution->socialMedia)->toHaveCount(0);
 });
 
+it('exposes institution contacts and social_media in admin-get-record response', function () {
+    ensureAdminApiMalaysiaCountryExists();
+
+    $admin = adminApiUser('super_admin');
+    Sanctum::actingAs($admin);
+
+    $createResponse = $this->postJson('/api/v1/admin/institutions', [
+        'name' => 'Admin API Get Record Contacts Institution',
+        'type' => 'masjid',
+        'status' => 'verified',
+        'is_active' => true,
+        'address' => ['country_id' => 132],
+        'contacts' => [
+            ['category' => 'email', 'value' => 'get-record@example.test', 'type' => 'main', 'is_public' => true],
+        ],
+        'social_media' => [
+            ['platform' => 'facebook', 'url' => 'https://facebook.com/get-record-institution'],
+        ],
+    ])->assertCreated();
+
+    $institutionRouteKey = (string) $createResponse->json('data.record.route_key');
+
+    $this->getJson('/api/v1/admin/institutions/'.$institutionRouteKey)
+        ->assertOk()
+        ->assertJsonPath('data.record.attributes.contacts.0.category', 'email')
+        ->assertJsonPath('data.record.attributes.contacts.0.value', 'get-record@example.test')
+        ->assertJsonPath('data.record.attributes.social_media.0.platform', 'facebook')
+        ->assertJsonPath('data.record.attributes.social_media.0.username', 'get-record-institution')
+        ->assertJsonPath('data.record.attributes.social_media.0.url', null);
+});
+
 it('requires a record key when requesting an admin update schema', function () {
     $admin = adminApiUser('super_admin');
 
