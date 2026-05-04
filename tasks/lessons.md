@@ -1,6 +1,7 @@
 # Lessons
 
 - When a user describes a desktop width as "between the logo and Daftar", measure the header's inner content edges and align the page grid to those exact edges instead of substituting a generic `max-w-*` cap.
+- When applying that same header-width rule to other public/auth pages, remove local `max-w-[100vw]` container overrides before judging the visual width; those overrides can silently defeat the shared Tailwind container cap.
 - When a public media field has conflicting display and distribution jobs, model those jobs as distinct named collections instead of asking one upload to satisfy incompatible aspect-ratio and information-density needs.
 - When adding secondary public directory links, avoid promoting them into the primary header by default; keep lower-priority discovery links in the footer/bottom menu unless the user explicitly asks for top navigation placement.
 - On PostgreSQL, do not rely on `ofMany()` tie-breaks for UUID primary keys at all; even an added `orderByDesc('id')` can still be folded back into `MAX(id)`. Use a UUID-safe latest-row strategy such as excluding newer candidates by timestamp and id instead.
