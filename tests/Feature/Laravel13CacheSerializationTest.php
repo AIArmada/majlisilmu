@@ -25,8 +25,7 @@ it('hydrates the events index state cache into the current safe payload format',
     ]);
 
     Livewire::test(Index::class)
-        ->call('toggleAdvancedFiltersPanel')
-        ->assertSet('showAdvancedFiltersPanel', true);
+        ->assertSee('Cari Majlis Ilmu');
 
     expect(Cache::get('states_all_v1'))
         ->toBeArray()

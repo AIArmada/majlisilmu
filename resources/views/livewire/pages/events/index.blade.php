@@ -10,23 +10,9 @@
     'scripts' => ['filament/support', 'filament/schemas', 'filament/forms'],
 ])
 
-@push('head')
-@endpush
-
 @once
     @push('styles')
         <style>
-            .mi-filter-shell .mi-advanced-filter-section.fi-section {
-                border-radius: 1.2rem;
-                border-color: rgb(226 232 240 / 0.8);
-                background: linear-gradient(180deg, rgb(255 255 255), rgb(248 250 252));
-                box-shadow: 0 8px 22px -18px rgb(15 23 42 / 0.45);
-            }
-
-            .mi-filter-shell .mi-advanced-filter-section .fi-section-content {
-                gap: 1rem;
-            }
-
             .mi-filter-shell .mi-advanced-filter-group.fi-section {
                 border-radius: 0.95rem;
                 border: 1px solid rgb(226 232 240 / 0.9);
@@ -42,13 +28,13 @@
                 gap: 0.75rem;
             }
 
-            .mi-filter-shell .mi-advanced-filter-section .fi-input,
-            .mi-filter-shell .mi-advanced-filter-section .fi-select-input,
-            .mi-filter-shell .mi-advanced-filter-section .fi-select-control {
+            .mi-filter-shell .mi-advanced-filter-group .fi-input,
+            .mi-filter-shell .mi-advanced-filter-group .fi-select-input,
+            .mi-filter-shell .mi-advanced-filter-group .fi-select-control {
                 border-radius: 0.8rem;
             }
 
-            .mi-filter-shell .mi-advanced-filter-section .fi-fo-field-wrp-label {
+            .mi-filter-shell .mi-advanced-filter-group .fi-fo-field-wrp-label {
                 font-size: 0.72rem;
                 letter-spacing: 0.08em;
                 text-transform: uppercase;
@@ -59,6 +45,7 @@
 @endonce
 
 @php
+    $events = $this->events;
     $search = $this->search;
     $countryId = $this->country_id;
     $stateId = $this->state_id;
@@ -79,7 +66,6 @@
     $lat = $this->lat;
     $lng = $this->lng;
     $sort = $this->sort;
-    $countries = $this->countries;
     $states = $this->states;
     $districts = $this->districts;
     $subdistricts = $this->subdistricts;
@@ -102,94 +88,75 @@
     $selectedEventTypes = array_values(array_filter((array) $this->event_type));
     $selectedEventFormats = array_values(array_filter((array) $this->event_format));
     $selectedLanguageCodes = array_values(array_filter((array) $this->language_codes));
-    $selectedTopicOptions = $this->tagOptionLabels(
-        \App\Enums\TagType::Discipline,
-        $selectedTopicIds,
-    );
-    $selectedSpeakerOptions = $this->speakerOptionLabels($selectedSpeakerIds);
     $selectedPersonInChargeOptions = $this->speakerOptionLabels($selectedPersonInChargeIds);
-    $selectedModeratorOptions = $this->speakerOptionLabels($selectedModeratorIds);
-    $selectedImamOptions = $this->speakerOptionLabels($selectedImamIds);
-    $selectedKhatibOptions = $this->speakerOptionLabels($selectedKhatibIds);
-    $selectedBilalOptions = $this->speakerOptionLabels($selectedBilalIds);
-    $selectedDomainTagOptions = $this->tagOptionLabels(\App\Enums\TagType::Domain, $selectedDomainTagIds);
-    $selectedSourceTagOptions = $this->tagOptionLabels(\App\Enums\TagType::Source, $selectedSourceTagIds);
-    $selectedIssueTagOptions = $this->tagOptionLabels(\App\Enums\TagType::Issue, $selectedIssueTagIds);
-    $selectedReferenceOptions = $this->referenceOptionLabels($selectedReferenceIds);
-    $selectedInstitutionLabel = filled($institutionId) ? $this->institutionOptionLabel((string) $institutionId) : null;
-    $selectedVenueLabel = filled($venueId) ? $this->venueOptionLabel((string) $venueId) : null;
-    $selectedTopicLabels = collect($selectedTopicIds)
-        ->map(fn (string $topicId): ?string => $selectedTopicOptions[$topicId] ?? null)
-        ->filter()
-        ->values();
-    $selectedSpeakerLabels = collect($selectedSpeakerIds)
-        ->map(fn (string $speakerId): ?string => $selectedSpeakerOptions[$speakerId] ?? null)
-        ->filter()
-        ->values();
-    $selectedKeyPersonRoleLabels = collect($selectedKeyPersonRoles)
-        ->map(fn (string $role): ?string => \App\Enums\EventKeyPersonRole::tryFrom($role)?->getLabel())
-        ->filter()
-        ->values();
     $selectedPersonInChargeLabels = collect($selectedPersonInChargeIds)
         ->map(fn (string $speakerId): ?string => $selectedPersonInChargeOptions[$speakerId] ?? null)
         ->filter()
         ->values();
-    $selectedModeratorLabels = collect($selectedModeratorIds)
-        ->map(fn (string $speakerId): ?string => $selectedModeratorOptions[$speakerId] ?? null)
-        ->filter()
-        ->values();
-    $selectedImamLabels = collect($selectedImamIds)
-        ->map(fn (string $speakerId): ?string => $selectedImamOptions[$speakerId] ?? null)
-        ->filter()
-        ->values();
-    $selectedKhatibLabels = collect($selectedKhatibIds)
-        ->map(fn (string $speakerId): ?string => $selectedKhatibOptions[$speakerId] ?? null)
-        ->filter()
-        ->values();
-    $selectedBilalLabels = collect($selectedBilalIds)
-        ->map(fn (string $speakerId): ?string => $selectedBilalOptions[$speakerId] ?? null)
-        ->filter()
-        ->values();
-    $selectedDomainTagLabels = collect($selectedDomainTagIds)
-        ->map(fn (string $tagId): ?string => $selectedDomainTagOptions[$tagId] ?? null)
-        ->filter()
-        ->values();
-    $selectedSourceTagLabels = collect($selectedSourceTagIds)
-        ->map(fn (string $tagId): ?string => $selectedSourceTagOptions[$tagId] ?? null)
-        ->filter()
-        ->values();
-    $selectedIssueTagLabels = collect($selectedIssueTagIds)
-        ->map(fn (string $tagId): ?string => $selectedIssueTagOptions[$tagId] ?? null)
-        ->filter()
-        ->values();
-    $selectedReferenceLabels = collect($selectedReferenceIds)
-        ->map(fn (string $referenceId): ?string => $selectedReferenceOptions[$referenceId] ?? null)
-        ->filter()
-        ->values();
-    $selectedLanguageLabels = collect($selectedLanguageCodes)
-        ->map(fn (string $code): string => (string) ($languageOptions[$code] ?? strtoupper($code)))
-        ->filter()
-        ->values();
-
     $eventTypeLabels = collect(\App\Enums\EventType::cases())
         ->mapWithKeys(fn (\App\Enums\EventType $type): array => [$type->value => $type->getLabel()])
         ->all();
-
     $eventFormatLabels = collect(\App\Enums\EventFormat::cases())
         ->mapWithKeys(fn (\App\Enums\EventFormat $format): array => [$format->value => $format->getLabel()])
         ->all();
-
     $ageGroupLabels = collect(\App\Enums\EventAgeGroup::cases())
         ->mapWithKeys(fn (\App\Enums\EventAgeGroup $group): array => [$group->value => $group->getLabel()])
         ->all();
-
     $genderLabels = collect(\App\Enums\EventGenderRestriction::cases())
         ->mapWithKeys(fn (\App\Enums\EventGenderRestriction $restriction): array => [$restriction->value => $restriction->getLabel()])
         ->all();
-
-    $timingModeLabel = \App\Enums\TimingMode::tryFrom((string) $timingMode)?->label();
     $prayerTimeLabel = \App\Enums\EventPrayerTime::tryFrom((string) $prayerTime)?->getLabel() ?? $prayerTime;
-
+    $timingModeLabel = \App\Enums\TimingMode::tryFrom((string) $timingMode)?->label();
+    $todayQuery = [
+        'starts_after' => now()->toDateString(),
+        'starts_before' => now()->toDateString(),
+        'time_scope' => 'all',
+    ];
+    $weekendQuery = [
+        'starts_after' => now()->next(\Carbon\CarbonInterface::SATURDAY)->toDateString(),
+        'starts_before' => now()->next(\Carbon\CarbonInterface::SUNDAY)->toDateString(),
+        'time_scope' => 'all',
+    ];
+    $activeFilterCount = collect([
+        filled($search),
+        filled($countryId) && $countryId !== $defaultCountryId,
+        filled($stateId),
+        filled($districtId),
+        filled($subdistrictId),
+        filled($institutionId),
+        filled($venueId),
+        count($selectedLanguageCodes) > 0,
+        count($selectedEventTypes) > 0,
+        count($selectedEventFormats) > 0,
+        filled($gender),
+        count($selectedAgeGroups) > 0,
+        $childrenAllowed !== null,
+        $isMuslimOnly !== null,
+        count($selectedSpeakerIds) > 0,
+        count($selectedKeyPersonRoles) > 0,
+        count($selectedPersonInChargeIds) > 0,
+        filled($personInChargeSearch),
+        count($selectedModeratorIds) > 0,
+        count($selectedImamIds) > 0,
+        count($selectedKhatibIds) > 0,
+        count($selectedBilalIds) > 0,
+        count($selectedTopicIds) > 0,
+        count($selectedDomainTagIds) > 0,
+        count($selectedSourceTagIds) > 0,
+        count($selectedIssueTagIds) > 0,
+        count($selectedReferenceIds) > 0,
+        filled($startsAfter),
+        filled($startsBefore),
+        filled($prayerTime),
+        filled($timingMode),
+        filled($startsTimeFrom),
+        filled($startsTimeUntil),
+        $this->has_event_url !== null,
+        $this->has_live_url !== null,
+        $timeScope !== 'upcoming',
+        filled($lat),
+    ])->filter()->count();
+    $hasActiveFilters = $activeFilterCount > 0;
     $savedSearchQuery = array_filter([
         'search' => $search,
         'country_id' => $countryId,
@@ -238,48 +205,6 @@
 
         return $value !== null && $value !== '';
     });
-
-    $activeFilterCount = collect([
-        filled($search),
-        filled($countryId) && $countryId !== $defaultCountryId,
-        filled($stateId),
-        filled($districtId),
-        filled($subdistrictId),
-        filled($institutionId),
-        filled($venueId),
-        count($selectedLanguageCodes) > 0,
-        count($selectedEventTypes) > 0,
-        count($selectedEventFormats) > 0,
-        filled($gender),
-        count($selectedAgeGroups) > 0,
-        $childrenAllowed !== null,
-        $isMuslimOnly !== null,
-        count($selectedSpeakerIds) > 0,
-        count($selectedKeyPersonRoles) > 0,
-        count($selectedPersonInChargeIds) > 0,
-        filled($personInChargeSearch),
-        count($selectedModeratorIds) > 0,
-        count($selectedImamIds) > 0,
-        count($selectedKhatibIds) > 0,
-        count($selectedBilalIds) > 0,
-        count($selectedTopicIds) > 0,
-        count($selectedDomainTagIds) > 0,
-        count($selectedSourceTagIds) > 0,
-        count($selectedIssueTagIds) > 0,
-        count($selectedReferenceIds) > 0,
-        filled($startsAfter),
-        filled($startsBefore),
-        filled($prayerTime),
-        filled($timingMode),
-        filled($startsTimeFrom),
-        filled($startsTimeUntil),
-        $this->has_event_url !== null,
-        $this->has_live_url !== null,
-        $timeScope !== 'upcoming',
-        filled($lat),
-    ])->filter()->count();
-
-    $hasActiveFilters = $activeFilterCount > 0;
     $searchShareUrl = $hasActiveFilters ? route('events.index', $savedSearchQuery) : null;
     $searchShareText = __('Explore these Majlis Ilmu search results on :app', ['app' => config('app.name')]);
     $searchShareData = $searchShareUrl !== null
@@ -294,954 +219,957 @@
         ]
         : null;
     $showsGeolocationControls = $this->showsGeolocationControls();
+    $savedEventIds = $this->savedEventIds;
+    $showPendingStatusNote = $events->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Pending);
+    $showCancelledStatusNote = $events->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Cancelled);
 @endphp
 
-<div class="relative min-h-screen">
-    <div class="relative pt-12 pb-16 bg-white border-b border-slate-100 overflow-hidden">
-        <div class="absolute inset-0 bg-emerald-50/50"></div>
-        <div class="absolute inset-0 opacity-5" style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
+<div
+    class="min-h-screen bg-[#fbfaf6] text-slate-900"
+    x-data="{
+        ...window.majlisIlmu.geolocationPermission({
+            initiallyGranted: @js($showsGeolocationControls),
+            cookieName: @js(\App\Support\Location\PublicGeolocationPermission::COOKIE_NAME),
+        }),
+        locating: false,
+        locationNotice: null,
+        copiedShareLink: false,
+        copiedEventId: null,
+        shareData: @js($searchShareData),
+        trackEndpoint: @js(route('dawah-share.track')),
+        providerQueryParameter: @js(config('dawah-share.provider_query_parameter', 'channel')),
+        attributedShareData: null,
+        setLocationNotice(message) {
+            this.locationNotice = message;
+        },
+        clearLocationNotice() {
+            this.locationNotice = null;
+        },
+        async locate() {
+            if (this.locating) return;
+            this.clearLocationNotice();
+            if (! navigator.geolocation) {
+                this.setGeolocationPermission(false);
+                this.setLocationNotice('{{ __("Geolocation is not supported by your browser.") }}');
+                return;
+            }
 
-        <div class="container relative mx-auto px-6 lg:px-12 text-center">
-            <span
-                class="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-white/80 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm backdrop-blur-sm mb-6">
-                <span class="relative flex h-2 w-2">
-                    <span
-                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                {{ $this->events->total() }}
-                {{ match ($this->time_scope ?? 'upcoming') {
-                    'past' => __('Past Gatherings'),
-                    'all' => __('All Gatherings'),
-                    default => __('Upcoming Gatherings'),
-                } }}
-            </span>
+            if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+                try {
+                    const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
 
-            <h1
-                class="font-heading text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight text-balance mb-6">
-                {{ __('Find Your Next') }} <br class="hidden md:block" />
-                <span
-                    class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">{{ __('Circle of Knowledge') }}</span>
-            </h1>
-            <p class="text-slate-600 text-lg md:text-xl max-w-2xl mx-auto text-balance">
-                {{ __('Discover classes, lectures, and community gatherings happening near you. Connect with knowledge seekers in your area.') }}
-            </p>
+                    if (permissionStatus.state === 'denied') {
+                        this.setGeolocationPermission(false);
+                    }
+                } catch (error) {
+                }
+            }
+
+            this.locating = true;
+            navigator.geolocation.getCurrentPosition((position) => {
+                this.clearLocationNotice();
+                this.setGeolocationPermission(true);
+                this.$wire.setLocation(position.coords.latitude, position.coords.longitude);
+                this.locating = false;
+            }, (error) => {
+                this.locating = false;
+                if (error?.code === 1) {
+                    this.setGeolocationPermission(false);
+                    this.setLocationNotice('{{ __("Allow location access in your browser settings to use nearby search.") }}');
+
+                    return;
+                }
+
+                this.setLocationNotice('{{ __("Unable to get your location. Please enable location services.") }}');
+            });
+        },
+        async resolveShareData() {
+            if (! this.shareData) {
+                return null;
+            }
+
+            if (this.attributedShareData) {
+                return this.attributedShareData;
+            }
+
+            const params = new URLSearchParams({
+                url: this.shareData.sourceUrl,
+                text: this.shareData.shareText,
+                title: this.shareData.fallbackTitle,
+            });
+            const response = await fetch(`${this.shareData.payloadEndpoint}?${params.toString()}`, {
+                headers: {
+                    Accept: 'application/json',
+                },
+            });
+
+            if (! response.ok) {
+                return this.shareData;
+            }
+
+            const payload = await response.json();
+            this.attributedShareData = {
+                ...this.shareData,
+                url: payload.url,
+                tracking_token: payload.tracking_token ?? null,
+            };
+
+            return this.attributedShareData;
+        },
+        async sharePayloadForChannel(provider = null) {
+            const shareData = await this.resolveShareData();
+
+            if (! shareData || ! provider || ! shareData.tracking_token) {
+                return shareData;
+            }
+
+            try {
+                const shareUrl = new URL(shareData.url, window.location.origin);
+                shareUrl.searchParams.set(this.providerQueryParameter, provider);
+
+                return {
+                    ...shareData,
+                    url: shareUrl.toString(),
+                };
+            } catch (error) {
+                return shareData;
+            }
+        },
+        async trackShare(provider) {
+            const shareData = await this.resolveShareData();
+
+            if (! shareData?.tracking_token) {
+                return;
+            }
+
+            const csrfToken = document.querySelector('meta[name=csrf-token]')?.content;
+
+            if (! csrfToken) {
+                return;
+            }
+
+            await fetch(this.trackEndpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({
+                    provider,
+                    tracking_token: shareData.tracking_token,
+                }),
+            });
+        },
+        async shareResults() {
+            const shareData = await this.sharePayloadForChannel('native_share');
+            if (! shareData) {
+                return;
+            }
+
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                    await this.trackShare('native_share');
+                } catch (error) {
+                }
+
+                return;
+            }
+
+            await this.copyShareLink();
+        },
+        async copyShareLink(shouldTrack = true, provider = 'copy_link') {
+            const shareData = await this.sharePayloadForChannel(provider);
+            if (! shareData) {
+                return;
+            }
+
+            await this.copyUrl(shareData.url);
+
+            if (shouldTrack) {
+                await this.trackShare(provider);
+            }
+
+            this.copiedShareLink = true;
+            setTimeout(() => this.copiedShareLink = false, 2200);
+        },
+        async copyUrl(url) {
+            if (! navigator.clipboard) {
+                window.prompt('{{ __("Copy this link:") }}', url);
+
+                return;
+            }
+
+            await navigator.clipboard.writeText(url);
+        },
+        async copyEventLink(eventId, url) {
+            await this.copyUrl(url);
+            this.copiedEventId = eventId;
+            setTimeout(() => this.copiedEventId = null, 1800);
+        },
+        async shareEvent(eventId, url, title) {
+            const payload = { url, title, text: title };
+
+            if (navigator.share) {
+                try {
+                    await navigator.share(payload);
+                    return;
+                } catch (error) {
+                }
+            }
+
+            await this.copyEventLink(eventId, url);
+        },
+    }">
+    <section class="relative pt-12 pb-16 bg-white border-b border-slate-100 overflow-hidden">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(245,158,11,0.12),transparent_32%),linear-gradient(90deg,#fffdf8_0%,#fffaf0_52%,#f2f8f4_100%)]"></div>
+        <div class="absolute inset-y-0 right-0 hidden w-[48%] overflow-hidden lg:block">
+            <div class="absolute inset-0 rounded-bl-[11rem] bg-slate-200">
+                <img src="{{ asset('images/hero-bg.png') }}" alt="{{ __('Masjid pada waktu senja') }}" class="h-full w-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-l from-transparent via-white/5 to-white/60"></div>
+            </div>
         </div>
-    </div>
+        <div class="pointer-events-none absolute right-[35%] top-6 hidden h-72 w-72 rounded-full border border-amber-200/50 opacity-40 lg:block"></div>
+        <div class="pointer-events-none absolute right-[38%] top-14 hidden h-52 w-52 rounded-full border border-emerald-200/60 opacity-40 lg:block"></div>
 
-    <div class="container mx-auto px-6 lg:px-12 -mt-8 relative z-10">
-        <form wire:submit.prevent
-            data-signal-change-event="filter.changed"
-            data-signal-category="filter"
-            data-signal-component="events_index_filters"
-            data-signal-control="filter_form"
-            data-signal-props='@json(['surface' => 'events_index'])'
-            x-data="{
-                    ...window.majlisIlmu.geolocationPermission({
-                        initiallyGranted: @js($showsGeolocationControls),
-                        cookieName: @js(\App\Support\Location\PublicGeolocationPermission::COOKIE_NAME),
-                    }),
-                    locating: false,
-                    locationNotice: null,
-                    copiedShareLink: false,
-                    shareData: @js($searchShareData),
-                    trackEndpoint: @js(route('dawah-share.track')),
-                    providerQueryParameter: @js(config('dawah-share.provider_query_parameter', 'channel')),
-                    attributedShareData: null,
-                    setLocationNotice(message) {
-                        this.locationNotice = message;
-                    },
-                    clearLocationNotice() {
-                        this.locationNotice = null;
-                    },
-                    async locate() {
-                        if (this.locating) return;
-                        this.clearLocationNotice();
-                        if (! navigator.geolocation) {
-                            this.setGeolocationPermission(false);
-                            this.setLocationNotice('{{ __("Geolocation is not supported by your browser.") }}');
-                            return;
-                        }
+        <div class="container relative mx-auto px-6 lg:px-12">
+            <div class="max-w-4xl">
+                <p class="text-xs font-bold uppercase tracking-[0.26em] text-emerald-700">{{ __('Majlis Ilmu') }}</p>
+                <h1 class="mt-4 font-heading text-5xl font-bold leading-none tracking-normal text-emerald-950 md:text-7xl">
+                    {{ __('Cari Majlis Ilmu') }}
+                    <span class="sr-only">{{ __('Circle of Knowledge') }}</span>
+                </h1>
+                <p class="mt-5 max-w-2xl text-lg leading-8 text-slate-700">
+                    {{ __('Cari ikut lokasi, masa, topik, penceramah atau institusi.') }}
+                </p>
 
-                        if (navigator.permissions && typeof navigator.permissions.query === 'function') {
-                            try {
-                                const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
-
-                                if (permissionStatus.state === 'denied') {
-                                    this.setGeolocationPermission(false);
-                                }
-                            } catch (error) {
-                            }
-                        }
-
-                        this.locating = true;
-                        navigator.geolocation.getCurrentPosition((position) => {
-                            this.clearLocationNotice();
-                            this.setGeolocationPermission(true);
-                            this.$wire.setLocation(position.coords.latitude, position.coords.longitude);
-                            this.locating = false;
-                        }, (error) => {
-                            this.locating = false;
-                            if (error?.code === 1) {
-                                this.setGeolocationPermission(false);
-                                this.setLocationNotice('{{ __("Allow location access in your browser settings to use nearby search.") }}');
-
-                                return;
-                            }
-
-                            this.setLocationNotice('{{ __("Unable to get your location. Please enable location services.") }}');
-                        });
-                    },
-                    async resolveShareData() {
-                        if (! this.shareData) {
-                            return null;
-                        }
-
-                        if (this.attributedShareData) {
-                            return this.attributedShareData;
-                        }
-
-                        const params = new URLSearchParams({
-                            url: this.shareData.sourceUrl,
-                            text: this.shareData.shareText,
-                            title: this.shareData.fallbackTitle,
-                        });
-                        const response = await fetch(`${this.shareData.payloadEndpoint}?${params.toString()}`, {
-                            headers: {
-                                Accept: 'application/json',
-                            },
-                        });
-
-                        if (!response.ok) {
-                            return this.shareData;
-                        }
-
-                        const payload = await response.json();
-                        this.attributedShareData = {
-                            ...this.shareData,
-                            url: payload.url,
-                            tracking_token: payload.tracking_token ?? null,
-                        };
-
-                        return this.attributedShareData;
-                    },
-                    async sharePayloadForChannel(provider = null) {
-                        const shareData = await this.resolveShareData();
-
-                        if (! shareData || ! provider || ! shareData.tracking_token) {
-                            return shareData;
-                        }
-
-                        try {
-                            const shareUrl = new URL(shareData.url, window.location.origin);
-                            shareUrl.searchParams.set(this.providerQueryParameter, provider);
-
-                            return {
-                                ...shareData,
-                                url: shareUrl.toString(),
-                            };
-                        } catch (error) {
-                            return shareData;
-                        }
-                    },
-                    async trackShare(provider) {
-                        const shareData = await this.resolveShareData();
-
-                        if (! shareData?.tracking_token) {
-                            return;
-                        }
-
-                        const csrfToken = document.querySelector('meta[name=csrf-token]')?.content;
-
-                        if (! csrfToken) {
-                            return;
-                        }
-
-                        await fetch(this.trackEndpoint, {
-                            method: 'POST',
-                            headers: {
-                                Accept: 'application/json',
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken,
-                            },
-                            body: JSON.stringify({
-                                provider,
-                                tracking_token: shareData.tracking_token,
-                            }),
-                        });
-                    },
-                    async shareResults() {
-                        const shareData = await this.sharePayloadForChannel('native_share');
-                        if (!shareData) {
-                            return;
-                        }
-
-                        if (navigator.share) {
-                            try {
-                                await navigator.share(shareData);
-                                await this.trackShare('native_share');
-                            } catch (error) {
-                            }
-
-                            return;
-                        }
-
-                        await this.copyShareLink();
-                    },
-                    async copyShareLink(shouldTrack = true, provider = 'copy_link') {
-                        const shareData = await this.sharePayloadForChannel(provider);
-                        if (!shareData) {
-                            return;
-                        }
-
-                        if (! navigator.clipboard) {
-                            window.prompt('{{ __("Copy this link:") }}', shareData.url);
-
-                            if (shouldTrack) {
-                                await this.trackShare(provider);
-                            }
-
-                            return;
-                        }
-
-                        navigator.clipboard.writeText(shareData.url).then(async () => {
-                            if (shouldTrack) {
-                                await this.trackShare(provider);
-                            }
-
-                            this.copiedShareLink = true;
-                            setTimeout(() => this.copiedShareLink = false, 2200);
-                        }, async () => {
-                            window.prompt('{{ __("Copy this link:") }}', shareData.url);
-
-                            if (shouldTrack) {
-                                await this.trackShare(provider);
-                            }
-                        });
-                    },
-                }" class="relative bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200 p-6 md:p-8">
-
-            <div wire:loading.delay.short
-                wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort"
-                class="pointer-events-none absolute right-4 top-4 z-20 inline-flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50/95 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm backdrop-blur-sm md:right-6 md:top-6">
-                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle>
-                    <path class="opacity-75" stroke-width="4" d="M22 12a10 10 0 00-10-10"></path>
-                </svg>
-                {{ __('Updating results...') }}
-            </div>
-
-            <div class="max-w-xl mx-auto mb-6">
-                <div class="relative group">
-                    <label for="event-search" class="sr-only">{{ __('Search events') }}</label>
-                    <input
-                        type="text"
-                        id="event-search"
-                        wire:model.live.debounce.300ms="filterData.search"
-                        wire:keydown.escape="clearSearch"
-                        data-signal-control="search"
-                        data-signal-include-value="true"
-                        placeholder="{{ __('Cari majlis...') }}"
-                        class="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 bg-white shadow-lg shadow-slate-200/60 font-medium text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all placeholder:text-slate-400"
-                    >
-                    <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-emerald-500 transition-colors"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    @if(filled($search))
-                        <button type="button" wire:click="clearSearch"
-                            data-signal-event="search.cleared"
-                            data-signal-category="search"
-                            data-signal-component="events_index_filters"
-                            data-signal-control="clear_search"
-                            class="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500 hover:underline">
-                            {{ __('Clear') }}
-                        </button>
-                    @endif
-                </div>
-
-                <div class="mt-3 flex flex-wrap items-center justify-center gap-5">
-                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-600 select-none">
-                        <input type="checkbox" wire:model.live="search_include_institutions" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                        {{ __('Institusi') }}
-                    </label>
-                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-600 select-none">
-                        <input type="checkbox" wire:model.live="search_include_speakers" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                        {{ __('Penceramah') }}
-                    </label>
-                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-600 select-none">
-                        <input type="checkbox" wire:model.live="search_include_references" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                        {{ __('Rujukan') }}
-                    </label>
-                </div>
-            </div>
-
-            @auth
-                <div class="mb-5 flex items-center justify-between gap-3 rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-2.5">
-                    <div class="flex items-center gap-2.5">
-                        <svg class="h-4 w-4 shrink-0 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-                        <p class="text-sm text-slate-600">{{ __('Keep the filters you use often for quick access.') }}</p>
-                    </div>
-                    <a href="{{ route('saved-searches.index') }}" wire:navigate
-                        data-signal-event="navigation.saved_searches_clicked"
-                        data-signal-category="navigation"
-                        data-signal-component="events_index_filters"
-                        data-signal-control="saved_searches"
-                        class="shrink-0 text-sm font-semibold text-sky-700 hover:text-sky-600 hover:underline">
-                        {{ __('Saved Searches') }} →
-                    </a>
-                </div>
-            @endauth
-
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-                <div class="flex items-center gap-2">
-                    <button type="button" @click="locate" :disabled="locating"
-                        data-testid="near-me-button"
-                        data-signal-event="search.nearby_requested"
-                        data-signal-category="search"
-                        data-signal-component="events_index_filters"
-                        data-signal-control="near_me"
-                        class="h-11 px-4 rounded-xl border border-slate-200 bg-white font-semibold text-slate-600 hover:border-emerald-500 hover:text-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" :class="locating ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path x-show="!locating" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path x-show="!locating" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <circle x-show="locating" class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4"></circle>
-                            <path x-show="locating" class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                <form wire:submit.prevent
+                    data-signal-change-event="filter.changed"
+                    data-signal-category="filter"
+                    data-signal-component="events_index_filters"
+                    data-signal-control="filter_form"
+                    data-signal-props='@json(['surface' => 'events_index'])'
+                    class="mt-8 max-w-3xl">
+                    <div class="relative">
+                        <label for="event-search" class="sr-only">{{ __('Search events') }}</label>
+                        <input
+                            type="text"
+                            id="event-search"
+                            wire:model.live.debounce.300ms="filterData.search"
+                            wire:keydown.escape="clearSearch"
+                            data-signal-control="search"
+                            data-signal-include-value="true"
+                            placeholder="{{ __('Cari tajuk, ustaz, masjid, topik...') }}"
+                            class="h-16 w-full rounded-2xl border border-slate-200 bg-white pl-14 pr-24 text-base font-medium text-slate-900 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.55)] outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10">
+                        <svg class="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                         </svg>
-                        <span x-text="locating ? '{{ __('Locating...') }}' : '{{ __('Near Me') }}'"></span>
-                    </button>
-
-                    @if($lat)
-                        <button type="button" wire:click="clearLocation"
-                            data-signal-event="filter.location_cleared"
-                            data-signal-category="filter"
-                            data-signal-component="events_index_filters"
-                            data-signal-control="clear_location"
-                            class="h-11 px-4 rounded-xl border border-rose-100 bg-rose-50 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition">
-                            {{ __('Clear Location') }}
-                        </button>
-
-                        @if(! $showAdvancedFiltersPanel)
-                            <label
-                                data-testid="nearby-radius-inline"
-                                x-cloak
-                                x-bind:hidden="! geolocationPermitted"
-                                @if (! $showsGeolocationControls)
-                                    hidden
-                                @endif
-                                class="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
-                                <span>{{ __('Radius (km)') }}</span>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="1000"
-                                    step="1"
-                                    wire:model.live="filterData.radius_km"
-                                    data-signal-control="radius_km"
-                                    data-signal-include-value="true"
-                                    class="h-8 w-20 rounded-lg border border-slate-200 px-2 text-sm font-medium text-slate-900 focus:border-emerald-500 focus:outline-none"
-                                >
-                            </label>
-                        @endif
-                    @endif
-                </div>
-
-                <div class="flex items-center gap-3">
-                    <span class="text-sm font-medium text-slate-600">{{ __('Sort:') }}</span>
-                    <div class="flex bg-slate-100 p-1 rounded-xl">
-                        <button type="button" wire:click="setSort('time')"
-                            data-signal-event="filter.sort_changed"
-                            data-signal-category="filter"
-                            data-signal-component="events_index_filters"
-                            data-signal-control="sort_time"
-                            data-signal-props='@json(['sort' => 'time'])'
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'time' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
-                            {{ __('Latest') }}
-                        </button>
-                        <button type="button" wire:click="setSort('relevance')"
-                            data-signal-event="filter.sort_changed"
-                            data-signal-category="filter"
-                            data-signal-component="events_index_filters"
-                            data-signal-control="sort_relevance"
-                            data-signal-props='@json(['sort' => 'relevance'])'
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'relevance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
-                            {{ __('Relevance') }}
-                        </button>
-                        @if($lat)
-                            <button type="button" wire:click="setSort('distance')"
-                                data-signal-event="filter.sort_changed"
-                                data-signal-category="filter"
+                        @if(filled($search))
+                            <button type="button" wire:click="clearSearch"
+                                data-signal-event="search.cleared"
+                                data-signal-category="search"
                                 data-signal-component="events_index_filters"
-                                data-signal-control="sort_distance"
-                                data-signal-props='@json(['sort' => 'distance'])'
-                                class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all {{ $sort === 'distance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800' }}">
-                                {{ __('Distance') }}
+                                data-signal-control="clear_search"
+                                class="absolute right-4 top-1/2 -translate-y-1/2 rounded-full border border-rose-100 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600 transition hover:bg-rose-100">
+                                {{ __('Clear') }}
                             </button>
                         @endif
                     </div>
-                </div>
-            </div>
 
-            <div x-show="locationNotice" x-cloak x-text="locationNotice"
-                class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"></div>
-
-            <div class="mi-filter-shell space-y-4">
-                <button type="button" wire:click="toggleAdvancedFiltersPanel"
-                    data-signal-event="filter.panel_toggled"
-                    data-signal-category="filter"
-                    data-signal-component="events_index_filters"
-                    data-signal-control="advanced_filters"
-                    data-signal-props='@json(['opened' => ! $showAdvancedFiltersPanel, 'active_filter_count' => $activeFilterCount])'
-                    class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50/60 focus:outline-none focus:ring-4 focus:ring-emerald-500/10">
-                    <div>
-                        <p class="text-sm font-semibold text-slate-900">{{ __('Advanced Filters') }}</p>
-                        <p class="text-xs text-slate-500">
-                            {{ $showAdvancedFiltersPanel
-                                ? __('Hide the full filter panel once you are done refining results.')
-                                : __('Open the full filter panel only when you need detailed filtering.') }}
-                        </p>
+                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                        <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Cari dalam') }}</span>
+                        <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                            <input type="checkbox" wire:model.live="search_include_institutions" class="size-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500">
+                            {{ __('Institusi') }}
+                        </label>
+                        <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                            <input type="checkbox" wire:model.live="search_include_speakers" class="size-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500">
+                            {{ __('Penceramah') }}
+                        </label>
+                        <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                            <input type="checkbox" wire:model.live="search_include_references" class="size-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500">
+                            {{ __('Rujukan') }}
+                        </label>
                     </div>
-
-                    <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                        @if($activeFilterCount > 0)
-                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">{{ $activeFilterCount }}</span>
-                        @endif
-
-                        {{ $showAdvancedFiltersPanel ? __('Hide') : __('Show') }}
-                    </span>
-                </button>
-
-                @if($showAdvancedFiltersPanel)
-                    <livewire:pages.events.advanced-filters-panel :filters="$filterData" />
-                @endif
-            </div>
-
-            @if($hasActiveFilters)
-                <div class="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100">
-                    <span class="text-xs font-bold text-slate-400 uppercase mr-2">{{ __('Active:') }}</span>
-
-                    @if($search)
-                        <span
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            "{{ $search }}"
-                        </span>
-                    @endif
-
-                    @if($lat)
-                        <span
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            </svg>
-                            {{ __('Nearby') }}
-                        </span>
-                    @endif
-
-                    @if($countryId && $countryId !== $defaultCountryId)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $countries->firstWhere('id', (int) $countryId)?->name ?? __('Country') }}
-                        </span>
-                    @endif
-
-                    @if($stateId)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $states->firstWhere('id', $stateId)?->name ?? __('State') }}
-                        </span>
-                    @endif
-
-                    @if($districtId)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $districts->firstWhere('id', $districtId)?->name ?? __('District') }}
-                        </span>
-                    @endif
-
-                    @if($subdistrictId)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $subdistricts->firstWhere('id', $subdistrictId)?->name ?? __('Bandar / Mukim / Zon') }}
-                        </span>
-                    @endif
-
-                    @if($institutionId)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $selectedInstitutionLabel ?? __('Institution') }}
-                        </span>
-                    @endif
-
-                    @if($venueId)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $selectedVenueLabel ?? __('Tempat') }}
-                        </span>
-                    @endif
-
-                    @foreach($selectedLanguageLabels as $languageLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-100">
-                            {{ $languageLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedEventTypes as $eventType)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $eventTypeLabels[$eventType] ?? str((string) $eventType)->replace('_', ' ')->headline() }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedEventFormats as $eventFormat)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100">
-                            {{ $eventFormatLabels[$eventFormat] ?? str((string) $eventFormat)->headline() }}
-                        </span>
-                    @endforeach
-
-                    @if($gender)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $genderLabels[$gender] ?? str((string) $gender)->replace('_', ' ')->headline() }}
-                        </span>
-                    @endif
-
-                    @if($prayerTime)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                            {{ $prayerTimeLabel }}
-                        </span>
-                    @endif
-
-                    @if($timingModeLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                            {{ $timingModeLabel }}
-                        </span>
-                    @endif
-
-                    @if($startsTimeFrom)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                            {{ __('Masa Dari') }} {{ \Illuminate\Support\Carbon::make($startsTimeFrom)?->format('h:i A') ?? $startsTimeFrom }}
-                        </span>
-                    @endif
-
-                    @if($startsTimeUntil)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                            {{ __('Masa Hingga') }} {{ \Illuminate\Support\Carbon::make($startsTimeUntil)?->format('h:i A') ?? $startsTimeUntil }}
-                        </span>
-                    @endif
-
-                    @if($childrenAllowed !== null)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $childrenAllowed ? __('Children Allowed') : __('No Children') }}
-                        </span>
-                    @endif
-
-                    @if($isMuslimOnly !== null)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $isMuslimOnly ? __('Muslim Only') : __('Open to All Faiths') }}
-                        </span>
-                    @endif
-
-                    @if($this->has_event_url !== null)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $this->has_event_url ? __('Has Event URL') : __('No Event URL') }}
-                        </span>
-                    @endif
-
-                    @if($this->has_live_url !== null)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $this->has_live_url ? __('Has Live URL') : __('No Live URL') }}
-                        </span>
-                    @endif
-
-                    @foreach($selectedAgeGroups as $ageGroup)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $ageGroupLabels[$ageGroup] ?? str($ageGroup)->replace('_', ' ')->headline() }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedDomainTagLabels as $domainTagLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-100">
-                            {{ $domainTagLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedTopicLabels as $topicLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            {{ $topicLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedSourceTagLabels as $sourceTagLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                            {{ $sourceTagLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedIssueTagLabels as $issueTagLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-100">
-                            {{ $issueTagLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedReferenceLabels as $referenceLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                            {{ $referenceLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedSpeakerLabels as $speakerLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ $speakerLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedKeyPersonRoleLabels as $roleLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
-                            {{ $roleLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedPersonInChargeLabels as $personInChargeLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
-                            {{ __('PIC / Penyelaras') }}: {{ $personInChargeLabel }}
-                        </span>
-                    @endforeach
-
-                    @if($personInChargeSearch)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
-                            {{ __('Nama PIC / Penyelaras') }}: {{ $personInChargeSearch }}
-                        </span>
-                    @endif
-
-                    @foreach($selectedModeratorLabels as $moderatorLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
-                            {{ __('Moderator') }}: {{ $moderatorLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedImamLabels as $imamLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
-                            {{ __('Imam') }}: {{ $imamLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedKhatibLabels as $khatibLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
-                            {{ __('Khatib') }}: {{ $khatibLabel }}
-                        </span>
-                    @endforeach
-
-                    @foreach($selectedBilalLabels as $bilalLabel)
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100">
-                            {{ __('Bilal') }}: {{ $bilalLabel }}
-                        </span>
-                    @endforeach
-
-                    @if($startsAfter)
-                        @php
-                            $startsAfterLabel = \Illuminate\Support\Carbon::make($startsAfter)?->format('d M Y') ?? $startsAfter;
-                        @endphp
-                        <span
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ __('Held from') }} {{ $startsAfterLabel }}
-                        </span>
-                    @endif
-
-                    @if($startsBefore)
-                        @php
-                            $startsBeforeLabel = \Illuminate\Support\Carbon::make($startsBefore)?->format('d M Y') ?? $startsBefore;
-                        @endphp
-                        <span
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ __('Held until') }} {{ $startsBeforeLabel }}
-                        </span>
-                    @endif
-
-                    @if($timeScope === 'past')
-                        <span
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ __('Past') }}
-                        </span>
-                    @endif
-
-                    @if($timeScope === 'all')
-                        <span
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {{ __('All Time') }}
-                        </span>
-                    @endif
-
-                    <div class="ml-auto flex flex-wrap items-center gap-3">
-                        <button type="button" @click="shareResults()"
-                            data-signal-event="share.results_native_clicked"
-                            data-signal-category="share"
-                            data-signal-component="events_index_filters"
-                            data-signal-control="share_results"
-                            class="text-xs font-bold text-slate-600 hover:text-emerald-700 hover:underline">
-                            {{ __('Share These Results') }}
-                        </button>
-                        <button type="button" @click="copyShareLink()"
-                            data-signal-event="share.results_copy_clicked"
-                            data-signal-category="share"
-                            data-signal-component="events_index_filters"
-                            data-signal-control="copy_share_link"
-                            class="text-xs font-bold text-slate-600 hover:text-emerald-700 hover:underline">
-                            {{ __('Copy Share Link') }}
-                        </button>
-                        <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
-                            data-signal-event="saved_search.create_intent"
-                            data-signal-category="retention"
-                            data-signal-component="events_index_filters"
-                            data-signal-control="save_search"
-                            class="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
-                            {{ __('Save This Search') }}
-                        </a>
-                    </div>
-
-                    <button type="button" wire:click="clearAllFilters"
-                        data-signal-event="filter.cleared"
-                        data-signal-category="filter"
-                        data-signal-component="events_index_filters"
-                        data-signal-control="clear_all"
-                        class="text-xs font-bold text-red-500 hover:text-red-600 hover:underline">
-                        {{ __('Clear All Filters') }}
-                    </button>
-                </div>
-
-                <div x-show="copiedShareLink" x-transition:enter="transition ease-out duration-300"
-                    x-transition:enter-start="opacity-0 -translate-y-2"
-                    x-transition:enter-end="opacity-100 translate-y-0"
-                    class="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                    {{ __('Link copied to clipboard!') }}
-                </div>
-            @endif
-        </form>
-
-        <!-- Results Grid -->
-        <div class="mt-16 relative">
-            @php
-                $events = $this->events;
-                $showPendingStatusNote = $events->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Pending);
-                $showCancelledStatusNote = $events->contains(fn (\App\Models\Event $event): bool => $event->status instanceof \App\States\EventStatus\Cancelled);
-            @endphp
-
-            <div wire:loading.delay.short
-                wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">
-                <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                    @foreach(range(1, 6) as $index)
-                        <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-md animate-pulse">
-                            <div class="relative aspect-[16/9] bg-slate-200">
-                                <div class="absolute left-4 top-4 h-14 w-14 rounded-xl bg-white/80"></div>
-                                <div class="absolute bottom-4 left-4 h-6 w-20 rounded-full bg-white/70"></div>
-                            </div>
-
-                            <div class="space-y-4 p-6">
-                                <div class="space-y-2">
-                                    <div class="h-6 w-5/6 rounded-full bg-slate-200"></div>
-                                    <div class="h-6 w-2/3 rounded-full bg-slate-200"></div>
-                                </div>
-
-                                <div class="space-y-3">
-                                    <div class="flex items-start gap-2.5">
-                                        <div class="mt-1 h-4 w-4 rounded-full bg-emerald-100"></div>
-                                        <div class="w-full space-y-2">
-                                            <div class="h-4 w-3/4 rounded-full bg-slate-200"></div>
-                                            <div class="h-3 w-1/2 rounded-full bg-slate-100"></div>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-center gap-2.5">
-                                        <div class="h-4 w-4 rounded-full bg-emerald-100"></div>
-                                        <div class="h-4 w-2/3 rounded-full bg-slate-200"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </article>
-                    @endforeach
-                </div>
-            </div>
-
-            <div wire:loading.remove wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort">
-            @if($showPendingStatusNote || $showCancelledStatusNote)
-                <x-public.moderation-status-note
-                    :show-pending="$showPendingStatusNote"
-                    :show-cancelled="$showCancelledStatusNote"
-                    class="mb-6"
-                />
-            @endif
-
-            @if($events->isEmpty())
-                <div class="flex flex-col items-center justify-center py-24 text-center">
-                    <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                        <svg class="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                    </div>
-                    <h3 class="font-heading text-xl font-bold text-slate-900 mb-2">{{ __('No events found') }}</h3>
-                    <p class="text-slate-600 max-w-md">
-                        {{ __('Try adjusting your search terms or filters to find what you\'re looking for.') }}
-                    </p>
-                    <button type="button" @click="window.location.href='{{ route('events.index') }}'"
-                        data-signal-event="filter.cleared"
-                        data-signal-category="filter"
-                        data-signal-component="events_index_empty_state"
-                        data-signal-control="view_all_events"
-                        class="mt-6 font-semibold text-emerald-600 hover:text-emerald-700">
-                        {{ __('View all events') }} &rarr;
-                    </button>
-                </div>
-            @else
-                <div class="grid items-start md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    @foreach($events as $event)
-                        @php
-                            $coverMedia = $event->getFirstMedia('cover');
-                            $eventCardImageUrl = $coverMedia?->getAvailableUrl(['card', 'preview', 'thumb']) ?: $event->card_image_url;
-                            $eventChangeBadgeLabel = $event->public_change_badge_label;
-                            $eventCoverAspectClass = 'aspect-[16/9]';
-                            $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
-                            $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
-                            $hierarchyText = \App\Support\Location\AddressHierarchyFormatter::format($addressModel);
-
-                            $locationPrimaryText = is_string($primaryLocationName) && $primaryLocationName !== ''
-                                ? $primaryLocationName
-                                : null;
-                            $locationSecondaryText = $hierarchyText !== '' ? $hierarchyText : null;
-
-                            if ($locationPrimaryText === null && $locationSecondaryText === null) {
-                                $locationPrimaryText = __('Online');
-                            }
-                        @endphp
-                        <article
-                            class="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-xl hover:shadow-emerald-900/8 hover:-translate-y-1 transition-all duration-300 border border-slate-200">
-                            <!-- Image/Date -->
-                            <a href="{{ route('events.show', $event) }}" wire:navigate
-                                data-signal-event="navigation.result_clicked"
-                                data-signal-category="navigation"
-                                data-signal-component="events_index_results"
-                                data-signal-control="event_card_image"
-                                data-signal-entity-type="event"
-                                data-signal-entity-id="{{ $event->id }}"
-                                class="relative overflow-hidden bg-slate-100 block {{ $eventCoverAspectClass }}"
-                                data-cover-aspect="16:9">
-                                <div
-                                    class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 z-10 transition-opacity group-hover:opacity-70">
-                                </div>
-                                <div class="w-full h-full bg-slate-200 flex items-center justify-center text-slate-300">
-                                    <img src="{{ $eventCardImageUrl }}" alt="{{ $event->title }}" loading="lazy"
-                                        class="w-full h-full transition-transform duration-700 group-hover:scale-105 object-cover">
-                                </div>
-
-                                @if($event->status instanceof \App\States\EventStatus\Pending || $eventChangeBadgeLabel)
-                                    <div class="absolute top-5 left-5 z-20">
-                                        @if($event->status instanceof \App\States\EventStatus\Pending)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-500/92 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-md">
-                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                {{ __('Menunggu Kelulusan') }}
-                                            </span>
-                                        @else
-                                            <span class="inline-flex items-center gap-1 rounded-full {{ $event->schedule_state === \App\Enums\ScheduleState::Postponed ? 'bg-amber-600/92' : ($event->status instanceof \App\States\EventStatus\Cancelled ? 'bg-rose-600/92' : 'bg-sky-600/92') }} px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-md">
-                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 12.728L5.636 5.636"/></svg>
-                                                {{ $eventChangeBadgeLabel }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                @if(isset($event->distance_km))
-                                    <div class="absolute top-5 right-5 z-20">
-                                        <span
-                                            class="inline-flex items-center gap-1 bg-emerald-600/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full text-xs font-semibold shadow-lg">
-                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                            </svg>
-                                            {{ number_format($event->distance_km, 1) }} km
-                                        </span>
-                                    </div>
-                                @endif
-                            </a>
-
-                            <div class="p-6 flex flex-col">
-                                <div class="mb-4 flex items-start justify-between gap-4" data-testid="event-card-badge-row">
-                                    <span
-                                        class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm"
-                                        data-testid="event-card-type-badge">
-                                        {{ $event->eventType?->name ?? __('Kuliah') }}
-                                    </span>
-
-                                    <div
-                                        class="min-w-[4.5rem] shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-center shadow-sm"
-                                        data-testid="event-card-date-badge">
-                                        <div class="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-slate-500">
-                                            {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'M') }}
-                                        </div>
-                                        <div class="mt-1 text-2xl font-bold font-heading leading-none text-slate-900">
-                                            {{ \App\Support\Timezone\UserDateTimeFormatter::format($event->starts_at, 'd') }}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-between items-start mb-3 gap-4">
-                                    <div>
-                                        <a href="{{ route('events.show', $event) }}" wire:navigate
-                                            data-signal-event="navigation.result_clicked"
-                                            data-signal-category="navigation"
-                                            data-signal-component="events_index_results"
-                                            data-signal-control="event_card_title"
-                                            data-signal-entity-type="event"
-                                            data-signal-entity-id="{{ $event->id }}"
-                                            class="group-hover:text-emerald-700 transition-colors" data-testid="event-card-title-link">
-                                            <h3 class="font-heading text-xl font-bold text-slate-900 line-clamp-2 leading-tight">
-                                                {{ $event->title }}
-                                            </h3>
-                                        </a>
-                                        @if($event->reference_study_subtitle)
-                                            <p class="mt-1 pl-3 text-sm font-bold italic text-slate-500">
-                                                {{ $event->reference_study_subtitle }}
-                                            </p>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <div class="space-y-3">
-                                    <div class="flex items-start gap-2.5 text-sm text-slate-600">
-                                        <svg class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                        <span class="min-w-0">
-                                            <span class="block line-clamp-1">{{ $locationPrimaryText }}</span>
-                                            @if($locationSecondaryText)
-                                                <span class="mt-0.5 block line-clamp-1 text-xs text-slate-500">{{ $locationSecondaryText }}</span>
-                                            @endif
-                                        </span>
-                                    </div>
-                                    <div class="flex items-center gap-2.5 text-sm text-slate-600">
-                                        <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        {{ $event->timing_display }}
-                                    </div>
-                                </div>
-
-                            </div>
-                        </article>
-                    @endforeach
-                </div>
-
-                <div class="mt-16">
-                    {{ $events->withQueryString()->links() }}
-                </div>
-            @endif
+                </form>
             </div>
         </div>
-    </div>
+    </section>
+
+    <main class="container relative z-10 mx-auto -mt-8 px-6 pb-20 lg:px-12">
+        <form wire:submit.prevent class="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)] 2xl:grid-cols-[20rem_minmax(0,1fr)]">
+            <aside class="h-fit rounded-2xl border border-amber-100/80 bg-white/95 p-4 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.55)] lg:sticky lg:top-24">
+                <div wire:loading.delay.short
+                    wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort,toggleSave"
+                    class="mb-4 inline-flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                    <svg class="size-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle>
+                        <path class="opacity-75" stroke-width="4" d="M22 12a10 10 0 0 0-10-10"></path>
+                    </svg>
+                    {{ __('Updating results...') }}
+                </div>
+
+                <div class="divide-y divide-slate-100">
+                    <section class="pb-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <h2 class="inline-flex items-center gap-2 font-heading text-base font-bold text-emerald-950">
+                                <svg class="size-5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s7-4.438 7-11a7 7 0 1 0-14 0c0 6.562 7 11 7 11Z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5h.01" />
+                                </svg>
+                                {{ __('Lokasi') }}
+                            </h2>
+                            @if($lat)
+                                <button type="button" wire:click="clearLocation" class="text-xs font-semibold text-rose-600 hover:text-rose-700">
+                                    {{ __('Clear') }}
+                                </button>
+                            @endif
+                        </div>
+
+                        <button type="button" @click="locate" :disabled="locating"
+                            data-testid="near-me-button"
+                            data-signal-event="search.nearby_requested"
+                            data-signal-category="search"
+                            data-signal-component="events_index_filters"
+                            data-signal-control="near_me"
+                            class="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 text-sm font-bold text-emerald-800 transition hover:border-emerald-200 hover:bg-emerald-100">
+                            <svg class="size-4" :class="locating ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path x-show="! locating" stroke-linecap="round" stroke-linejoin="round" d="M12 21s7-4.438 7-11a7 7 0 1 0-14 0c0 6.562 7 11 7 11Z" />
+                                <path x-show="! locating" stroke-linecap="round" stroke-linejoin="round" d="M12 10.5h.01" />
+                                <circle x-show="locating" class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle>
+                                <path x-show="locating" class="opacity-75" stroke-width="4" d="M22 12a10 10 0 0 0-10-10"></path>
+                            </svg>
+                            <span x-text="locating ? '{{ __('Locating...') }}' : '{{ __('Dekat saya') }}'"></span>
+                        </button>
+
+                        <div x-show="locationNotice" x-cloak x-text="locationNotice" class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800"></div>
+
+                        <div class="mt-4 space-y-3">
+                            <label class="block">
+                                <span class="mb-1.5 block text-xs font-semibold text-slate-600">{{ __('Negeri') }}</span>
+                                <select wire:model.live="filterData.state_id" data-signal-control="state_id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10">
+                                    <option value="">{{ __('Pilih negeri') }}</option>
+                                    @foreach($states as $state)
+                                        <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+
+                            <label class="block">
+                                <span class="mb-1.5 block text-xs font-semibold text-slate-600">{{ __('Daerah') }}</span>
+                                <select wire:model.live="filterData.district_id" data-signal-control="district_id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" @disabled(! filled($stateId) || \App\Support\Location\FederalTerritoryLocation::isFederalTerritoryStateId($stateId))>
+                                    <option value="">{{ __('Pilih daerah') }}</option>
+                                    @foreach($districts as $district)
+                                        <option value="{{ $district->id }}">{{ $district->name }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+
+                            @if(filled($stateId) && (filled($districtId) || \App\Support\Location\FederalTerritoryLocation::isFederalTerritoryStateId($stateId)))
+                                <label class="block">
+                                    <span class="mb-1.5 block text-xs font-semibold text-slate-600">{{ __('Bandar / Mukim / Zon') }}</span>
+                                    <select wire:model.live="filterData.subdistrict_id" data-signal-control="subdistrict_id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10">
+                                        <option value="">{{ __('Semua kawasan') }}</option>
+                                        @foreach($subdistricts as $subdistrict)
+                                            <option value="{{ $subdistrict->id }}">{{ $subdistrict->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @endif
+
+                            @if($lat)
+                                <label
+                                    data-testid="nearby-radius-inline"
+                                    x-cloak
+                                    x-bind:hidden="! geolocationPermitted"
+                                    @if(! $showsGeolocationControls)
+                                        hidden
+                                    @endif
+                                    class="block">
+                                    <span class="mb-1.5 flex items-center justify-between text-xs font-semibold text-slate-600">
+                                        <span>{{ __('Radius') }}</span>
+                                        <span>{{ $this->radius_km }} km</span>
+                                    </span>
+                                    <input type="range" min="1" max="1000" step="1" wire:model.live="filterData.radius_km" data-signal-control="radius_km" class="w-full accent-emerald-700">
+                                </label>
+                            @endif
+                        </div>
+                    </section>
+
+                    <section class="py-4">
+                        <h2 class="inline-flex items-center gap-2 font-heading text-base font-bold text-emerald-950">
+                            <svg class="size-5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5M5.25 5.25h13.5A1.5 1.5 0 0 1 20.25 6.75v12A1.5 1.5 0 0 1 18.75 20.25H5.25A1.5 1.5 0 0 1 3.75 18.75v-12A1.5 1.5 0 0 1 5.25 5.25Z" />
+                            </svg>
+                            {{ __('Tarikh') }}
+                        </h2>
+                        <div class="mt-3 grid grid-cols-2 gap-2">
+                            <a href="{{ route('events.index', $todayQuery) }}" wire:navigate class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50">{{ __('Hari ini') }}</a>
+                            <a href="{{ route('events.index', $weekendQuery) }}" wire:navigate class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50">{{ __('Hujung minggu') }}</a>
+                        </div>
+                        <div class="mt-3 space-y-3">
+                            <label class="block">
+                                <span class="mb-1.5 block text-xs font-semibold text-slate-600">{{ __('Dari') }}</span>
+                                <input type="date" wire:model.live="filterData.starts_after" data-signal-control="starts_after" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10">
+                            </label>
+                            <label class="block">
+                                <span class="mb-1.5 block text-xs font-semibold text-slate-600">{{ __('Hingga') }}</span>
+                                <input type="date" wire:model.live="filterData.starts_before" data-signal-control="starts_before" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10">
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="py-4">
+                        <h2 class="font-heading text-base font-bold text-emerald-950">{{ __('Jenis majlis') }}</h2>
+                        <div class="mt-3 grid grid-cols-2 gap-2">
+                            @foreach(\App\Enums\EventType::cases() as $quickEventType)
+                                <label class="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl border px-2 text-center text-xs font-semibold transition {{ in_array($quickEventType->value, $selectedEventTypes, true) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200' }}">
+                                    <input type="checkbox" wire:model.live="filterData.event_type" value="{{ $quickEventType->value }}" class="sr-only">
+                                    {{ $quickEventType->getLabel() }}
+                                </label>
+                            @endforeach
+                        </div>
+                    </section>
+
+                    <section class="py-4">
+                        <h2 class="font-heading text-base font-bold text-emerald-950">{{ __('Bahasa') }}</h2>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @foreach($languageOptions as $languageCode => $languageLabel)
+                                <label class="inline-flex cursor-pointer items-center rounded-xl border px-3 py-2 text-xs font-semibold transition {{ in_array($languageCode, $selectedLanguageCodes, true) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200' }}">
+                                    <input type="checkbox" wire:model.live="filterData.language_codes" value="{{ $languageCode }}" class="sr-only">
+                                    {{ $languageCode === 'ms' ? 'BM' : strtoupper((string) $languageCode) }}
+                                </label>
+                            @endforeach
+                        </div>
+                    </section>
+
+                    <section class="py-4">
+                        <h2 class="font-heading text-base font-bold text-emerald-950">{{ __('Format') }}</h2>
+                        <div class="mt-3 grid grid-cols-3 gap-2">
+                            @foreach(\App\Enums\EventFormat::cases() as $formatOption)
+                                <label class="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl border px-2 text-center text-xs font-semibold transition {{ in_array($formatOption->value, $selectedEventFormats, true) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200' }}">
+                                    <input type="checkbox" wire:model.live="filterData.event_format" value="{{ $formatOption->value }}" class="sr-only">
+                                    {{ $formatOption->getLabel() }}
+                                </label>
+                            @endforeach
+                        </div>
+                    </section>
+
+                    <section class="pt-4">
+                        <div class="mi-filter-shell space-y-3">
+                            {{ $this->form }}
+                        </div>
+
+                        <div class="mt-4 flex items-center justify-between gap-3">
+                            <button type="button" wire:click="clearAllFilters"
+                                data-signal-event="filter.cleared"
+                                data-signal-category="filter"
+                                data-signal-component="events_index_filters"
+                                data-signal-control="clear_all"
+                                aria-label="{{ __('Clear All Filters') }}"
+                                class="text-xs font-semibold text-amber-700 transition hover:text-amber-800">
+                                {{ __('Set semula semua') }}
+                            </button>
+                            <button type="submit" class="rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-900">
+                                {{ __('Terapkan penapis') }}
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </aside>
+
+            <section class="min-w-0">
+                <div class="rounded-2xl border border-amber-100/80 bg-white/95 p-4 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.55)] md:p-6">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div>
+                            <h2 class="font-heading text-2xl font-bold text-emerald-950">
+                                {{ trans_choice(':count majlis dijumpai', $events->total(), ['count' => number_format($events->total())]) }}
+                            </h2>
+                            <p class="mt-1 text-sm text-slate-500">
+                                {{ match ($this->time_scope ?? 'upcoming') {
+                                    'past' => __('Past Gatherings'),
+                                    'all' => __('All Gatherings'),
+                                    default => __('Upcoming Gatherings'),
+                                } }}
+                                ·
+                                {{ filled($lat) ? __('Menunjukkan hasil dalam :radius km', ['radius' => $this->radius_km]) : __('Menunjukkan majlis yang sepadan dengan carian anda') }}
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white p-1">
+                                <a href="#majlis-map-preview"
+                                    data-signal-event="navigation.map_preview_clicked"
+                                    data-signal-category="navigation"
+                                    data-signal-component="events_index_toolbar"
+                                    data-signal-control="map_preview"
+                                    class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-emerald-800">
+                                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 18.75 3.75 21V6.75L9 4.5m0 14.25 6-2.25m-6 2.25V4.5m6 12 5.25 2.25V4.5L15 6.75m0 9.75V6.75m0 0L9 4.5" />
+                                    </svg>
+                                    {{ __('Peta') }}
+                                </a>
+                                <span class="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white">
+                                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+                                    </svg>
+                                    {{ __('Senarai') }}
+                                </span>
+                            </div>
+
+                            <label class="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600">
+                                <span>{{ __('Susun:') }}</span>
+                                <select wire:model.live="filterData.sort" data-signal-control="sort" class="border-0 bg-transparent py-0 pl-0 pr-7 text-sm font-bold text-slate-800 focus:ring-0">
+                                    <option value="time">{{ __('Terbaru') }}</option>
+                                    <option value="relevance">{{ __('Relevance') }}</option>
+                                    @if($lat)
+                                        <option value="distance">{{ __('Distance') }}</option>
+                                    @endif
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+
+                    @if($hasActiveFilters)
+                        <div class="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+                            @if($search)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">"{{ $search }}"</span>
+                            @endif
+                            @if($lat)
+                                <span class="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">{{ __('Dekat saya') }} · {{ $this->radius_km }} km</span>
+                            @endif
+                            @if($stateId)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ $states->firstWhere('id', $stateId)?->name ?? __('State') }}</span>
+                            @endif
+                            @if($districtId)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ $districts->firstWhere('id', $districtId)?->name ?? __('District') }}</span>
+                            @endif
+                            @foreach($selectedEventTypes as $eventType)
+                                <span class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">{{ $eventTypeLabels[$eventType] ?? str((string) $eventType)->replace('_', ' ')->headline() }}</span>
+                            @endforeach
+                            @foreach($selectedEventFormats as $eventFormat)
+                                <span class="inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800">{{ $eventFormatLabels[$eventFormat] ?? str((string) $eventFormat)->headline() }}</span>
+                            @endforeach
+                            @foreach($selectedLanguageCodes as $languageCode)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ $languageOptions[$languageCode] ?? strtoupper((string) $languageCode) }}</span>
+                            @endforeach
+                            @if($gender)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ $genderLabels[$gender] ?? str((string) $gender)->replace('_', ' ')->headline() }}</span>
+                            @endif
+                            @foreach($selectedAgeGroups as $ageGroup)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ $ageGroupLabels[$ageGroup] ?? str((string) $ageGroup)->replace('_', ' ')->headline() }}</span>
+                            @endforeach
+                            @if($prayerTime)
+                                <span class="inline-flex items-center rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">{{ $prayerTimeLabel }}</span>
+                            @endif
+                            @if($timingModeLabel)
+                                <span class="inline-flex items-center rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">{{ $timingModeLabel }}</span>
+                            @endif
+                            @foreach($selectedPersonInChargeLabels as $personInChargeLabel)
+                                <span class="inline-flex items-center rounded-full border border-orange-100 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-800">{{ __('PIC / Penyelaras') }}: {{ $personInChargeLabel }}</span>
+                            @endforeach
+                            @if($personInChargeSearch)
+                                <span class="inline-flex items-center rounded-full border border-orange-100 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-800">{{ __('Nama PIC / Penyelaras') }}: {{ $personInChargeSearch }}</span>
+                            @endif
+                            @if($this->has_event_url !== null)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ $this->has_event_url ? __('Has Event URL') : __('No Event URL') }}</span>
+                            @endif
+                            @if($this->has_live_url !== null)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ $this->has_live_url ? __('Has Live URL') : __('No Live URL') }}</span>
+                            @endif
+                            @if($startsAfter)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ __('Held from') }} {{ \Illuminate\Support\Carbon::make($startsAfter)?->format('d M Y') ?? $startsAfter }}</span>
+                            @endif
+                            @if($startsBefore)
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ __('Held until') }} {{ \Illuminate\Support\Carbon::make($startsBefore)?->format('d M Y') ?? $startsBefore }}</span>
+                            @endif
+                            @if($timeScope === 'past')
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ __('Past') }}</span>
+                            @endif
+                            @if($timeScope === 'all')
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{{ __('All Time') }}</span>
+                            @endif
+
+                            <div class="ml-auto flex flex-wrap items-center gap-3">
+                                <button type="button" @click="shareResults()"
+                                    data-signal-event="share.results_native_clicked"
+                                    data-signal-category="share"
+                                    data-signal-component="events_index_filters"
+                                    data-signal-control="share_results"
+                                    class="text-xs font-bold text-slate-600 transition hover:text-emerald-800">
+                                    {{ __('Share These Results') }}
+                                </button>
+                                <button type="button" @click="copyShareLink()"
+                                    data-signal-event="share.results_copy_clicked"
+                                    data-signal-category="share"
+                                    data-signal-component="events_index_filters"
+                                    data-signal-control="copy_share_link"
+                                    class="text-xs font-bold text-slate-600 transition hover:text-emerald-800">
+                                    {{ __('Copy Share Link') }}
+                                </button>
+                                <a href="{{ route('saved-searches.index', $savedSearchQuery) }}" wire:navigate
+                                    data-signal-event="saved_search.create_intent"
+                                    data-signal-category="retention"
+                                    data-signal-component="events_index_filters"
+                                    data-signal-control="save_search"
+                                    class="text-xs font-bold text-emerald-700 transition hover:text-emerald-900">
+                                    {{ __('Save This Search') }}
+                                </a>
+                            </div>
+                        </div>
+
+                        <div x-show="copiedShareLink" x-cloak x-transition class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                            {{ __('Link copied to clipboard!') }}
+                        </div>
+                    @else
+                        @auth
+                            <div class="mt-5 flex flex-col gap-3 rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                <p class="text-sm text-slate-600">{{ __('Keep the filters you use often for quick access.') }}</p>
+                                <a href="{{ route('saved-searches.index') }}" wire:navigate
+                                    data-signal-event="navigation.saved_searches_clicked"
+                                    data-signal-category="navigation"
+                                    data-signal-component="events_index_filters"
+                                    data-signal-control="saved_searches"
+                                    class="text-sm font-semibold text-sky-700 transition hover:text-sky-800">
+                                    {{ __('Saved Searches') }}
+                                </a>
+                            </div>
+                        @endauth
+                    @endif
+                </div>
+
+                <div class="mt-5">
+                    @if($showPendingStatusNote || $showCancelledStatusNote)
+                        <x-public.moderation-status-note
+                            :show-pending="$showPendingStatusNote"
+                            :show-cancelled="$showCancelledStatusNote"
+                            class="mb-5"
+                        />
+                    @endif
+
+                    <div wire:loading.delay.short wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort,toggleSave" class="space-y-4">
+                        @foreach(range(1, 4) as $index)
+                            <article class="animate-pulse rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+                                <div class="grid items-start gap-4 md:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[18rem_minmax(0,1fr)_8.5rem] xl:grid-cols-[21rem_minmax(0,1fr)_9rem] 2xl:grid-cols-[24rem_minmax(0,1fr)_9rem]">
+                                    <div class="aspect-[16/9] w-full rounded-xl bg-slate-200"></div>
+                                    <div class="space-y-4 py-1">
+                                        <div class="h-6 w-2/3 rounded-full bg-slate-200"></div>
+                                        <div class="h-4 w-1/2 rounded-full bg-slate-100"></div>
+                                        <div class="h-4 w-5/6 rounded-full bg-slate-100"></div>
+                                        <div class="flex gap-2">
+                                            <div class="h-8 w-24 rounded-lg bg-slate-100"></div>
+                                            <div class="h-8 w-24 rounded-lg bg-slate-100"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+
+                    <div wire:loading.remove wire:target="filterData,setLocation,clearLocation,clearAllFilters,setSort,toggleSave">
+                        @if($events->isEmpty())
+                            <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+                                <div class="mx-auto flex size-20 items-center justify-center rounded-full bg-slate-50">
+                                    <svg class="size-9 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5M5.25 5.25h13.5A1.5 1.5 0 0 1 20.25 6.75v12A1.5 1.5 0 0 1 18.75 20.25H5.25A1.5 1.5 0 0 1 3.75 18.75v-12A1.5 1.5 0 0 1 5.25 5.25Z" />
+                                    </svg>
+                                </div>
+                                <h3 class="mt-5 font-heading text-2xl font-bold text-slate-900">{{ __('No events found') }}</h3>
+                                <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{{ __('Try adjusting your search terms or filters to find what you\'re looking for.') }}</p>
+                                <button type="button" wire:click="clearAllFilters"
+                                    data-signal-event="filter.cleared"
+                                    data-signal-category="filter"
+                                    data-signal-component="events_index_empty_state"
+                                    data-signal-control="view_all_events"
+                                    class="mt-6 rounded-xl bg-emerald-800 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-900">
+                                    {{ __('View all events') }}
+                                </button>
+                            </div>
+                        @else
+                            <div class="space-y-4">
+                                @foreach($events as $event)
+                                    @php
+                                        $coverMedia = $event->getFirstMedia('cover');
+                                        $eventCardImageUrl = $coverMedia?->getAvailableUrl(['card', 'preview', 'thumb']) ?: $event->card_image_url;
+                                        $eventChangeBadgeLabel = $event->public_change_badge_label;
+                                        $eventTypeValues = $event->event_type;
+                                        $firstEventType = $eventTypeValues instanceof \Illuminate\Support\Collection
+                                            ? $eventTypeValues->first()
+                                            : (is_array($eventTypeValues) ? ($eventTypeValues[0] ?? null) : $eventTypeValues);
+                                        $eventTypeLabel = $firstEventType instanceof \App\Enums\EventType
+                                            ? $firstEventType->getLabel()
+                                            : (\App\Enums\EventType::tryFrom((string) $firstEventType)?->getLabel() ?? __('Kuliah'));
+                                        $eventFormat = $event->event_format instanceof \App\Enums\EventFormat
+                                            ? $event->event_format
+                                            : \App\Enums\EventFormat::tryFrom((string) $event->event_format);
+                                        $formatValue = $eventFormat?->value ?? \App\Enums\EventFormat::Physical->value;
+                                        $formatLabel = $eventFormat?->getLabel() ?? __('Physical');
+                                        $formatBadgeClass = match ($formatValue) {
+                                            \App\Enums\EventFormat::Online->value => 'bg-sky-700 text-white',
+                                            \App\Enums\EventFormat::Hybrid->value => 'bg-teal-700 text-white',
+                                            default => 'bg-emerald-800 text-white',
+                                        };
+                                        $primaryLocationName = $event->venue?->name ?? $event->institution?->name;
+                                        $addressModel = $event->venue?->addressModel ?? $event->institution?->addressModel;
+                                        $hierarchyText = \App\Support\Location\AddressHierarchyFormatter::format($addressModel);
+                                        $locationPrimaryText = is_string($primaryLocationName) && $primaryLocationName !== '' ? $primaryLocationName : null;
+                                        $locationSecondaryText = $hierarchyText !== '' ? $hierarchyText : null;
+
+                                        if ($locationPrimaryText === null && $locationSecondaryText === null) {
+                                            $locationPrimaryText = $formatValue === \App\Enums\EventFormat::Online->value ? __('Online') : __('Location pending');
+                                        }
+
+                                        $speakerNames = $event->speakers
+                                            ->take(2)
+                                            ->map(fn (\App\Models\Speaker $speaker): string => (string) ($speaker->formatted_name ?? $speaker->name))
+                                            ->filter()
+                                            ->values();
+                                        $speakerText = $speakerNames->isNotEmpty() ? $speakerNames->implode(', ') : __('Penceramah akan diumumkan');
+                                        $languageChips = $event->languages
+                                            ->take(1)
+                                            ->map(fn (\Nnjeim\World\Models\Language $language): string => (string) ($language->code === 'ms' ? 'BM' : strtoupper((string) $language->code)))
+                                            ->filter()
+                                            ->values();
+                                        $tagChips = $event->tags
+                                            ->whereIn('status', ['verified', 'pending'])
+                                            ->take(2)
+                                            ->map(fn (\App\Models\Tag $tag): string => (string) ($tag->getTranslation('name', app()->getLocale(), false) ?: \Illuminate\Support\Arr::first((array) $tag->name)))
+                                            ->filter()
+                                            ->values();
+                                        $statusBadgeLabel = $event->status instanceof \App\States\EventStatus\Pending
+                                            ? __('Menunggu Kelulusan')
+                                            : ($eventChangeBadgeLabel ?? __('Confirmed'));
+                                        $statusBadgeClass = $event->status instanceof \App\States\EventStatus\Pending
+                                            ? 'border-amber-100 bg-amber-50 text-amber-700'
+                                            : ($event->schedule_state === \App\Enums\ScheduleState::Postponed || $event->status instanceof \App\States\EventStatus\Cancelled
+                                                ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                                : ($eventChangeBadgeLabel ? 'border-sky-100 bg-sky-50 text-sky-700' : 'border-emerald-100 bg-emerald-50 text-emerald-700'));
+                                        $statusTimeLabel = $eventChangeBadgeLabel
+                                            ? $event->updated_at?->diffForHumans()
+                                            : $event->published_at?->diffForHumans();
+                                        $mapUrl = filled($addressModel?->google_maps_url)
+                                            ? (string) $addressModel->google_maps_url
+                                            : (filled($addressModel?->lat) && filled($addressModel?->lng)
+                                                ? 'https://www.google.com/maps/dir/?api=1&destination='.$addressModel->lat.','.$addressModel->lng
+                                                : null);
+                                        $eventUrl = route('events.show', $event);
+                                        $isSaved = in_array((string) $event->getKey(), $savedEventIds, true);
+                                    @endphp
+
+                                    <article class="group rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-emerald-100 hover:shadow-[0_20px_55px_-38px_rgba(6,95,70,0.55)] sm:p-4">
+                                        <div class="grid items-start gap-4 md:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[18rem_minmax(0,1fr)_8.5rem] xl:grid-cols-[21rem_minmax(0,1fr)_9rem] 2xl:grid-cols-[24rem_minmax(0,1fr)_9rem]">
+                                            <a href="{{ $eventUrl }}" wire:navigate
+                                                data-signal-event="navigation.result_clicked"
+                                                data-signal-category="navigation"
+                                                data-signal-component="events_index_results"
+                                                data-signal-control="event_card_image"
+                                                data-signal-entity-type="event"
+                                                data-signal-entity-id="{{ $event->id }}"
+                                                class="relative block aspect-[16/9] w-full overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-1 ring-slate-900/5"
+                                                data-cover-aspect="16:9">
+                                                <img src="{{ $eventCardImageUrl }}" alt="{{ $event->title }}" loading="lazy" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                                                <span class="absolute bottom-3 left-3 rounded-lg px-2.5 py-1.5 text-[11px] font-bold shadow-sm {{ $formatBadgeClass }}">{{ $formatLabel }}</span>
+                                                @if(isset($event->distance_km))
+                                                    <span class="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-emerald-800 shadow-sm backdrop-blur">{{ number_format($event->distance_km, 1) }} km</span>
+                                                @endif
+                                            </a>
+
+                                            <div class="min-w-0">
+                                                <div class="mb-2.5 flex flex-wrap items-center gap-2" data-testid="event-card-badge-row">
+                                                    <span class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800" data-testid="event-card-type-badge">
+                                                        {{ $eventTypeLabel }}
+                                                    </span>
+                                                    <span class="inline-flex items-center rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800" data-testid="event-card-date-badge">
+                                                        {{ \App\Support\Timezone\UserDateTimeFormatter::translatedFormat($event->starts_at, 'j M') }}
+                                                    </span>
+                                                </div>
+
+                                                <a href="{{ $eventUrl }}" wire:navigate
+                                                    data-signal-event="navigation.result_clicked"
+                                                    data-signal-category="navigation"
+                                                    data-signal-component="events_index_results"
+                                                    data-signal-control="event_card_title"
+                                                    data-signal-entity-type="event"
+                                                    data-signal-entity-id="{{ $event->id }}"
+                                                    class="block" data-testid="event-card-title-link">
+                                                    <h3 class="font-heading text-xl font-bold leading-tight text-emerald-950 transition group-hover:text-emerald-800 lg:text-[1.35rem]">
+                                                        {{ $event->title }}
+                                                    </h3>
+                                                </a>
+
+                                                @if($event->reference_study_subtitle)
+                                                    <p class="mt-1 text-xs font-semibold italic text-slate-500">{{ $event->reference_study_subtitle }}</p>
+                                                @endif
+
+                                                <dl class="mt-2.5 space-y-1.5 text-xs leading-5 text-slate-600">
+                                                    <div class="flex gap-2">
+                                                        <dt class="mt-0.5 text-slate-500">
+                                                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a8.25 8.25 0 1 1 15 0" />
+                                                            </svg>
+                                                        </dt>
+                                                        <dd class="min-w-0 truncate">{{ $speakerText }}</dd>
+                                                    </div>
+                                                    <div class="flex gap-2">
+                                                        <dt class="mt-0.5 text-slate-500">
+                                                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s7-4.438 7-11a7 7 0 1 0-14 0c0 6.562 7 11 7 11Z" />
+                                                            </svg>
+                                                        </dt>
+                                                        <dd class="min-w-0">
+                                                            <span class="block truncate">{{ $locationPrimaryText }}</span>
+                                                            @if($locationSecondaryText)
+                                                                <span class="block truncate text-xs text-slate-500">{{ $locationSecondaryText }}</span>
+                                                            @endif
+                                                        </dd>
+                                                    </div>
+                                                    <div class="flex gap-2">
+                                                        <dt class="mt-0.5 text-slate-500">
+                                                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                                            </svg>
+                                                        </dt>
+                                                        <dd>{{ $event->timing_display }}</dd>
+                                                    </div>
+                                                </dl>
+
+                                                <div class="mt-2.5 flex flex-wrap gap-2">
+                                                    @foreach($languageChips as $languageChip)
+                                                        <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">{{ $languageChip }}</span>
+                                                    @endforeach
+                                                    @foreach($tagChips as $tagChip)
+                                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{{ $tagChip }}</span>
+                                                    @endforeach
+                                                </div>
+
+                                            </div>
+
+                                            <div class="grid gap-2 md:col-span-2 md:grid-cols-4 lg:col-span-1 lg:flex lg:flex-col lg:border-l lg:border-slate-100 lg:pl-4">
+                                                    <span class="rounded-lg border px-2.5 py-1.5 text-center text-[11px] font-semibold leading-4 md:col-span-4 {{ $statusBadgeClass }}">
+                                                        <span class="block">{{ $statusBadgeLabel }}</span>
+                                                        @if($statusTimeLabel)
+                                                            <span class="mt-0.5 block font-normal opacity-75">{{ $statusTimeLabel }}</span>
+                                                        @endif
+                                                    </span>
+                                                    <a href="{{ $eventUrl }}" wire:navigate class="inline-flex h-9 items-center justify-center rounded-xl border border-emerald-700 bg-white px-2 text-[11px] font-bold leading-tight text-emerald-800 transition hover:bg-emerald-50 lg:w-full">
+                                                        {{ __('Lihat Detail') }}
+                                                    </a>
+                                                    <button type="button" wire:click="toggleSave('{{ $event->getKey() }}')"
+                                                        data-signal-event="engagement.event_save_clicked"
+                                                        data-signal-category="engagement"
+                                                        data-signal-component="events_index_results"
+                                                        data-signal-control="save"
+                                                        data-signal-entity-type="event"
+                                                        data-signal-entity-id="{{ $event->id }}"
+                                                        data-signal-props='@json(['currently_saved' => $isSaved])'
+                                                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-semibold leading-tight text-slate-600 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 lg:w-full">
+                                                        <svg class="size-4" fill="{{ $isSaved ? 'currentColor' : 'none' }}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-3.5L5 21V5Z" />
+                                                        </svg>
+                                                        {{ $isSaved ? __('Disimpan') : __('Simpan') }}
+                                                    </button>
+                                                    <button type="button" @click="shareEvent(@js((string) $event->getKey()), @js($eventUrl), @js($event->title))"
+                                                        data-signal-event="share.event_clicked"
+                                                        data-signal-category="share"
+                                                        data-signal-component="events_index_results"
+                                                        data-signal-control="share_event"
+                                                        data-signal-entity-type="event"
+                                                        data-signal-entity-id="{{ $event->id }}"
+                                                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-semibold leading-tight text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 lg:w-full">
+                                                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314" />
+                                                        </svg>
+                                                        <span x-text="copiedEventId === @js((string) $event->getKey()) ? '{{ __('Disalin') }}' : '{{ __('Kongsi') }}'"></span>
+                                                    </button>
+                                                    @if($mapUrl)
+                                                        <a href="{{ $mapUrl }}" target="_blank" rel="noopener noreferrer"
+                                                            data-signal-event="navigation.event_map_opened"
+                                                            data-signal-category="navigation"
+                                                            data-signal-component="events_index_results"
+                                                            data-signal-control="open_maps"
+                                                            data-signal-entity-type="event"
+                                                            data-signal-entity-id="{{ $event->id }}"
+                                                            class="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-semibold leading-tight text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 lg:w-full">
+                                                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="m12 19.5 7.5-4.125V4.875L12 9 4.5 4.875v10.5L12 19.5Zm0 0V9" />
+                                                            </svg>
+                                                            {{ __('Buka Maps') }}
+                                                        </a>
+                                                    @else
+                                                        <span class="hidden sm:block"></span>
+                                                    @endif
+                                            </div>
+                                        </div>
+                                    </article>
+                                @endforeach
+                            </div>
+
+                            <div class="mt-6">
+                                {{ $events->withQueryString()->links() }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <section id="majlis-map-preview" class="mt-6 overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-sm">
+                    <div class="grid gap-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
+                        <div class="flex items-center gap-4 p-6">
+                            <div class="flex size-20 shrink-0 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50">
+                                <svg class="size-10 text-emerald-800" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 18.75 3.75 21V6.75L9 4.5m0 14.25 6-2.25m-6 2.25V4.5m6 12 5.25 2.25V4.5L15 6.75m0 9.75V6.75m0 0L9 4.5" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="font-heading text-xl font-bold text-emerald-950">{{ __('Lihat majlis di peta') }}</h2>
+                                <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('Terokai majlis berdekatan anda dengan paparan peta interaktif.') }}</p>
+                                <button type="button" @click="locate" class="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-900">
+                                    {{ __('Lihat di peta penuh') }}
+                                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="relative min-h-44 overflow-hidden bg-[#eaf2ec]">
+                            <div class="absolute inset-0 opacity-70" style="background-image: linear-gradient(30deg, transparent 45%, rgba(148, 163, 184, .45) 46%, rgba(148, 163, 184, .45) 48%, transparent 49%), linear-gradient(120deg, transparent 42%, rgba(148, 163, 184, .35) 43%, rgba(148, 163, 184, .35) 46%, transparent 47%); background-size: 120px 80px, 160px 100px;"></div>
+                            <div class="absolute left-[18%] top-[38%] size-8 rounded-full bg-emerald-800 p-1 text-white shadow-lg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21s6-4.5 6-10a6 6 0 1 0-12 0c0 5.5 6 10 6 10Z" /></svg></div>
+                            <div class="absolute left-[52%] top-[26%] size-8 rounded-full bg-sky-600 p-1 text-white shadow-lg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21s6-4.5 6-10a6 6 0 1 0-12 0c0 5.5 6 10 6 10Z" /></svg></div>
+                            <div class="absolute right-[18%] top-[42%] size-8 rounded-full bg-emerald-800 p-1 text-white shadow-lg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21s6-4.5 6-10a6 6 0 1 0-12 0c0 5.5 6 10 6 10Z" /></svg></div>
+                            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-1.5 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur">{{ __('Shah Alam') }}</div>
+                        </div>
+                    </div>
+                </section>
+            </section>
+        </form>
+
+        <section class="mt-6 overflow-hidden rounded-2xl bg-[#062b49] px-6 py-8 text-center text-white shadow-[0_24px_70px_-45px_rgba(6,43,73,0.75)] md:px-10">
+            <div class="mx-auto max-w-3xl">
+                <h2 class="font-heading text-2xl font-bold leading-tight text-amber-100 md:text-3xl">
+                    {{ __('Ilmu dah ada. Masjid dah terbuka. Surau dah hidup.') }}
+                    <span class="block text-amber-200">{{ __('Sekarang, mari bantu lebih ramai orang sampai.') }}</span>
+                </h2>
+                <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                    <a href="{{ route('events.index', $todayQuery) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-600">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                        {{ __('Cari Majlis Hari Ini') }}
+                    </a>
+                    <a href="{{ route('home') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white px-5 py-3 text-sm font-bold text-slate-900 transition hover:bg-amber-50">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V3.75m0 12.75 3.75-3.75M12 16.5l-3.75-3.75M4.5 20.25h15" />
+                        </svg>
+                        {{ __('Download Ilmu360') }}
+                    </a>
+                    <a href="{{ route('submit-event.create') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200/60 px-5 py-3 text-sm font-bold text-amber-100 transition hover:bg-white/10">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M4.5 19.5h15a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5h-15A1.5 1.5 0 0 0 3 6v12a1.5 1.5 0 0 0 1.5 1.5Z" />
+                        </svg>
+                        {{ __('Hantar Majlis') }}
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
 </div>
