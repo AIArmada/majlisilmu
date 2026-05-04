@@ -35,6 +35,7 @@ enum PreNominal: string implements HasLabel
 
     // Program-Based/Religious Roles
     case ImamMuda = 'imam_muda';
+    case PU = 'pu';
     case Dai = 'dai';
     case Mufti = 'mufti';
     case Kadi = 'kadi';
