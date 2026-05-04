@@ -60,8 +60,8 @@ trait BuildsEventImagePrompt
 
         $result = $builder->build($event, [
             'target_collection' => $targetCollection,
-            'creative_direction' => is_string($arguments['creative_direction'] ?? null) && trim((string) $arguments['creative_direction']) !== ''
-                ? trim((string) $arguments['creative_direction'])
+            'creative_direction' => is_string($arguments['creative_direction'] ?? null) && trim($arguments['creative_direction']) !== ''
+                ? trim($arguments['creative_direction'])
                 : null,
             'include_existing_media' => $this->parseBoolArgument($arguments['include_existing_media'] ?? null, true),
             'max_reference_media' => $maxReferenceMedia,
@@ -109,7 +109,7 @@ trait BuildsEventImagePrompt
         $uploadTool = $targetCollection === 'poster' ? 'upload-event-poster-image' : 'upload-event-cover-image';
 
         $safetyNotes = is_array($payload['usage']['safety_notes'] ?? null)
-            ? implode("\n", array_map(fn (mixed $n): string => '- '.(string) $n, $payload['usage']['safety_notes']))
+            ? implode("\n", array_map(fn (mixed $n): string => '- '.$n, $payload['usage']['safety_notes']))
             : '';
 
         $referenceNote = $this->referenceAssetsText($payload);
@@ -182,29 +182,27 @@ trait BuildsEventImagePrompt
             }
 
             $position = $index + 1;
-            $label = is_string($media['label'] ?? null) && trim((string) $media['label']) !== ''
-                ? trim((string) $media['label'])
-                : (is_string($media['file_name'] ?? null) && trim((string) $media['file_name']) !== ''
-                    ? trim((string) $media['file_name'])
+            $label = is_string($media['label'] ?? null) && trim($media['label']) !== ''
+                ? trim($media['label'])
+                : (is_string($media['file_name'] ?? null) && trim($media['file_name']) !== ''
+                    ? trim($media['file_name'])
                     : "Reference asset {$position}");
-            $role = is_string($media['role'] ?? null) && trim((string) $media['role']) !== ''
-                ? trim((string) $media['role'])
+            $role = is_string($media['role'] ?? null) && trim($media['role']) !== ''
+                ? trim($media['role'])
                 : 'reference';
-            $collection = is_string($media['collection'] ?? null) && trim((string) $media['collection']) !== ''
-                ? trim((string) $media['collection'])
+            $collection = is_string($media['collection'] ?? null) && trim($media['collection']) !== ''
+                ? trim($media['collection'])
                 : 'unknown';
-            $reason = is_string($media['selection_reason'] ?? null) && trim((string) $media['selection_reason']) !== ''
-                ? trim((string) $media['selection_reason'])
+            $reason = is_string($media['selection_reason'] ?? null) && trim($media['selection_reason']) !== ''
+                ? trim($media['selection_reason'])
                 : 'Use if helpful.';
-            $url = is_string($media['url'] ?? null) && trim((string) $media['url']) !== ''
-                ? trim((string) $media['url'])
-                : (is_string($media['original_url'] ?? null) && trim((string) $media['original_url']) !== ''
-                    ? trim((string) $media['original_url'])
+            $url = is_string($media['url'] ?? null) && trim($media['url']) !== ''
+                ? trim($media['url'])
+                : (is_string($media['original_url'] ?? null) && trim($media['original_url']) !== ''
+                    ? trim($media['original_url'])
                     : null);
 
-            $urlLine = $url === null
-                ? 'no direct URL available; rely on the inline attachment if present'
-                : $url;
+            $urlLine = $url ?? 'no direct URL available; rely on the inline attachment if present';
 
             $lines[] = "{$position}. {$label} [role: {$role}; collection: {$collection}] — {$reason} — asset: {$urlLine}";
         }

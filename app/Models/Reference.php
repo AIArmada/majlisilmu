@@ -266,7 +266,7 @@ class Reference extends Model implements AuditableContract, HasMedia
     {
         return trim(implode(' ', array_filter([
             trim((string) $this->titleValue()),
-            trim((string) $this->displayTitle()),
+            trim($this->displayTitle()),
             trim((string) $this->partLabelValue()),
             trim((string) $this->partNumberValue()),
             trim((string) $this->authorValue()),

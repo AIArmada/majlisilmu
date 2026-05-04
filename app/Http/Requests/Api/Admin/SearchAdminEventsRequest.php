@@ -12,7 +12,7 @@ class SearchAdminEventsRequest extends FormRequest
     /**
      * @var list<string>
      */
-    private const ARRAY_FILTER_KEYS = [
+    private const array ARRAY_FILTER_KEYS = [
         'language_codes',
         'event_type',
         'age_group',
@@ -50,6 +50,7 @@ class SearchAdminEventsRequest extends FormRequest
         return $eventSearchService->validationRules();
     }
 
+    #[\Override]
     protected function prepareForValidation(): void
     {
         $normalized = [];

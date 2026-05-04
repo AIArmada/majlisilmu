@@ -272,12 +272,12 @@ class EventImageGenerationService
     {
         $dimensions = @getimagesizefromstring($contents);
 
-        if (! is_array($dimensions) || ! isset($dimensions[0], $dimensions[1])) {
+        if (! is_array($dimensions)) {
             throw new RuntimeException('The generated image could not be decoded.');
         }
 
-        $sourceWidth = (int) $dimensions[0];
-        $sourceHeight = (int) $dimensions[1];
+        $sourceWidth = $dimensions[0];
+        $sourceHeight = $dimensions[1];
 
         if ($sourceWidth <= 0 || $sourceHeight <= 0) {
             throw new RuntimeException('The generated image dimensions are invalid.');
@@ -322,7 +322,7 @@ class EventImageGenerationService
 
         imagealphablending($canvas, true);
 
-        $copied = imagecopyresampled(
+        imagecopyresampled(
             $canvas,
             $source,
             0,
@@ -336,12 +336,6 @@ class EventImageGenerationService
         );
 
         imagedestroy($source);
-
-        if (! $copied) {
-            imagedestroy($canvas);
-
-            throw new RuntimeException('The generated image could not be cropped.');
-        }
 
         ob_start();
         $encoded = function_exists('imagewebp')

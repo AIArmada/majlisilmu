@@ -285,7 +285,6 @@ it('formats cover prompt text as a strict 16:9 request and exposes fallback asse
         public function format(array $payload, string $targetCollection): string
         {
             $method = new ReflectionMethod($this, 'buildPromptMessageText');
-            $method->setAccessible(true);
 
             /** @var string $text */
             $text = $method->invoke($this, $payload, $targetCollection);
@@ -510,7 +509,6 @@ it('uses storage-backed image attachments instead of remote url attachments', fu
 
     $service = app(EventImageGenerationService::class);
     $method = new ReflectionMethod(EventImageGenerationService::class, 'attachmentForMedia');
-    $method->setAccessible(true);
 
     $attachment = $method->invoke($service, $media);
 

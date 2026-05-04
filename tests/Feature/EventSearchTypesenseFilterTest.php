@@ -1,14 +1,30 @@
 <?php
 
 use App\Services\EventSearchService;
+use App\Support\Search\InstitutionSearchService;
+use App\Support\Search\ReferenceSearchService;
+use App\Support\Search\SpeakerSearchService;
 use App\Support\Search\TypesenseHealthCheckService;
+
+/**
+ * @return array{0: TypesenseHealthCheckService, 1: SpeakerSearchService, 2: InstitutionSearchService, 3: ReferenceSearchService}
+ */
+function eventSearchTypesenseFilterDependencies(): array
+{
+    return [
+        new TypesenseHealthCheckService,
+        new SpeakerSearchService,
+        new InstitutionSearchService,
+        new ReferenceSearchService,
+    ];
+}
 
 test('typesense filters include active event constraint', function () {
     $service = new class extends EventSearchService
     {
         public function __construct()
         {
-            parent::__construct(new TypesenseHealthCheckService);
+            parent::__construct(...eventSearchTypesenseFilterDependencies());
         }
 
         /**
@@ -31,7 +47,7 @@ test('typesense filters include subdistrict constraint when provided', function 
     {
         public function __construct()
         {
-            parent::__construct(new TypesenseHealthCheckService);
+            parent::__construct(...eventSearchTypesenseFilterDependencies());
         }
 
         /**
@@ -56,7 +72,7 @@ test('typesense filters include country constraint when provided', function () {
     {
         public function __construct()
         {
-            parent::__construct(new TypesenseHealthCheckService);
+            parent::__construct(...eventSearchTypesenseFilterDependencies());
         }
 
         /**
@@ -81,7 +97,7 @@ test('country filter alone does not force database fallback', function () {
     {
         public function __construct()
         {
-            parent::__construct(new TypesenseHealthCheckService);
+            parent::__construct(...eventSearchTypesenseFilterDependencies());
         }
 
         /**
@@ -103,7 +119,7 @@ test('typesense filters include domain tag ids constraint when provided', functi
     {
         public function __construct()
         {
-            parent::__construct(new TypesenseHealthCheckService);
+            parent::__construct(...eventSearchTypesenseFilterDependencies());
         }
 
         /**
@@ -128,7 +144,7 @@ test('typesense filters include source, issue, and reference constraints when pr
     {
         public function __construct()
         {
-            parent::__construct(new TypesenseHealthCheckService);
+            parent::__construct(...eventSearchTypesenseFilterDependencies());
         }
 
         /**
@@ -158,7 +174,7 @@ test('typesense filters include linked PIC profile ids and free-text PIC search 
     {
         public function __construct()
         {
-            parent::__construct(new TypesenseHealthCheckService);
+            parent::__construct(...eventSearchTypesenseFilterDependencies());
         }
 
         /**
@@ -195,7 +211,7 @@ test('typesense starts_after filter uses held-period overlap semantics', functio
     {
         public function __construct()
         {
-            parent::__construct(new TypesenseHealthCheckService);
+            parent::__construct(...eventSearchTypesenseFilterDependencies());
         }
 
         /**

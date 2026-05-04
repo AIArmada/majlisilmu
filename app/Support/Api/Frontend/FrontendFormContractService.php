@@ -766,6 +766,7 @@ class FrontendFormContractService
     /**
      * @param  list<string|int>|null  $allowedValues
      * @param  list<string>|null  $acceptedMimeTypes
+     * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
      */
     private function field(

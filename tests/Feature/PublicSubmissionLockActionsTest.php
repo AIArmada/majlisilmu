@@ -52,7 +52,7 @@ it('uses a rich editor for institution description on the admin edit form', func
 
     Livewire::actingAs($admin)
         ->test(EditInstitution::class, ['record' => $institution->id])
-        ->assertFormFieldExists('description', fn(RichEditor $editor): bool => true);
+        ->assertFormFieldExists('description', fn (RichEditor $editor): bool => true);
 });
 
 it('disables turning off institution public submission when credible precondition fails', function () {

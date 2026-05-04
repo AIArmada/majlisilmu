@@ -758,7 +758,7 @@ class EventCoverPromptBuilder
     ): array {
         $selectedConversion = $this->selectedConversion($media, $preferredConversions);
         $useTemporaryUrl = $this->diskSupportsTemporaryUrls($media->disk);
-        $expiry = now()->addMinutes(60);
+        $expiry = now()->startOfHour()->addHours(2);
 
         if ($useTemporaryUrl) {
             $url = $preferredConversions === []

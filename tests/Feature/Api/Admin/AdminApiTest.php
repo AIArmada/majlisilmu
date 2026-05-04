@@ -210,7 +210,7 @@ it('redacts tracked property write keys in admin api payloads', function () {
         ->assertJsonPath('data.0.id', (string) $trackedProperty?->getKey())
         ->assertJsonPath('data.0.attributes.write_key', 'present');
 
-    $this->getJson('/api/v1/admin/tracked-properties/'.(string) $trackedProperty?->getRouteKey())
+    $this->getJson('/api/v1/admin/tracked-properties/'.$trackedProperty?->getRouteKey())
         ->assertOk()
         ->assertJsonPath('data.resource.key', 'tracked-properties')
         ->assertJsonPath('data.record.route_key', (string) $trackedProperty?->getRouteKey())
@@ -3660,6 +3660,7 @@ function adminApiEventPayload(array $fixtures, array $overrides = []): array
 
 it('batch-creates admin resource records and returns per-row results', function () {
     $admin = adminApiUser('super_admin');
+    ensureAdminApiMalaysiaCountryExists();
 
     Sanctum::actingAs($admin);
 
@@ -3721,6 +3722,7 @@ it('batch-creates admin resource records and returns per-row results', function 
 
 it('batch-creates records and returns per-row validation errors without rolling back successes', function () {
     $admin = adminApiUser('super_admin');
+    ensureAdminApiMalaysiaCountryExists();
 
     Sanctum::actingAs($admin);
 
@@ -3768,6 +3770,7 @@ it('batch-creates records and returns per-row validation errors without rolling 
 
 it('batch-creates records with validate_only and returns previews without persisting', function () {
     $admin = adminApiUser('super_admin');
+    ensureAdminApiMalaysiaCountryExists();
 
     Sanctum::actingAs($admin);
 

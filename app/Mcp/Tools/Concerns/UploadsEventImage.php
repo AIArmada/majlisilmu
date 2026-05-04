@@ -153,7 +153,7 @@ trait UploadsEventImage
     protected function eventImageUploadResponse(Event $event, Media $media, string $collection): ResponseFactory
     {
         $url = $media->getUrl();
-        $text = "Uploaded {$collection} image for ".((string) $event->title).'.';
+        $text = "Uploaded {$collection} image for ".($event->title).'.';
 
         if ($url !== '') {
             $text .= "\nSaved media URL: {$url}";

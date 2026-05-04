@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\Frontend;
 
 use App\Actions\Signals\RecordMobileTelemetryBatchAction;
 use App\Http\Requests\Api\StoreMobileTelemetryRequest;
+use App\Models\User;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -36,7 +37,7 @@ class MobileTelemetryController extends FrontendController
                 'received_events' => $result['received_events'],
                 'recorded_events' => $result['recorded_events'],
                 'dropped_events' => $result['dropped_events'],
-                'authenticated' => $request->actor() instanceof \App\Models\User,
+                'authenticated' => $request->actor() instanceof User,
                 'client' => $result['client'],
             ],
             'meta' => [

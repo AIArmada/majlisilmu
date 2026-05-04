@@ -45,6 +45,7 @@ class AdminSearchEventsTool extends AbstractAdminTool
     /**
      * @return array<string, Type>
      */
+    #[\Override]
     public function schema(JsonSchema $schema): array
     {
         return $this->mcpEventSearchService->schema($schema);

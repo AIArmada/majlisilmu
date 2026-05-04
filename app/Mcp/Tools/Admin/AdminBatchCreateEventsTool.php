@@ -239,7 +239,7 @@ class AdminBatchCreateEventsTool extends AbstractAdminWriteTool
 
         $speakerKeys = array_values(array_filter(
             array_map(
-                fn (mixed $k): ?string => $this->normalizeOptionalString($k),
+                $this->normalizeOptionalString(...),
                 (array) ($item['speaker_keys'] ?? [])
             ),
             static fn (?string $v): bool => $v !== null,
@@ -258,7 +258,7 @@ class AdminBatchCreateEventsTool extends AbstractAdminWriteTool
 
         $referenceKeys = array_values(array_filter(
             array_map(
-                fn (mixed $k): ?string => $this->normalizeOptionalString($k),
+                $this->normalizeOptionalString(...),
                 (array) ($item['reference_keys'] ?? [])
             ),
             static fn (?string $v): bool => $v !== null,

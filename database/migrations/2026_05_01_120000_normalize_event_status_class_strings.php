@@ -31,7 +31,7 @@ return new class extends Migration
 
     private function normalizeStatusValue(string $legacyStatus): ?string
     {
-        $trimmedStatus = trim($legacyStatus, " \\");
+        $trimmedStatus = trim($legacyStatus, ' \\');
 
         if (! str_contains($trimmedStatus, 'App\\States\\EventStatus\\')) {
             return null;

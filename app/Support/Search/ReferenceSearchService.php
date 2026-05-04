@@ -259,13 +259,21 @@ class ReferenceSearchService
     {
         $operator = DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
         $collapsedWildcardSearch = '%'.str_replace(' ', '%', $normalizedSearch).'%';
-        $searchTokens = array_values(array_filter(explode(' ', $normalizedSearch), static fn (string $token): bool => $token !== ''));
+        $searchTokens = array_values(array_filter(
+            explode(' ', $normalizedSearch),
+            static fn (string $token): bool => $token !== '' && (mb_strlen($token) >= 2 || ctype_digit($token))
+        ));
 
         return $query->where(function (Builder $innerQuery) use ($normalizedSearch, $operator, $collapsedWildcardSearch, $searchTokens): void {
             $innerQuery
                 ->where('references.title', $operator, "%{$normalizedSearch}%")
                 ->orWhere('references.title', $operator, $collapsedWildcardSearch)
-                ->orWhere('references.author', $operator, "%{$normalizedSearch}%");
+                ->orWhere('references.author', $operator, "%{$normalizedSearch}%")
+                ->orWhere('references.publisher', $operator, "%{$normalizedSearch}%")
+                ->orWhere('references.description', $operator, "%{$normalizedSearch}%")
+                ->orWhere('references.part_type', $operator, "%{$normalizedSearch}%")
+                ->orWhere('references.part_label', $operator, "%{$normalizedSearch}%")
+                ->orWhere('references.part_number', $operator, "%{$normalizedSearch}%");
 
             if (count($searchTokens) < 2) {
                 return;
@@ -273,13 +281,16 @@ class ReferenceSearchService
 
             $innerQuery->orWhere(function (Builder $tokenQuery) use ($searchTokens, $operator): void {
                 foreach ($searchTokens as $token) {
-                    if (mb_strlen($token) < 2) {
-                        continue;
-                    }
-
-                    $tokenQuery
-                        ->orWhere('references.title', $operator, "%{$token}%")
-                        ->orWhere('references.author', $operator, "%{$token}%");
+                    $tokenQuery->where(function (Builder $singleTokenQuery) use ($token, $operator): void {
+                        $singleTokenQuery
+                            ->where('references.title', $operator, "%{$token}%")
+                            ->orWhere('references.author', $operator, "%{$token}%")
+                            ->orWhere('references.publisher', $operator, "%{$token}%")
+                            ->orWhere('references.description', $operator, "%{$token}%")
+                            ->orWhere('references.part_type', $operator, "%{$token}%")
+                            ->orWhere('references.part_label', $operator, "%{$token}%")
+                            ->orWhere('references.part_number', $operator, "%{$token}%");
+                    });
                 }
             });
         });

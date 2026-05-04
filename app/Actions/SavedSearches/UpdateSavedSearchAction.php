@@ -6,12 +6,12 @@ use App\Models\SavedSearch;
 use App\Support\SavedSearches\SavedSearchFilterNormalizer;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-final class UpdateSavedSearchAction
+final readonly class UpdateSavedSearchAction
 {
     use AsAction;
 
     public function __construct(
-        private readonly SavedSearchFilterNormalizer $filterNormalizer,
+        private SavedSearchFilterNormalizer $filterNormalizer,
     ) {}
 
     /**
