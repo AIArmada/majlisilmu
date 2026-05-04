@@ -39,7 +39,7 @@ class AdminBatchCreateEventsTool extends AbstractAdminWriteTool
 
     protected string $title = 'Batch Create Events';
 
-    protected string $description = 'Use this to create multiple events in a single request. Each item uses the same field contract as admin-create-event and supports organizer_key, institution_key, venue_key, space_key, speaker_keys, and reference_keys resolved by slug or UUID. Items are processed independently; the response contains a per-row result with status created, validation_failed, unresolved_key, or error. Set validate_only=true to preview all rows and surface validation errors upfront without persisting any records. Include external_row_id per item for idempotency tracking and safe retries after interruption. Maximum 50 events per batch.';
+    protected string $description = 'Use this MCP-only event wrapper to create multiple events in one request. Each item uses the same field contract as admin-create-event and resolves organizer, location, speakers, and references by route keys before calling the shared admin event create path. Items are processed independently; the response contains a per-row result with status created, validation_failed, unresolved_key, or error. Set validate_only=true to preview all rows without persisting. apply_defaults is only honored together with validate_only=true for preview/autofill feedback; it is ignored for real creates, so persisted rows must explicitly include the values the caller wants to write. Include external_row_id per item for idempotency tracking and safe retries after interruption. Maximum 50 events per batch.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -98,7 +98,7 @@ class AdminBatchCreateEventsTool extends AbstractAdminWriteTool
                 }
 
                 try {
-                    $builtPayload = $this->buildEventPayload($itemPayload, $schemaResponse, $applyDefaults);
+                    $builtPayload = $this->buildEventPayload($itemPayload, $schemaResponse, $validateOnly && $applyDefaults);
 
                     $resolvedItem = ['payload' => $builtPayload];
 
@@ -312,8 +312,8 @@ class AdminBatchCreateEventsTool extends AbstractAdminWriteTool
             'institution_key' => $schema->string()->nullable()->description('Institution route key (slug preferred, UUID allowed).'),
             'venue_key' => $schema->string()->nullable()->description('Venue route key (slug preferred, UUID allowed).'),
             'space_key' => $schema->string()->nullable()->description('Space route key (slug preferred, UUID allowed).'),
-            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of speaker route keys (slug or UUID). Resolved to speaker UUIDs and attached as speaker-role key people.'),
-            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of reference route keys (slug or UUID).'),
+            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying speakers UUID array. On create, omit/null/[] all mean no speakers; event types that require a speaker will fail validation if this resolves to an empty list. Pass speaker slugs/UUIDs to attach those speakers in payload order.'),
+            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying references UUID array. On create, omit/null/[] all mean no references. Pass reference slugs/UUIDs to link those references.'),
             'languages' => $schema->array()->items($schema->integer())->nullable(),
             'domain_tags' => $schema->array()->items($schema->string())->nullable(),
             'discipline_tags' => $schema->array()->items($schema->string())->nullable(),
@@ -335,12 +335,12 @@ class AdminBatchCreateEventsTool extends AbstractAdminWriteTool
             'is_priority' => $schema->boolean()->default(false),
             'is_featured' => $schema->boolean()->default(false),
             'is_active' => $schema->boolean()->default(true),
-        ])->required(['title', 'event_date', 'prayer_time', 'event_type']);
+        ]);
 
         return [
             'items' => $schema->array()->required()->min(1)->max(50)->items($eventItemSchema)->description('Array of event items to create. Each item must include title, event_date, prayer_time, and event_type. Maximum 50 events per batch.'),
             'validate_only' => $schema->boolean()->default(false)->description('When true, validates all items without persisting. Returns per-row preview or validation error details.'),
-            'apply_defaults' => $schema->boolean()->default(false)->description('When true, fills schema defaults into the normalized payload visible in validate_only previews.'),
+            'apply_defaults' => $schema->boolean()->default(false)->description('Preview-only helper. Honored only when validate_only=true to merge schema defaults into preview validation. Ignored for persisted creates; include the actual field values you want saved.'),
         ];
     }
 }

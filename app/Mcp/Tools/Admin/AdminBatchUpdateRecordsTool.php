@@ -75,7 +75,7 @@ class AdminBatchUpdateRecordsTool extends AbstractAdminWriteTool
                     'record_key' => $schema->string()->required()->description('Route key of the record to update (UUID or slug).'),
                     'external_row_id' => $schema->string()->nullable()->description('Optional caller-assigned row identifier for idempotency tracking.'),
                     'payload' => $schema->object()->required()->description('Update payload for this item. Fields must match the resource write schema. Use admin-get-write-schema with operation=update to discover available fields.'),
-                ])->required(['record_key', 'payload'])
+                ])
             )->description('Array of items to update. Each item must contain record_key and payload. Maximum 100 items per batch.'),
             'validate_only' => $schema->boolean()->default(false)->description('When true, validates all items without persisting. Returns per-row preview or validation error details.'),
         ];

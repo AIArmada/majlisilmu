@@ -344,7 +344,7 @@ Fetch the live schema first so the client sees the current enum values and allow
 
 ### Update a single event
 
-Use `admin-update-event` to update an existing event identified by slug or UUID. Specify only the fields you want to change; omitted optional fields preserve the current value. `speaker_keys` and `reference_keys` perform a full sync — omit to leave unchanged, pass `[]` to detach all.
+Use `admin-update-event` to update an existing event identified by slug or UUID. Specify only the fields you want to change; omitted optional fields preserve the current value. `speaker_keys` and `reference_keys` are MCP-only route-key aliases for the underlying `speakers` and `references` UUID arrays. On update, they are presence-sensitive full syncs: omit or pass `null` to leave unchanged, pass `[]` to detach all, or pass a non-empty array to replace all.
 
 ```json
 {
@@ -361,9 +361,22 @@ Use `admin-update-event` to update an existing event identified by slug or UUID.
 }
 ```
 
+To intentionally detach all speakers and references, send the empty arrays explicitly:
+
+```json
+{
+  "tool": "admin-update-event",
+  "arguments": {
+    "event_key": "weekly-kuliah-selasa",
+    "speaker_keys": [],
+    "reference_keys": []
+  }
+}
+```
+
 ### Batch create events
 
-Use `admin-batch-create-events` to create up to 50 events in one call. Each item uses the same field contract as `admin-create-event`. Set `validate_only=true` to preview all rows without persisting.
+Use `admin-batch-create-events` to create up to 50 events in one call. Each item uses the same field contract as `admin-create-event`. Set `validate_only=true` to preview all rows without persisting. `apply_defaults=true` is a preview-only helper; it is ignored unless `validate_only=true`, so real create rows must include the values you want saved.
 
 ```json
 {
@@ -398,7 +411,7 @@ Each result in `data.results` has a `status` of `created`, `validation_failed`, 
 
 ### Batch update events
 
-Use `admin-batch-update-events` to update up to 50 existing events in one call. Each item must include `event_key` (slug or UUID). Omitted optional fields preserve the current value.
+Use `admin-batch-update-events` to update up to 50 existing events in one call. Each item must include `event_key` (slug or UUID). Omitted optional fields preserve the current value. `speaker_keys` and `reference_keys` use the same update semantics as `admin-update-event`: omit or `null` preserves, `[]` detaches all, non-empty arrays replace all.
 
 ```json
 {

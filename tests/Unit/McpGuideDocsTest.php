@@ -60,6 +60,8 @@ it('keeps the admin MCP guide aligned with the live admin write-capable resource
         ->toContain('## Entity selection heuristics for record search')
         ->toContain('## Quick search playbook')
         ->toContain('## Validate-only preview behavior')
+        ->toContain('`apply_defaults=true` is preview-only')
+        ->toContain('omitted or `null` preserves the current relationship set; `[]` detaches all')
         ->not->toContain('docs-member-mcp-guide')
         ->not->toContain('member-list-contribution-requests')
         ->not->toContain('member-update-record');

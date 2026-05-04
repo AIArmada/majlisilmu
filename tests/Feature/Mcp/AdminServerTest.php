@@ -1749,6 +1749,9 @@ it('returns write schema for supported resources and rejects unknown resources',
             ->where('data.schema.tool_arguments.payload', 'object')
             ->where('data.schema.tool_arguments.validate_only', false)
             ->where('data.schema.tool_arguments.apply_defaults', false)
+            ->where('data.schema.apply_defaults_semantics.scope', 'preview_only')
+            ->where('data.schema.apply_defaults_semantics.honored_when', 'validate_only=true and apply_defaults=true')
+            ->where('data.schema.apply_defaults_semantics.persisted_writes', 'ignored; send the values you want saved')
             ->where('data.schema.endpoint', null)
             ->where('data.schema.content_type', 'application/json')
             ->where('data.schema.media_uploads_supported', true)
@@ -1775,6 +1778,8 @@ it('returns write schema for supported resources and rejects unknown resources',
             ->where('data.schema.tool', 'admin-create-event')
             ->where('data.schema.tool_arguments.organizer_key', 'route_key')
             ->where('data.schema.tool_arguments.institution_key', 'route_key')
+            ->where('data.schema.mcp_only_semantics.route_key_aliases.speaker_keys', 'resolves to speakers')
+            ->where('data.schema.mcp_only_semantics.update_relation_arrays.empty_array', 'detach all related records for that alias')
             ->etc());
 
     AdminServer::actingAs($admin)
@@ -3479,6 +3484,19 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
     expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.speaker_keys.type'))->contains('array'))->toBeTrue();
     expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.reference_keys.type'))->contains('array'))->toBeTrue();
     expect(collect((array) data_get($tools->get('admin-create-event'), 'inputSchema.properties.languages.type'))->contains('array'))->toBeTrue();
+    expect((string) data_get($tools->get('admin-create-event'), 'inputSchema.properties.apply_defaults.description'))
+        ->toContain('Preview-only helper')
+        ->toContain('ignored for persisted creates');
+    expect((string) data_get($tools->get('admin-update-event'), 'description'))
+        ->toContain('MCP-only event wrapper')
+        ->toContain('pass [] to detach all')
+        ->toContain('pass null to preserve');
+    expect((string) data_get($tools->get('admin-update-event'), 'inputSchema.properties.speaker_keys.description'))
+        ->toContain('Omit or pass null to preserve')
+        ->toContain('Pass [] to detach all speakers');
+    expect((string) data_get($tools->get('admin-batch-create-events'), 'description'))
+        ->toContain('apply_defaults is only honored together with validate_only=true')
+        ->toContain('ignored for real creates');
 
     expect(data_get($tools->get('admin-create-record'), 'inputSchema.properties.payload.type'))->toBe('object');
     expect(collect((array) data_get($tools->get('admin-create-record'), 'inputSchema.required'))->contains('payload'))->toBeTrue();
@@ -4105,6 +4123,7 @@ function adminMcpEventPayload(array $fixtures, array $overrides = []): array
 
 it('batch-creates admin resource records via the admin-batch-create-records MCP tool', function () {
     $admin = adminMcpUser('super_admin');
+    $countryId = ensureMcpMalaysiaCountryExists();
 
     AdminServer::actingAs($admin)
         ->tool(AdminBatchCreateRecordsTool::class, [
@@ -4117,6 +4136,9 @@ it('batch-creates admin resource records via the admin-batch-create-records MCP 
                         'gender' => 'male',
                         'status' => 'verified',
                         'is_active' => true,
+                        'address' => [
+                            'country_id' => $countryId,
+                        ],
                     ],
                 ],
                 [
@@ -4126,6 +4148,9 @@ it('batch-creates admin resource records via the admin-batch-create-records MCP 
                         'gender' => 'female',
                         'status' => 'verified',
                         'is_active' => true,
+                        'address' => [
+                            'country_id' => $countryId,
+                        ],
                     ],
                 ],
             ],
@@ -4144,12 +4169,13 @@ it('batch-creates admin resource records via the admin-batch-create-records MCP 
             ->etc()
         );
 
-    assertDatabaseHas('speakers', ['name' => 'MCP Batch Speaker Alpha']);
-    assertDatabaseHas('speakers', ['name' => 'MCP Batch Speaker Beta']);
+    $this->assertDatabaseHas('speakers', ['name' => 'MCP Batch Speaker Alpha']);
+    $this->assertDatabaseHas('speakers', ['name' => 'MCP Batch Speaker Beta']);
 });
 
 it('batch-creates records with validate_only via the admin-batch-create-records MCP tool without persisting', function () {
     $admin = adminMcpUser('super_admin');
+    $countryId = ensureMcpMalaysiaCountryExists();
 
     AdminServer::actingAs($admin)
         ->tool(AdminBatchCreateRecordsTool::class, [
@@ -4161,6 +4187,9 @@ it('batch-creates records with validate_only via the admin-batch-create-records 
                         'gender' => 'male',
                         'status' => 'verified',
                         'is_active' => true,
+                        'address' => [
+                            'country_id' => $countryId,
+                        ],
                     ],
                 ],
             ],
@@ -4173,7 +4202,7 @@ it('batch-creates records with validate_only via the admin-batch-create-records 
             ->etc()
         );
 
-    assertDatabaseMissing('speakers', ['name' => 'MCP Dry Run Speaker']);
+    $this->assertDatabaseMissing('speakers', ['name' => 'MCP Dry Run Speaker']);
 });
 
 it('batch-updates admin resource records via the admin-batch-update-records MCP tool', function () {
@@ -4210,7 +4239,7 @@ it('batch-updates admin resource records via the admin-batch-update-records MCP 
             ->etc()
         );
 
-    assertDatabaseHas('speakers', ['name' => 'MCP Batch Update After']);
+    $this->assertDatabaseHas('speakers', ['name' => 'MCP Batch Update After']);
 });
 
 it('batch-creates events via the admin-batch-create-events MCP tool with speaker_keys and reference_keys resolved', function () {
@@ -4241,6 +4270,11 @@ it('batch-creates events via the admin-batch-create-events MCP tool with speaker
                     'event_date' => '2026-07-15',
                     'prayer_time' => EventPrayerTime::LainWaktu->value,
                     'custom_time' => '20:00',
+                    'timezone' => 'Asia/Kuala_Lumpur',
+                    'event_format' => EventFormat::Physical->value,
+                    'visibility' => EventVisibility::Public->value,
+                    'gender' => EventGenderRestriction::All->value,
+                    'age_group' => [EventAgeGroup::AllAges->value],
                     'event_type' => [EventType::Other->value],
                     'institution_key' => $institution->slug,
                     'speaker_keys' => [$speaker->slug],
@@ -4253,6 +4287,11 @@ it('batch-creates events via the admin-batch-create-events MCP tool with speaker
                     'event_date' => '2026-07-16',
                     'prayer_time' => EventPrayerTime::LainWaktu->value,
                     'custom_time' => '21:00',
+                    'timezone' => 'Asia/Kuala_Lumpur',
+                    'event_format' => EventFormat::Physical->value,
+                    'visibility' => EventVisibility::Public->value,
+                    'gender' => EventGenderRestriction::All->value,
+                    'age_group' => [EventAgeGroup::AllAges->value],
                     'event_type' => [EventType::Other->value],
                     'status' => 'draft',
                     'is_active' => true,
@@ -4270,8 +4309,38 @@ it('batch-creates events via the admin-batch-create-events MCP tool with speaker
             ->etc()
         );
 
-    assertDatabaseHas('events', ['title' => 'MCP Batch Event Alpha']);
-    assertDatabaseHas('events', ['title' => 'MCP Batch Event Beta']);
+    $this->assertDatabaseHas('events', ['title' => 'MCP Batch Event Alpha']);
+    $this->assertDatabaseHas('events', ['title' => 'MCP Batch Event Beta']);
+});
+
+it('does not apply schema defaults during persisted admin-batch-create-events writes', function () {
+    $admin = adminMcpUser('super_admin');
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchCreateEventsTool::class, [
+            'apply_defaults' => true,
+            'items' => [
+                [
+                    'external_row_id' => 'missing-default-fields',
+                    'title' => 'MCP Batch Event Missing Persisted Defaults',
+                    'event_date' => '2026-07-17',
+                    'prayer_time' => EventPrayerTime::SelepasMaghrib->value,
+                    'event_type' => [EventType::Other->value],
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.summary.total', 1)
+            ->where('data.summary.validation_failed', 1)
+            ->where('data.results.0.status', 'validation_failed')
+            ->where('data.results.0.external_row_id', 'missing-default-fields')
+            ->has('data.results.0.errors.timezone')
+            ->has('data.results.0.errors.event_format')
+            ->etc()
+        );
+
+    $this->assertDatabaseMissing('events', ['title' => 'MCP Batch Event Missing Persisted Defaults']);
 });
 
 it('batch-creates events with validate_only via admin-batch-create-events without persisting', function () {
@@ -4300,7 +4369,7 @@ it('batch-creates events with validate_only via admin-batch-create-events withou
             ->etc()
         );
 
-    assertDatabaseMissing('events', ['title' => 'MCP Batch Dry Run Event']);
+    $this->assertDatabaseMissing('events', ['title' => 'MCP Batch Dry Run Event']);
 });
 
 it('updates an event via the admin-update-event MCP tool with speaker_keys resolved', function () {
@@ -4325,7 +4394,7 @@ it('updates an event via the admin-update-event MCP tool with speaker_keys resol
             ->etc()
         );
 
-    assertDatabaseHas('events', [
+    $this->assertDatabaseHas('events', [
         'id' => $event->id,
         'title' => 'Updated Event Title',
     ]);
@@ -4333,10 +4402,86 @@ it('updates an event via the admin-update-event MCP tool with speaker_keys resol
     expect($event->refresh()->speakers->contains($speaker))->toBeTrue();
 });
 
+it('detaches speakers and references when empty route-key arrays are provided via admin-update-event', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $event = Event::factory()->create([
+        'title' => 'Event With Existing Relations',
+        'event_type' => [EventType::Other->value],
+        'status' => 'draft',
+    ]);
+
+    $speaker = Speaker::factory()->create(['slug' => 'detach-update-speaker']);
+    $reference = Reference::factory()->create(['slug' => 'detach-update-reference']);
+
+    $event->keyPeople()->create([
+        'speaker_id' => $speaker->id,
+        'role' => 'speaker',
+        'order_column' => 1,
+    ]);
+    $event->references()->attach($reference->id);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateEventTool::class, [
+            'event_key' => $event->getRouteKey(),
+            'speaker_keys' => [],
+            'reference_keys' => [],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.title', 'Event With Existing Relations')
+            ->etc()
+        );
+
+    $event->refresh()->load(['speakers', 'references']);
+
+    expect($event->speakers)->toHaveCount(0)
+        ->and($event->references)->toHaveCount(0);
+});
+
+it('preserves speakers and references when route-key arrays are omitted via admin-update-event', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $event = Event::factory()->create([
+        'title' => 'Event Preserve Existing Relations',
+        'event_type' => [EventType::Other->value],
+        'status' => 'draft',
+    ]);
+
+    $speaker = Speaker::factory()->create(['slug' => 'preserve-update-speaker']);
+    $reference = Reference::factory()->create(['slug' => 'preserve-update-reference']);
+
+    $event->keyPeople()->create([
+        'speaker_id' => $speaker->id,
+        'role' => 'speaker',
+        'order_column' => 1,
+    ]);
+    $event->references()->attach($reference->id);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminUpdateEventTool::class, [
+            'event_key' => $event->getRouteKey(),
+            'title' => 'Event Preserve Existing Relations Updated',
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.record.title', 'Event Preserve Existing Relations Updated')
+            ->etc()
+        );
+
+    $event->refresh()->load(['speakers', 'references']);
+
+    expect($event->speakers->contains($speaker))->toBeTrue()
+        ->and($event->references->contains($reference))->toBeTrue();
+});
+
 it('updates an event with validate_only via admin-update-event without persisting', function () {
     $admin = adminMcpUser('super_admin');
 
-    $event = Event::factory()->create(['title' => 'Event Before Dry Run']);
+    $event = Event::factory()->create([
+        'title' => 'Event Before Dry Run',
+        'event_type' => [EventType::Other->value],
+    ]);
 
     AdminServer::actingAs($admin)
         ->tool(AdminUpdateEventTool::class, [
@@ -4346,7 +4491,7 @@ it('updates an event with validate_only via admin-update-event without persistin
         ])
         ->assertOk();
 
-    assertDatabaseHas('events', [
+    $this->assertDatabaseHas('events', [
         'id' => $event->id,
         'title' => 'Event Before Dry Run',
     ]);
@@ -4355,8 +4500,16 @@ it('updates an event with validate_only via admin-update-event without persistin
 it('batch-updates events and resolves speaker_keys via admin-batch-update-events', function () {
     $admin = adminMcpUser('super_admin');
 
-    $eventA = Event::factory()->create(['title' => 'Batch Update Event Alpha', 'status' => 'draft']);
-    $eventB = Event::factory()->create(['title' => 'Batch Update Event Beta', 'status' => 'draft']);
+    $eventA = Event::factory()->create([
+        'title' => 'Batch Update Event Alpha',
+        'event_type' => [EventType::Other->value],
+        'status' => 'draft',
+    ]);
+    $eventB = Event::factory()->create([
+        'title' => 'Batch Update Event Beta',
+        'event_type' => [EventType::Other->value],
+        'status' => 'draft',
+    ]);
     $speaker = Speaker::factory()->create(['slug' => 'batch-update-speaker']);
 
     AdminServer::actingAs($admin)
@@ -4382,15 +4535,80 @@ it('batch-updates events and resolves speaker_keys via admin-batch-update-events
             ->etc()
         );
 
-    assertDatabaseHas('events', ['id' => $eventA->id, 'title' => 'Updated Alpha']);
-    assertDatabaseHas('events', ['id' => $eventB->id, 'title' => 'Updated Beta']);
+    $this->assertDatabaseHas('events', ['id' => $eventA->id, 'title' => 'Updated Alpha']);
+    $this->assertDatabaseHas('events', ['id' => $eventB->id, 'title' => 'Updated Beta']);
     expect($eventA->refresh()->speakers->contains($speaker))->toBeTrue();
+});
+
+it('batch-updates events detach or preserve speakers and references based on route-key array presence', function () {
+    $admin = adminMcpUser('super_admin');
+
+    $eventToDetach = Event::factory()->create([
+        'title' => 'Batch Detach Relations Event',
+        'event_type' => [EventType::Other->value],
+        'status' => 'draft',
+    ]);
+    $eventToPreserve = Event::factory()->create([
+        'title' => 'Batch Preserve Relations Event',
+        'event_type' => [EventType::Other->value],
+        'status' => 'draft',
+    ]);
+
+    $detachSpeaker = Speaker::factory()->create(['slug' => 'batch-detach-speaker']);
+    $preserveSpeaker = Speaker::factory()->create(['slug' => 'batch-preserve-speaker']);
+    $detachReference = Reference::factory()->create(['slug' => 'batch-detach-reference']);
+    $preserveReference = Reference::factory()->create(['slug' => 'batch-preserve-reference']);
+
+    $eventToDetach->keyPeople()->create([
+        'speaker_id' => $detachSpeaker->id,
+        'role' => 'speaker',
+        'order_column' => 1,
+    ]);
+    $eventToPreserve->keyPeople()->create([
+        'speaker_id' => $preserveSpeaker->id,
+        'role' => 'speaker',
+        'order_column' => 1,
+    ]);
+    $eventToDetach->references()->attach($detachReference->id);
+    $eventToPreserve->references()->attach($preserveReference->id);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminBatchUpdateEventsTool::class, [
+            'items' => [
+                [
+                    'event_key' => $eventToDetach->getRouteKey(),
+                    'speaker_keys' => [],
+                    'reference_keys' => [],
+                ],
+                [
+                    'event_key' => $eventToPreserve->getRouteKey(),
+                    'title' => 'Batch Preserve Relations Event Updated',
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('data.results.0.status', 'updated')
+            ->where('data.results.1.status', 'updated')
+            ->etc()
+        );
+
+    $eventToDetach->refresh()->load(['speakers', 'references']);
+    $eventToPreserve->refresh()->load(['speakers', 'references']);
+
+    expect($eventToDetach->speakers)->toHaveCount(0)
+        ->and($eventToDetach->references)->toHaveCount(0)
+        ->and($eventToPreserve->speakers->contains($preserveSpeaker))->toBeTrue()
+        ->and($eventToPreserve->references->contains($preserveReference))->toBeTrue();
 });
 
 it('batch-updates events with validate_only via admin-batch-update-events without persisting', function () {
     $admin = adminMcpUser('super_admin');
 
-    $event = Event::factory()->create(['title' => 'Batch Dry Run Event']);
+    $event = Event::factory()->create([
+        'title' => 'Batch Dry Run Event',
+        'event_type' => [EventType::Other->value],
+    ]);
 
     AdminServer::actingAs($admin)
         ->tool(AdminBatchUpdateEventsTool::class, [
@@ -4409,7 +4627,7 @@ it('batch-updates events with validate_only via admin-batch-update-events withou
             ->etc()
         );
 
-    assertDatabaseHas('events', [
+    $this->assertDatabaseHas('events', [
         'id' => $event->id,
         'title' => 'Batch Dry Run Event',
     ]);
@@ -4418,7 +4636,10 @@ it('batch-updates events with validate_only via admin-batch-update-events withou
 it('batch-updates events returns unresolved_key for invalid event key via admin-batch-update-events', function () {
     $admin = adminMcpUser('super_admin');
 
-    $event = Event::factory()->create(['title' => 'Valid Event For Batch Update']);
+    $event = Event::factory()->create([
+        'title' => 'Valid Event For Batch Update',
+        'event_type' => [EventType::Other->value],
+    ]);
 
     AdminServer::actingAs($admin)
         ->tool(AdminBatchUpdateEventsTool::class, [
