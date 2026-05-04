@@ -16,6 +16,9 @@ use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+use function data_get;
+use function data_set;
+
 #[IsReadOnly(false)]
 #[IsIdempotent(false)]
 #[IsDestructive(false)]
@@ -78,5 +81,35 @@ class AdminBatchCreateRecordsTool extends AbstractAdminWriteTool
             )->description('Array of items to create. Each item must contain a payload object. Maximum 100 items per batch.'),
             'validate_only' => $schema->boolean()->default(false)->description('When true, validates all items without persisting. Returns per-row preview or validation error details.'),
         ];
+    }
+
+    /**
+     * @return array{
+     *     name: string,
+     *     title?: string|null,
+     *     description?: string|null,
+     *     inputSchema?: array<string, mixed>,
+     *     outputSchema?: array<string, mixed>,
+     *     annotations?: array<string, mixed>|object,
+     *     _meta?: array<string, mixed>
+     * }
+     */
+    #[\Override]
+    public function toArray(): array
+    {
+        $tool = parent::toArray();
+
+        data_set($tool, 'inputSchema.properties.items.items.properties.payload.properties', (object) []);
+        data_set($tool, 'inputSchema.properties.items.items.properties.payload.additionalProperties', true);
+
+        /** @var list<string> $required */
+        $required = data_get($tool, 'inputSchema.properties.items.items.required', []);
+
+        if (! in_array('payload', $required, true)) {
+            $required[] = 'payload';
+            data_set($tool, 'inputSchema.properties.items.items.required', $required);
+        }
+
+        return $tool;
     }
 }

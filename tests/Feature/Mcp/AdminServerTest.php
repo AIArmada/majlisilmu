@@ -3505,6 +3505,15 @@ it('initializes and lists admin MCP tools over the HTTP endpoint for Passport-au
     expect(collect((array) data_get($tools->get('admin-update-record'), 'inputSchema.required'))->contains('record_key'))->toBeTrue();
     expect(collect((array) data_get($tools->get('admin-update-record'), 'inputSchema.required'))->contains('payload'))->toBeTrue();
 
+    expect(data_get($tools->get('admin-batch-create-records'), 'inputSchema.properties.items.items.properties.payload.type'))->toBe('object');
+    expect(data_get($tools->get('admin-batch-create-records'), 'inputSchema.properties.items.items.properties.payload.additionalProperties'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-batch-create-records'), 'inputSchema.properties.items.items.required'))->contains('payload'))->toBeTrue();
+
+    expect(data_get($tools->get('admin-batch-update-records'), 'inputSchema.properties.items.items.properties.payload.type'))->toBe('object');
+    expect(data_get($tools->get('admin-batch-update-records'), 'inputSchema.properties.items.items.properties.payload.additionalProperties'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-batch-update-records'), 'inputSchema.properties.items.items.required'))->contains('record_key'))->toBeTrue();
+    expect(collect((array) data_get($tools->get('admin-batch-update-records'), 'inputSchema.properties.items.items.required'))->contains('payload'))->toBeTrue();
+
     expect($tools->get('admin-create-github-issue')['annotations'] ?? [])->toMatchArray([
         'readOnlyHint' => false,
         'idempotentHint' => false,
