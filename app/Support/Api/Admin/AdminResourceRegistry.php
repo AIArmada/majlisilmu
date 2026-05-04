@@ -759,7 +759,21 @@ class AdminResourceRegistry
      */
     private function apiRelations(Model $model): array
     {
-        return method_exists($model, 'address') ? ['address'] : [];
+        $relations = [];
+
+        if (method_exists($model, 'address')) {
+            $relations[] = 'address';
+        }
+
+        if (method_exists($model, 'contacts')) {
+            $relations[] = 'contacts';
+        }
+
+        if (method_exists($model, 'socialMedia')) {
+            $relations[] = 'socialMedia';
+        }
+
+        return $relations;
     }
 
     /**
