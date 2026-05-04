@@ -238,6 +238,77 @@ class ResourceController extends Controller
         return response()->json($this->resourceService->showRecord($resourceKey, $recordKey, includeResourceMeta: true));
     }
 
+    #[PathParameter('resourceKey', 'Writable admin resource key from `GET /admin/manifest`.', example: 'speakers')]
+    #[QueryParameter('validate_only', 'When true, validates all items without persisting any changes. Returns per-row preview or validation error details.', required: false, type: 'boolean', infer: false, default: false, example: false)]
+    #[Endpoint(
+        title: 'Batch create admin resource records',
+        description: 'Creates multiple records for a writable admin resource in a single request. '
+            .'Each item is processed independently. The response includes a per-row result list with statuses: `created`, `validation_failed`, or `error`. '
+            .'Set `validate_only=true` to preview normalized payloads and catch validation errors upfront without persisting any records. '
+            .'Optionally include `external_row_id` in each item payload for idempotency tracking and safe retries. '
+            .'The request body must contain a `items` array. Each item may include an optional `external_row_id` for retry tracking and a `payload` object matching the create schema for the resource.',
+    )]
+    public function batchStoreRecords(Request $request, string $resourceKey): JsonResponse
+    {
+        $actor = $this->currentUser($request);
+        $validateOnly = $request->boolean('validate_only');
+
+        /** @var list<array<string, mixed>> $items */
+        $items = $request->input('items', []);
+
+        if (! is_array($items)) {
+            return response()->json([
+                'message' => 'The items field must be an array.',
+                'errors' => ['items' => ['The items field must be an array.']],
+            ], 422);
+        }
+
+        return response()->json(
+            $this->resourceService->batchStoreRecords(
+                resourceKey: $resourceKey,
+                items: $items,
+                actor: $actor,
+                validateOnly: $validateOnly,
+            ),
+            $validateOnly ? 200 : 201,
+        );
+    }
+
+    #[PathParameter('resourceKey', 'Writable admin resource key from `GET /admin/manifest`.', example: 'speakers')]
+    #[QueryParameter('validate_only', 'When true, validates all items without persisting any changes. Returns per-row preview or validation error details.', required: false, type: 'boolean', infer: false, default: false, example: false)]
+    #[Endpoint(
+        title: 'Batch update admin resource records',
+        description: 'Updates multiple records for a writable admin resource in a single request. '
+            .'Each item is processed independently. The response includes a per-row result list with statuses: `updated`, `validation_failed`, `not_found`, or `error`. '
+            .'Set `validate_only=true` to preview normalized payloads and catch validation errors upfront without persisting any changes. '
+            .'The request body must contain an `items` array. Each item must include a `record_key` and a `payload` object matching the update schema for the resource. '
+            .'An optional `external_row_id` per item enables idempotency tracking and safe retries.',
+    )]
+    public function batchUpdateRecords(Request $request, string $resourceKey): JsonResponse
+    {
+        $actor = $this->currentUser($request);
+        $validateOnly = $request->boolean('validate_only');
+
+        /** @var list<array<string, mixed>> $items */
+        $items = $request->input('items', []);
+
+        if (! is_array($items)) {
+            return response()->json([
+                'message' => 'The items field must be an array.',
+                'errors' => ['items' => ['The items field must be an array.']],
+            ], 422);
+        }
+
+        return response()->json(
+            $this->resourceService->batchUpdateRecords(
+                resourceKey: $resourceKey,
+                items: $items,
+                actor: $actor,
+                validateOnly: $validateOnly,
+            ),
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */

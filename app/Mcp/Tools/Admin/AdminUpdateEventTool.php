@@ -33,13 +33,13 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsIdempotent(false)]
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]
-class AdminCreateEventTool extends AbstractAdminWriteTool
+class AdminUpdateEventTool extends AbstractAdminWriteTool
 {
-    protected string $name = 'admin-create-event';
+    protected string $name = 'admin-update-event';
 
-    protected string $title = 'Create Event';
+    protected string $title = 'Update Event';
 
-    protected string $description = 'Use this MCP-only event wrapper to create a new event, optionally with cover, poster, or gallery images in the same request. It resolves organizer, location, speakers, and references by human-readable route keys before calling the shared admin event create path. speaker_keys/reference_keys are route-key aliases for the underlying speakers/references UUID arrays. apply_defaults is only honored together with validate_only=true for preview/autofill feedback and is ignored for persisted creates. Do not use to update an existing event; use admin-update-event instead.';
+    protected string $description = 'Use this MCP-only event wrapper to update an existing event record by event_key. It resolves organizer, location, speakers, and references by human-readable route keys before calling the shared admin event update path. speaker_keys and reference_keys are full-sync aliases for the underlying speakers/references UUID arrays: omit the field or pass null to preserve existing relationships; pass [] to detach all; pass a non-empty array to replace all. apply_defaults is only honored together with validate_only=true for preview/autofill feedback and is ignored for persisted updates. Supports cover, poster, and gallery image descriptors in the same request; media clear flags are not supported, so omit fields to leave existing media unchanged. Do not use to create a new event; use admin-create-event instead.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -49,17 +49,18 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
     {
         yield Response::notification('notifications/message', [
             'level' => 'info',
-            'data' => 'Validating and creating event...',
+            'data' => 'Validating and updating event...',
         ]);
 
         yield $this->safeResponse(function () use ($request): ResponseFactory {
             $actor = $this->authorizeAdmin($request);
 
             $validated = $this->validateArguments($request, [
-                'title' => ['required', 'string', 'max:255'],
+                'event_key' => ['required', 'string'],
+                'title' => ['sometimes', 'string', 'max:255'],
                 'description' => ['nullable'],
-                'event_date' => ['required', 'date'],
-                'prayer_time' => ['required', 'string'],
+                'event_date' => ['sometimes', 'date'],
+                'prayer_time' => ['sometimes', 'string'],
                 'custom_time' => ['nullable', 'string', 'max:32'],
                 'end_time' => ['nullable', 'string', 'max:32'],
                 'timezone' => ['sometimes', 'string', 'max:64'],
@@ -73,7 +74,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                 'age_group.*' => ['string'],
                 'children_allowed' => ['sometimes', 'boolean'],
                 'is_muslim_only' => ['sometimes', 'boolean'],
-                'event_type' => ['required', 'array', 'min:1'],
+                'event_type' => ['sometimes', 'array', 'min:1'],
                 'event_type.*' => ['string'],
                 'organizer_type' => ['nullable', 'string', 'in:institution,speaker,'.Institution::class.','.Speaker::class],
                 'organizer_key' => ['nullable', 'string'],
@@ -116,6 +117,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                 'apply_defaults' => ['sometimes', 'boolean'],
             ]);
 
+            $eventKey = (string) $validated['event_key'];
             $validateOnly = (bool) ($validated['validate_only'] ?? false);
             $applyDefaults = (bool) ($validated['apply_defaults'] ?? false);
 
@@ -123,7 +125,8 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
 
             $schemaResponse = $this->resourceService->writeSchema(
                 resourceKey: $resourceKey,
-                operation: 'create',
+                operation: 'update',
+                recordKey: $eventKey,
                 actor: $actor,
             );
 
@@ -142,8 +145,9 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                 /** @var array<string, mixed> $normalizedPayload */
                 $normalizedPayload = $normalizedMediaPayload['payload'];
 
-                return Response::structured($this->resourceService->storeRecord(
+                return Response::structured($this->resourceService->updateRecord(
                     resourceKey: $resourceKey,
+                    recordKey: $eventKey,
                     payload: $normalizedPayload,
                     actor: $actor,
                     validateOnly: $validateOnly,
@@ -154,7 +158,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                     payload: $payload,
                     schemaResponse: $schemaResponse,
                     resourceKey: $resourceKey,
-                    operation: 'create',
+                    operation: 'update',
                     validateOnly: $validateOnly,
                     applyDefaults: $applyDefaults,
                 );
@@ -173,6 +177,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
         $payload = $validated;
 
         unset(
+            $payload['event_key'],
             $payload['validate_only'],
             $payload['apply_defaults'],
             $payload['organizer_key'],
@@ -237,7 +242,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             static fn (?string $v): bool => $v !== null,
         ));
 
-        if ($speakerKeys !== []) {
+        if (array_key_exists('speaker_keys', $validated) && is_array($validated['speaker_keys'])) {
             $payload['speakers'] = array_values(array_map(
                 fn (string $key): string => $this->resolveRecordIdentifier(
                     field: 'speaker_keys',
@@ -256,7 +261,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             static fn (?string $v): bool => $v !== null,
         ));
 
-        if ($referenceKeys !== []) {
+        if (array_key_exists('reference_keys', $validated) && is_array($validated['reference_keys'])) {
             $payload['references'] = array_values(array_map(
                 fn (string $key): string => $this->resolveRecordIdentifier(
                     field: 'reference_keys',
@@ -277,35 +282,36 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'title' => $schema->string()->required()->max(255),
+            'event_key' => $schema->string()->required()->min(1)->description('Route key of the event to update (slug or UUID).'),
+            'title' => $schema->string()->max(255),
             'description' => $schema->string()->nullable(),
-            'event_date' => $schema->string()->required()->description('Local event date in YYYY-MM-DD format.'),
-            'prayer_time' => $schema->string()->required()->enum($this->enumValues(EventPrayerTime::class)),
+            'event_date' => $schema->string()->description('Local event date in YYYY-MM-DD format.'),
+            'prayer_time' => $schema->string()->enum($this->enumValues(EventPrayerTime::class)),
             'custom_time' => $schema->string()->nullable()->description('Required when prayer_time is lain_waktu. HH:MM preferred.'),
             'end_time' => $schema->string()->nullable()->description('Optional end time (HH:MM).'),
-            'timezone' => $schema->string()->default('Asia/Kuala_Lumpur'),
-            'event_format' => $schema->string()->default(EventFormat::Physical->value)->enum($this->enumValues(EventFormat::class)),
-            'visibility' => $schema->string()->default(EventVisibility::Public->value)->enum($this->enumValues(EventVisibility::class)),
+            'timezone' => $schema->string(),
+            'event_format' => $schema->string()->enum($this->enumValues(EventFormat::class)),
+            'visibility' => $schema->string()->enum($this->enumValues(EventVisibility::class)),
             'event_url' => $schema->string()->nullable()->description('Public event URL when applicable.'),
             'live_url' => $schema->string()->nullable()->description('Livestream URL when applicable.'),
             'recording_url' => $schema->string()->nullable()->description('Recording URL when applicable.'),
-            'gender' => $schema->string()->default(EventGenderRestriction::All->value)->enum($this->enumValues(EventGenderRestriction::class)),
-            'age_group' => $schema->array()->items($schema->string()->enum($this->enumValues(EventAgeGroup::class)))->default([EventAgeGroup::AllAges->value]),
-            'children_allowed' => $schema->boolean()->default(false),
-            'is_muslim_only' => $schema->boolean()->default(false),
-            'event_type' => $schema->array()->required()->items($schema->string()->enum($this->enumValues(EventType::class))),
+            'gender' => $schema->string()->enum($this->enumValues(EventGenderRestriction::class)),
+            'age_group' => $schema->array()->items($schema->string()->enum($this->enumValues(EventAgeGroup::class))),
+            'children_allowed' => $schema->boolean(),
+            'is_muslim_only' => $schema->boolean(),
+            'event_type' => $schema->array()->items($schema->string()->enum($this->enumValues(EventType::class))),
             'organizer_type' => $schema->string()->enum(['institution', 'speaker', Institution::class, Speaker::class])->description('Organizer model type. Prefer institution or speaker.'),
             'organizer_key' => $schema->string()->nullable()->description('Organizer route key (slug preferred, UUID allowed).'),
             'institution_key' => $schema->string()->nullable()->description('Institution route key (slug preferred, UUID allowed).'),
             'venue_key' => $schema->string()->nullable()->description('Venue route key (slug preferred, UUID allowed).'),
             'space_key' => $schema->string()->nullable()->description('Space route key (slug preferred, UUID allowed).'),
-            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying speakers UUID array. On create, omit/null/[] all mean no speakers; event types that require a speaker will fail validation if this resolves to an empty list. Pass speaker slugs/UUIDs to attach those speakers in payload order. Required for event types that mandate a speaker: kuliah_ceramah, kelas_daurah, talim, forum, seminar_konvensyen, tazkirah.'),
-            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying references UUID array. On create, omit/null/[] all mean no references. Pass reference slugs/UUIDs to link those references.'),
-            'languages' => $schema->array()->items($schema->integer())->nullable()->description('Array of language record IDs (integers) for the event language(s). Use admin-list-records on the languages resource to discover available IDs.'),
-            'domain_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of domain/category tag UUIDs (max 3). Use admin-list-records on the tags resource filtered by type=domain.'),
-            'discipline_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of discipline/field-of-study tag UUIDs. Use admin-list-records on the tags resource filtered by type=discipline.'),
-            'source_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of source tag UUIDs (e.g. Quran, Hadith). Use admin-list-records on the tags resource filtered by type=source.'),
-            'issue_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of issue/theme tag UUIDs. Use admin-list-records on the tags resource filtered by type=issue.'),
+            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying speakers UUID array. Omit or pass null to preserve currently attached speakers. Pass [] to detach all speakers. Pass a non-empty array of speaker slugs/UUIDs to replace all attached speakers.'),
+            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying references UUID array. Omit or pass null to preserve currently linked references. Pass [] to detach all references. Pass a non-empty array of reference slugs/UUIDs to replace all linked references.'),
+            'languages' => $schema->array()->items($schema->integer())->nullable()->description('Array of language record IDs (integers).'),
+            'domain_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of domain/category tag UUIDs (max 3).'),
+            'discipline_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of discipline/field-of-study tag UUIDs.'),
+            'source_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of source tag UUIDs.'),
+            'issue_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of issue/theme tag UUIDs.'),
             'other_key_people' => $schema->array()->items(
                 $schema->object([
                     'role' => $schema->string()->required()->description('One of the non-speaker EventKeyPersonRole values: moderator, khatib, imam, bilal, pic, other.'),
@@ -336,14 +342,14 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
                     'mime_type' => $schema->string()->nullable(),
                 ])
             )->nullable()->description('Optional gallery image descriptors (max 10 items).'),
-            'status' => $schema->string()->default('draft')->enum(['draft', 'pending', 'approved']),
-            'registration_required' => $schema->boolean()->default(false),
-            'registration_mode' => $schema->string()->default(RegistrationMode::Event->value)->enum($this->enumValues(RegistrationMode::class)),
-            'is_priority' => $schema->boolean()->default(false),
-            'is_featured' => $schema->boolean()->default(false),
-            'is_active' => $schema->boolean()->default(true),
+            'status' => $schema->string()->enum(['draft', 'pending', 'approved']),
+            'registration_required' => $schema->boolean(),
+            'registration_mode' => $schema->string()->enum($this->enumValues(RegistrationMode::class)),
+            'is_priority' => $schema->boolean(),
+            'is_featured' => $schema->boolean(),
+            'is_active' => $schema->boolean(),
             'validate_only' => $schema->boolean()->default(false),
-            'apply_defaults' => $schema->boolean()->default(false)->description('Preview-only helper. Honored only when validate_only=true to merge schema defaults into validation feedback; ignored for persisted creates.'),
+            'apply_defaults' => $schema->boolean()->default(false)->description('Preview-only helper. Honored only when validate_only=true to merge schema defaults into validation feedback; ignored for persisted updates.'),
         ];
     }
 

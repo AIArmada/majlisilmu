@@ -100,8 +100,8 @@ class AdminCreateRecordTool extends AbstractAdminWriteTool
         return [
             'resource_key' => $schema->string()->required()->min(1),
             'payload' => $schema->object()->required()->description('Required object containing writable fields for the target resource.'),
-            'validate_only' => $schema->boolean()->default(false),
-            'apply_defaults' => $schema->boolean()->default(false),
+            'validate_only' => $schema->boolean()->default(false)->description('When true, validates and normalizes the payload without persisting a record.'),
+            'apply_defaults' => $schema->boolean()->default(false)->description('Preview-only helper. Honored only when validate_only=true to merge schema defaults into validation feedback; ignored for persisted creates.'),
         ];
     }
 

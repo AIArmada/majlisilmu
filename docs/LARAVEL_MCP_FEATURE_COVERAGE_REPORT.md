@@ -18,6 +18,8 @@ This report compares the Laravel MCP documentation (13.x) against the actual imp
 - **🔧 Custom Extensions**: 5 (preflight validation, dual-auth, documentation enforcement, media handling, local testing)
 - **📊 Code Maturity**: Production-ready with comprehensive testing
 
+> **Tool count last updated: May 4, 2026.** The admin server now registers 47 tools (up from 42) following the addition of `admin-update-event`, `admin-batch-create-events`, `admin-batch-update-events`, `admin-batch-create-records`, and `admin-batch-update-records`.
+
 ---
 
 ## Feature Coverage Matrix
@@ -26,7 +28,7 @@ This report compares the Laravel MCP documentation (13.x) against the actual imp
 |---------|--------|-----------------|-------|
 | **Installation** | ✅ Complete | `composer require laravel/mcp` | Published via `routes/ai.php` |
 | **Servers** | ✅ Complete | AdminServer, MemberServer, dual registration | Includes local testing servers |
-| **Tools** | ✅ Complete | 42 tools across both servers | Comprehensive with annotations |
+| **Tools** | ✅ Complete | 47 tools across both servers | Comprehensive with annotations |
 | **Prompts** | ⚠️ Partial | 2 prompts (documentation routing) | Missing: Generic system prompts, context-setting |
 | **Resources** | ⚠️ Partial | 3 markdown resources | Missing: Resource templates, dynamic resources |
 | **Apps** | ❌ Not Used | N/A | Not implemented (not core need) |

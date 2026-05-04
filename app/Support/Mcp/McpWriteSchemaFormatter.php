@@ -51,6 +51,13 @@ final class McpWriteSchemaFormatter
         $schema['transport'] = 'mcp';
         $schema['tool'] = $tool;
         $schema['tool_arguments'] = $toolArguments;
+        $schema['apply_defaults_semantics'] = [
+            'scope' => 'preview_only',
+            'honored_when' => 'validate_only=true and apply_defaults=true',
+            'persisted_writes' => 'ignored; send the values you want saved',
+            'purpose' => 'schema-default autofill for validation feedback, not a write-time mutation shortcut',
+        ];
+        $schema['mcp_only_semantics'] = $this->mcpOnlySemantics($tool);
         $schema['endpoint'] = null;
         $schema['content_type'] = 'application/json';
         $schema['media_uploads_supported'] = $mediaFields !== [];
@@ -68,6 +75,34 @@ final class McpWriteSchemaFormatter
         $schema['fields'] = $this->annotateFields($fields);
 
         return $schema;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function mcpOnlySemantics(string $tool): ?array
+    {
+        if (! in_array($tool, ['admin-create-event', 'admin-update-event'], true)) {
+            return null;
+        }
+
+        return [
+            'wrapper' => 'This tool accepts route-key convenience aliases, then calls the shared admin events write path.',
+            'route_key_aliases' => [
+                'organizer_key' => 'resolves to organizer_id',
+                'institution_key' => 'resolves to institution_id',
+                'venue_key' => 'resolves to venue_id',
+                'space_key' => 'resolves to space_id',
+                'speaker_keys' => 'resolves to speakers',
+                'reference_keys' => 'resolves to references',
+            ],
+            'update_relation_arrays' => [
+                'omitted' => 'preserve existing relationship set',
+                'null' => 'preserve existing relationship set',
+                'empty_array' => 'detach all related records for that alias',
+                'non_empty_array' => 'replace the full relationship set with the resolved records',
+            ],
+        ];
     }
 
     /**
