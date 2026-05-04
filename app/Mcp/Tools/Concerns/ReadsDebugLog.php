@@ -95,7 +95,7 @@ trait ReadsDebugLog
     protected function debugLogOutputSchema(JsonSchema $schema): array
     {
         return [
-            'lines' => $schema->array($schema->string())->required()->description('Matching log lines in chronological order (most recent entry is last).'),
+            'lines' => $schema->array()->items($schema->string())->required()->description('Matching log lines in chronological order (most recent entry is last).'),
             'total_matched' => $schema->integer()->required()->description('Total number of log lines matched before truncating to the requested limit.'),
             'log_path' => $schema->string()->required()->description('Absolute path of the log file that was read.'),
             'filter' => $schema->string()->required()->description('Filter string that was applied. Empty string means no filtering.'),

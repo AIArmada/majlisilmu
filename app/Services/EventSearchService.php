@@ -27,10 +27,10 @@ use Illuminate\Support\Str;
 class EventSearchService
 {
     public function __construct(
-        private TypesenseHealthCheckService $healthCheck,
-        private SpeakerSearchService $speakerSearch,
-        private InstitutionSearchService $institutionSearch,
-        private ReferenceSearchService $referenceSearch,
+        private readonly TypesenseHealthCheckService $healthCheck,
+        private readonly SpeakerSearchService $speakerSearch,
+        private readonly InstitutionSearchService $institutionSearch,
+        private readonly ReferenceSearchService $referenceSearch,
     ) {}
 
     /**

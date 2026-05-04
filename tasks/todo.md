@@ -1,3 +1,32 @@
+# Full Quality Suite Fix
+
+- [x] Record full-suite plan and current baseline
+- [x] Run full Rector suite and fix failures
+- [x] Run full Pint suite and fix style drift
+- [x] Run full PHPStan suite and fix level 6 issues
+- [x] Run full Pest suite in parallel and fix failing tests
+- [x] Run database safety scans for constraints/cascades and SoftDeletes
+- [x] Record review notes and verification results
+
+## Review
+
+- Changes:
+  - Applied Rector and Pint cleanup across the suite, including `#[Override]`, typed constants, stricter callable syntax, and removal of an unused MCP image response trait.
+  - Fixed PHPStan level 6 issues in MCP debug-log schema definitions, admin media serialization, frontend contract metadata typing, event image generation guards, and MCP event search pagination typing.
+  - Stabilized MCP event image prompt asset URLs by using a bucketed temporary URL expiry so prompt text and attached media stay aligned within a request flow.
+  - Tightened fallback reference search so multi-token queries require every meaningful token across supported reference fields, while still covering publisher, description, and child-part metadata.
+  - Fixed focused test fixtures for admin batch event creation, Typesense filter construction dependencies, and saved-search date filters with random nearby-search factory state.
+  - No UI behavior changed, so product event tracking did not need updates.
+- Verification:
+  - `vendor/bin/rector --dry-run` => pass
+  - `vendor/bin/pint --test --format=agent` => pass
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pest --parallel --compact` => 2010 passed, 1 skipped, 13157 assertions
+  - `git diff --check` => pass
+  - `rg -n -- "softDeletes\\(\\)|SoftDeletes" database/ app/Models/` => no matches
+  - `rg -n -- "constrained\\(|cascadeOnDelete\\(" database/ app/Models/` => no matches
+  - Package database constraint scan: no `packages/` database directories exist in this checkout.
+
 # MCP Event Write Contract Fix
 
 - [x] Record project task plan for the MCP write-contract fix

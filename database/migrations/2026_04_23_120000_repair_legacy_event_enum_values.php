@@ -136,13 +136,9 @@ return new class extends Migration
             'relative to prayer times' => 'prayer_relative',
         ];
 
-        if (isset($aliases[$key])) {
-            return $aliases[$key];
-        }
-
-        return $this->hasPrayerTimingData($prayerReference, $prayerDisplayText)
+        return $aliases[$key] ?? ($this->hasPrayerTimingData($prayerReference, $prayerDisplayText)
             ? 'prayer_relative'
-            : 'absolute';
+            : 'absolute');
     }
 
     private function normalizePrayerReference(mixed $rawValue): ?string

@@ -9,8 +9,8 @@ use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Services\EventSearchService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\JsonSchema\Types\Type;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Arr;
 
@@ -19,7 +19,7 @@ class McpEventSearchService
     /**
      * @var list<string>
      */
-    private const ARRAY_FILTER_KEYS = [
+    private const array ARRAY_FILTER_KEYS = [
         'language_codes',
         'event_type',
         'age_group',
@@ -42,7 +42,7 @@ class McpEventSearchService
     /**
      * @var list<string>
      */
-    private const FILTER_KEYS = [
+    private const array FILTER_KEYS = [
         'country_id',
         'state_id',
         'district_id',
@@ -90,6 +90,7 @@ class McpEventSearchService
     ) {}
 
     /**
+     * @param  array<string, mixed>  $arguments
      * @return array<string, mixed>
      */
     public function search(array $arguments): array
@@ -462,7 +463,7 @@ class McpEventSearchService
 
         $values = is_array($value) ? $value : [$value];
 
-        return array_values(array_filter(array_map('strval', $values), static fn (string $item): bool => $item !== ''));
+        return array_values(array_filter(array_map(strval(...), $values), static fn (string $item): bool => $item !== ''));
     }
 
     private function normalizeOptionalString(mixed $value): ?string

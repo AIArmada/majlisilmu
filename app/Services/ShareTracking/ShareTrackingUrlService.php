@@ -18,10 +18,10 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-final class ShareTrackingUrlService
+final readonly class ShareTrackingUrlService
 {
     public function __construct(
-        private readonly SlugOrUuidResolver $slugOrUuidResolver,
+        private SlugOrUuidResolver $slugOrUuidResolver,
     ) {}
 
     /**

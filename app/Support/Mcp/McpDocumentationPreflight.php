@@ -18,7 +18,7 @@ class McpDocumentationPreflight
 
     public const GUIDE_RESOURCE_URI = 'file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md';
 
-    private const CACHE_KEY_PREFIX = 'mcp:documentation-preflight:admin:';
+    private const string CACHE_KEY_PREFIX = 'mcp:documentation-preflight:admin:';
 
     public function shouldBlockOperationalToolCall(Request $request, string $toolName, ?Transport $transport = null): bool
     {
@@ -42,13 +42,7 @@ class McpDocumentationPreflight
 
     public function hasGuideInContext(Request|string|null $request): bool
     {
-        foreach ($this->contextKeys($request) as $contextKey) {
-            if (Cache::get($this->cacheKey($contextKey), false) === true) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($this->contextKeys($request), fn ($contextKey) => Cache::get($this->cacheKey($contextKey), false) === true);
     }
 
     public function isDocumentationTool(string $toolName): bool
@@ -152,7 +146,7 @@ class McpDocumentationPreflight
     private function pathLooksLikeSessionId(array $path): bool
     {
         $normalizedPath = array_values(array_filter(array_map(
-            fn (string $segment): string => $this->normalizeMetaSegment($segment),
+            $this->normalizeMetaSegment(...),
             $path,
         )));
 
@@ -176,7 +170,7 @@ class McpDocumentationPreflight
 
     private function actorContextKey(?Authenticatable $user): ?string
     {
-        if ($user === null) {
+        if (! $user instanceof Authenticatable) {
             return null;
         }
 

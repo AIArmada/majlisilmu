@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -289,20 +290,19 @@ class AdminResourceService
 
         abort_unless(collect($abilities)->contains(true), 403);
 
-        $record->loadMissing('media');
-
-        /** @var list<array<string, mixed>> $media */
-        $media = $record->media
-            ->map(fn (Media $m): array => [
-                'id' => $m->id,
-                'collection_name' => $m->collection_name,
-                'file_name' => $m->file_name,
-                'mime_type' => $m->mime_type,
-                'size' => $m->size,
-                'url' => $m->getUrl(),
-            ])
-            ->values()
-            ->all();
+        $media = $record instanceof HasMedia
+            ? $record->getMedia()
+                ->map(fn (Media $m): array => [
+                    'id' => $m->id,
+                    'collection_name' => $m->collection_name,
+                    'file_name' => $m->file_name,
+                    'mime_type' => $m->mime_type,
+                    'size' => $m->size,
+                    'url' => $m->getUrl(),
+                ])
+                ->values()
+                ->all()
+            : [];
 
         /** @var array<string, mixed> $data */
         $data = [

@@ -20,7 +20,7 @@ trait LogsMcpToolExecution
             'server' => $server,
             'tool' => $toolName,
             'request_id' => $request->id,
-            'argument_keys' => array_values(array_map('strval', array_keys($arguments))),
+            'argument_keys' => array_values(array_map(strval(...), array_keys($arguments))),
             'arguments' => $this->summarizeArguments($arguments),
         ]);
     }
@@ -110,12 +110,6 @@ trait LogsMcpToolExecution
     {
         $normalized = strtolower($key);
 
-        foreach (['token', 'password', 'secret', 'authorization', 'cookie'] as $needle) {
-            if (str_contains($normalized, $needle)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(['token', 'password', 'secret', 'authorization', 'cookie'], fn ($needle) => str_contains($normalized, (string) $needle));
     }
 }

@@ -442,6 +442,9 @@ describe('Saved Search API Endpoints', function () {
                         'starts_on_local_date' => '2026-04-23',
                         'time_scope' => 'all',
                     ],
+                    'radius_km' => null,
+                    'lat' => null,
+                    'lng' => null,
                 ]);
 
                 $response = $this

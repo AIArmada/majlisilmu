@@ -148,7 +148,7 @@ abstract class AbstractMemberTool extends Tool
                 $this->httpExceptionCode($exception),
                 ['status' => $exception->getStatusCode()],
             );
-        } catch (ModelNotFoundException $exception) {
+        } catch (ModelNotFoundException) {
             return $this->errorResponse(
                 'Resource not found.',
                 'not_found',
