@@ -39,7 +39,7 @@ class AdminBatchUpdateEventsTool extends AbstractAdminWriteTool
 
     protected string $title = 'Batch Update Events';
 
-    protected string $description = 'Use this to update multiple existing events in a single request. Each item identifies the target event via event_key (slug or UUID) and uses the same field contract as admin-update-event, supporting organizer_key, institution_key, venue_key, space_key, speaker_keys, and reference_keys resolved by slug or UUID. speaker_keys and reference_keys perform a full sync (replace) — omit the field to leave existing relationships unchanged; pass an empty array to detach all. Items are processed independently; the response contains a per-row result with status updated, validation_failed, unresolved_key, not_found, or error. Set validate_only=true to preview all rows and surface validation errors upfront without persisting any changes. Include external_row_id per item for idempotency tracking and safe retries after interruption. Maximum 50 events per batch.';
+    protected string $description = 'Use this MCP-only event wrapper to update multiple existing events in one request. Each item identifies the target event via event_key and resolves organizer, location, speakers, and references by route keys before calling the shared admin event update path. speaker_keys and reference_keys are full-sync aliases for the underlying speakers/references UUID arrays: omit the field or pass null to preserve existing relationships; pass [] to detach all; pass a non-empty array to replace all. Items are processed independently; the response contains a per-row result with status updated, validation_failed, unresolved_key, not_found, or error. Set validate_only=true to preview all rows without persisting. Include external_row_id per item for idempotency tracking and safe retries after interruption. Maximum 50 events per batch.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -260,7 +260,7 @@ class AdminBatchUpdateEventsTool extends AbstractAdminWriteTool
             static fn (?string $v): bool => $v !== null,
         ));
 
-        if ($speakerKeys !== []) {
+        if (array_key_exists('speaker_keys', $item) && is_array($item['speaker_keys'])) {
             $payload['speakers'] = array_values(array_map(
                 fn (string $key): string => $this->resolveRecordIdentifier(
                     field: 'speaker_keys',
@@ -279,7 +279,7 @@ class AdminBatchUpdateEventsTool extends AbstractAdminWriteTool
             static fn (?string $v): bool => $v !== null,
         ));
 
-        if ($referenceKeys !== []) {
+        if (array_key_exists('reference_keys', $item) && is_array($item['reference_keys'])) {
             $payload['references'] = array_values(array_map(
                 fn (string $key): string => $this->resolveRecordIdentifier(
                     field: 'reference_keys',
@@ -324,8 +324,8 @@ class AdminBatchUpdateEventsTool extends AbstractAdminWriteTool
             'institution_key' => $schema->string()->nullable()->description('Institution route key (slug preferred, UUID allowed).'),
             'venue_key' => $schema->string()->nullable()->description('Venue route key (slug preferred, UUID allowed).'),
             'space_key' => $schema->string()->nullable()->description('Space route key (slug preferred, UUID allowed).'),
-            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of speaker route keys (slug or UUID). Replaces all currently attached speakers.'),
-            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of reference route keys (slug or UUID). Replaces all currently attached references.'),
+            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying speakers UUID array. Omit or pass null to preserve currently attached speakers. Pass [] to detach all speakers. Pass a non-empty array of speaker slugs/UUIDs to replace all attached speakers.'),
+            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying references UUID array. Omit or pass null to preserve currently linked references. Pass [] to detach all references. Pass a non-empty array of reference slugs/UUIDs to replace all linked references.'),
             'languages' => $schema->array()->items($schema->integer())->nullable(),
             'domain_tags' => $schema->array()->items($schema->string())->nullable(),
             'discipline_tags' => $schema->array()->items($schema->string())->nullable(),
@@ -347,7 +347,7 @@ class AdminBatchUpdateEventsTool extends AbstractAdminWriteTool
             'is_priority' => $schema->boolean(),
             'is_featured' => $schema->boolean(),
             'is_active' => $schema->boolean(),
-        ])->required(['event_key']);
+        ]);
 
         return [
             'items' => $schema->array()->required()->min(1)->max(50)->items($eventItemSchema)->description('Array of event items to update. Each item must include event_key. Maximum 50 events per batch.'),

@@ -39,7 +39,7 @@ class AdminUpdateEventTool extends AbstractAdminWriteTool
 
     protected string $title = 'Update Event';
 
-    protected string $description = 'Use this to update an existing event record. Resolves organizer and location by human-readable route key — avoid raw UUIDs when a key is available. Supports speaker_keys and reference_keys to replace (full sync) attached speakers and references by slug or UUID — omit the field to leave existing relationships unchanged; pass an empty array to detach all. Supports cover, poster, and gallery image descriptors in the same request; media clear flags are not supported — omit fields to leave existing media unchanged. Do not use to create a new event; use admin-create-event instead.';
+    protected string $description = 'Use this MCP-only event wrapper to update an existing event record by event_key. It resolves organizer, location, speakers, and references by human-readable route keys before calling the shared admin event update path. speaker_keys and reference_keys are full-sync aliases for the underlying speakers/references UUID arrays: omit the field or pass null to preserve existing relationships; pass [] to detach all; pass a non-empty array to replace all. apply_defaults is only honored together with validate_only=true for preview/autofill feedback and is ignored for persisted updates. Supports cover, poster, and gallery image descriptors in the same request; media clear flags are not supported, so omit fields to leave existing media unchanged. Do not use to create a new event; use admin-create-event instead.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -242,7 +242,7 @@ class AdminUpdateEventTool extends AbstractAdminWriteTool
             static fn (?string $v): bool => $v !== null,
         ));
 
-        if ($speakerKeys !== []) {
+        if (array_key_exists('speaker_keys', $validated) && is_array($validated['speaker_keys'])) {
             $payload['speakers'] = array_values(array_map(
                 fn (string $key): string => $this->resolveRecordIdentifier(
                     field: 'speaker_keys',
@@ -261,7 +261,7 @@ class AdminUpdateEventTool extends AbstractAdminWriteTool
             static fn (?string $v): bool => $v !== null,
         ));
 
-        if ($referenceKeys !== []) {
+        if (array_key_exists('reference_keys', $validated) && is_array($validated['reference_keys'])) {
             $payload['references'] = array_values(array_map(
                 fn (string $key): string => $this->resolveRecordIdentifier(
                     field: 'reference_keys',
@@ -305,8 +305,8 @@ class AdminUpdateEventTool extends AbstractAdminWriteTool
             'institution_key' => $schema->string()->nullable()->description('Institution route key (slug preferred, UUID allowed).'),
             'venue_key' => $schema->string()->nullable()->description('Venue route key (slug preferred, UUID allowed).'),
             'space_key' => $schema->string()->nullable()->description('Space route key (slug preferred, UUID allowed).'),
-            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of speaker route keys (slug preferred, UUID allowed). Replaces all currently attached speakers.'),
-            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of reference route keys (slug preferred, UUID allowed). Replaces all currently attached references.'),
+            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying speakers UUID array. Omit or pass null to preserve currently attached speakers. Pass [] to detach all speakers. Pass a non-empty array of speaker slugs/UUIDs to replace all attached speakers.'),
+            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying references UUID array. Omit or pass null to preserve currently linked references. Pass [] to detach all references. Pass a non-empty array of reference slugs/UUIDs to replace all linked references.'),
             'languages' => $schema->array()->items($schema->integer())->nullable()->description('Array of language record IDs (integers).'),
             'domain_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of domain/category tag UUIDs (max 3).'),
             'discipline_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of discipline/field-of-study tag UUIDs.'),
@@ -349,7 +349,7 @@ class AdminUpdateEventTool extends AbstractAdminWriteTool
             'is_featured' => $schema->boolean(),
             'is_active' => $schema->boolean(),
             'validate_only' => $schema->boolean()->default(false),
-            'apply_defaults' => $schema->boolean()->default(false),
+            'apply_defaults' => $schema->boolean()->default(false)->description('Preview-only helper. Honored only when validate_only=true to merge schema defaults into validation feedback; ignored for persisted updates.'),
         ];
     }
 

@@ -111,6 +111,9 @@ it('keeps the CRUD comparison JSON aligned with runtime panel resources and writ
         ->and(data_get($document, 'transport_rules.admin_api.apply_defaults_preview'))->toBeTrue()
         ->and(data_get($document, 'transport_rules.admin_api.validation_feedback'))->toBeTrue()
         ->and(data_get($document, 'transport_rules.admin_mcp.apply_defaults'))->toBeTrue()
+        ->and(data_get($document, 'transport_rules.admin_mcp.apply_defaults_preview_only'))->toBeTrue()
+        ->and(data_get($document, 'transport_rules.admin_mcp.apply_defaults_persisted_writes'))->toBe('ignored')
+        ->and(data_get($document, 'transport_rules.admin_mcp.event_route_key_wrapper_semantics.update_relation_arrays.empty_array'))->toBe('detach all relations for that alias')
         ->and(data_get($document, 'transport_rules.admin_mcp.validation_feedback'))->toBeTrue()
         ->and(data_get($document, 'transport_rules.admin_api.validation_remediation_details'))->toBe([
             'fix_plan',
@@ -149,6 +152,8 @@ it('keeps the markdown companion anchored to the verified runtime model', functi
         ->toContain('MCP media and preview semantics')
         ->toContain('`apply_defaults=1` is supported during preview requests')
         ->toContain('`apply_defaults` is supported on admin preview tools')
+        ->toContain('It is ignored for persisted MCP writes')
+        ->toContain('omitted or `null` preserves existing relations, `[]` detaches all')
         ->toContain('json_base64_descriptor')
         ->toContain('Validation failures in validate-only mode now return machine-readable remediation details')
         ->toContain('Validation failures now expose schema-driven `feedback`')

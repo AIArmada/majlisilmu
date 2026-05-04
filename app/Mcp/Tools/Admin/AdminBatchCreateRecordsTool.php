@@ -74,7 +74,7 @@ class AdminBatchCreateRecordsTool extends AbstractAdminWriteTool
                 $schema->object([
                     'external_row_id' => $schema->string()->nullable()->description('Optional caller-assigned row identifier for idempotency tracking and safe retries.'),
                     'payload' => $schema->object()->required()->description('Create payload for this item. Fields must match the resource write schema. Use admin-get-write-schema to discover required fields.'),
-                ])->required(['payload'])
+                ])
             )->description('Array of items to create. Each item must contain a payload object. Maximum 100 items per batch.'),
             'validate_only' => $schema->boolean()->default(false)->description('When true, validates all items without persisting. Returns per-row preview or validation error details.'),
         ];

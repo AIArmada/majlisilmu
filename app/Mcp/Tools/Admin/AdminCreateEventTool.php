@@ -39,7 +39,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
 
     protected string $title = 'Create Event';
 
-    protected string $description = 'Use this when you want to create a new event, optionally with cover, poster, or gallery images in the same request. Resolves organizer and location by human-readable route key — avoid raw UUIDs when a key is available. Supports speaker_keys and reference_keys to attach required speakers and references by slug or UUID. Do not use to update an existing event; use admin-update-event instead.';
+    protected string $description = 'Use this MCP-only event wrapper to create a new event, optionally with cover, poster, or gallery images in the same request. It resolves organizer, location, speakers, and references by human-readable route keys before calling the shared admin event create path. speaker_keys/reference_keys are route-key aliases for the underlying speakers/references UUID arrays. apply_defaults is only honored together with validate_only=true for preview/autofill feedback and is ignored for persisted creates. Do not use to update an existing event; use admin-update-event instead.';
 
     public function __construct(
         private readonly AdminResourceService $resourceService,
@@ -299,8 +299,8 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             'institution_key' => $schema->string()->nullable()->description('Institution route key (slug preferred, UUID allowed).'),
             'venue_key' => $schema->string()->nullable()->description('Venue route key (slug preferred, UUID allowed).'),
             'space_key' => $schema->string()->nullable()->description('Space route key (slug preferred, UUID allowed).'),
-            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of speaker route keys (slug preferred, UUID allowed). Each entry is resolved to a speaker UUID and attached as a speaker-role key person. Required for event types that mandate a speaker: kuliah_ceramah, kelas_daurah, talim, forum, seminar_konvensyen, tazkirah.'),
-            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('Array of reference route keys (slug preferred, UUID allowed). Each entry is resolved to a reference UUID and linked to the event.'),
+            'speaker_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying speakers UUID array. On create, omit/null/[] all mean no speakers; event types that require a speaker will fail validation if this resolves to an empty list. Pass speaker slugs/UUIDs to attach those speakers in payload order. Required for event types that mandate a speaker: kuliah_ceramah, kelas_daurah, talim, forum, seminar_konvensyen, tazkirah.'),
+            'reference_keys' => $schema->array()->items($schema->string())->nullable()->description('MCP-only route-key alias for the underlying references UUID array. On create, omit/null/[] all mean no references. Pass reference slugs/UUIDs to link those references.'),
             'languages' => $schema->array()->items($schema->integer())->nullable()->description('Array of language record IDs (integers) for the event language(s). Use admin-list-records on the languages resource to discover available IDs.'),
             'domain_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of domain/category tag UUIDs (max 3). Use admin-list-records on the tags resource filtered by type=domain.'),
             'discipline_tags' => $schema->array()->items($schema->string())->nullable()->description('Array of discipline/field-of-study tag UUIDs. Use admin-list-records on the tags resource filtered by type=discipline.'),
@@ -343,7 +343,7 @@ class AdminCreateEventTool extends AbstractAdminWriteTool
             'is_featured' => $schema->boolean()->default(false),
             'is_active' => $schema->boolean()->default(true),
             'validate_only' => $schema->boolean()->default(false),
-            'apply_defaults' => $schema->boolean()->default(false),
+            'apply_defaults' => $schema->boolean()->default(false)->description('Preview-only helper. Honored only when validate_only=true to merge schema defaults into validation feedback; ignored for persisted creates.'),
         ];
     }
 

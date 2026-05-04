@@ -1409,7 +1409,26 @@
       "content_type": "application/json",
       "validate_only": true,
       "apply_defaults": true,
+      "apply_defaults_preview_only": true,
+      "apply_defaults_persisted_writes": "ignored",
       "validation_feedback": true,
+      "event_route_key_wrapper_semantics": {
+        "mcp_only": true,
+        "route_key_aliases": [
+          "organizer_key",
+          "institution_key",
+          "venue_key",
+          "space_key",
+          "speaker_keys",
+          "reference_keys"
+        ],
+        "update_relation_arrays": {
+          "omitted": "preserve existing relations",
+          "null": "preserve existing relations",
+          "empty_array": "detach all relations for that alias",
+          "non_empty_array": "replace all relations for that alias"
+        }
+      },
       "media_upload_transport": "json_base64_descriptor",
       "destructive_clear_flags_supported": false,
       "validation_remediation_details": [

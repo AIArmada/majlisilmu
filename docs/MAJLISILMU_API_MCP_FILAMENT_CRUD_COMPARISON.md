@@ -351,11 +351,12 @@ This is the area where the previous version drifted the most.
 
 - Write schemas are reformatted to MCP JSON contracts by `McpWriteSchemaFormatter`.
 - Create/update preview is supported through the `validate_only` boolean tool argument.
-- `apply_defaults` is supported on admin preview tools and returns a candidate autofilled payload in validation feedback when the request is still invalid.
+- `apply_defaults` is supported on admin preview tools only (`validate_only=true`) and returns a candidate autofilled payload in validation feedback when the request is still invalid. It is ignored for persisted MCP writes; persisted creates/updates must include the values the caller wants saved.
 - Validation failures now expose the same schema-driven `feedback` structure as the admin HTTP API.
 - Validation failures in validate-only mode now return the same remediation fields as the admin HTTP API so AI clients can recover in one retry loop.
 - When a schema advertises file fields, MCP uploads use `json_base64_descriptor`, not multipart.
 - Descriptor normalization and staging is implemented by `McpFilePayloadNormalizer`.
+- Dedicated MCP event tools are route-key wrappers over the shared admin event writer. On update, `speaker_keys` and `reference_keys` are presence-sensitive: omitted or `null` preserves existing relations, `[]` detaches all, and a non-empty array replaces all.
 - Destructive media clear flags such as `clear_cover`, `clear_avatar`, `clear_gallery`, and siblings are intentionally removed from MCP schema fields and rejected by the write tools.
 
 ### Member MCP
