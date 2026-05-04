@@ -1,6 +1,6 @@
 # MajlisIlmu MCP Guide
 
-Updated: May 2, 2026
+Updated: May 4, 2026
 Audience: developers and AI-client integrators.
 
 This is the human setup and broader integration guide.
@@ -222,7 +222,7 @@ Apply this before operational tools such as:
 - `admin-list-related-records`, `member-list-related-records`
 - `admin-get-resource-meta`, `member-get-resource-meta`
 - `admin-get-write-schema`, `member-get-write-schema`
-- `admin-create-record`, `admin-update-record`, `member-update-record`
+- `admin-create-record`, `admin-batch-create-records`, `admin-update-record`, `admin-batch-update-records`, `admin-create-event`, `admin-batch-create-events`, `admin-update-event`, `admin-batch-update-events`, `member-update-record`
 - `admin-get-event-moderation-schema`, `admin-get-report-triage-schema`, `admin-get-contribution-request-review-schema`, `admin-get-membership-claim-review-schema`
 - `admin-moderate-event`, `admin-triage-report`, `admin-review-contribution-request`, `admin-review-membership-claim`
 - `member-list-contribution-requests`, `member-approve-contribution-request`, `member-reject-contribution-request`, `member-cancel-contribution-request`, `member-list-membership-claims`, `member-submit-membership-claim`, and `member-cancel-membership-claim`
@@ -257,9 +257,15 @@ Use this section as the quick MCP-only capability summary.
 | Membership-claim workflows | `admin-review-membership-claim` | `member-list-membership-claims`, `member-submit-membership-claim`, `member-cancel-membership-claim` |
 | Event image prompts | `admin-event-cover-image-prompt` (prompt), `admin-event-poster-image-prompt` (prompt) | `member-event-cover-image-prompt` (prompt), `member-event-poster-image-prompt` (prompt) |
 | Event image upload | `admin-upload-event-cover-image`, `admin-upload-event-poster-image` | `member-upload-event-cover-image`, `member-upload-event-poster-image` |
+| Dedicated event create | `admin-create-event` | Not exposed |
+| Batch event create | `admin-batch-create-events` | Not exposed |
+| Dedicated event update | `admin-update-event` | Not exposed |
+| Batch event update | `admin-batch-update-events` | Not exposed |
 | Create | `admin-create-record` | Not exposed |
+| Batch create | `admin-batch-create-records` | Not exposed |
 | Update | `admin-update-record` | `member-update-record` |
-| Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` | Yes, on `member-update-record` |
+| Batch update | `admin-batch-update-records` | Not exposed |
+| Validate-only preview | Yes, on all create/update/batch tools | Yes, on `member-update-record` |
 
 Admin GitHub issue reports can skip Copilot assignment entirely by setting `GITHUB_ISSUE_REPORTING_ADMIN_COPILOT_ASSIGNMENT_ENABLED=false` on the server.
 
@@ -427,14 +433,25 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-review-contribution-request` | Approve or reject one pending contribution request | `POST /api/v1/admin/contribution-requests/{recordKey}/review` |
 | `admin-review-membership-claim` | Approve or reject a pending membership claim | `POST /api/v1/admin/membership-claims/{recordKey}/review` |
 | `admin-create-record` | Create or preview a writable admin record | `POST /api/v1/admin/{resourceKey}` |
+| `admin-batch-create-records` | Create up to 100 records in a single request; each item processed independently with per-row results | `POST /api/v1/admin/{resourceKey}/batch` |
 | `admin-create-event` | Create or preview a new event with event-first fields and relation route keys, optionally including cover, poster, or gallery image descriptors | `POST /api/v1/admin/{resourceKey}` with `resourceKey=events` (MCP wrapper with route-key conveniences) |
+| `admin-batch-create-events` | Create up to 50 events in a single request; same field contract as `admin-create-event` with per-row results | `POST /api/v1/admin/{resourceKey}/batch` with `resourceKey=events` |
 | `admin-get-record-media` | List media attachments for one admin record to verify uploads or prefill forms | MCP-only media inspection tool |
 | `admin-read-debug-log` | Read recent filtered lines from the application debug log | MCP-only debug log reader |
 | `admin-update-record` | Update or preview a writable admin record | `PUT /api/v1/admin/{resourceKey}/{recordKey}` |
+| `admin-batch-update-records` | Update up to 100 records in a single request; each item identified by `record_key` with per-row results | `PUT /api/v1/admin/{resourceKey}/batch` |
+| `admin-update-event` | Update or preview an existing event with event-first fields and relation route keys | `PUT /api/v1/admin/{resourceKey}/{recordKey}` with `resourceKey=events` (MCP wrapper with route-key conveniences) |
+| `admin-batch-update-events` | Update up to 50 existing events in a single request; same field contract as `admin-update-event` with per-row results | `PUT /api/v1/admin/{resourceKey}/batch` with `resourceKey=events` |
 
 Admin tool behavior notes:
 
-- `validate_only=true` is supported for create/update preview flows.
+- `validate_only=true` is supported for create/update/batch preview flows.
+- `apply_defaults=true` is preview-only. It is honored only when `validate_only=true`, where it merges schema defaults into the candidate payload for validation feedback. It is ignored for persisted creates/updates; for real writes, send the exact values you want saved.
+- Batch tools (`admin-batch-create-events`, `admin-batch-update-events`, `admin-batch-create-records`, `admin-batch-update-records`) process each item independently. The response contains a `data.results` array with per-row `status` values (`created`, `updated`, `validation_failed`, `unresolved_key`, `not_found`, `error`, or `preview`) and a `data.summary` block with per-status counts. Include `external_row_id` per item for idempotency tracking and safe retries.
+- For batch event tools, unresolved `organizer_key`, `institution_key`, `venue_key`, `space_key`, `speaker_keys`, or `reference_keys` yield `unresolved_key` at the row level without failing the whole batch.
+- `admin-batch-create-events` and `admin-batch-update-events` have a per-batch maximum of 50 items; `admin-batch-create-records` and `admin-batch-update-records` have a per-batch maximum of 100 items.
+- Dedicated MCP event tools are convenience wrappers, not separate persistence paths. They accept route-key aliases (`organizer_key`, `institution_key`, `venue_key`, `space_key`, `speaker_keys`, `reference_keys`) and normalize them into the same admin event payload used by the raw HTTP/admin resource writer.
+- `admin-update-event` and `admin-batch-update-events` use presence-sensitive relation aliases: omit `speaker_keys`/`reference_keys` or pass `null` to preserve existing relationships; pass `[]` to detach all; pass a non-empty array to replace all.
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-search-events` is the dedicated event-discovery MCP path and is aligned with `GET /api/v1/admin/events/search`. It supports keyword search with default cross-entity expansion (institution/speaker/reference), geo-proximity sorting (`sort=distance` with `lat`, `lng`, `radius_km`), date range (`starts_after`, `starts_before`, `time_scope`), clock-time or prayer-relative windows (`timing_mode`, `starts_time_from/until`, `prayer_time`), event type and format arrays, audience and audience-boolean filters, institution/venue/speaker/role filters, tag/reference UUID arrays, reference author filters (`reference_author_search`), and query expansion toggles (`search_include_institutions`, `search_include_speakers`, `search_include_references`). Each parameter includes an inline description of valid values in the tool schema.
@@ -450,7 +467,7 @@ Admin tool behavior notes:
 - If the prompt call fails while attaching reference images, retry the prompt call with `include_existing_media=false` and `max_reference_media=0`.
 - Event media writes enforce fixed ratios across MCP writes: `cover` must be `16:9` and `poster` must be `4:5`.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
-- `admin-create-event` now maps to the `/hantar-majlis` wizard payload model for event creation and writes through the admin API create endpoint (`POST /api/v1/admin/events` via `POST /api/v1/admin/{resourceKey}`). It accepts scalar event fields, relation route keys (`organizer_key`, `institution_key`, `venue_key`, `space_key`), speaker/reference route-key arrays (`speaker_keys`, `reference_keys`), language IDs (`languages`), tag arrays (`domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`), `other_key_people`, optional `series`, and media descriptors (`cover`, `poster`, `gallery`).
+- `admin-create-event` now maps to the `/hantar-majlis` wizard payload model for event creation and writes through the admin API create endpoint (`POST /api/v1/admin/events` via `POST /api/v1/admin/{resourceKey}`). It accepts scalar event fields, relation route keys (`organizer_key`, `institution_key`, `venue_key`, `space_key`), speaker/reference route-key arrays (`speaker_keys`, `reference_keys`), language IDs (`languages`), tag arrays (`domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`), `other_key_people`, optional `series`, and media descriptors (`cover`, `poster`, `gallery`). For persisted creates, include the actual defaultable values you want stored (`timezone`, `event_format`, `visibility`, `gender`, `age_group`, etc.); `apply_defaults` will not fill them unless the call is a validate-only preview.
 - `admin-get-record-media` returns media collection metadata for one admin record. Use it to verify that cover/poster/gallery uploads persisted and to build reference-media descriptors for image generation prompts.
 - `admin-read-debug-log` returns recent application debug-log lines, optionally filtered by a keyword. Restrict access to trusted admin actors only.
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain. This tool is **conditionally registered** and only present when the GitHub issue reporter is configured; it will be absent from `tools/list` if GitHub issue reporting has not been set up.
@@ -555,7 +572,7 @@ Read-only admin resources are still discoverable through the resource list and m
 Write-tool preview tip:
 
 - `admin-create-record` and `admin-update-record` accept `validate_only=true` to validate, normalize, and preview a write without persisting it.
-- Add `apply_defaults=true` on preview calls when you want the server to apply schema defaults before validation and return a candidate autofilled payload in validation feedback.
+- Add `apply_defaults=true` only on preview calls (`validate_only=true`) when you want the server to apply schema defaults before validation and return a candidate autofilled payload in validation feedback. `apply_defaults` is ignored on persisted admin MCP writes.
 - Preview responses return the normalized payload plus warning metadata for supported write-side checks.
 - Validation failures return schema-driven `feedback` issues with suggested values, defaults, and conditional `required_because` context.
 - Validation failures in validate-only mode now include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.
@@ -631,7 +648,10 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `admin-get-record-actions` | Get focused next-step MCP actions for one admin record | `resource_key`, `record_key` |
 | `admin-upload-event-cover-image` | Upload a pre-generated image to the event `cover` collection at `16:9` (use `admin-event-cover-image-prompt` first) | `event_key`, `image`, `creative_direction?` |
 | `admin-upload-event-poster-image` | Upload a pre-generated image to the event `poster` collection at `4:5` (use `admin-event-poster-image-prompt` first) | `event_key`, `image`, `creative_direction?` |
-| `admin-create-event` | Create or preview a new event with event-first fields and relation route keys, aligned to `/hantar-majlis` non-media payload structure. | `title`, `event_date`, `event_type` (array), `prayer_time`, `description?`, `custom_time?`, `end_time?`, `timezone?`, `event_format?`, `visibility?`, `event_url?`, `live_url?`, `recording_url?`, `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `organizer_type?`, `organizer_key?`, `institution_key?`, `venue_key?`, `space_key?`, `speaker_keys?` (array), `reference_keys?` (array), `languages?` (array of IDs), `domain_tags?` (array), `discipline_tags?` (array), `source_tags?` (array), `issue_tags?` (array), `other_key_people?` (array), `series?` (array), `status?`, `registration_required?`, `registration_mode?`, `is_priority?`, `is_featured?`, `is_active?`, `cover?`, `poster?`, `gallery?`, `validate_only?`, `apply_defaults?` |
+| `admin-create-event` | MCP-only wrapper to create or preview a new event with event-first fields and relation route keys, aligned to `/hantar-majlis` non-media payload structure. `apply_defaults?` is preview-only. | `title`, `event_date`, `event_type` (array), `prayer_time`, `description?`, `custom_time?`, `end_time?`, `timezone?`, `event_format?`, `visibility?`, `event_url?`, `live_url?`, `recording_url?`, `gender?`, `age_group?` (array), `children_allowed?`, `is_muslim_only?`, `organizer_type?`, `organizer_key?`, `institution_key?`, `venue_key?`, `space_key?`, `speaker_keys?` (array), `reference_keys?` (array), `languages?` (array of IDs), `domain_tags?` (array), `discipline_tags?` (array), `source_tags?` (array), `issue_tags?` (array), `other_key_people?` (array), `series?` (array), `status?`, `registration_required?`, `registration_mode?`, `is_priority?`, `is_featured?`, `is_active?`, `cover?`, `poster?`, `gallery?`, `validate_only?`, `apply_defaults?` |
+| `admin-batch-create-events` | MCP-only batch create for up to 50 events; same field contract per item as `admin-create-event`, plus per-batch `validate_only?`, `apply_defaults?`. `apply_defaults?` is ignored unless `validate_only=true`. | `items` (array, max 50), `validate_only?`, `apply_defaults?` — each item: same event fields + optional `external_row_id` |
+| `admin-update-event` | MCP-only update wrapper with event-first fields and relation route keys. `speaker_keys`/`reference_keys`: omit or `null` to preserve, `[]` to detach all, non-empty array to replace all. | `event_key`, all `admin-create-event` fields except required scalars, `validate_only?` |
+| `admin-batch-update-events` | MCP-only batch update for up to 50 existing events; each item must include `event_key`; same relation presence semantics as `admin-update-event`. | `items` (array, max 50), `validate_only?` — each item: `event_key` + same event fields + optional `external_row_id` |
 | `admin-get-record-media` | List media attachments for one admin record | `resource_key`, `record_key` |
 | `admin-read-debug-log` | Read recent filtered lines from the debug log | `filter?`, `lines?`, `all?` |
 | `admin-create-github-issue` | Create a GitHub issue in the configured repository and auto-assign Copilot (conditionally registered) | `category`, `title`, `summary`, `platform?`, `proposal?`, `description?` (plus additional diagnostic fields) |
@@ -645,7 +665,9 @@ Use this as the quick scan list when you want ChatGPT to reason about the connec
 | `admin-review-contribution-request` | Approve or reject one pending contribution request | `record_key`, `action`, `reason_code?`, `reviewer_note?` |
 | `admin-review-membership-claim` | Approve or reject one pending membership claim | `record_key`, `action`, `granted_role_slug?`, `reviewer_note?` |
 | `admin-create-record` | Create or preview a writable admin record | `resource_key`, `payload`, `validate_only?`, `apply_defaults?` |
+| `admin-batch-create-records` | Batch create up to 100 records for a writable admin resource | `resource_key`, `items` (array, max 100), `validate_only?` — each item: `payload` + optional `external_row_id` |
 | `admin-update-record` | Update or preview a writable admin record | `resource_key`, `record_key`, `payload`, `validate_only?`, `apply_defaults?` |
+| `admin-batch-update-records` | Batch update up to 100 records for a writable admin resource | `resource_key`, `items` (array, max 100), `validate_only?` — each item: `record_key`, `payload`, optional `external_row_id` |
 
 ### Member MCP tools
 

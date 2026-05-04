@@ -1,3 +1,29 @@
+# MCP Event Write Contract Fix
+
+- [x] Record project task plan for the MCP write-contract fix
+- [x] Patch event relation empty-array semantics and batch create default handling
+- [x] Clarify tool descriptions, schema descriptions, metadata, and docs
+- [x] Add regression tests for detach semantics and preview-only defaults
+- [x] Run focused tests, PHPStan/format checks, and document review results
+
+## Review
+
+- Changes:
+  - Fixed `admin-update-event` and `admin-batch-update-events` so explicit empty `speaker_keys` / `reference_keys` arrays are forwarded as empty relation payloads and detach all existing links; omitted or `null` aliases still preserve relations.
+  - Changed `admin-batch-create-events` so `apply_defaults` only affects validate-only preview payloads and is ignored for persisted creates.
+  - Clarified MCP-only event wrapper descriptions, schema field descriptions, write-schema metadata, admin guide, general guide, examples, and CRUD comparison docs for route-key aliases and preview-only defaults.
+  - Fixed invalid batch tool JSON Schema builder usage by relying on required child properties instead of `required([...])`.
+  - Added MCP regression coverage for empty-array detach, omitted-field preserve, preview-only defaults, schema metadata, and doc wording.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php` => 94 passed, 1488 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/AdminServerTest.php --filter='initializes and lists admin MCP tools over the HTTP endpoint for Passport-authenticated admins'` => 1 passed, 133 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/CrudComparisonDocsTest.php` => 2 passed, 71 assertions
+  - `vendor/bin/pest --parallel --compact tests/Unit/McpGuideDocsTest.php` => 2 passed, 28 assertions
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `git diff --check` => pass
+  - `vendor/bin/phpstan analyse --ansi app/Mcp/Tools/Admin/AdminBatchCreateEventsTool.php app/Mcp/Tools/Admin/AdminBatchCreateRecordsTool.php app/Mcp/Tools/Admin/AdminBatchUpdateEventsTool.php app/Mcp/Tools/Admin/AdminBatchUpdateRecordsTool.php app/Mcp/Tools/Admin/AdminCreateEventTool.php app/Mcp/Tools/Admin/AdminCreateRecordTool.php app/Mcp/Tools/Admin/AdminUpdateEventTool.php app/Mcp/Tools/Admin/AdminUpdateRecordTool.php app/Support/Mcp/McpWriteSchemaFormatter.php` => pass
+  - Full `vendor/bin/phpstan analyse --ansi` still fails on 11 pre-existing issues outside this change set: unused `GeneratesEventImageResponse`, `ReadsDebugLog` schema array argument count, undefined generic `Model::$media`, missing iterable value types, and unrelated MCP image/search-service type findings.
+
 # User Dashboard Full Visual Redesign
 
 - [x] Audit the current `/dashboard` route, Livewire component, Blade view, tests, and visual reference

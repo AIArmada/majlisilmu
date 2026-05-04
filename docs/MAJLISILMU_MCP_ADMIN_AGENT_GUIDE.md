@@ -1,6 +1,6 @@
 # MajlisIlmu Admin MCP Agent Guide
 
-Updated: May 2, 2026
+Updated: May 4, 2026
 Audience: model-facing admin MCP agents and tool clients.
 
 This guide is for the admin MCP surface only. For transport, connector, OAuth, inspector, and other setup details, use `docs/MAJLISILMU_MCP_GUIDE.md`. The member guide is separate and is not exposed through this server.
@@ -181,8 +181,14 @@ Apply this before operational tools such as:
 - `admin-list-related-records`
 - `admin-get-resource-meta`
 - `admin-get-write-schema`
+- `admin-create-event`
+- `admin-batch-create-events`
+- `admin-update-event`
+- `admin-batch-update-events`
 - `admin-create-record`
+- `admin-batch-create-records`
 - `admin-update-record`
+- `admin-batch-update-records`
 - `admin-get-event-moderation-schema`
 - `admin-get-report-triage-schema`
 - `admin-get-contribution-request-review-schema`
@@ -229,9 +235,15 @@ Use this section as the quick admin-only capability summary.
 | Membership-claim workflows | `admin-review-membership-claim` |
 | Event image prompts | `admin-event-cover-image-prompt` (prompt), `admin-event-poster-image-prompt` (prompt) |
 | Event image upload | `admin-upload-event-cover-image`, `admin-upload-event-poster-image` |
+| Dedicated event create | `admin-create-event` |
+| Batch event create | `admin-batch-create-events` |
+| Dedicated event update | `admin-update-event` |
+| Batch event update | `admin-batch-update-events` |
 | Create | `admin-create-record` |
+| Batch create | `admin-batch-create-records` |
 | Update | `admin-update-record` |
-| Validate-only preview | Yes, on `admin-create-record` and `admin-update-record` |
+| Batch update | `admin-batch-update-records` |
+| Validate-only preview | Yes, on create/update/batch tools |
 
 ## Event cover/poster image generation
 
@@ -260,18 +272,18 @@ Event image generation uses a 3-step workflow on the admin server:
 
 | Resource | Admin MCP | Notes |
 | --- | --- | --- |
-| `events` | list/get/meta + schema + create + update + preview | Event moderation has a dedicated workflow schema tool |
-| `inspirations` | list/get/meta + schema + create + update + preview | Admin-only through the current MCP surface |
-| `institutions` | list/get/meta + schema + create + update + preview | Member scope is separate |
-| `speakers` | list/get/meta + schema + create + update + preview | Member scope is separate |
-| `references` | list/get/meta + schema + create + update + preview | Member scope is separate |
-| `reports` | list/get/meta + schema + create + update + preview | Admin-only CRUD plus explicit triage workflow |
-| `donation-channels` | list/get/meta + schema + create + update + preview | Admin-only payment channel management |
-| `series` | list/get/meta + schema + create + update + preview | Admin-only through the current MCP surface |
-| `spaces` | list/get/meta + schema + create + update + preview | Admin-only through the current MCP surface |
-| `tags` | list/get/meta + schema + create + update + preview | Admin-only taxonomy management |
-| `venues` | list/get/meta + schema + create + update + preview | Admin-only through the current MCP surface |
-| `subdistricts` | list/get/meta + schema + create + update + preview | No media upload fields |
+| `events` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Event moderation has a dedicated workflow schema tool |
+| `inspirations` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only through the current MCP surface |
+| `institutions` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Member scope is separate |
+| `speakers` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Member scope is separate |
+| `references` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Member scope is separate |
+| `reports` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only CRUD plus explicit triage workflow |
+| `donation-channels` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only payment channel management |
+| `series` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only through the current MCP surface |
+| `spaces` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only through the current MCP surface |
+| `tags` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only taxonomy management |
+| `venues` | list/get/meta + schema + create + batch-create + update + batch-update + preview | Admin-only through the current MCP surface |
+| `subdistricts` | list/get/meta + schema + create + batch-create + update + batch-update + preview | No media upload fields |
 
 ## Current structurally write-capable admin resources include:
 
@@ -349,7 +361,9 @@ When the user asks you to “look for” a named place, start with the most like
 - Venue write schemas expose `address`, `facilities`, `contacts`, and `social_media` semantics. Omitted address keys preserve the existing nested values, but `address: {}` deletes the stored venue address on the shared save path. `facilities`, `contacts`, and `social_media` are replacement collections; `facilities` input is normalized into the stored boolean facility map, so safe clients should resend the full enabled facility set.
 - Reference write schemas expose `author`, `publication_year`, `publisher`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, and `social_media` semantics. Omitted optional scalars preserve the existing value, while `null` or trimmed empty input clears `author`, `publication_year`, and `publisher` to `null`. `parent_reference_id` turns a book reference into a child part only when it points at a root book reference; `null` converts the record back to a root/standalone reference and clears the part fields. `part_type`, `part_number`, and `part_label` are used only when the reference remains a child book part, and the shared mutation layer normalizes blank part values to `null`. `social_media` follows the same replacement and canonicalization rules as the other write-capable directory resources.
 - Reference record payloads and list results can now surface `display_title`, `parent_reference_id`, `part_type`, `part_number`, `part_label`, and `is_part`. Use `display_title` for human-facing labels when a record may be a specific jilid/bahagian/volume.
-- Event write schemas expose `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, `registration_mode`, and `status`. Omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear supported relation collections, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values. `status` accepts `draft`, `pending`, or `approved`; create defaults to `draft`; `approved` sets `published_at`; `draft` and `pending` clear it.
+- Event write schemas expose `event_url`, `live_url`, `recording_url`, `languages`, `references`, `series`, `domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`, `speakers`, `other_key_people`, `organizer_type`, `registration_mode`, and `status`. Omitted scalar and relation fields preserve the current value via server-side form-state merge, `null` or `[]` clear supported relation collections on the raw UUID-array fields, and submitted `speakers` / `other_key_people` arrays rebuild the underlying `key_people` rows with new order values. `status` accepts `draft`, `pending`, or `approved`; create defaults to `draft`; `approved` sets `published_at`; `draft` and `pending` clear it.
+- Dedicated MCP event tools are convenience wrappers, not separate persistence paths. `admin-create-event`, `admin-update-event`, `admin-batch-create-events`, and `admin-batch-update-events` accept route-key aliases (`organizer_key`, `institution_key`, `venue_key`, `space_key`, `speaker_keys`, `reference_keys`) and normalize them into the same admin event payload used by the raw HTTP/admin resource writer.
+- On update-only MCP event tools, `speaker_keys` and `reference_keys` have presence-sensitive full-sync semantics: omitted or `null` preserves the current relationship set; `[]` detaches all; a non-empty array replaces all with the resolved records. Do not send `[]` unless detaching all is intentional.
 - Event record detail payloads also expose the public change-surface projection fields `active_change_notice`, `change_announcements`, and `replacement_event` so MCP clients can reason about the same published replacement-chain behavior as the public/mobile event detail contract without following stale links.
 - Series write schemas expose `description`, `languages`, and `slug` semantics. `title`, `slug`, and `visibility` remain required on update; `description` clears on `null` / trimmed empty input and `languages` follows omit-preserve / null-clear / array-replace semantics.
 - Donation channel write schemas expose `donatable_type`, `method`, `label`, `reference_note`, and the method-specific bank / DuitNow / ewallet fields. Owner-type aliases normalize to canonical stored morph values, method switches clear unrelated field groups, and destructive QR clear flags remain unsupported through MCP.
@@ -370,9 +384,9 @@ When the user asks you to “look for” a named place, start with the most like
 
 ## Validate-only preview behavior
 
-- `validate_only=true` is supported on `admin-create-record` and `admin-update-record`.
+- `validate_only=true` is supported on `admin-create-event`, `admin-update-event`, `admin-batch-create-events`, `admin-batch-update-events`, `admin-create-record`, `admin-update-record`, `admin-batch-create-records`, and `admin-batch-update-records`.
 - Previews normalize descriptors into file summaries without persisting media.
-- `apply_defaults=true` enables server-side default application during preview flows where the schema advertises it.
+- `apply_defaults=true` is preview-only. It is honored only when `validate_only=true`, where it merges schema defaults into the candidate payload for validation feedback. It is ignored for persisted creates/updates; for real writes, send the exact values you want saved and rely only on the shared backend save action for true model defaults.
 - schema-driven `feedback` issues may include suggested values, defaults, and conditional `required_because` context.
 - Validation failures in validate-only mode include `fix_plan`, `remaining_blockers`, `normalized_payload_preview`, and `can_retry` so tool clients can recover in one retry loop.
 - `clear_*` media flags are intentionally rejected in MCP even when the raw HTTP admin schema may mention destructive media handling.
@@ -446,7 +460,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 | `admin-get-report-triage-schema` | Read the explicit triage schema for one report | `GET /api/v1/admin/reports/{recordKey}/triage-schema` |
 | `admin-get-contribution-request-review-schema` | Read the explicit review schema for one contribution request | `GET /api/v1/admin/contribution-requests/{recordKey}/review-schema` |
 | `admin-get-membership-claim-review-schema` | Read the explicit review schema for one membership claim | `GET /api/v1/admin/membership-claims/{recordKey}/review-schema` |
-| `admin-create-event` | Create or preview an event with event-first fields and relation route keys. Accepts scalar event fields (`title`, `event_date`, `prayer_time`, `event_type`, `description`, `custom_time`, `end_time`, `timezone`, `event_format`, `visibility`, `event_url`, `live_url`, `recording_url`, `gender`, `age_group`, `children_allowed`, `is_muslim_only`, `status`, `registration_required`, `registration_mode`, `is_priority`, `is_featured`, `is_active`), relation route keys (`organizer_type`, `organizer_key`, `institution_key`, `venue_key`, `space_key`), speaker/reference route-key arrays (`speaker_keys`, `reference_keys`), language IDs (`languages`), tag arrays (`domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`), `other_key_people`, optional `series`, media descriptors (`cover`, `poster`, `gallery`), and control flags (`validate_only`, `apply_defaults`). | `POST /api/v1/admin/{resourceKey}` with `resourceKey=events` (MCP event-first wrapper) |
+| `admin-create-event` | MCP-only event wrapper for create/preview with event-first fields and relation route keys. Accepts scalar event fields (`title`, `event_date`, `prayer_time`, `event_type`, `description`, `custom_time`, `end_time`, `timezone`, `event_format`, `visibility`, `event_url`, `live_url`, `recording_url`, `gender`, `age_group`, `children_allowed`, `is_muslim_only`, `status`, `registration_required`, `registration_mode`, `is_priority`, `is_featured`, `is_active`), relation route keys (`organizer_type`, `organizer_key`, `institution_key`, `venue_key`, `space_key`), speaker/reference route-key arrays (`speaker_keys`, `reference_keys`), language IDs (`languages`), tag arrays (`domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`), `other_key_people`, optional `series`, media descriptors (`cover`, `poster`, `gallery`), and control flags (`validate_only`, `apply_defaults`). `apply_defaults` is preview-only. | `POST /api/v1/admin/{resourceKey}` with `resourceKey=events` (MCP event-first wrapper) |
 | `admin-get-record-media` | List media attachments for one admin record to verify uploads or prefill image generation forms | MCP-only media inspection tool |
 | `admin-read-debug-log` | Read recent filtered lines from the application debug log | MCP-only debug log reader |
 | `admin-create-github-issue` | Create a GitHub issue in the configured repository and auto-assign Copilot | `POST /api/v1/github-issues` (admin caller path) |
@@ -460,6 +474,7 @@ The admin server is the model-visible API-like surface for admin workflows. The 
 Admin tool behavior notes:
 
 - `validate_only=true` is supported for create/update preview flows.
+- `apply_defaults=true` has no effect unless `validate_only=true`. Treat schema defaults as preview/autofill hints, not as a persisted-write shortcut.
 - `admin-list-resources` is a discovery manifest, not merely a small name list. Keep `verbose=false` for compact exploration and use `verbose=true` only when you need full metadata. Pass `writable_only=true` to filter the list to only resources with active write support.
 - `current_media` is metadata only; it is useful for form prefill but does not expose signed URLs.
 - `admin-search-events` is a dedicated event discovery tool and is aligned with `GET /api/v1/admin/events/search`. It supports keyword search with default cross-entity expansion (institution/speaker/reference), geo-proximity sorting (`sort=distance` with `lat`, `lng`, `radius_km`), date range (`starts_after`, `starts_before`, `time_scope`), clock-time or prayer-relative windows (`timing_mode`, `starts_time_from/until`, `prayer_time`), event type and format arrays, audience and audience-boolean filters, institution/venue/speaker/role filters, tag/reference UUID arrays, reference author filters (`reference_author_search`), and query expansion toggles (`search_include_institutions`, `search_include_speakers`, `search_include_references`). Each parameter's description in the tool schema lists valid enum values and interdependencies (e.g. `sort=distance` requires `lat`+`lng`).
@@ -476,7 +491,8 @@ Admin tool behavior notes:
 - `admin-create-github-issue` creates a GitHub issue and, for admin actors, automatically assigns Copilot using the server-side configuration and model fallback chain.
 - All read-only tools (discovery, list, get, schema, and workflow-schema tools) carry read-only and idempotent metadata hints; MCP clients that honor these hints can call them without requiring confirmation.
 - Write and workflow execution tools carry non-read-only and non-idempotent metadata hints; MCP clients may prompt for confirmation before calling them.
-- For event creation, prefer `admin-create-event` over `admin-create-record` to avoid raw UUID-heavy payloads and get event-specific confirmation text. Its payload is aligned with `/hantar-majlis` field semantics (excluding media-only UX concerns) and is normalized into the same admin API create contract used by `POST /api/v1/admin/events`: use route-key helpers (`organizer_key`, `institution_key`, `venue_key`, `space_key`, `speaker_keys`, `reference_keys`) plus direct arrays for tags (`domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`), `other_key_people`, and `series` where needed.
+- `admin-update-event` and `admin-batch-update-events` use the same route-key contract as `admin-create-event`, but update relation aliases are presence-sensitive: omit `speaker_keys`/`reference_keys` or pass `null` to preserve existing relationships; pass `[]` to detach all; pass a non-empty array to replace all.
+- For event creation, prefer `admin-create-event` over `admin-create-record` to avoid raw UUID-heavy payloads and get event-specific confirmation text. Its payload is aligned with `/hantar-majlis` field semantics (excluding media-only UX concerns) and is normalized into the same admin API create contract used by `POST /api/v1/admin/events`: use route-key helpers (`organizer_key`, `institution_key`, `venue_key`, `space_key`, `speaker_keys`, `reference_keys`) plus direct arrays for tags (`domain_tags`, `discipline_tags`, `source_tags`, `issue_tags`), `other_key_people`, and `series` where needed. For persisted creates, include the actual defaultable values you want stored (`timezone`, `event_format`, `visibility`, `gender`, `age_group`, etc.); `apply_defaults` will not fill them unless the call is a validate-only preview.
 - `admin-get-record-media` is useful after any media upload to confirm that the file persisted correctly and to retrieve collection metadata for image-generation reference prompts.
 - `admin-read-debug-log` exposes recent application log lines. It is conditionally available and should only be invoked by trusted admin actors for debugging purposes.
 
