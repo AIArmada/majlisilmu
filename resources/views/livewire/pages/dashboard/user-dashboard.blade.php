@@ -543,8 +543,8 @@
 
                     @if($recommendedEvent instanceof \App\Models\Event)
                         <a href="{{ route('events.show', $recommendedEvent) }}" wire:navigate class="group mt-4 block overflow-hidden rounded-lg border border-[#eadfca] transition hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/10">
-                            <div class="aspect-4/3 overflow-hidden bg-slate-100">
-                                <img src="{{ $recommendedEvent->card_image_url }}" alt="{{ $recommendedEvent->title }}" loading="lazy" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                            <div class="aspect-video overflow-hidden bg-slate-100">
+                                <img src="{{ $recommendedEvent->card_image_url }}" alt="{{ $recommendedEvent->title }}" loading="lazy" class="h-full w-full object-contain p-1">
                             </div>
                             <div class="p-4">
                                 <h3 class="line-clamp-2 font-heading text-lg font-bold text-[#0b2a42]">{{ $recommendedEvent->title }}</h3>
