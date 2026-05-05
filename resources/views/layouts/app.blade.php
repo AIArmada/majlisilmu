@@ -252,9 +252,9 @@
                             </div>
                         </div>
 
-                        <a href="{{ route('submit-event.create') }}" wire:navigate
+                        <a href="{{ route('submit-event.landing') }}" wire:navigate
                             class="hidden sm:inline-flex items-center justify-center rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors">
-                            {{ __('Submit') }}
+                            {{ __('Tambah Majlis') }}
                         </a>
 
                         @auth
@@ -352,9 +352,9 @@
                                 class="block py-2 text-base font-semibold text-slate-700 hover:text-emerald-600">{{ __('Speakers') }}</a>
                         </div>
                         <div class="border-t border-slate-100 pt-4 flex flex-col gap-3">
-                            <a href="{{ route('submit-event.create') }}" wire:navigate
+                            <a href="{{ route('submit-event.landing') }}" wire:navigate
                                 class="block w-full text-center rounded-lg bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
-                                {{ __('Submit Event') }}
+                                {{ __('Tambah Majlis') }}
                             </a>
                             @guest
                                 <div class="grid grid-cols-2 gap-3">

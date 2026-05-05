@@ -75,6 +75,8 @@ Route::get('/majlis/{event:slug}/kalendar.ics', [EventsController::class, 'calen
     ->name('events.calendar');
 
 // Event Submission (Public)
+Route::livewire('/tambah-majlis', 'pages.submit-event.landing')
+    ->name('submit-event.landing');
 Route::livewire('/hantar-majlis', 'pages.submit-event.create')
     ->name('submit-event.create');
 Route::livewire('/hantar-majlis/berjaya', 'pages.submit-event.success')->name('submit-event.success');
