@@ -153,6 +153,7 @@ MajlisIlmu exposes the member MCP server for Ahli-scoped resource access. Treat 
 | Resource | URI | Purpose |
 |---|---|---|
 | `docs-member-mcp-guide` | `file://docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md` | Member-facing guide for auth, transport, discovery primitives, capability matrix, writable resources, and workflow guidance |
+| `docs-admin-event-csv-json-create-guide` | `file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md` | CSV/JSON event creation workflow playbook with correction handling, entity resolution, duplicate checks, and chunked validate-then-create execution |
 
 ## Documentation search and fetch tools
 
@@ -163,7 +164,7 @@ The member server exposes two read-only documentation tools for model discoverab
 | `search` | Search the verified member MCP guide exposed by this server | Input: one `query` string |
 | `fetch` | Fetch the member guide by id | Input: one `id` string returned by `search` |
 
-These tools search and fetch only the verified member guide above. They do **not** search member runtime records.
+These tools search and fetch only the verified member MCP docs above. They do **not** search member runtime records.
 
 ## Documentation routing prompt
 

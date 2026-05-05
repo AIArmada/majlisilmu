@@ -142,6 +142,7 @@ MajlisIlmu exposes the admin MCP server for full admin-surface resource access. 
 | Resource | URI | Purpose |
 |---|---|---|
 | `docs-admin-mcp-guide` | `file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md` | Admin-facing guide for auth, transport, discovery primitives, capability matrix, writable resources, and workflow guidance |
+| `docs-admin-event-csv-json-create-guide` | `file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md` | CSV/JSON event creation workflow playbook with correction handling, entity resolution, duplicate checks, and chunked validate-then-create execution |
 
 ## Documentation search and fetch tools
 
@@ -152,7 +153,7 @@ The admin server exposes two read-only documentation tools for model discoverabi
 | `search` | Search the verified admin MCP guide exposed by this server | Input: one `query` string |
 | `fetch` | Fetch the admin guide by id | Input: one `id` string returned by `search` |
 
-These tools search and fetch only the verified admin guide above. They do **not** search admin runtime records.
+These tools search and fetch only the verified admin docs above. They do **not** search admin runtime records.
 
 ## Documentation routing prompt
 
