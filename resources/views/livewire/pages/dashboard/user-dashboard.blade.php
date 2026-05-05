@@ -86,6 +86,12 @@
             'class' => 'bg-teal-50 text-teal-700',
         ],
         [
+            'label' => __('Rujukan Diikuti'),
+            'value' => $followingReferences->count(),
+            'icon' => 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+            'class' => 'bg-sky-50 text-sky-700',
+        ],
+        [
             'label' => __('Sumbangan Saya'),
             'value' => $dawahImpactSummary['total_outcomes'],
             'icon' => 'M12 21s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.6-7 10-7 10z',
@@ -99,21 +105,27 @@
             'count' => $followingInstitutions->count(),
             'description' => __('Masjid dan surau yang saya ikuti'),
             'url' => route('institutions.index'),
-            'image' => $followingInstitutions->first()?->public_image_url ?? asset('images/placeholders/institution.png'),
+            'type' => 'institution',
+            'images' => $followingInstitutions->filter(fn($i) => $i->public_image_url)->shuffle()->take(3)->map(fn($i) => $i->public_image_url)->values()->all(),
+            'placeholder' => asset('images/placeholders/institution.png'),
         ],
         [
             'label' => __('Penceramah'),
             'count' => $followingSpeakers->count(),
             'description' => __('Ulama dan ustaz yang saya ikuti'),
             'url' => route('speakers.index'),
-            'image' => $followingSpeakers->first()?->public_avatar_url ?? asset('images/placeholders/speaker.png'),
+            'type' => 'speaker',
+            'images' => $followingSpeakers->map(fn($s) => $s->public_avatar_url)->filter()->values()->take(4)->all(),
+            'placeholder' => asset('images/placeholders/speaker.png'),
         ],
         [
             'label' => __('Rujukan'),
             'count' => $followingReferences->count(),
             'description' => __('Kitab dan bahan bacaan yang saya ikuti'),
             'url' => route('references.index'),
-            'image' => asset('images/about/section_02.png'),
+            'type' => 'reference',
+            'images' => $followingReferences->filter(fn($r) => $r->hasMedia('front_cover'))->map(fn($r) => $r->getFirstMediaUrl('front_cover', 'thumb'))->filter()->values()->take(4)->all(),
+            'placeholder' => asset('images/about/section_02.png'),
         ],
         [
             'label' => __('Carian'),
@@ -162,35 +174,34 @@
         <div class="container relative mx-auto px-6 py-10 lg:px-12 lg:py-14">
             <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
                 <div class="max-w-3xl">
-                    <p class="text-sm font-semibold text-emerald-800">{{ $dashboardPageLabel }}</p>
-                    <h1 class="mt-4 break-words font-heading text-4xl font-bold leading-tight text-[#0b2a42] md:text-5xl">
-                        {{ __('Ini perjalanan ilmu saya.') }}
+                    <h1 class="break-words font-heading text-4xl font-bold leading-tight text-[#0b2a42] md:text-5xl">
+                        {{ __('Perjalanan Menuju Allah') }}
                     </h1>
                     <p class="mt-5 max-w-2xl break-words text-base leading-7 text-slate-600">
                         {{ __('Teruskan istiqamah mencari ilmu dan sebarkan manfaatnya. Setiap langkah kecil hari ini, membawa kita lebih dekat kepada keredhaan Allah.') }}
                     </p>
                 </div>
 
-                <div class="relative hidden min-h-72 lg:block">
-                    <div class="absolute right-0 top-1/2 size-96 -translate-y-1/2 overflow-hidden rounded-full border border-white/70 bg-white shadow-2xl shadow-emerald-950/10">
-                        <img src="{{ asset('images/default-mosque-hero.png') }}" alt="" class="h-full w-full object-cover">
+                <div class="hidden lg:block">
+                    <div class="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl shadow-emerald-950/10">
+                        <img src="{{ asset('images/default-mosque-hero.png') }}" alt="" class="h-80 w-full object-cover">
                     </div>
                 </div>
             </div>
 
             <div class="relative z-10 mt-8 rounded-lg border border-[#eadfca] bg-white/95 p-4 shadow-xl shadow-amber-950/10 backdrop-blur">
-                <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                <div class="grid grid-cols-3 gap-2 md:grid-cols-3 xl:grid-cols-6">
                     @foreach($dashboardStats as $stat)
-                        <a href="{{ $loop->index < 2 ? '#majlis-saya' : ($loop->index === 4 ? route('dashboard.dawah-impact') : '#ikuti') }}"
-                            @if($loop->index === 4) wire:navigate @endif
-                            class="group flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-[#eee4d3] bg-white px-3 py-4 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/5">
-                            <span class="flex size-11 items-center justify-center rounded-full {{ $stat['class'] }}">
-                                <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <a href="{{ $loop->index < 2 ? '#majlis-saya' : ($loop->index === 5 ? route('dashboard.dawah-impact') : '#ikuti') }}"
+                            @if($loop->index === 5) wire:navigate @endif
+                            class="group flex flex-col items-center justify-center gap-1.5 rounded-lg border border-[#eee4d3] bg-white px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/5">
+                            <span class="flex size-8 items-center justify-center rounded-full {{ $stat['class'] }}">
+                                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $stat['icon'] }}" />
                                 </svg>
                             </span>
-                            <span class="font-heading text-3xl font-bold leading-none text-[#0b2a42]">{{ number_format($stat['value']) }}</span>
-                            <span class="text-xs font-medium leading-tight text-slate-600">{{ $stat['label'] }}</span>
+                            <span class="font-heading text-2xl font-bold leading-none text-[#0b2a42]">{{ number_format($stat['value']) }}</span>
+                            <span class="text-xs font-medium leading-tight text-slate-500">{{ $stat['label'] }}</span>
                         </a>
                     @endforeach
                 </div>
@@ -321,8 +332,32 @@
                     <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         @foreach($followingPanels as $panel)
                             <a href="{{ $panel['url'] }}" wire:navigate class="group rounded-lg border border-[#eadfca] bg-white p-3 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/10">
-                                <div class="relative h-20 overflow-hidden rounded-lg bg-[#f7f3ea]">
-                                    <img src="{{ $panel['image'] }}" alt="" loading="lazy" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                                <div class="relative aspect-video overflow-hidden rounded-lg bg-[#f7f3ea]">
+                                    @php
+                                        $panelType = $panel['type'] ?? 'institution';
+                                        $panelImages = $panel['images'] ?? [];
+                                        $panelPlaceholder = $panel['placeholder'] ?? '';
+                                    @endphp
+                                    @if(in_array($panelType, ['speaker', 'reference']) && count($panelImages) > 0)
+                                        <div class="flex h-full w-full items-center justify-center bg-[#f7f3ea]">
+                                            <div class="flex items-center -space-x-4">
+                                                @foreach(array_slice($panelImages, 0, 3) as $idx => $imgUrl)
+                                                    <div class="size-12 overflow-hidden rounded-full border-2 border-white shadow" style="z-index: {{ 10 - $idx }}">
+                                                        <img src="{{ $imgUrl }}" alt="" loading="lazy" class="h-full w-full object-cover">
+                                                    </div>
+                                                @endforeach
+                                                @if(count($panelImages) > 3)
+                                                    <div class="flex size-12 items-center justify-center rounded-full border-2 border-white bg-emerald-700 text-xs font-bold text-white shadow" style="z-index: 1">
+                                                        +{{ count($panelImages) - 3 }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @elseif($panelType === 'institution' && count($panelImages) > 0)
+                                        <img src="{{ $panelImages[0] }}" alt="" loading="lazy" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                                    @else
+                                        <img src="{{ $panelPlaceholder }}" alt="" loading="lazy" class="h-full w-full object-cover opacity-60">
+                                    @endif
                                     <span class="absolute right-2 top-2 flex size-9 items-center justify-center rounded-full bg-emerald-50 text-sm font-bold text-emerald-800 ring-1 ring-emerald-100">{{ number_format($panel['count']) }}</span>
                                 </div>
                                 <h3 class="mt-3 font-heading text-lg font-bold text-[#0b2a42]">{{ $panel['label'] }}</h3>
@@ -353,7 +388,16 @@
 
                     <div class="mt-5 space-y-2">
                         @forelse($recentSavedSearches as $savedSearch)
-                            <a href="{{ route('saved-searches.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg border border-[#eadfca] bg-white px-4 py-3 transition hover:border-emerald-200 hover:bg-emerald-50/40">
+                            @php
+                                $savedSearchUrl = route('events.index', array_filter(
+                                    array_merge(
+                                        ['search' => $savedSearch->query ?: null],
+                                        is_array($savedSearch->filters) ? $savedSearch->filters : []
+                                    ),
+                                    fn($v) => $v !== null && $v !== '' && $v !== []
+                                ));
+                            @endphp
+                            <a href="{{ $savedSearchUrl }}" wire:navigate class="flex items-center gap-3 rounded-lg border border-[#eadfca] bg-white px-4 py-3 transition hover:border-emerald-200 hover:bg-emerald-50/40">
                                 <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
                                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.2-5.2M10.8 18a7.2 7.2 0 100-14.4 7.2 7.2 0 000 14.4z" />
@@ -499,7 +543,7 @@
 
                     @if($recommendedEvent instanceof \App\Models\Event)
                         <a href="{{ route('events.show', $recommendedEvent) }}" wire:navigate class="group mt-4 block overflow-hidden rounded-lg border border-[#eadfca] transition hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/10">
-                            <div class="aspect-[16/7] overflow-hidden bg-slate-100">
+                            <div class="aspect-4/3 overflow-hidden bg-slate-100">
                                 <img src="{{ $recommendedEvent->card_image_url }}" alt="{{ $recommendedEvent->title }}" loading="lazy" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
                             </div>
                             <div class="p-4">
