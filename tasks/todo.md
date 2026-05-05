@@ -11411,3 +11411,27 @@
   - `npm run build` => pass
   - `git diff --check` => pass
   - Full `vendor/bin/phpstan analyse --ansi` still fails on two pre-existing `PreNominal::PU` exhaustiveness errors in `app/Models/Speaker.php` and `database/migrations/2026_04_09_000100_add_search_index_to_speakers.php`.
+
+# Tambah Majlis Page Todo
+
+- [x] Audit existing submit-event entry points and layout conventions
+- [x] Add a new `/tambah-majlis` public page based on the supplied design
+- [x] Connect primary actions to the existing submit-event flow without duplicating backend submission logic
+- [x] Evaluate whether product event tracking is needed for the new entry page
+- [x] Run focused page tests, build, and browser verification
+
+## Review
+- Changes:
+  - Added a new public `/tambah-majlis` route named `submit-event.landing`.
+  - Built a new `Tambah Majlis` page based on the supplied reference: hero, three entry cards, poster-assisted walkthrough, manual-entry preview, trust/help cards, and bottom thank-you band.
+  - Updated the desktop and mobile header submit entry to point to `/tambah-majlis` while leaving the existing `/hantar-majlis` submission component intact.
+  - Connected poster/manual/institution CTAs to the existing submit-event form and added high-signal Signals tracking attributes for entry selection and flow starts.
+- Verification:
+  - `php artisan route:list --name=submit-event --path=tambah-majlis` => `/tambah-majlis` registered as `submit-event.landing`.
+  - Chrome DevTools on `https://majlisilmu.test/tambah-majlis` at 1800px => title/content rendered, no horizontal overflow, content frame spans 180px to 1620px matching header content.
+  - Chrome DevTools mobile viewport => no horizontal overflow; hero, entry cards, and manual section render in a single-column flow.
+  - `vendor/bin/pest --parallel --compact tests/Feature/PublicPagesTest.php --filter='loads public index pages|submit-event'` => 3 passed, 39 assertions
+  - `vendor/bin/phpstan analyse routes/web.php tests/Feature/PublicPagesTest.php --ansi` => no errors
+  - `vendor/bin/pint --test routes/web.php resources/views/layouts/app.blade.php resources/views/components/pages/submit-event/⚡landing.blade.php tests/Feature/PublicPagesTest.php` => pass
+  - `npm run build` => pass
+  - `git diff --check` => pass

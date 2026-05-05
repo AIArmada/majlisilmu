@@ -35,6 +35,12 @@ it('loads public index pages', function () {
     $this->get(route('speakers.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
     $this->get(route('venues.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
     $this->get(route('references.index'))->assertSuccessful()->assertSee('Majlis Ilmu');
+    $this->get(route('submit-event.landing'))
+        ->assertSuccessful()
+        ->assertSee('Tambah Majlis')
+        ->assertSee('Ada majlis ilmu')
+        ->assertSee('yang patut orang tahu?')
+        ->assertSee(route('submit-event.create'), false);
     $this->get(route('submit-event.create'))->assertSuccessful()->assertSee('Hantar Majlis');
     $this->get(route('submit-event.success'))->assertSuccessful()->assertSee(__('Event Submitted!'));
 
