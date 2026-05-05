@@ -150,8 +150,8 @@ it('renders the reference-inspired user dashboard with real saved search and not
 
     $response->assertOk()
         ->assertSee('Dashboard')
-        ->assertSee('This is my knowledge journey.')
-        ->assertSee('Keep seeking knowledge steadily and share its benefit.')
+        ->assertSee('Perjalanan Menuju Allah')
+        ->assertSee('Keep seeking knowledge steadily')
         ->assertSee('My Events')
         ->assertSee('Latest Notifications')
         ->assertSee('Quick Actions')
@@ -336,7 +336,7 @@ it('renders the redesigned dashboard in Malay with reference-inspired sections',
 
     $response->assertOk()
         ->assertSee('Dashboard')
-        ->assertSee('Ini perjalanan ilmu saya.')
+        ->assertSee('Perjalanan Menuju Allah')
         ->assertSee('Teruskan istiqamah mencari ilmu dan sebarkan manfaatnya.')
         ->assertSee('Majlis Saya')
         ->assertSee('Notifikasi Terkini')
