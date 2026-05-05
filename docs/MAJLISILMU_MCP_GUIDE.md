@@ -168,11 +168,12 @@ If you want ChatGPT to understand a capability, expose it as a dedicated tool wi
 
 ### Verified documentation resources
 
-Each MCP server exposes its own read-only markdown guide through MCP `resources/list` and `resources/read`:
+Each MCP server exposes verified read-only markdown docs through MCP `resources/list` / `resources/read`, and through the MCP docs `search` / `fetch` tools:
 
 | Resource | URI | Purpose |
 |---|---|---|
 | `docs-admin-mcp-guide` | `file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md` | Verified guide for admin MCP auth, transport, discovery primitives, capability matrix, media rules, and admin write behavior |
+| `docs-admin-event-csv-json-create-guide` | `file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md` | Verified operational playbook for creating events from CSV/JSON source data via admin MCP tools |
 | `docs-member-mcp-guide` | `file://docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md` | Verified guide for member MCP auth, transport, discovery primitives, capability matrix, media rules, and member write behavior |
 
 Treat the matching server guide as the model-readable documentation page for that MCP surface, not as a replacement for the live tool/resource descriptors.
@@ -190,9 +191,9 @@ Each server exposes two MCP-standard read-only documentation tools for model dis
 | `search` | Search the verified documentation page exposed by this server | Input: one `query` string. Returns JSON text with `{results:[{id,title,url}]}`. |
 | `fetch` | Fetch the verified documentation page by id | Input: one `id` string returned by `search`. Returns JSON text with `{id,title,text,url,metadata}`. |
 
-These tools search and fetch only the verified MCP guide exposed by that same server. They do **not** search admin/member resource records.
+These tools search and fetch only the verified MCP docs exposed by that same server. They do **not** search admin/member resource records.
 
-The `url` returned by `search` and shown in the raw MCP resource list is informational. The `fetch` tool schema accepts `id` only; call it as `{"id":"docs-admin-mcp-guide"}` or `{"id":"docs-member-mcp-guide"}` depending on the connected server, and do not pass `url` or `file://...`.
+The `url` returned by `search` and shown in the raw MCP resource list is informational. The `fetch` tool schema accepts `id` only; call it as `{"id":"docs-admin-mcp-guide"}`, `{"id":"docs-admin-event-csv-json-create-guide"}`, or `{"id":"docs-member-mcp-guide"}` depending on the connected server, and do not pass `url` or `file://...`.
 
 ### Documentation routing prompt
 

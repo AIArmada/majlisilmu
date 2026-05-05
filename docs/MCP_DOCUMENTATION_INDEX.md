@@ -22,6 +22,7 @@
 | **Member AI Agents** | English | [MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md](MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md) | You're writing AI agents to access the member MCP surface. Covers member workflows and limitations. |
 | **Tool Integrators** | English | [MAJLISILMU_MCP_TOOL_EXAMPLES.md](MAJLISILMU_MCP_TOOL_EXAMPLES.md) | You need copy-paste examples of how to call MCP tools in JSON. |
 | **ChatGPT Connector Builders** | English | [CHATGPT_FILE_PARAMS_INTEGRATION.md](CHATGPT_FILE_PARAMS_INTEGRATION.md) | You're building a ChatGPT connector and need to understand file upload support. |
+| **CSV/JSON Event Import Operators** | English | [MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md](MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md) | You need a safe, correction-aware workflow for creating events from spreadsheet-style data through MCP tools. |
 
 ---
 
@@ -79,6 +80,18 @@
 
 ---
 
+### "I'm importing events from CSV/JSON and need a safe workflow"
+→ Read: **[MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md](MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md)**
+
+✅ You'll learn:
+- Source-of-truth and correction precedence
+- Institution/speaker/reference resolution strategy
+- Prayer-time and event-type normalization
+- Duplicate checks before create
+- Validate-first, chunked batch execution
+
+---
+
 ### "I'm integrating MCP file descriptors (content_base64 / download_url)"
 → Read: **[CHATGPT_FILE_PARAMS_INTEGRATION.md](CHATGPT_FILE_PARAMS_INTEGRATION.md)**
 
@@ -101,6 +114,7 @@
 | **MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md** | Complete guide for AI agents on member surface | AI agents, tool builders | Medium |
 | **MAJLISILMU_MCP_TOOL_EXAMPLES.md** | JSON code examples for tool calls | Developers, integrators | Short |
 | **CHATGPT_FILE_PARAMS_INTEGRATION.md** | ChatGPT file parameter support documentation | Connector builders | Short |
+| **MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md** | Safe event-creation workflow from CSV/JSON source data via MCP | MCP operators, AI agents | Medium |
 
 ---
 
@@ -114,6 +128,7 @@
 | Member Agent Guide | ✅ [MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md](MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md) | — | For AI agents (English sufficient) |
 | Tool Examples | ✅ [MAJLISILMU_MCP_TOOL_EXAMPLES.md](MAJLISILMU_MCP_TOOL_EXAMPLES.md) | — | JSON is language-agnostic |
 | File Descriptors | ✅ [CHATGPT_FILE_PARAMS_INTEGRATION.md](CHATGPT_FILE_PARAMS_INTEGRATION.md) | — | For technical integrators |
+| CSV/JSON Event Creation Playbook | ✅ [MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md](MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md) | — | Operational safety checklist for event imports |
 
 ---
 
@@ -166,6 +181,7 @@
 | MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md | April 28, 2026 | ✅ Current |
 | MAJLISILMU_MCP_TOOL_EXAMPLES.md | April 29, 2026 | ✅ Current |
 | CHATGPT_FILE_PARAMS_INTEGRATION.md | April 29, 2026 | ✅ Current |
+| MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md | May 5, 2026 | ✅ Current |
 
 ---
 

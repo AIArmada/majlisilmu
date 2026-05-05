@@ -3639,14 +3639,36 @@ it('searches and fetches verified documentation through admin MCP tools', functi
         ->assertName('search')
         ->assertTitle('Search Verified Documentation')
         ->assertStructuredContent(fn ($json) => $json
-            ->has('results', 1)
-            ->where('results.0.id', 'docs-admin-mcp-guide')
-            ->where('results.0.title', 'MajlisIlmu Admin MCP Agent Guide')
-            ->where('results.0.url', 'file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md')
+            ->has('results')
+            ->where('results', fn ($results): bool => collect($results)->contains(
+                fn (array $result): bool => ($result['id'] ?? null) === 'docs-admin-mcp-guide'
+                    && ($result['title'] ?? null) === 'MajlisIlmu Admin MCP Agent Guide'
+                    && ($result['url'] ?? null) === 'file://docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md'
+            ))
             ->etc())
         ->assertSee([
             'docs-admin-mcp-guide',
             'MajlisIlmu Admin MCP Agent Guide',
+        ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminDocumentationSearchTool::class, [
+            'query' => 'csv json correction duplicate check validate only chunk',
+        ])
+        ->assertOk()
+        ->assertName('search')
+        ->assertTitle('Search Verified Documentation')
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('results')
+            ->where('results', fn ($results): bool => collect($results)->contains(
+                fn (array $result): bool => ($result['id'] ?? null) === 'docs-admin-event-csv-json-create-guide'
+                    && ($result['title'] ?? null) === 'MajlisIlmu MCP CSV / JSON Event Creation Playbook'
+                    && ($result['url'] ?? null) === 'file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md'
+            ))
+            ->etc())
+        ->assertSee([
+            'docs-admin-event-csv-json-create-guide',
+            'MajlisIlmu MCP CSV / JSON Event Creation Playbook',
         ]);
 
     AdminServer::actingAs($admin)
@@ -3670,6 +3692,28 @@ it('searches and fetches verified documentation through admin MCP tools', functi
             '# MajlisIlmu Admin MCP Agent Guide',
             '## MCP capability matrix',
             'Tool-centric clients like ChatGPT and the OpenAI Responses MCP integration import tools from `tools/list`',
+        ]);
+
+    AdminServer::actingAs($admin)
+        ->tool(AdminDocumentationFetchTool::class, [
+            'id' => 'docs-admin-event-csv-json-create-guide',
+        ])
+        ->assertOk()
+        ->assertName('fetch')
+        ->assertTitle('Fetch Verified Documentation Page')
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('id', 'docs-admin-event-csv-json-create-guide')
+            ->where('title', 'MajlisIlmu MCP CSV / JSON Event Creation Playbook')
+            ->where('url', 'file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md')
+            ->where('metadata.mime_type', 'text/markdown')
+            ->where('metadata.resource_uri', 'file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md')
+            ->where('metadata.relative_path', 'docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md')
+            ->where('text', fn (string $text): bool => str_contains($text, '## Source-of-truth precedence'))
+            ->etc())
+        ->assertSee([
+            'docs-admin-event-csv-json-create-guide',
+            '# MajlisIlmu MCP CSV / JSON Event Creation Playbook',
+            '## Source-of-truth precedence',
         ]);
 });
 

@@ -16,7 +16,9 @@ it('documents the app MCP usage guide', function (): void {
         ->toContain('MCP_CUSTOM_SCHEMES')
         ->toContain('docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md')
         ->toContain('docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md')
+        ->toContain('docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md')
         ->toContain('docs-admin-mcp-guide')
+        ->toContain('docs-admin-event-csv-json-create-guide')
         ->toContain('docs-member-mcp-guide')
         ->not->toContain('MAJLISILMU_MCP_AGENT_GUIDE.md')
         ->not->toContain('docs-mcp-guide');

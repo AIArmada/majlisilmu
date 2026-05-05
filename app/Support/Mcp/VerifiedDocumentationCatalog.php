@@ -35,6 +35,15 @@ class VerifiedDocumentationCatalog
                 'relative_path' => 'docs/MAJLISILMU_MCP_ADMIN_AGENT_GUIDE.md',
                 'mime_type' => 'text/markdown',
             ],
+            [
+                'id' => 'docs-admin-event-csv-json-create-guide',
+                'title' => 'MajlisIlmu MCP CSV / JSON Event Creation Playbook',
+                'description' => 'Verified workflow for creating events from CSV or JSON payloads through admin MCP tools, including correction handling, entity resolution, duplicate checks, and chunked validate-then-create execution.',
+                'resource_uri' => 'file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md',
+                'url' => 'file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md',
+                'relative_path' => 'docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md',
+                'mime_type' => 'text/markdown',
+            ],
         ], fn (array $document): bool => is_file(base_path($document['relative_path']))));
     }
 

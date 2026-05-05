@@ -1317,14 +1317,36 @@ it('searches and fetches verified documentation through member MCP tools', funct
         ->assertName('search')
         ->assertTitle('Search Verified Documentation')
         ->assertStructuredContent(fn ($json) => $json
-            ->has('results', 1)
-            ->where('results.0.id', 'docs-member-mcp-guide')
-            ->where('results.0.title', 'MajlisIlmu Member MCP Agent Guide')
-            ->where('results.0.url', 'file://docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md')
+            ->has('results')
+            ->where('results', fn ($results): bool => collect($results)->contains(
+                fn (array $result): bool => ($result['id'] ?? null) === 'docs-member-mcp-guide'
+                    && ($result['title'] ?? null) === 'MajlisIlmu Member MCP Agent Guide'
+                    && ($result['url'] ?? null) === 'file://docs/MAJLISILMU_MCP_MEMBER_AGENT_GUIDE.md'
+            ))
             ->etc())
         ->assertSee([
             'docs-member-mcp-guide',
             'MajlisIlmu Member MCP Agent Guide',
+        ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberDocumentationSearchTool::class, [
+            'query' => 'csv json correction duplicate check validate only chunk',
+        ])
+        ->assertOk()
+        ->assertName('search')
+        ->assertTitle('Search Verified Documentation')
+        ->assertStructuredContent(fn ($json) => $json
+            ->has('results')
+            ->where('results', fn ($results): bool => collect($results)->contains(
+                fn (array $result): bool => ($result['id'] ?? null) === 'docs-admin-event-csv-json-create-guide'
+                    && ($result['title'] ?? null) === 'MajlisIlmu MCP CSV / JSON Event Creation Playbook'
+                    && ($result['url'] ?? null) === 'file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md'
+            ))
+            ->etc())
+        ->assertSee([
+            'docs-admin-event-csv-json-create-guide',
+            'MajlisIlmu MCP CSV / JSON Event Creation Playbook',
         ]);
 
     MemberServer::actingAs($member)
@@ -1347,6 +1369,28 @@ it('searches and fetches verified documentation through member MCP tools', funct
             'docs-member-mcp-guide',
             '# MajlisIlmu Member MCP Agent Guide',
             'Current member-write-capable resources include:',
+        ]);
+
+    MemberServer::actingAs($member)
+        ->tool(MemberDocumentationFetchTool::class, [
+            'id' => 'docs-admin-event-csv-json-create-guide',
+        ])
+        ->assertOk()
+        ->assertName('fetch')
+        ->assertTitle('Fetch Verified Documentation Page')
+        ->assertStructuredContent(fn ($json) => $json
+            ->where('id', 'docs-admin-event-csv-json-create-guide')
+            ->where('title', 'MajlisIlmu MCP CSV / JSON Event Creation Playbook')
+            ->where('url', 'file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md')
+            ->where('metadata.mime_type', 'text/markdown')
+            ->where('metadata.resource_uri', 'file://docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md')
+            ->where('metadata.relative_path', 'docs/MAJLISILMU_MCP_EVENT_CSV_JSON_CREATION_GUIDE.md')
+            ->where('text', fn (string $text): bool => str_contains($text, '## Source-of-truth precedence'))
+            ->etc())
+        ->assertSee([
+            'docs-admin-event-csv-json-create-guide',
+            '# MajlisIlmu MCP CSV / JSON Event Creation Playbook',
+            '## Source-of-truth precedence',
         ]);
 });
 
