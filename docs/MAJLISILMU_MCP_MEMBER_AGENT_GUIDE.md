@@ -107,7 +107,20 @@ Event records expose multiple time representations:
 | `starts_at_local` | Local datetime when precise display is needed |
 | `starts_at` | Machine processing only — stored in UTC |
 
-For prayer-relative events, `timing_display` is always better than converting `starts_at`.
+**Timezone resolution for Malaysian users**
+
+`timing_display` and `end_time_display` reflect the timezone resolved by the server for the request context. When no viewer timezone is present, the server resolves to UTC. This means:
+
+- If `starts_at_local` has offset `+00:00`, the display strings are in UTC, **not** Malaysia local time.
+- When answering Malaysian user queries, convert the absolute UTC value in `starts_at` to `Asia/Kuala_Lumpur` (UTC+8) before presenting the time.
+- **Example**: `starts_at: 2026-05-07T00:30:00Z` → present as **8:30 AM MYT** (UTC+8), not `12:30 AM`.
+- **Prayer-relative labels** (`Selepas Maghrib`, `Selepas Isyak`, etc.) carry no raw clock time and must **not** be manually converted — display them as-is.
+
+Decision rule:
+
+1. If `timing_display` is a prayer-relative label → show it directly.
+2. If `starts_at_local` offset is `+08:00` → `timing_display` is already Malaysia local; show it directly.
+3. If `starts_at_local` offset is `+00:00` → convert `starts_at` UTC to `Asia/Kuala_Lumpur` and present the result (e.g., `8:30 AM MYT`).
 
 #### List my contribution requests
 
