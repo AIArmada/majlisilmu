@@ -117,6 +117,8 @@ If `data` is empty and `meta.pagination.total` is 0, the query succeeded but no 
 
 Avoid dumping large media payloads or raw UTC timestamps unless specifically requested.
 
+> **Timezone note**: `timing_display` and `end_time_display` are formatted in the timezone resolved by the server for the request. When no Malaysian viewer timezone context is present (including all admin MCP calls that do not supply one), the server resolves to UTC. Check `starts_at_local`: if its offset is `+00:00`, the display strings are UTC and **must be converted to `Asia/Kuala_Lumpur` before presenting them to Malaysian admins**.
+
 #### User-facing time display
 
 Event records expose multiple time representations:
@@ -129,7 +131,20 @@ Event records expose multiple time representations:
 | `starts_at_local` | Local datetime when precise display is needed |
 | `starts_at` | Machine processing only — stored in UTC |
 
-For prayer-relative events, `timing_display` is always better than converting `starts_at`.
+**Timezone resolution for Malaysian admins**
+
+`timing_display` and `end_time_display` reflect the timezone resolved by the server for the request context. Admin MCP calls do not carry a viewer timezone, so the server resolves to UTC by default. This means:
+
+- If `starts_at_local` has offset `+00:00`, the display strings (`timing_display`, `end_time_display`) are in UTC, **not** Malaysia local time.
+- When answering Malaysian admin queries ("hari ni ada majlis apa?"), convert the absolute UTC value in `starts_at` to `Asia/Kuala_Lumpur` (UTC+8) before presenting the time to the user.
+- **Example**: `starts_at: 2026-05-07T00:30:00Z` → present as **8:30 AM MYT** (UTC+8), not `12:30 AM`.
+- **Prayer-relative labels** (`Selepas Maghrib`, `Selepas Isyak`, etc.) in `timing_display` carry no raw clock time and must **not** be manually converted — display them as-is.
+
+Decision rule:
+
+1. If `timing_display` is a prayer-relative label → show it directly.
+2. If `starts_at_local` offset is `+08:00` → `timing_display` is already Malaysia local; show it directly.
+3. If `starts_at_local` offset is `+00:00` → convert `starts_at` UTC to `Asia/Kuala_Lumpur` and present the result (e.g., `8:30 AM MYT`).
 
 ---
 
@@ -504,10 +519,11 @@ Admin tool behavior notes:
 3. For event lists by date range, use `resource_key: "events"` with `starts_after` and `starts_before` (inclusive date-only boundaries).
 4. For a single local date, prefer `starts_on_local_date` over a same-day range.
 5. For user-facing event summaries, prefer `timing_display`, `starts_on_local_date`, `end_time_display`, and `event_type_label` over raw UTC fields.
-6. For any write, call `admin-get-write-schema` first and trust the live schema.
-7. Never guess relation names — use `admin-get-resource-meta` to discover them.
-8. Use `search` when the topic is fuzzy, `fetch` when the guide id is already known.
-9. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.
+6. **Always check the timezone of event display fields**: if `starts_at_local` offset is `+00:00`, the display strings are UTC — convert `starts_at` to `Asia/Kuala_Lumpur` (UTC+8) for Malaysian-facing answers. Prayer-relative labels (e.g., `Selepas Maghrib`) need no conversion. See the **User-facing time display** section for the full decision rule.
+7. For any write, call `admin-get-write-schema` first and trust the live schema.
+8. Never guess relation names — use `admin-get-resource-meta` to discover them.
+9. Use `search` when the topic is fuzzy, `fetch` when the guide id is already known.
+10. Keep setup, connector, and raw HTTP API concerns out of MCP-only reasoning.
 
 ## Explicit CRUD boundary and non-goals
 
