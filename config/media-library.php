@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\Media\GenerateResponsiveImagesJob;
 use App\Observers\AuditedMediaObserver;
 use App\Support\Media\MediaFileNamer;
 use App\Support\Media\MediaPathGenerator;
@@ -22,7 +23,6 @@ use Spatie\MediaLibrary\Conversions\ImageGenerators\Webp;
 use Spatie\MediaLibrary\Conversions\Jobs\PerformConversionsJob;
 use Spatie\MediaLibrary\Downloaders\DefaultDownloader;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Spatie\MediaLibrary\ResponsiveImages\Jobs\GenerateResponsiveImagesJob;
 use Spatie\MediaLibrary\ResponsiveImages\TinyPlaceholderGenerator\Blurred;
 use Spatie\MediaLibrary\ResponsiveImages\WidthCalculator\FileSizeOptimizedWidthCalculator;
 use Spatie\MediaLibrary\Support\FileRemover\FileBaseFileRemover;
