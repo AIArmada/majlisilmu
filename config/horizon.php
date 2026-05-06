@@ -188,7 +188,7 @@ return [
     |
     */
 
-    'memory_limit' => 64,
+    'memory_limit' => 256,
 
     /*
     |--------------------------------------------------------------------------
@@ -209,11 +209,12 @@ return [
             'autoScalingStrategy' => 'time',
             'minProcesses' => 1,
             'maxProcesses' => 1,
-            'maxTime' => 0,
+            'maxTime' => 3600,
             'maxJobs' => 0,
             'memory' => 256,
             'tries' => 3,
             'timeout' => 180,
+            'backoff' => [1, 5, 10],
             'nice' => 0,
         ],
 
@@ -224,11 +225,12 @@ return [
             'autoScalingStrategy' => 'time',
             'minProcesses' => 1,
             'maxProcesses' => 1,
-            'maxTime' => 0,
+            'maxTime' => 3600,
             'maxJobs' => 0,
             'memory' => 256,
             'tries' => 3,
             'timeout' => 180,
+            'backoff' => [1, 5, 10],
             'nice' => 0,
         ],
 
@@ -239,11 +241,12 @@ return [
             'autoScalingStrategy' => 'time',
             'minProcesses' => 1,
             'maxProcesses' => 1,
-            'maxTime' => 0,
+            'maxTime' => 7200,
             'maxJobs' => 0,
             'memory' => 512,
             'tries' => 2,
-            'timeout' => 300,
+            'timeout' => 330,
+            'backoff' => [5, 15, 30],
             'nice' => 0,
         ],
     ],
@@ -253,19 +256,19 @@ return [
             'supervisor-default' => [
                 'maxProcesses' => 10,
                 'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
+                'balanceCooldown' => 10,
             ],
 
             'supervisor-notifications' => [
                 'maxProcesses' => 6,
                 'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
+                'balanceCooldown' => 10,
             ],
 
             'supervisor-media' => [
                 'maxProcesses' => 3,
                 'balanceMaxShift' => 1,
-                'balanceCooldown' => 5,
+                'balanceCooldown' => 15,
             ],
         ],
 
