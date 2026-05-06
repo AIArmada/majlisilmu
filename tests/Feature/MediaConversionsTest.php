@@ -157,6 +157,24 @@ it('prefers Event cover over poster in card_image_url accessor', function () {
     expect($event->card_image_url)->toContain('cover');
 });
 
+it('uses Event cover in recommendation_image_url accessor', function () {
+    $event = Event::factory()->create();
+
+    $event->addMedia(fakeGeneratedImageUpload('cover.png', 1600, 900))
+        ->toMediaCollection('cover');
+
+    expect($event->recommendation_image_url)->toContain('cover');
+});
+
+it('falls back to placeholder in recommendation_image_url accessor when cover is missing', function () {
+    $event = Event::factory()->create();
+
+    $event->addMedia(fakeGeneratedImageUpload('poster.png', 1200, 1500))
+        ->toMediaCollection('poster');
+
+    expect($event->recommendation_image_url)->toContain('images/placeholders/event.png');
+});
+
 it('uses institution logo when Event has no poster', function () {
     $institution = Institution::factory()->create();
     $institution->addMedia(fakeGeneratedImageUpload('logo.png', 400, 400))

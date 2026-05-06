@@ -106,7 +106,14 @@
             'description' => __('Masjid dan surau yang saya ikuti'),
             'url' => route('institutions.index'),
             'type' => 'institution',
-            'images' => $followingInstitutions->filter(fn($i) => $i->public_image_url)->shuffle()->take(3)->map(fn($i) => $i->public_image_url)->values()->all(),
+            'images' => $followingInstitutions
+                ->filter(fn ($institution) => $institution->hasMedia('cover'))
+                ->map(fn ($institution) => $institution->getFirstMediaUrl('cover', 'banner') ?: $institution->getFirstMediaUrl('cover'))
+                ->filter()
+                ->shuffle()
+                ->take(4)
+                ->values()
+                ->all(),
             'placeholder' => asset('images/placeholders/institution.png'),
         ],
         [
@@ -124,7 +131,13 @@
             'description' => __('Kitab dan bahan bacaan yang saya ikuti'),
             'url' => route('references.index'),
             'type' => 'reference',
-            'images' => $followingReferences->filter(fn($r) => $r->hasMedia('front_cover'))->map(fn($r) => $r->getFirstMediaUrl('front_cover', 'thumb'))->filter()->values()->take(4)->all(),
+            'images' => $followingReferences
+                ->filter(fn ($reference) => $reference->hasMedia('front_cover'))
+                ->map(fn ($reference) => $reference->getFirstMediaUrl('front_cover', 'thumb') ?: $reference->getFirstMediaUrl('front_cover'))
+                ->filter()
+                ->values()
+                ->take(4)
+                ->all(),
             'placeholder' => asset('images/about/section_02.png'),
         ],
         [
@@ -132,6 +145,13 @@
             'count' => $recentSavedSearches->count(),
             'description' => __('Carian ilmu yang saya simpan'),
             'url' => route('saved-searches.index'),
+            'type' => 'search',
+            'keywords' => $recentSavedSearches
+                ->pluck('name')
+                ->filter()
+                ->take(3)
+                ->values()
+                ->all(),
             'image' => asset('images/pattern-bg.png'),
         ],
     ];
@@ -169,27 +189,44 @@
 
 <div class="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#f7f3ea] pb-0">
     <section class="relative max-w-[100vw] overflow-hidden border-b border-[#eadfca] bg-[#fbf8f1]">
-        <div class="absolute inset-y-0 right-0 hidden w-1/2 bg-cover bg-center opacity-20 lg:block"
-            style="background-image: url('{{ asset('images/pattern-bg.png') }}');"></div>
+        <div class="pointer-events-none absolute inset-0 opacity-[0.16]"
+            style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-position: center; background-size: 420px;"></div>
+        <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#fbf8f1] via-[#fbf8f1]/96 to-[#f6efe0]/90"></div>
         <div class="container relative mx-auto px-6 py-10 lg:px-12 lg:py-14">
-            <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
-                <div class="max-w-3xl">
-                    <h1 class="break-words font-heading text-4xl font-bold leading-tight text-[#0b2a42] md:text-5xl">
-                        {{ __('Perjalanan Menuju Allah') }}
-                    </h1>
-                    <p class="mt-5 max-w-2xl break-words text-base leading-7 text-slate-600">
-                        {{ __('Teruskan istiqamah mencari ilmu dan sebarkan manfaatnya. Setiap langkah kecil hari ini, membawa kita lebih dekat kepada keredhaan Allah.') }}
-                    </p>
-                </div>
+            <div data-testid="dashboard-hero-shell" class="relative overflow-hidden rounded-[2rem] border border-[#eadfca] bg-white/80 shadow-[0_30px_70px_-40px_rgba(11,42,66,0.45)] backdrop-blur-sm">
+                <div class="absolute inset-y-0 right-0 hidden w-full max-w-[44%] bg-gradient-to-br from-[#f8f0df] via-[#f4ead6] to-[#efe0c3] lg:block"></div>
 
-                <div class="hidden lg:block">
-                    <div class="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl shadow-emerald-950/10">
-                        <img src="{{ asset('images/default-mosque-hero.png') }}" alt="" class="h-80 w-full object-cover">
+                <div class="grid lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-stretch">
+                    <div class="relative z-10 px-6 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
+                        <span class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold tracking-[0.2em] text-emerald-800 uppercase">
+                            {{ __('Dashboard') }}
+                        </span>
+
+                        <div class="mt-5 max-w-3xl">
+                            <h1 class="break-words font-heading text-4xl font-bold leading-tight text-[#0b2a42] md:text-5xl">
+                                {{ __('Perjalanan Menuju Allah') }}
+                            </h1>
+                            <p class="mt-5 max-w-2xl break-words text-base leading-7 text-slate-600 sm:text-lg">
+                                {{ __('Teruskan istiqamah mencari ilmu dan sebarkan manfaatnya. Setiap langkah kecil hari ini, membawa kita lebih dekat kepada keredhaan Allah.') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="relative border-t border-[#eadfca] lg:border-t-0 lg:border-l lg:border-l-[#eadfca]/80">
+                        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_transparent_58%)]"></div>
+                        <div class="absolute inset-0 opacity-25"
+                            style="background-image: url('{{ asset('images/pattern-bg.png') }}'); background-position: center; background-size: 300px;"></div>
+
+                        <div class="relative h-full p-4 sm:p-5 lg:p-6">
+                            <div data-testid="dashboard-hero-media" class="overflow-hidden rounded-[1.75rem] border border-white/70 bg-[#f8f1e2] shadow-2xl shadow-amber-950/10">
+                                <img src="{{ asset('images/default-mosque-hero.png') }}" alt="" class="aspect-[5/4] h-full w-full object-cover object-center lg:min-h-[22rem] lg:aspect-auto">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="relative z-10 mt-8 rounded-lg border border-[#eadfca] bg-white/95 p-4 shadow-xl shadow-amber-950/10 backdrop-blur">
+            <div class="relative z-10 mt-6 rounded-lg border border-[#eadfca] bg-white/95 p-4 shadow-xl shadow-amber-950/10 backdrop-blur">
                 <div class="grid grid-cols-3 gap-2 md:grid-cols-3 xl:grid-cols-6">
                     @foreach($dashboardStats as $stat)
                         <a href="{{ $loop->index < 2 ? '#majlis-saya' : ($loop->index === 5 ? route('dashboard.dawah-impact') : '#ikuti') }}"
@@ -338,7 +375,7 @@
                                         $panelImages = $panel['images'] ?? [];
                                         $panelPlaceholder = $panel['placeholder'] ?? '';
                                     @endphp
-                                    @if(in_array($panelType, ['speaker', 'reference']) && count($panelImages) > 0)
+                                    @if($panelType === 'speaker' && count($panelImages) > 0)
                                         <div class="flex h-full w-full items-center justify-center bg-[#f7f3ea]">
                                             <div class="flex items-center -space-x-4">
                                                 @foreach(array_slice($panelImages, 0, 3) as $idx => $imgUrl)
@@ -353,8 +390,63 @@
                                                 @endif
                                             </div>
                                         </div>
+                                    @elseif($panelType === 'reference' && count($panelImages) > 0)
+                                        <div data-testid="dashboard-follow-reference-stack" class="flex h-full w-full items-center justify-center bg-[#f7f3ea]">
+                                            <div class="flex items-center -space-x-3">
+                                                @foreach(array_slice($panelImages, 0, 3) as $idx => $imgUrl)
+                                                    <div class="h-16 w-12 overflow-hidden rounded-md border-2 border-white shadow" style="z-index: {{ 10 - $idx }}">
+                                                        <img src="{{ $imgUrl }}" alt="" loading="lazy" class="h-full w-full object-cover">
+                                                    </div>
+                                                @endforeach
+                                                @if(count($panelImages) > 3)
+                                                    <div class="flex h-16 w-12 items-center justify-center rounded-md border-2 border-white bg-emerald-700 text-xs font-bold text-white shadow" style="z-index: 1">
+                                                        +{{ count($panelImages) - 3 }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
                                     @elseif($panelType === 'institution' && count($panelImages) > 0)
-                                        <img src="{{ $panelImages[0] }}" alt="" loading="lazy" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                                        <div data-testid="dashboard-follow-institution-covers" class="flex h-full w-full items-center justify-center bg-[#f7f3ea]">
+                                            <div class="relative h-24 w-44">
+                                                @foreach(array_slice($panelImages, 0, 3) as $idx => $imgUrl)
+                                                    <div
+                                                        class="absolute h-20 w-32 overflow-hidden rounded-lg border-2 border-white shadow-lg"
+                                                        style="
+                                                            z-index: {{ 10 - $idx }};
+                                                            left: {{ [8, 24, 52][$idx] ?? 24 }}px;
+                                                            top: {{ [14, 8, 14][$idx] ?? 10 }}px;
+                                                            transform: rotate({{ [-8, 0, 8][$idx] ?? 0 }}deg);
+                                                        "
+                                                    >
+                                                        <img src="{{ $imgUrl }}" alt="" loading="lazy" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @elseif($panelType === 'search')
+                                        <div data-testid="dashboard-follow-search-preview" class="relative h-full w-full overflow-hidden bg-linear-to-br from-emerald-50 via-teal-50 to-cyan-100">
+                                            <div class="absolute -right-3 -top-6 h-20 w-20 rounded-full bg-emerald-200/45 blur-sm"></div>
+                                            <div class="absolute -bottom-6 -left-4 h-20 w-20 rounded-full bg-cyan-200/45 blur-sm"></div>
+
+                                            <div class="relative flex h-full flex-col justify-between p-3">
+                                                <div class="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-200/90 bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z" />
+                                                    </svg>
+                                                    {{ __('Trend') }}
+                                                </div>
+
+                                                <div class="mt-2 flex flex-wrap gap-1.5">
+                                                    @forelse(($panel['keywords'] ?? []) as $keyword)
+                                                        <span class="inline-flex max-w-full truncate rounded-md bg-white/90 px-2 py-1 text-[10px] font-medium text-slate-700 ring-1 ring-emerald-100">{{ $keyword }}</span>
+                                                    @empty
+                                                        <span class="rounded-md bg-white/90 px-2 py-1 text-[10px] font-medium text-slate-600 ring-1 ring-emerald-100">{{ __('Majlis berhampiran') }}</span>
+                                                        <span class="rounded-md bg-white/90 px-2 py-1 text-[10px] font-medium text-slate-600 ring-1 ring-emerald-100">{{ __('Kuliah maghrib') }}</span>
+                                                        <span class="rounded-md bg-white/90 px-2 py-1 text-[10px] font-medium text-slate-600 ring-1 ring-emerald-100">{{ __('Tafsir minggu ini') }}</span>
+                                                    @endforelse
+                                                </div>
+                                            </div>
+                                        </div>
                                     @else
                                         <img src="{{ $panelPlaceholder }}" alt="" loading="lazy" class="h-full w-full object-cover opacity-60">
                                     @endif
@@ -544,7 +636,7 @@
                     @if($recommendedEvent instanceof \App\Models\Event)
                         <a href="{{ route('events.show', $recommendedEvent) }}" wire:navigate class="group mt-4 block overflow-hidden rounded-lg border border-[#eadfca] transition hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/10">
                             <div class="aspect-video overflow-hidden bg-slate-100">
-                                <img src="{{ $recommendedEvent->card_image_url }}" alt="{{ $recommendedEvent->title }}" loading="lazy" class="h-full w-full object-contain p-1">
+                                <img src="{{ $recommendedEvent->recommendation_image_url }}" alt="{{ $recommendedEvent->title }}" loading="lazy" class="h-full w-full object-cover">
                             </div>
                             <div class="p-4">
                                 <h3 class="line-clamp-2 font-heading text-lg font-bold text-[#0b2a42]">{{ $recommendedEvent->title }}</h3>

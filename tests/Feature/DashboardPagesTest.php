@@ -23,7 +23,9 @@ use App\Support\Authz\MemberRoleScopes;
 use App\Support\Authz\ScopedMemberRoleSeeder;
 use Filament\Tables\Enums\PaginationMode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -152,6 +154,8 @@ it('renders the reference-inspired user dashboard with real saved search and not
         ->assertSee('Dashboard')
         ->assertSee('Perjalanan Menuju Allah')
         ->assertSee('Keep seeking knowledge steadily')
+        ->assertSee('data-testid="dashboard-hero-shell"', false)
+        ->assertSee('data-testid="dashboard-hero-media"', false)
         ->assertSee('My Events')
         ->assertSee('Latest Notifications')
         ->assertSee('Quick Actions')
@@ -193,6 +197,7 @@ it('renders the reference-inspired user dashboard with real saved search and not
     $response->assertDontSee('x-show="cell.entries.length > 0"', false);
     $response->assertDontSee("entry.role_badges.map(badge => badge.label).join(' • ')", false);
     $response->assertDontSee('bg-emerald-50/80', false);
+    $response->assertDontSee('absolute inset-y-0 right-0 hidden w-1/2', false);
 
     expect($html)->toContain(route('dashboard.dawah-impact'));
 });
@@ -259,6 +264,57 @@ it('shows the redesigned followed-entity category cards on the dashboard', funct
         ->assertSee('Kitab dan bahan bacaan yang saya ikuti')
         ->assertSee('Penceramah Diikuti')
         ->assertSee('Institusi Diikuti');
+});
+
+it('uses institution cover media only for the follow cards and renders reference/search visual stacks', function () {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    $institution = Institution::factory()->create(['name' => 'Masjid Ikuti Utama']);
+
+    Event::factory()->for($otherUser)->for($institution)->create([
+        'title' => 'Follow Cards Event',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDays(2),
+    ]);
+
+    $coverOnlyInstitution = Institution::factory()->create(['name' => 'Masjid Cover Sahaja']);
+    $logoOnlyInstitution = Institution::factory()->create(['name' => 'Masjid Logo Sahaja']);
+
+    $coverOnlyInstitution->addMedia(UploadedFile::fake()->image('dashboard-cover.jpg', 1600, 900))
+        ->toMediaCollection('cover');
+
+    $logoOnlyInstitution->addMedia(UploadedFile::fake()->image('dashboard-logo.png', 600, 600))
+        ->toMediaCollection('logo');
+
+    $reference = Reference::factory()->create([
+        'title' => 'Rujukan Dashboard Visual',
+    ]);
+
+    $reference->addMedia(UploadedFile::fake()->image('dashboard-reference.jpg', 900, 1200))
+        ->toMediaCollection('front_cover');
+
+    SavedSearch::factory()->for($user)->create([
+        'name' => 'Kuliah Subuh KL',
+    ]);
+
+    $user->follow($coverOnlyInstitution);
+    $user->follow($logoOnlyInstitution);
+    $user->follow($reference);
+
+    $response = $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get('/dashboard');
+
+    $response->assertOk()
+        ->assertSee('data-testid="dashboard-follow-institution-covers"', false)
+        ->assertSee('data-testid="dashboard-follow-reference-stack"', false)
+        ->assertSee('data-testid="dashboard-follow-search-preview"', false)
+        ->assertSee('dashboard-cover', false)
+        ->assertDontSee('dashboard-logo', false);
 });
 
 it('renders a valid event management link on the user dashboard for manageable events', function () {

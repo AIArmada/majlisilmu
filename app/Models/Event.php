@@ -1255,6 +1255,17 @@ class Event extends Model implements AuditableContract, HasMedia
      * Get the card image URL for frontend.
      * Priority: Cover card -> Poster card -> Institution logo thumb -> Default.
      */
+    public function getRecommendationImageUrlAttribute(): string
+    {
+        $coverUrl = $this->preferredMediaUrl($this->getFirstMedia('cover'), ['card', 'preview', 'thumb']);
+
+        return $coverUrl ?? asset('images/placeholders/event.png');
+    }
+
+    /**
+     * Get the card image URL for frontend.
+     * Priority: Cover card -> Poster card -> Institution logo thumb -> Default.
+     */
     public function getCardImageUrlAttribute(): string
     {
         $coverUrl = $this->preferredMediaUrl($this->getFirstMedia('cover'), ['card', 'preview', 'thumb']);
