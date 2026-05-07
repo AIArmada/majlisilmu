@@ -8,6 +8,7 @@ use App\Data\Api\Frontend\Search\EventListData;
 use App\Enums\TimingMode;
 use App\Models\Event;
 use App\Services\EventSearchService;
+use App\Support\Timezone\UserTimezoneResolver;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\JsonSchema\Types\Type;
@@ -138,7 +139,14 @@ class McpEventSearchService
         return [
             'data' => collect($results->items())
                 ->map(function ($event): array {
-                    $item = EventListData::fromModel($event)->toArray();
+                    $timezoneResolution = UserTimezoneResolver::resolveWithSource();
+                    $viewerHasExplicitTimezone = ! in_array($timezoneResolution['source'], ['app_fallback', 'system_fallback'], true);
+                    $eventTimezone = is_string($event->timezone) && $event->timezone !== '' ? $event->timezone : null;
+                    $displayTimezone = $viewerHasExplicitTimezone
+                        ? $timezoneResolution['timezone']
+                        : ($eventTimezone ?? $timezoneResolution['timezone']);
+
+                    $item = EventListData::fromModel($event, $displayTimezone)->toArray();
                     $distanceKm = $event->getAttributes()['distance_km'] ?? null;
 
                     if (is_numeric($distanceKm)) {

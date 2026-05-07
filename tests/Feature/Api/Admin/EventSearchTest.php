@@ -167,6 +167,67 @@ describe('Event Search API', function () {
         expect(collect(data_get($referenceResponse->json(), 'data', []))->pluck('title')->all())
             ->toContain('API Admin Reference Match Event');
     });
+
+    it('uses event timezone for local fields when no viewer timezone is set', function () {
+        $admin = eventSearchAdminUser();
+        $admin->forceFill(['timezone' => null])->save();
+
+        Sanctum::actingAs($admin);
+
+        $startsAt = \Illuminate\Support\Carbon::create(2026, 5, 8, 0, 30, 0, 'UTC');
+        $endsAt = \Illuminate\Support\Carbon::create(2026, 5, 8, 2, 0, 0, 'UTC');
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'timing_mode' => 'absolute',
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'timezone' => 'Asia/Kuala_Lumpur',
+        ]);
+
+        $response = $this->getJson('/api/v1/admin/events/search?time_scope=all')
+            ->assertOk();
+
+        $found = collect($response->json('data'))->firstWhere('id', (string) $event->getKey());
+
+        expect($found)->toBeArray()
+            ->and($found['starts_at'])->toBe($startsAt->copy()->utc()->format('Y-m-d\TH:i:s.u\Z'))
+            ->and($found['starts_at_local'])->toBe($startsAt->copy()->timezone('Asia/Kuala_Lumpur')->format(DATE_ATOM))
+            ->and($found['starts_on_local_date'])->toBe('2026-05-08')
+            ->and($found['ends_at_local'])->toBe($endsAt->copy()->timezone('Asia/Kuala_Lumpur')->format(DATE_ATOM))
+            ->and($found['timing_display'])->toBe('8:30 AM')
+            ->and($found['end_time_display'])->toBe('10:00 AM')
+            ->and($found['timezone'])->toBe('Asia/Kuala_Lumpur');
+    });
+
+    it('uses viewer timezone over event timezone when X-Timezone header is provided', function () {
+        $admin = eventSearchAdminUser();
+        $admin->forceFill(['timezone' => null])->save();
+
+        Sanctum::actingAs($admin);
+
+        $startsAt = \Illuminate\Support\Carbon::create(2026, 5, 8, 0, 30, 0, 'UTC');
+        $endsAt = \Illuminate\Support\Carbon::create(2026, 5, 8, 2, 0, 0, 'UTC');
+
+        $event = Event::factory()->create([
+            'status' => 'approved',
+            'timing_mode' => 'absolute',
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'timezone' => 'Asia/Kuala_Lumpur',
+        ]);
+
+        $response = $this->withHeader('X-Timezone', 'Asia/Jakarta')
+            ->getJson('/api/v1/admin/events/search?time_scope=all')
+            ->assertOk();
+
+        $found = collect($response->json('data'))->firstWhere('id', (string) $event->getKey());
+
+        expect($found)->toBeArray()
+            ->and($found['starts_at_local'])->toBe($startsAt->copy()->timezone('Asia/Jakarta')->format(DATE_ATOM))
+            ->and($found['timing_display'])->toBe($startsAt->copy()->timezone('Asia/Jakarta')->format('g:i A'))
+            ->and($found['timezone'])->toBe('Asia/Jakarta');
+    });
 });
 
 function eventSearchAdminUser(string $role = 'super_admin'): User
