@@ -136,15 +136,17 @@ class McpEventSearchService
             );
         });
 
+        $timezoneResolution = UserTimezoneResolver::resolveWithSource();
+        $viewerHasExplicitTimezone = ! in_array($timezoneResolution['source'], ['app_fallback', 'system_fallback'], true);
+        $viewerTimezone = $timezoneResolution['timezone'];
+
         return [
             'data' => collect($results->items())
-                ->map(function ($event): array {
-                    $timezoneResolution = UserTimezoneResolver::resolveWithSource();
-                    $viewerHasExplicitTimezone = ! in_array($timezoneResolution['source'], ['app_fallback', 'system_fallback'], true);
+                ->map(function ($event) use ($viewerHasExplicitTimezone, $viewerTimezone): array {
                     $eventTimezone = is_string($event->timezone) && $event->timezone !== '' ? $event->timezone : null;
                     $displayTimezone = $viewerHasExplicitTimezone
-                        ? $timezoneResolution['timezone']
-                        : ($eventTimezone ?? $timezoneResolution['timezone']);
+                        ? $viewerTimezone
+                        : ($eventTimezone ?? $viewerTimezone);
 
                     $item = EventListData::fromModel($event, $displayTimezone)->toArray();
                     $distanceKm = $event->getAttributes()['distance_km'] ?? null;

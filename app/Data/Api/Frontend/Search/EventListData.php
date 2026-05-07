@@ -63,7 +63,7 @@ class EventListData extends Data
 
     public static function fromModel(Event $event, ?string $displayTimezone = null): self
     {
-        $resolvedTimezone = $displayTimezone ?? UserDateTimeFormatter::resolveTimezone();
+        $resolvedTimezone = self::resolveDisplayTimezone($displayTimezone);
         $eventTypeValues = self::eventTypeValues($event);
         $eventFormat = $event->event_format;
         $eventFormatValue = self::enumValue($eventFormat);
@@ -201,6 +201,21 @@ class EventListData extends Data
         }
 
         return $poster->getAvailableUrl(['preview', 'thumb']) ?: $poster->getUrl();
+    }
+
+    private static function resolveDisplayTimezone(?string $displayTimezone): string
+    {
+        if (is_string($displayTimezone) && $displayTimezone !== '') {
+            try {
+                new \DateTimeZone($displayTimezone);
+
+                return $displayTimezone;
+            } catch (\Exception) {
+                // Fall through to viewer timezone resolution
+            }
+        }
+
+        return UserDateTimeFormatter::resolveTimezone();
     }
 
     private static function computeTimingDisplay(Event $event, string $timezone): string
