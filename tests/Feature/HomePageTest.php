@@ -280,3 +280,23 @@ it('does not render the removed homepage discovery categories section', function
         ->assertDontSee('Jelajah Mengikut Kategori')
         ->assertDontSee('Pilih topik yang anda minati');
 });
+
+it('renders the homepage guide section with PDF download link', function () {
+    $response = $this->get('/');
+
+    $response->assertSuccessful()
+        ->assertSee('homepage-guide-section', false)
+        ->assertSee('Apa itu Majlis Ilmu?')
+        ->assertSee('Muat Turun Panduan PDF')
+        ->assertSee('downloads/panduan-majlis-ilmu.pdf', false)
+        ->assertSee('guide.pdf_download_clicked', false);
+});
+
+it('has the downloadable PDF guide file in public assets', function () {
+    $path = public_path('downloads/panduan-majlis-ilmu.pdf');
+
+    expect(file_exists($path))->toBeTrue();
+
+    $header = file_get_contents($path, false, null, 0, 5);
+    expect($header)->toStartWith('%PDF-');
+});
