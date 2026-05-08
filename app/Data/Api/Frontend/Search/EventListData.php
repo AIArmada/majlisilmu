@@ -4,6 +4,7 @@ namespace App\Data\Api\Frontend\Search;
 
 use App\Enums\EventFormat;
 use App\Enums\EventType;
+use App\Enums\TimingMode;
 use App\Models\Address;
 use App\Models\Event;
 use App\Models\Institution;
@@ -13,7 +14,6 @@ use App\Support\Location\AddressHierarchyFormatter;
 use App\Support\Timezone\UserDateTimeFormatter;
 use BackedEnum;
 use Carbon\CarbonInterface;
-use DateTimeInterface;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -40,6 +40,7 @@ class EventListData extends Data
         public ?string $timing_display,
         public ?string $prayer_display_text,
         public ?string $end_time_display,
+        public ?string $timezone,
         public string $visibility,
         public string $status,
         public string $status_label,
@@ -60,8 +61,9 @@ class EventListData extends Data
         public array $speakers,
     ) {}
 
-    public static function fromModel(Event $event): self
+    public static function fromModel(Event $event, ?string $displayTimezone = null): self
     {
+        $resolvedTimezone = self::resolveDisplayTimezone($displayTimezone);
         $eventTypeValues = self::eventTypeValues($event);
         $eventFormat = $event->event_format;
         $eventFormatValue = self::enumValue($eventFormat);
@@ -73,15 +75,16 @@ class EventListData extends Data
             slug: (string) $event->slug,
             title: (string) $event->title,
             starts_at: self::optionalDateTimeString($event->starts_at),
-            starts_at_local: self::optionalLocalDateTimeString($event->starts_at),
-            starts_on_local_date: self::optionalLocalDateString($event->starts_at),
+            starts_at_local: self::optionalLocalDateTimeString($event->starts_at, $resolvedTimezone),
+            starts_on_local_date: self::optionalLocalDateString($event->starts_at, $resolvedTimezone),
             ends_at: self::optionalDateTimeString($event->ends_at),
-            ends_at_local: self::optionalLocalDateTimeString($event->ends_at),
-            timing_display: $event->timing_display,
+            ends_at_local: self::optionalLocalDateTimeString($event->ends_at, $resolvedTimezone),
+            timing_display: self::computeTimingDisplay($event, $resolvedTimezone),
             prayer_display_text: $event->prayer_display_text,
-            end_time_display: $event->ends_at instanceof DateTimeInterface
-                ? UserDateTimeFormatter::format($event->ends_at, 'h:i A')
+            end_time_display: $event->ends_at instanceof CarbonInterface
+                ? $event->ends_at->copy()->timezone($resolvedTimezone)->format('h:i A')
                 : null,
+            timezone: $resolvedTimezone,
             visibility: self::enumValue($event->visibility),
             status: $statusValue,
             status_label: $status instanceof HasLabel ? $status->getLabel() : Str::headline($statusValue),
@@ -200,6 +203,34 @@ class EventListData extends Data
         return $poster->getAvailableUrl(['preview', 'thumb']) ?: $poster->getUrl();
     }
 
+    private static function resolveDisplayTimezone(?string $displayTimezone): string
+    {
+        if (is_string($displayTimezone) && $displayTimezone !== '') {
+            try {
+                new \DateTimeZone($displayTimezone);
+
+                return $displayTimezone;
+            } catch (\Exception) {
+                // Fall through to viewer timezone resolution
+            }
+        }
+
+        return UserDateTimeFormatter::resolveTimezone();
+    }
+
+    private static function computeTimingDisplay(Event $event, string $timezone): string
+    {
+        if ($event->timing_mode === TimingMode::PrayerRelative) {
+            return $event->timing_display;
+        }
+
+        if ($event->starts_at instanceof CarbonInterface) {
+            return $event->starts_at->copy()->timezone($timezone)->format('g:i A');
+        }
+
+        return '';
+    }
+
     private static function optionalDateTimeString(mixed $value): ?string
     {
         if ($value instanceof CarbonInterface) {
@@ -209,19 +240,19 @@ class EventListData extends Data
         return is_string($value) && $value !== '' ? $value : null;
     }
 
-    private static function optionalLocalDateTimeString(mixed $value): ?string
+    private static function optionalLocalDateTimeString(mixed $value, string $timezone): ?string
     {
         if ($value instanceof CarbonInterface) {
-            return $value->copy()->timezone(UserDateTimeFormatter::resolveTimezone())->format(DATE_ATOM);
+            return $value->copy()->timezone($timezone)->format(DATE_ATOM);
         }
 
         return is_string($value) && $value !== '' ? $value : null;
     }
 
-    private static function optionalLocalDateString(mixed $value): ?string
+    private static function optionalLocalDateString(mixed $value, string $timezone): ?string
     {
         if ($value instanceof CarbonInterface) {
-            return $value->copy()->timezone(UserDateTimeFormatter::resolveTimezone())->format('Y-m-d');
+            return $value->copy()->timezone($timezone)->format('Y-m-d');
         }
 
         return is_string($value) && $value !== '' ? substr($value, 0, 10) : null;
