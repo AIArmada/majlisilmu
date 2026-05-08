@@ -96,6 +96,28 @@ final readonly class ProductSignalsService
         );
     }
 
+    /**
+     * @param  array<string, mixed>  $properties
+     */
+    public function recordEventCoverGenerated(
+        Event $event,
+        ?User $user = null,
+        ?Request $request = null,
+        array $properties = [],
+    ): ?SignalEvent {
+        return $this->record(
+            request: $request,
+            eventName: 'admin.event_cover.generated',
+            eventCategory: 'admin',
+            user: $user,
+            properties: [
+                'event_id' => (string) $event->getKey(),
+                'event_status' => (string) $event->status,
+                ...$properties,
+            ],
+        );
+    }
+
     public function recordReportSubmitted(Report $report, ?Request $request = null): ?SignalEvent
     {
         $user = $request?->user();

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Tables;
 
+use App\Actions\Events\GenerateEventCoverImageAction;
 use App\Enums\EventAgeGroup;
 use App\Enums\EventFormat;
 use App\Enums\EventGenderRestriction;
@@ -15,12 +16,17 @@ use App\Filament\Resources\Institutions\InstitutionResource;
 use App\Models\Event;
 use App\Models\User;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -32,6 +38,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Throwable;
 
 class EventsTable
 {
@@ -304,14 +311,145 @@ class EventsTable
                     }),
             ])
             ->recordActions([
+                self::generateCoverImageTableAction(),
                 ViewAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    self::generateCoverImageBulkAction(),
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    private static function generateCoverImageTableAction(): Action
+    {
+        return Action::make('generate_cover_image')
+            ->label('Generate Cover')
+            ->icon('heroicon-o-sparkles')
+            ->color('info')
+            ->schema(self::coverGenerationForm())
+            ->requiresConfirmation()
+            ->modalHeading('Generate Event Cover')
+            ->modalDescription('This makes one OpenAI image generation request and replaces the event cover media.')
+            ->modalSubmitActionLabel('Generate cover')
+            ->action(function (Event $record, array $data): void {
+                try {
+                    self::generateCoverForRecord($record, $data);
+
+                    Notification::make()
+                        ->title('Event cover generated')
+                        ->success()
+                        ->send();
+                } catch (Throwable $exception) {
+                    report($exception);
+
+                    Notification::make()
+                        ->title('Event cover generation failed')
+                        ->body($exception->getMessage())
+                        ->danger()
+                        ->send();
+                }
+            })
+            ->visible(fn (Event $record): bool => self::canGenerateCover($record));
+    }
+
+    private static function generateCoverImageBulkAction(): BulkAction
+    {
+        return BulkAction::make('generate_cover_images')
+            ->label('Generate Covers')
+            ->icon('heroicon-o-sparkles')
+            ->color('info')
+            ->schema(self::coverGenerationForm())
+            ->requiresConfirmation()
+            ->modalHeading('Generate Event Covers')
+            ->modalDescription('This makes one OpenAI image generation request per selected event and replaces each event cover media.')
+            ->modalSubmitActionLabel('Generate covers')
+            ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data): void {
+                $generated = 0;
+                $skipped = 0;
+                $failed = 0;
+
+                foreach ($records as $record) {
+                    if (! $record instanceof Event || ! self::canGenerateCover($record)) {
+                        $skipped++;
+
+                        continue;
+                    }
+
+                    try {
+                        self::generateCoverForRecord($record, $data);
+                        $generated++;
+                    } catch (Throwable $exception) {
+                        report($exception);
+                        $failed++;
+                    }
+                }
+
+                $notification = Notification::make()
+                    ->title("Generated {$generated} event cover".($generated === 1 ? '' : 's'));
+
+                if ($failed > 0 || $skipped > 0) {
+                    $notification
+                        ->body("Failed: {$failed}. Skipped: {$skipped}.")
+                        ->warning();
+                } else {
+                    $notification->success();
+                }
+
+                $notification->send();
+            })
+            ->visible(fn (): bool => self::canSeeBulkCoverGeneration())
+            ->deselectRecordsAfterCompletion();
+    }
+
+    /**
+     * @return array<int, Textarea|Toggle>
+     */
+    private static function coverGenerationForm(): array
+    {
+        return [
+            Textarea::make('creative_direction')
+                ->label('Creative direction')
+                ->rows(3)
+                ->maxLength(2000)
+                ->helperText('Optional visual direction to merge with the event data and reference media.'),
+
+            Toggle::make('include_existing_media')
+                ->label('Use existing media as references')
+                ->default(true),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private static function generateCoverForRecord(Event $record, array $data): void
+    {
+        $user = auth()->user();
+
+        app(GenerateEventCoverImageAction::class)->handle(
+            event: $record,
+            creativeDirection: filled($data['creative_direction'] ?? null) ? (string) $data['creative_direction'] : null,
+            includeExistingMedia: (bool) ($data['include_existing_media'] ?? true),
+            user: $user instanceof User ? $user : null,
+            request: request(),
+        );
+    }
+
+    private static function canGenerateCover(Event $record): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->can('update', $record);
+    }
+
+    private static function canSeeBulkCoverGeneration(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->hasApplicationAdminAccess();
     }
 
     private static function canManageFeaturedFlag(): bool

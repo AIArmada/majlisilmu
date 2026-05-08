@@ -10,7 +10,9 @@ use App\Enums\RegistrationMode;
 use App\Enums\TimingMode;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
+use App\Filament\Resources\Events\Pages\ListEvents;
 use App\Filament\Resources\Events\Pages\ViewEvent;
+use App\Models\AiUsageLog;
 use App\Models\Event;
 use App\Models\EventSettings;
 use App\Models\Institution;
@@ -22,6 +24,8 @@ use Filament\Forms\Components\TextInput;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Ai\Image;
+use Laravel\Ai\Prompts\ImagePrompt;
 use Livewire\Livewire;
 
 it('resolves pending transitionable states without moderation context', function () {
@@ -80,6 +84,111 @@ it('renders admin events list and search with pending events', function () {
         ->get('/admin/events?search='.urlencode($event->title))
         ->assertSuccessful()
         ->assertSee($event->title);
+});
+
+it('generates an admin event cover from the events table and logs image cost', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $event = Event::factory()->create([
+        'status' => 'pending',
+        'event_type' => [EventType::Other->value],
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'starts_at' => Carbon::parse('2026-05-13 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+        'ends_at' => Carbon::parse('2026-05-13 22:00:00', 'Asia/Kuala_Lumpur')->utc(),
+    ]);
+
+    $imageFixture = fakeGeneratedImageUpload('ai-generated-cover.jpg', 1536, 1024);
+    $contents = file_get_contents($imageFixture->getRealPath());
+    expect($contents)->toBeString();
+
+    Image::fake([
+        base64_encode((string) $contents),
+    ])->preventStrayImages();
+
+    Livewire::actingAs($administrator)
+        ->test(ListEvents::class)
+        ->assertTableActionVisible('generate_cover_image', $event->id)
+        ->assertTableBulkActionVisible('generate_cover_images')
+        ->callTableAction('generate_cover_image', $event->id, data: [
+            'creative_direction' => 'Use a restrained ilmu360 visual direction.',
+            'include_existing_media' => false,
+        ])
+        ->assertHasNoTableActionErrors();
+
+    Image::assertGenerated(fn (ImagePrompt $prompt): bool => $prompt->isLandscape()
+        && $prompt->quality === 'low'
+        && $prompt->model === 'gpt-image-2'
+        && $prompt->contains('Use a restrained ilmu360 visual direction.'));
+
+    $coverMedia = $event->fresh()->getFirstMedia('cover');
+    expect($coverMedia)->not->toBeNull()
+        ->and($coverMedia?->getCustomProperty('generation.model'))->toBe('gpt-image-2')
+        ->and($coverMedia?->getCustomProperty('generation.quality'))->toBe('low');
+
+    $usageLog = AiUsageLog::query()->where('operation', 'image_generation')->sole();
+
+    expect($usageLog->provider)->toBe('openai')
+        ->and($usageLog->model)->toBe('gpt-image-2')
+        ->and($usageLog->cost_usd)->toBe('0.00500000')
+        ->and($usageLog->meta)->toMatchArray([
+            'requested_size' => '3:2',
+            'requested_quality' => 'low',
+            'images_count' => 1,
+            'cost_source' => 'pricing_config_fallback',
+        ]);
+});
+
+it('bulk generates admin event covers for selected events', function () {
+    Storage::fake('public');
+    config()->set('media-library.disk_name', 'public');
+
+    $this->seed(PermissionSeeder::class);
+    $this->seed(RoleSeeder::class);
+
+    $administrator = User::factory()->create();
+    $administrator->assignRole('super_admin');
+
+    $events = Event::factory()
+        ->count(2)
+        ->sequence(
+            ['title' => 'Bulk AI Cover Event One'],
+            ['title' => 'Bulk AI Cover Event Two'],
+        )
+        ->create([
+            'status' => 'pending',
+            'event_type' => [EventType::Other->value],
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'starts_at' => Carbon::parse('2026-05-13 20:00:00', 'Asia/Kuala_Lumpur')->utc(),
+            'ends_at' => Carbon::parse('2026-05-13 22:00:00', 'Asia/Kuala_Lumpur')->utc(),
+        ]);
+
+    $imageFixture = fakeGeneratedImageUpload('ai-generated-bulk-cover.jpg', 1536, 1024);
+    $contents = file_get_contents($imageFixture->getRealPath());
+    expect($contents)->toBeString();
+
+    Image::fake([
+        base64_encode((string) $contents),
+        base64_encode((string) $contents),
+    ])->preventStrayImages();
+
+    Livewire::actingAs($administrator)
+        ->test(ListEvents::class)
+        ->callTableBulkAction('generate_cover_images', $events->pluck('id')->all(), data: [
+            'creative_direction' => null,
+            'include_existing_media' => false,
+        ])
+        ->assertHasNoTableBulkActionErrors();
+
+    expect($events->map(fn (Event $event): bool => $event->fresh()->hasMedia('cover'))->all())
+        ->toBe([true, true])
+        ->and(AiUsageLog::query()->where('operation', 'image_generation')->count())->toBe(2);
 });
 
 it('shows typed event fields on the admin edit form', function () {

@@ -485,6 +485,7 @@ class Speaker extends Model implements AuditableContract, HasMedia
             PreNominal::Ustaz => 26,
             PreNominal::Ustazah => 27,
             PreNominal::ImamMuda => 28,
+            PreNominal::PU,
             PreNominal::Dai => 29,
             PreNominal::Hafiz => 30,
             PreNominal::Hafizah => 31,

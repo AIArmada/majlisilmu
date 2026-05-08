@@ -98,7 +98,8 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard/notifications', NotificationsIndex::class)->name('dashboard.notifications');
     Route::livewire('/tetapan-akaun', AccountSettings::class)->name('dashboard.account-settings');
     Route::livewire('/dashboard/institusi', InstitutionDashboard::class)->name('dashboard.institutions');
-    Route::livewire('/dashboard/institusi/hantar-majlis', 'pages.submit-event.create')->name('dashboard.institutions.submit-event');
+    Route::livewire('/dashboard/institusi/senarai-majlis', InstitutionDashboard::class)->name('dashboard.institutions.events');
+    Route::livewire('/dashboard/institusi/tambah-majlis', 'pages.submit-event.create')->name('dashboard.institutions.submit-event');
     Route::livewire('/dashboard/majlis/cipta-lanjutan', CreateAdvanced::class)->name('dashboard.events.create-advanced');
     Route::livewire('/carian-tersimpan', Index::class)->name('saved-searches.index');
     Route::livewire('/jemputan-ahli/{token}', ShowMemberInvitation::class)->name('member-invitations.show');

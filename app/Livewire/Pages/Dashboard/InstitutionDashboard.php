@@ -67,6 +67,8 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
     #[Url(as: 'event_per_page', except: 8)]
     public int $eventPerPage = 8;
 
+    public bool $eventListPage = false;
+
     public string $newMemberEmail = '';
 
     public string $newMemberRoleId = '';
@@ -77,6 +79,8 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
 
     public function mount(): void
     {
+        $this->eventListPage = request()->routeIs('dashboard.institutions.events');
+
         $user = auth()->user();
 
         abort_unless($user instanceof User, 403);
@@ -294,13 +298,28 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
         }
 
         return $this->availableInstitutionsQuery($user)
+            ->with('media')
             ->withCount([
                 'events',
+                'members',
+                'followers',
                 'events as public_events_count' => function (Builder $query): void {
                     $query
                         ->where('events.is_active', true)
                         ->whereIn('events.status', Event::PUBLIC_STATUSES)
-                        ->where('events.visibility', EventVisibility::Public);
+                        ->where('events.visibility', EventVisibility::Public->value);
+                },
+                'events as upcoming_events_count' => function (Builder $query): void {
+                    $query
+                        ->whereNotNull('events.starts_at')
+                        ->where('events.starts_at', '>=', now())
+                        ->where('events.starts_at', '<=', now()->addDays(30));
+                },
+                'events as draft_events_count' => function (Builder $query): void {
+                    $query->where('events.status', 'draft');
+                },
+                'events as pending_events_count' => function (Builder $query): void {
+                    $query->whereIn('events.status', ['pending', 'needs_changes']);
                 },
             ])
             ->orderBy('name')
@@ -328,7 +347,7 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
     }
 
     /**
-     * @return array{events_count:int,public_events_count:int,internal_events_count:int}
+     * @return array{events_count:int,public_events_count:int,internal_events_count:int,upcoming_events_count:int,draft_events_count:int,pending_events_count:int,members_count:int,followers_count:int,registrations_count:int}
      */
     #[Computed]
     public function institutionStats(): array
@@ -340,17 +359,83 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
                 'events_count' => 0,
                 'public_events_count' => 0,
                 'internal_events_count' => 0,
+                'upcoming_events_count' => 0,
+                'draft_events_count' => 0,
+                'pending_events_count' => 0,
+                'members_count' => 0,
+                'followers_count' => 0,
+                'registrations_count' => 0,
             ];
         }
 
         $totalEvents = (int) ($institution->events_count ?? 0);
         $publicEvents = (int) ($institution->public_events_count ?? 0);
+        $registrationsCount = (int) Event::query()
+            ->where('institution_id', $institution->id)
+            ->sum('registrations_count');
 
         return [
             'events_count' => $totalEvents,
             'public_events_count' => $publicEvents,
             'internal_events_count' => max($totalEvents - $publicEvents, 0),
+            'upcoming_events_count' => (int) ($institution->upcoming_events_count ?? 0),
+            'draft_events_count' => (int) ($institution->draft_events_count ?? 0),
+            'pending_events_count' => (int) ($institution->pending_events_count ?? 0),
+            'members_count' => (int) ($institution->members_count ?? 0),
+            'followers_count' => (int) ($institution->followers_count ?? 0),
+            'registrations_count' => $registrationsCount,
         ];
+    }
+
+    /**
+     * @return Collection<int, Event>
+     */
+    #[Computed]
+    public function recentInstitutionEvents(): Collection
+    {
+        $institution = $this->selectedInstitution();
+
+        if (! $institution instanceof Institution) {
+            return collect();
+        }
+
+        $upcomingEvents = $this->institutionEventCardQuery($institution)
+            ->whereNotNull('starts_at')
+            ->where('starts_at', '>=', now())
+            ->orderBy('starts_at')
+            ->limit(7)
+            ->get();
+
+        if ($upcomingEvents->isNotEmpty()) {
+            return $upcomingEvents;
+        }
+
+        return $this->institutionEventCardQuery($institution)
+            ->orderByDesc('starts_at')
+            ->orderBy('title')
+            ->limit(7)
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, Event>
+     */
+    #[Computed]
+    public function pendingInstitutionEvents(): Collection
+    {
+        $institution = $this->selectedInstitution();
+
+        if (! $institution instanceof Institution) {
+            return collect();
+        }
+
+        return $this->applyDashboardEventFilters($this->institutionEventCardQuery($institution))
+            ->whereIn('status', ['pending', 'needs_changes'])
+            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+            ->orderBy('starts_at')
+            ->orderBy('title')
+            ->limit(2)
+            ->get();
     }
 
     /**
@@ -612,6 +697,51 @@ class InstitutionDashboard extends Component implements HasForms, HasTable
     protected function availableInstitutionsQuery(User $user): BelongsToMany
     {
         return $user->institutions();
+    }
+
+    /**
+     * @return Builder<Event>
+     */
+    protected function institutionEventCardQuery(Institution $institution): Builder
+    {
+        return Event::query()
+            ->where('institution_id', $institution->id)
+            ->with([
+                'institution.media',
+                'media',
+                'space:id,name',
+                'venue:id,name',
+            ])
+            ->withCount(['registrations as dashboard_registrations_count']);
+    }
+
+    /**
+     * @param  Builder<Event>  $query
+     * @return Builder<Event>
+     */
+    protected function applyDashboardEventFilters(Builder $query): Builder
+    {
+        $search = mb_strtolower(trim($this->eventSearch));
+
+        if ($search !== '') {
+            $search = '%'.$search.'%';
+
+            $query->where(function (Builder $builder) use ($search): void {
+                $builder
+                    ->whereRaw('LOWER(title) LIKE ?', [$search])
+                    ->orWhereHas('venue', fn (Builder $venueQuery) => $venueQuery->whereRaw('LOWER(name) LIKE ?', [$search]));
+            });
+        }
+
+        if ($this->eventStatus !== 'all') {
+            $query->where('status', $this->eventStatus);
+        }
+
+        if ($this->eventVisibility !== 'all') {
+            $query->where('visibility', $this->eventVisibility);
+        }
+
+        return $query;
     }
 
     protected function selectedInstitutionSupportsScopedSubmission(): bool

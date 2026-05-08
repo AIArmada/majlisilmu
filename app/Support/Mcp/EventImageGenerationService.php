@@ -44,15 +44,19 @@ class EventImageGenerationService
         $target = $this->targetFromPayload($payload);
         $maxReferenceMedia = max(0, min(8, (int) ($options['max_reference_media'] ?? 6)));
         $attachments = $this->attachments($result['content_media'], $maxReferenceMedia);
+        $provider = $this->generationProvider();
+        $model = $this->generationModel();
+        $quality = $this->generationQuality();
+        $timeout = $this->generationTimeout();
 
         $pendingImage = Image::of((string) $payload['prompt'])
             ->attachments($attachments)
-            ->quality('high')
-            ->timeout(120);
+            ->quality($quality)
+            ->timeout($timeout);
 
         $imageResponse = $target['collection'] === 'poster'
-            ? $pendingImage->portrait()->generate()
-            : $pendingImage->landscape()->generate();
+            ? $pendingImage->portrait()->generate($provider, $model)
+            : $pendingImage->landscape()->generate($provider, $model);
 
         $normalizedImage = $this->normalizeToTargetRatio(
             contents: (string) $imageResponse,
@@ -68,6 +72,7 @@ class EventImageGenerationService
             attachmentCount: count($attachments),
             provider: $imageResponse->meta->provider,
             model: $imageResponse->meta->model,
+            quality: $quality,
         );
 
         $attachedMediaIds = collect(array_slice($result['content_media'], 0, $maxReferenceMedia))
@@ -87,7 +92,7 @@ class EventImageGenerationService
         $payload['generation'] = [
             'provider' => $imageResponse->meta->provider,
             'model' => $imageResponse->meta->model,
-            'quality' => 'high',
+            'quality' => $quality,
             'requested_ai_size' => $target['ai_size'],
             'normalized_mime_type' => $normalizedImage['mime_type'],
             'attached_reference_media_count' => count($attachments),
@@ -223,6 +228,7 @@ class EventImageGenerationService
         int $attachmentCount,
         ?string $provider,
         ?string $model,
+        string $quality,
     ): Media {
         $fileName = $this->generatedFileName($event, $target['collection'], $image['extension']);
 
@@ -243,6 +249,7 @@ class EventImageGenerationService
                     'prompt_sha256' => hash('sha256', $prompt),
                     'provider' => $provider,
                     'model' => $model,
+                    'quality' => $quality,
                     'attached_reference_media_count' => $attachmentCount,
                 ],
             ])
@@ -392,5 +399,43 @@ class EventImageGenerationService
                 'preview' => $media->getAvailableUrl(['preview']),
             ],
         ];
+    }
+
+    private function generationProvider(): string
+    {
+        $provider = config('ai.features.event_cover_generation.provider', 'openai');
+
+        return is_string($provider) && trim($provider) !== ''
+            ? trim($provider)
+            : 'openai';
+    }
+
+    private function generationModel(): string
+    {
+        $model = config('ai.features.event_cover_generation.model', 'gpt-image-2');
+
+        return is_string($model) && trim($model) !== ''
+            ? trim($model)
+            : 'gpt-image-2';
+    }
+
+    private function generationQuality(): string
+    {
+        $quality = config('ai.features.event_cover_generation.quality', 'low');
+
+        if (! is_string($quality)) {
+            return 'low';
+        }
+
+        $quality = trim($quality);
+
+        return in_array($quality, ['low', 'medium', 'high'], true) ? $quality : 'low';
+    }
+
+    private function generationTimeout(): int
+    {
+        $timeout = config('ai.features.event_cover_generation.timeout', 120);
+
+        return max(1, (int) $timeout);
     }
 }

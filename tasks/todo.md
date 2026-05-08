@@ -1,3 +1,89 @@
+# Institution Dashboard Majlis List Split
+
+- [x] Audit current institution dashboard wording, event-list placement, route usage, and dashboard tests
+- [x] Add a dedicated institution `Senarai Majlis` page and route
+- [x] Remove the full `Senarai Majlis` table from the overview dashboard while keeping member management there
+- [x] Rename dashboard-facing `program` wording to `majlis`
+- [x] Change the dashboard `Majlis` preview to show 7 nearest events and link `Lihat semua majlis` to the dedicated list page
+- [x] Update focused dashboard route/UI tests and run verification
+
+## Review
+
+- Changes:
+  - Added `/dashboard/institusi/senarai-majlis` as the dedicated institution majlis list page, while keeping `/dashboard/institusi` as the overview and `/dashboard/institusi/tambah-majlis` as the add-majlis form route.
+  - Moved the Filament event table and table assets to the dedicated list page only.
+  - Renamed institution-dashboard program wording to majlis and changed the overview `Majlis` section to show the 7 nearest upcoming institution events.
+  - Linked both `Lihat semua majlis` entry points to the dedicated `Senarai Majlis` page and added high-signal Signals tracking for that navigation intent.
+  - Updated English and Malay locale strings so dashboard-facing old program keys now render as majlis wording.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => 30 passed, 309 assertions
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `php artisan view:clear` and `php artisan view:cache` => pass
+  - `npm run build` => pass
+  - `php artisan route:list --path=dashboard/institusi` => `/dashboard/institusi`, `/dashboard/institusi/senarai-majlis`, and `/dashboard/institusi/tambah-majlis`
+  - Locale JSON parse check for `en`, `ms`, and `ms_MY` => pass
+  - `git diff --check` => pass
+  - DB safety scans for constraints/cascades and SoftDeletes in `database` and `app/Models` => no matches; no `packages/*/database` directories exist.
+  - Browser smoke: unauthenticated local route access redirects to login as expected; authenticated dashboard rendering is covered by the feature tests.
+
+# Institution Dashboard Route and Visual Refresh
+
+- [x] Audit the current `/dashboard/institusi` route, Livewire component, Blade view, and regression coverage
+- [x] Change the institution-scoped event submission URL from `/dashboard/institusi/hantar-majlis` to `/dashboard/institusi/tambah-majlis`
+- [x] Add lightweight institution dashboard summary data for the redesigned page
+- [x] Redesign `/dashboard/institusi` using the provided mobile dashboard image as visual direction while preserving event table and member workflows
+- [x] Update focused dashboard tests and route assertions
+- [x] Run focused Pest, formatter/static checks where practical, and record review notes
+
+## Review
+
+- Changes:
+  - Renamed the institution-scoped event creation route to `/dashboard/institusi/tambah-majlis` while keeping the existing `dashboard.institutions.submit-event` route name.
+  - Redesigned `/dashboard/institusi` around the provided reference direction: hero selector, operational KPI tiles, recent programs, pending review cards, primary add-event CTA, summary stats, event table, and member management.
+  - Added selected-institution dashboard counts and event highlight queries, with highlight queries respecting active event search/status/visibility filters and hiding on later table pages.
+  - Added frontend Signals tracking for the institution dashboard add-event CTA because the redesign changes the primary event-submission entry point.
+  - Added English and Malay locale strings for the new dashboard labels.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/DashboardPagesTest.php` => 29 passed, 276 assertions
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `php artisan view:clear && php artisan view:cache` => pass
+  - `npm run build` => pass
+  - `php artisan route:list --path=dashboard/institusi` => only `/dashboard/institusi` and `/dashboard/institusi/tambah-majlis`
+  - Locale JSON parse check for `en`, `ms`, and `ms_MY` => pass
+  - `git diff --check` => pass
+  - DB safety scans for constraints/cascades and SoftDeletes => no matches; package database scan skipped because no `packages` directory exists.
+
+# Admin Event AI Cover Generation
+
+- [x] Inspect existing MCP event image prompt/generation code, media handling, and AI usage ledger
+- [x] Configure event cover generation to use OpenAI `gpt-image-2` with low quality
+- [x] Add admin Filament record and bulk actions for event cover generation
+- [x] Add/adjust AI usage cost pricing so generated covers calculate image cost
+- [x] Add focused regression coverage for service settings, Filament actions, and cost calculation
+- [x] Run focused Pest, PHPStan, formatter, DB safety scans, and record review notes
+
+## Review
+
+- Changes:
+  - Added event cover generation settings and `.env.example` entries for OpenAI `gpt-image-2` at `low` quality, using the existing MCP event image prompt builder and Laravel AI image generation pipeline.
+  - Added admin event table record and bulk actions to generate cover images, with optional creative direction and existing-media references.
+  - Persisted generated images to the Event `cover` media collection with generation metadata and added backend Signals tracking for confirmed admin cover-generation outcomes.
+  - Added OpenAI `gpt-image-2` per-image pricing fallback so `AiUsageLog` records image-generation cost even when token usage is absent.
+  - Fixed the existing `PreNominal::PU` PHPStan exhaustiveness gap in speaker sort-order matching.
+- Verification:
+  - `vendor/bin/pest --parallel --compact tests/Feature/AdminEventsResourceTest.php` => 17 passed, 114 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/AiUsageLoggingTest.php` => 4 passed, 48 assertions
+  - `vendor/bin/pest --parallel --compact tests/Feature/Mcp/EventImageGenerationToolTest.php --filter='uses storage-backed image attachments instead of remote url attachments|embeds reference urls and title-driven ambience guidance in generated prompt text'` => 2 passed, 12 assertions
+  - `vendor/bin/phpstan analyse --ansi` => pass
+  - `vendor/bin/pint --dirty --test --format=agent` => pass
+  - `git diff --check` => pass
+  - DB safety scans for constraints/cascades and SoftDeletes => no matches; `packages/` database scan skipped because no `packages` directory exists.
+  - Full `vendor/bin/pest --parallel --compact` after log cleanup: 2013 passed, 1 skipped, and 3 reproducible failures remain outside the modified feature files in `SignalsIntegrationTest`, `HomepageRendersContentTest`, and `McpGuideTest`; the prior media temp failure was caused by the machine having ~211 MB free and passed on focused rerun after truncating logs.
+
+---
+
 # Full Quality Suite Fix
 
 - [x] Record full-suite plan and current baseline

@@ -143,6 +143,13 @@ return [
                 'image/webp',
             ],
         ],
+        'event_cover_generation' => [
+            'provider' => env('AI_EVENT_COVER_GENERATION_PROVIDER', 'openai'),
+            'model' => env('AI_EVENT_COVER_GENERATION_MODEL', 'gpt-image-2'),
+            'quality' => env('AI_EVENT_COVER_GENERATION_QUALITY', 'low'),
+            'timeout' => (int) env('AI_EVENT_COVER_GENERATION_TIMEOUT', 120),
+            'max_reference_media' => (int) env('AI_EVENT_COVER_GENERATION_MAX_REFERENCE_MEDIA', 6),
+        ],
     ],
 
     /*
@@ -160,7 +167,13 @@ return [
     'usage_tracking' => [
         'enabled' => (bool) env('AI_USAGE_TRACKING_ENABLED', true),
         'currency' => env('AI_USAGE_TRACKING_CURRENCY', 'USD'),
-        'pricing' => [],
+        'pricing' => [
+            'openai' => [
+                'gpt-image-2*' => [
+                    'per_image' => (float) env('AI_OPENAI_GPT_IMAGE_2_LOW_LANDSCAPE_PER_IMAGE_USD', 0.005),
+                ],
+            ],
+        ],
     ],
 
 ];

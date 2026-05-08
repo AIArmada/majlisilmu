@@ -39,12 +39,17 @@ it('requires authentication for user and institution dashboards', function () {
     expect(route('dashboard'))->toEndWith('/dashboard');
     expect(route('dashboard.account-settings'))->toEndWith('/tetapan-akaun');
     expect(route('dashboard.institutions'))->toEndWith('/dashboard/institusi');
+    expect(route('dashboard.institutions.events'))->toEndWith('/dashboard/institusi/senarai-majlis');
+    expect(route('dashboard.institutions.submit-event'))->toEndWith('/dashboard/institusi/tambah-majlis');
 
     $this->get('/papan-pemuka')->assertNotFound();
     $this->get('/dashboard')->assertRedirect(route('login'));
     $this->get('/dashboard/notifications')->assertRedirect(route('login'));
     $this->get('/tetapan-akaun')->assertRedirect(route('login'));
     $this->get('/dashboard/institusi')->assertRedirect(route('login'));
+    $this->get('/dashboard/institusi/senarai-majlis')->assertRedirect(route('login'));
+    $this->get('/dashboard/institusi/tambah-majlis')->assertRedirect(route('login'));
+    $this->get('/dashboard/institusi/hantar-majlis')->assertNotFound();
     $this->get(route('dashboard.events.create-advanced'))->assertRedirect(route('login'));
 });
 
@@ -526,14 +531,73 @@ it('renders the institution dashboard picker as a plain selector without search 
         ->assertSee('Masjid Flux Pilihan');
 });
 
-it('loads filament table assets after the core filament scripts on the institution dashboard', function () {
+it('shows seven nearest majlis on the institution dashboard and links to the dedicated event list', function () {
+    $user = User::factory()->create();
+    $institution = Institution::factory()->create(['name' => 'Masjid Senarai Majlis']);
+    $otherInstitution = Institution::factory()->create(['name' => 'Masjid Luar']);
+
+    $user->institutions()->attach($institution->id);
+
+    foreach (range(1, 8) as $index) {
+        Event::factory()->for($institution)->create([
+            'title' => sprintf('Majlis Terdekat %02d', $index),
+            'status' => 'approved',
+            'visibility' => 'public',
+            'starts_at' => now()->addDays($index),
+        ]);
+    }
+
+    Event::factory()->for($otherInstitution)->create([
+        'title' => 'Majlis Institusi Luar',
+        'status' => 'approved',
+        'visibility' => 'public',
+        'starts_at' => now()->addDay(),
+    ]);
+
+    $eventsUrl = route('dashboard.institutions.events', ['institution' => $institution->id]);
+
+    $dashboardResponse = $this->withSession(['locale' => 'ms'])
+        ->actingAs($user)
+        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
+
+    $dashboardResponse->assertOk()
+        ->assertSee('Majlis')
+        ->assertSee('Lihat semua majlis')
+        ->assertSee($eventsUrl, false)
+        ->assertSeeInOrder([
+            'Majlis Terdekat 01',
+            'Majlis Terdekat 02',
+            'Majlis Terdekat 03',
+            'Majlis Terdekat 04',
+            'Majlis Terdekat 05',
+            'Majlis Terdekat 06',
+            'Majlis Terdekat 07',
+        ])
+        ->assertDontSee('Majlis Terdekat 08')
+        ->assertDontSee('Majlis Institusi Luar')
+        ->assertDontSee('Program Saya')
+        ->assertDontSee('Program Akan Datang')
+        ->assertDontSee('Jumlah Program')
+        ->assertDontSee('/js/filament/tables/tables.js', false);
+
+    $eventsResponse = $this->withSession(['locale' => 'ms'])
+        ->actingAs($user)
+        ->get($eventsUrl);
+
+    $eventsResponse->assertOk()
+        ->assertSee('Senarai Majlis')
+        ->assertSee('Majlis Terdekat 08')
+        ->assertDontSee('Program Saya');
+});
+
+it('loads filament table assets after the core filament scripts on the institution event list page', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create(['name' => 'Masjid Table Assets']);
 
     $institution->members()->syncWithoutDetaching([$user->id]);
 
     $response = $this->actingAs($user)
-        ->get(route('dashboard.institutions', ['institution' => $institution->id]));
+        ->get(route('dashboard.institutions.events', ['institution' => $institution->id]));
 
     $response->assertOk()
         ->assertSee('/js/filament/support/support.js', false)
@@ -616,7 +680,7 @@ it('shows institution profile and events for members without a separate registra
     $eventInInstitution->references()->attach($reference->id);
 
     $parentProgram = Event::factory()->for($institution)->create([
-        'title' => 'Institution Parent Program',
+        'title' => 'Institution Parent Majlis',
         'event_structure' => EventStructure::ParentProgram->value,
         'status' => 'draft',
         'visibility' => 'public',
@@ -647,15 +711,39 @@ it('shows institution profile and events for members without a separate registra
 
     $response->assertOk()
         ->assertSee('Masjid Al-Ikhlas')
-        ->assertSee('Event List')
-        ->assertSee('Submit Event')
-        ->assertDontSee('Create Advanced Program')
+        ->assertSee('Manage Institution')
+        ->assertSee('Majlis')
+        ->assertSee('View all majlis')
+        ->assertSee('Waiting Review')
+        ->assertSee('Summary Statistics')
+        ->assertSee('Add Event')
+        ->assertDontSee('Create Advanced Majlis')
         ->assertSee('Members & Roles')
+        ->assertSee('Institution Dashboard Event')
+        ->assertDontSee('Event List')
+        ->assertDontSee('Ustaz Dashboard Speaker')
+        ->assertDontSee('Kitab Dashboard Reference')
+        ->assertDontSee('Add Child Event')
+        ->assertDontSee('Event Registrations')
+        ->assertDontSee('Registrations (All)')
+        ->assertDontSee('Ahmad Registrant')
+        ->assertDontSee('Outside Institution Event')
+        ->assertDontSee('External Registrant');
+
+    $response->assertDontSee('/js/filament/tables/tables.js', false);
+
+    $eventsResponse = $this->withSession(['locale' => 'en'])
+        ->actingAs($user)
+        ->get(route('dashboard.institutions.events', ['institution' => $institution->id]));
+
+    $eventsResponse->assertOk()
+        ->assertSee('Masjid Al-Ikhlas')
+        ->assertSee('Event List')
         ->assertSee('Speakers')
         ->assertSee('References')
         ->assertSee('Location')
         ->assertSee('Institution Dashboard Event')
-        ->assertSee('Institution Parent Program')
+        ->assertSee('Institution Parent Majlis')
         ->assertSee('Ustaz Dashboard Speaker')
         ->assertSee('Kitab Dashboard Reference')
         ->assertSee('Dewan Utama Institusi')
@@ -666,9 +754,10 @@ it('shows institution profile and events for members without a separate registra
         ->assertDontSee('Outside Institution Event')
         ->assertDontSee('External Registrant');
 
+    $response->assertSee(e(route('dashboard.institutions.events', ['institution' => $institution->id])), false);
     $response->assertSee(e(route('dashboard.institutions.submit-event', ['institution' => $institution->id])), false);
-    $response->assertSee(e(route('dashboard.institutions.submit-event', ['institution' => $institution->id, 'duplicate' => $eventInInstitution->id])), false);
-    $response->assertSee(e(route('submit-event.create', ['parent' => $parentProgram->id])), false);
+    $eventsResponse->assertSee(e(route('dashboard.institutions.submit-event', ['institution' => $institution->id, 'duplicate' => $eventInInstitution->id])), false);
+    $eventsResponse->assertSee(e(route('submit-event.create', ['parent' => $parentProgram->id])), false);
 });
 
 it('only shows duplicate event links on the institution dashboard to users who can update the event', function () {
@@ -759,7 +848,7 @@ it('hides scoped submit and duplicate links for inactive institution dashboards'
         ->assertForbidden();
 });
 
-it('renders institution dashboard event dates with translated times or prayer labels', function () {
+it('renders institution event list dates with translated times or prayer labels', function () {
     $user = User::factory()->create([
         'timezone' => 'Asia/Kuala_Lumpur',
     ]);
@@ -800,7 +889,7 @@ it('renders institution dashboard event dates with translated times or prayer la
 
     $this->withSession(['locale' => 'ms'])
         ->actingAs($user)
-        ->get(route('dashboard.institutions', ['institution' => $institution->id]))
+        ->get(route('dashboard.institutions.events', ['institution' => $institution->id]))
         ->assertOk()
         ->assertSee($expectedAbsoluteLabel)
         ->assertSee($expectedPrayerLabel);
@@ -825,10 +914,10 @@ it('highlights institution events that are waiting approval', function () {
 
     $response->assertOk()
         ->assertSee('Pending Institution Dashboard Event')
-        ->assertSee('Pending Approval');
+        ->assertSee('Pending');
 });
 
-it('filters and sorts institution events on the dashboard', function () {
+it('filters and sorts institution events on the dedicated event list page', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create(['name' => 'Masjid Tapis Majlis']);
     $otherInstitution = Institution::factory()->create();
@@ -869,7 +958,7 @@ it('filters and sorts institution events on the dashboard', function () {
 
     $filteredResponse = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
-        ->get(route('dashboard.institutions', [
+        ->get(route('dashboard.institutions.events', [
             'institution' => $institution->id,
             'event_search' => 'alpha',
             'event_status' => 'pending',
@@ -884,7 +973,7 @@ it('filters and sorts institution events on the dashboard', function () {
 
     $sortedResponse = $this->withSession(['locale' => 'en'])
         ->actingAs($user)
-        ->get(route('dashboard.institutions', [
+        ->get(route('dashboard.institutions.events', [
             'institution' => $institution->id,
             'event_sort' => 'title_asc',
         ]));
@@ -899,6 +988,7 @@ it('filters and sorts institution events on the dashboard', function () {
     $tableTest = Livewire::withQueryParams(['institution' => $institution->id])
         ->actingAs($user)
         ->test(InstitutionDashboard::class)
+        ->set('eventListPage', true)
         ->assertTableColumnExists('title')
         ->assertTableColumnExists('starts_at')
         ->assertTableColumnExists('status')
@@ -926,6 +1016,7 @@ it('filters and sorts institution events on the dashboard', function () {
     Livewire::withQueryParams(['institution' => $institution->id])
         ->actingAs($user)
         ->test(InstitutionDashboard::class)
+        ->set('eventListPage', true)
         ->sortTable('title', 'asc')
         ->assertCanSeeTableRecords([$alphaEvent, $betaEvent, $zuluEvent], true)
         ->assertCanNotSeeTableRecords([$outsideEvent]);
@@ -933,6 +1024,7 @@ it('filters and sorts institution events on the dashboard', function () {
     Livewire::withQueryParams(['institution' => $institution->id])
         ->actingAs($user)
         ->test(InstitutionDashboard::class)
+        ->set('eventListPage', true)
         ->set('eventSort', 'pending_first')
         ->assertCanSeeTableRecords([$alphaEvent, $betaEvent, $zuluEvent], true)
         ->assertCanNotSeeTableRecords([$outsideEvent]);
@@ -940,12 +1032,13 @@ it('filters and sorts institution events on the dashboard', function () {
     Livewire::withQueryParams(['institution' => $institution->id])
         ->actingAs($user)
         ->test(InstitutionDashboard::class)
+        ->set('eventListPage', true)
         ->set('eventSort', 'registrations_desc')
         ->assertCanSeeTableRecords([$zuluEvent, $betaEvent, $alphaEvent], true)
         ->assertCanNotSeeTableRecords([$outsideEvent]);
 });
 
-it('paginates institution events on the dashboard', function () {
+it('paginates institution events on the dedicated event list page', function () {
     $user = User::factory()->create();
     $institution = Institution::factory()->create(['name' => 'Masjid Paginate']);
 
@@ -963,7 +1056,7 @@ it('paginates institution events on the dashboard', function () {
     }
 
     $pageOne = $this->actingAs($user)
-        ->get(route('dashboard.institutions', [
+        ->get(route('dashboard.institutions.events', [
             'institution' => $institution->id,
             'event_sort' => 'title_asc',
             'event_per_page' => 8,
@@ -989,7 +1082,7 @@ it('paginates institution events on the dashboard', function () {
         ->and($paginationInstance->getTable()->hasExtremePaginationLinks())->toBeTrue();
 
     $pageTwo = $this->actingAs($user)
-        ->get(route('dashboard.institutions', [
+        ->get(route('dashboard.institutions.events', [
             'institution' => $institution->id,
             'event_sort' => 'title_asc',
             'event_per_page' => 8,
